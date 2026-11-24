@@ -293,12 +293,16 @@ export function offerFor(
     // The related entry names the day, time and place (Q4 G5): "Shall I book Bandra Sunday food
     // drive on Sun 29 Nov, 11:00 at Bandra West station (1 place)?", never "book 0 on…".
     if (a.when || a.where) {
-      const what = [a.title, ...a.details].filter(Boolean).join(', ');
+      // BT1: the time is named once. An appointment's title is its slot's time, which "on {when}"
+      // already says ("Shall I book Sat 28 Nov 2026, 10:00, Antenatal check-up on Sat 28 Nov…").
+      const named = [a.title, ...a.details].filter(
+        (v) => v && !(a.when && a.when.includes(v)),
+      );
       return {
         key,
         questions: {
-          en: `Shall I book ${what}${whenWhere(a)}${forWhom}?`,
-          hi: `क्या मैं ${forWhomHi}${what}${whenWhereHi(a)} बुक कर दूँ?`,
+          en: `Shall I book ${named.join(', ') || 'this'}${whenWhere(a)}${forWhom}?`,
+          hi: `क्या मैं ${forWhomHi}${named.join(', ') || 'यह'}${whenWhereHi(a)} बुक कर दूँ?`,
         },
       };
     }

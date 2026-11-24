@@ -107,12 +107,46 @@ export class ActionsService {
     if (!firstUse) {
       return { handledBy: WaHandledBy.TAP, body: words.already };
     }
+    if (claims.kind === 'choose' && claims.fill) {
+      const proposed = await this.propose(turn, claims.fill);
+      if (proposed) return proposed;
+    }
     if (claims.kind === 'keep') {
       await this.consent?.consume(turn.chatbot.id, turn.conversationId ?? '');
       return { handledBy: WaHandledBy.TAP, body: words.kept };
     }
     // choose, change, cancel, move, ask: the agent answers the words the tap stands for.
     return null;
+  }
+
+  /** A chip that completes a waiting write: its card next (no model), else the agent answers. */
+  private async propose(
+    turn: ChatTurn,
+    fill: { tool: string; input: Record<string, string | number> },
+  ): Promise<TapDecision | null> {
+    const conversationId = turn.conversationId ?? '';
+    const out = await this.gateway.proposeWrite(
+      {
+        chatbotId: turn.chatbot.id,
+        conversationId,
+        contactId: turn.contactId ?? null,
+      },
+      fill.tool,
+      fill.input,
+    );
+    const question = (out.result as { question?: string } | undefined)
+      ?.question;
+    if (out.ok || out.error !== 'needs_confirmation' || !question) return null;
+    return {
+      handledBy: WaHandledBy.TAP,
+      body: question,
+      agent: {
+        runtime: AgentRuntimeUsed.V2,
+        runId: out.runId,
+        conversationId,
+        trace: [],
+      },
+    };
   }
 
   private async confirm(
@@ -197,16 +231,30 @@ export class ActionsService {
       };
     }
     const free = (result.passages ?? []).filter((p) => p.record_id);
+    const reason = plainReason(result.message);
     return {
       handledBy: WaHandledBy.TAP,
       body: free.length
         ? words.taken
-        : result.message
-          ? fillCopy(words.refused, { reason: result.message })
-          : words.expired,
+        : reason
+          ? fillCopy(words.refused, { reason })
+          : words.refusedPlain,
       agent: ref,
     };
   }
+}
+
+/**
+ * A refusal's reason as a person can read it, or null: never an error code, a field or option key
+ * ("no_show"), or a line written for the agent ("Not done yet: ask which…").
+ */
+export function plainReason(message: string | null | undefined): string | null {
+  const text = (message ?? '').trim();
+  if (!text || !/\s/.test(text)) return null;
+  if (/\b[a-z0-9]+_[a-z0-9_]+\b/i.test(text)) return null;
+  if (/[{}<>]|\bask (which|the person|them)\b|^not done yet/i.test(text))
+    return null;
+  return text;
 }
 
 /** "Sun 29 Nov 2026, 11:00, Bandra West station": the card's when and where, else its title. */

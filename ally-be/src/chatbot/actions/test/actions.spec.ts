@@ -11,7 +11,7 @@ import {
 } from '../../agent-tools/test/agent-tools.fakes';
 import { ActionPartsService, entryCard } from '../action-parts.service';
 import { ActionTokenService, type ActionClaims } from '../action-token.service';
-import { ActionsService } from '../actions.service';
+import { ActionsService, plainReason } from '../actions.service';
 
 /** Redis as the action tokens use it: get, set and SET NX over a Map. */
 const redis = () => {
@@ -529,5 +529,134 @@ describe('ActionPartsService (BT1: chips and cards from tool results, never from
         text: 'id: x\nDocuments: Aadhaar',
       }).details,
     ).toEqual([{ label: 'Documents', value: 'Aadhaar' }]);
+  });
+});
+
+describe('a refusal said plainly (BT1)', () => {
+  it('shows a sentence a person can read, never a code, a key or a line for the agent', () => {
+    expect(plainReason('Sun 29 Nov drive is full.')).toBe(
+      'Sun 29 Nov drive is full.',
+    );
+    expect(plainReason('capacity_full')).toBeNull();
+    expect(plainReason("Status can't go from booked to no_show.")).toBeNull();
+    expect(
+      plainReason('Not done yet: ask which service this is for (A, B).'),
+    ).toBeNull();
+    expect(plainReason('')).toBeNull();
+  });
+});
+
+describe('a chip tapped after earlier answers keeps them (BT1, 91Springboard)', () => {
+  // Tara gave her name and picked Sat 28 Nov, 10:00; the booking waited for its service.
+  const waiting = {
+    tool: 'create_appointments',
+    input: { slot: 'slot-sat-10', person_name: 'Tara Test' },
+    status: 'error',
+    error_code: 'missing_detail',
+    result: {
+      field: 'service',
+      choice: { label: 'Service', options: ['Day pass', 'Virtual office'] },
+    },
+  };
+
+  it('the service chip carries the waiting booking with the service filled in', async () => {
+    const r = redis();
+    const tokens = new ActionTokenService(appConfig(), r as never);
+    const parts = new ActionPartsService(
+      { query: jest.fn(async () => [waiting]) } as never,
+      tokens,
+      {} as never,
+      { current: jest.fn() } as never,
+    );
+    const out = await parts.partsFor({
+      ...where,
+      runId: 'run-1',
+      language: 'en',
+      suppressed: false,
+      answered: false,
+    });
+    const chip = out.choices!.options[0];
+    expect(chip.label).toBe('Day pass');
+    expect(await tokens.redeem(chip.token, where)).toMatchObject({
+      ok: true,
+      claims: {
+        kind: 'choose',
+        fill: {
+          tool: 'create_appointments',
+          input: {
+            slot: 'slot-sat-10',
+            person_name: 'Tara Test',
+            service: 'Day pass',
+          },
+        },
+      },
+    });
+  });
+
+  it('tapping it proposes that booking in code: the card next, never "which city?"', async () => {
+    const gateway = {
+      proposeWrite: jest.fn().mockResolvedValue({
+        ok: false,
+        error: 'needs_confirmation',
+        replayed: false,
+        runId: 'run-proposed',
+        result: {
+          question:
+            'Shall I book Day pass on Sat 28 Nov 2026, 10:00 for Tara Test?',
+        },
+      }),
+    };
+    const service = new ActionsService(
+      gateway as never,
+      {} as never,
+      {} as never,
+    );
+    const decision = await service.perform({
+      chatbot: { id: BOT_A },
+      conversationId: CONV_A,
+      contactId: CONTACT,
+      text: 'Day pass',
+      tap: {
+        ok: true,
+        firstUse: true,
+        claims: {
+          kind: 'choose',
+          text: 'Day pass',
+          ...where,
+          fill: {
+            tool: 'create_appointments',
+            input: {
+              slot: 'slot-sat-10',
+              person_name: 'Tara Test',
+              service: 'Day pass',
+            },
+          },
+        },
+      },
+    } as never);
+    expect(gateway.proposeWrite).toHaveBeenCalledWith(
+      where,
+      'create_appointments',
+      { slot: 'slot-sat-10', person_name: 'Tara Test', service: 'Day pass' },
+    );
+    expect(decision).toMatchObject({
+      handledBy: WaHandledBy.TAP,
+      body: 'Shall I book Day pass on Sat 28 Nov 2026, 10:00 for Tara Test?',
+      agent: { runId: 'run-proposed' },
+    });
+  });
+
+  it('the gateway proposes without writing: no consent on the run', async () => {
+    const tool = new RecordingTool('note_it');
+    tool.outcome = {
+      ok: false,
+      error: 'needs_confirmation',
+      result: { question: 'Shall I?' },
+    };
+    const { gateway, db } = makeGateway([tool]);
+    db.bots.set(BOT_A, { abilities: { note_it: 'do_it' } as never });
+    const out = await gateway.proposeWrite(where, 'note_it', { note: 'x' });
+    expect(out).toMatchObject({ ok: false, error: 'needs_confirmation' });
+    expect(tool.calls[0].ctx.consentOfferId).toBeNull();
   });
 });

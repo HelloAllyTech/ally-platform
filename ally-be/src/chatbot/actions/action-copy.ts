@@ -142,8 +142,10 @@ export const TAP_REPLY: Record<
     notYours: string;
     /** A second tap on something already done. */
     already: string;
-    /** The write was refused for another reason (a rule). */
+    /** The write was refused for another reason (a rule), said plainly. */
     refused: string;
+    /** Refused, with no reason a person can read (a code or a field key): never shown. */
+    refusedPlain: string;
     /** "Keep it" on a cancel card. */
     kept: string;
   }
@@ -156,6 +158,8 @@ export const TAP_REPLY: Record<
       "That button isn't for this chat. Please type what you would like to do.",
     already: 'That is already done.',
     refused: "That couldn't be saved: {reason}",
+    refusedPlain:
+      "That couldn't be saved. Please type what you would like to do.",
     kept: 'No change: it stays as it is.',
   },
   hi: {
@@ -166,6 +170,7 @@ export const TAP_REPLY: Record<
       'यह बटन इस चैट के लिए नहीं है। कृपया लिखें कि आप क्या करना चाहते हैं।',
     already: 'यह पहले ही हो चुका है।',
     refused: 'यह सेव नहीं हो सका: {reason}',
+    refusedPlain: 'यह सेव नहीं हो सका। कृपया लिखें कि आप क्या करना चाहते हैं।',
     kept: 'कोई बदलाव नहीं: यह जैसा है वैसा ही रहेगा।',
   },
   'hi-latn': {
@@ -176,6 +181,8 @@ export const TAP_REPLY: Record<
       'Yeh button is chat ke liye nahi hai. Kripya likhein ki aap kya karna chahte hain.',
     already: 'Yeh pehle hi ho chuka hai.',
     refused: 'Yeh save nahi ho saka: {reason}',
+    refusedPlain:
+      'Yeh save nahi ho saka. Kripya likhein ki aap kya karna chahte hain.',
     kept: 'Koi badlav nahi: yeh jaisa hai waisa hi rahega.',
   },
 };

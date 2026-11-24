@@ -64,6 +64,7 @@ export const MAX_SUGGESTIONS = 3;
 
 interface ToolRunRow {
   tool: string;
+  input?: Record<string, string | number> | null;
   status: string;
   error_code: string | null;
   result: {
@@ -72,6 +73,8 @@ interface ToolRunRow {
     preview?: boolean;
     /** A booking missing a choice (the service): its options. */
     choice?: { label: string; options: string[] };
+    /** The field the choice fills. */
+    field?: string;
   } | null;
 }
 
@@ -142,10 +145,21 @@ export class ActionPartsService {
       if (missing?.result?.choice) {
         const choice = missing.result.choice;
         const options: TapButton[] = [];
+        const field = missing.result.field;
         for (const option of choice.options.slice(0, MAX_CHOICES)) {
           const b = await this.button(input, option, {
             kind: 'choose',
             text: option,
+            // The tap keeps the booking the person was making (its time, their name) and adds
+            // this choice: its card is built in code, never re-asked by the model.
+            ...(field && missing.input
+              ? {
+                  fill: {
+                    tool: missing.tool,
+                    input: { ...missing.input, [field]: option },
+                  },
+                }
+              : {}),
           });
           if (b) options.push(b);
         }
@@ -179,7 +193,7 @@ export class ActionPartsService {
 
   private async toolRuns(runId: string): Promise<ToolRunRow[]> {
     return (await this.dataSource.query(
-      `SELECT tool, status, error_code, result FROM tool_runs
+      `SELECT tool, input, status, error_code, result FROM tool_runs
         WHERE run_id = $1 ORDER BY step`,
       [runId],
     )) as ToolRunRow[];

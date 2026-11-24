@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { randomUUID } from 'crypto';
 import { v5 as uuidv5 } from 'uuid';
 import { DataSource } from 'typeorm';
 import { isServiceKey } from '../../common/util/service-key';
@@ -164,6 +165,34 @@ export class AgentGatewayService {
         (outcome.ok ? '' : ` error=${outcome.error}`),
     );
     return { ...outcome, replayed: false };
+  }
+
+  /**
+   * BT1: a chip that completes a write waiting for a choice (the service). The write is proposed
+   * through the same tool, never written: with no consent the gateway stores an offer and answers
+   * `needs_confirmation`, and the card is built from it. No model call.
+   */
+  async proposeWrite(
+    ctx: Pick<AgentToolContext, 'chatbotId' | 'conversationId' | 'contactId'>,
+    name: string,
+    input: Record<string, string | number>,
+  ): Promise<AgentGatewayResponse & { runId: string }> {
+    const runId = randomUUID();
+    const tool =
+      this.registry.get(name) ??
+      (await this.listTools.resolve(ctx.chatbotId, name));
+    if (!tool) return { ok: false, error: 'not_found', replayed: false, runId };
+    if (
+      abilityFor(await this.storedSettings(ctx.chatbotId), name) !== 'do_it'
+    ) {
+      return { ok: false, error: 'tool_off', replayed: false, runId };
+    }
+    const runCtx: AgentToolContext = { ...ctx, runId, consentOfferId: null };
+    const parsed = tool.parse(input);
+    const out = await this.execute(runCtx, 0, name, input, () =>
+      tool.run(runCtx, parsed),
+    );
+    return { ...out, runId };
   }
 
   /**

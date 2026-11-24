@@ -31,6 +31,11 @@ export interface ActionClaims {
   offer?: WriteOffer;
   /** cancel and move: the entry. */
   entryId?: string;
+  /**
+   * choose, on a write that waited for a choice (the service): the write with the choice filled
+   * in, everything else the person already gave kept. Proposed in code: its card comes next.
+   */
+  fill?: { tool: string; input: Record<string, string | number> };
 }
 
 export type RedeemFailure = 'invalid' | 'expired' | 'not_yours';
