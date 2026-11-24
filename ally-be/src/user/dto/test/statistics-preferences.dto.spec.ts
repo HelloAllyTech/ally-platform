@@ -5,6 +5,55 @@ import { UpdateUserPreferencesDto } from '../update-user-prefernces.dto';
 const errorsFor = async (body: Record<string, unknown>) =>
   validate(plainToInstance(UpdateUserPreferencesDto, body));
 
+describe('statistics_seen', () => {
+  const snap = (over: Record<string, unknown> = {}) => ({
+    at: '2026-11-24T10:00:00.000Z',
+    findings: ['courses.notStarted:abc'],
+    active: 9,
+    sessions: 218,
+    ...over,
+  });
+
+  it('accepts a current snapshot, with or without a previous one', async () => {
+    expect(await errorsFor({ statistics_seen: { current: snap() } })).toEqual(
+      [],
+    );
+    expect(
+      await errorsFor({
+        statistics_seen: { previous: snap(), current: snap() },
+      }),
+    ).toEqual([]);
+  });
+
+  it('accepts the same shape for the customers list', async () => {
+    expect(
+      await errorsFor({ statistics_seen_customers: { current: snap() } }),
+    ).toEqual([]);
+    expect(
+      await errorsFor({ statistics_seen_customers: { next: snap() } }),
+    ).not.toEqual([]);
+  });
+
+  it.each([
+    ['another slot', { next: snap() }],
+    ['a date that is not a date', { current: snap({ at: 'soon' }) }],
+    ['findings that are not strings', { current: snap({ findings: [4] }) }],
+    [
+      'too many findings',
+      {
+        current: snap({
+          findings: Array.from({ length: 41 }, (_, i) => `k${i}`),
+        }),
+      },
+    ],
+    ['a negative count', { current: snap({ active: -1 }) }],
+    ['a count that is not whole', { current: snap({ sessions: 1.5 }) }],
+    ['a list in place of the object', [snap()]],
+  ])('refuses %s', async (_label, seen) => {
+    expect(await errorsFor({ statistics_seen: seen })).not.toEqual([]);
+  });
+});
+
 describe('statistics preferences', () => {
   describe('statistics_layouts', () => {
     it('accepts a list of card keys for each view and the pins', async () => {
@@ -15,6 +64,7 @@ describe('statistics preferences', () => {
             course: [],
             learner: ['TSQ-063'],
             pins: ['TSQ-001'],
+            customers: ['reach', 'table'],
           },
         }),
       ).toEqual([]);

@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import {
   StatisticsLayoutsConstraint,
+  StatisticsSeenConstraint,
   StatisticsSubjectsConstraint,
 } from './statistics-preferences.validators';
 
@@ -82,6 +83,18 @@ export class UpdateUserPreferencesDto {
   @IsOptional()
   @Validate(StatisticsSubjectsConstraint)
   statistics_subjects?: Record<string, string>;
+
+  // What the person last saw on For you (a previous and a current snapshot), so
+  // the summary can say what changed since their last visit.
+  @IsOptional()
+  @Validate(StatisticsSeenConstraint)
+  statistics_seen?: Record<string, unknown>;
+
+  // The same for Ally staff, whose For you page is the Customers list: what they
+  // last saw there, so the summary can say what changed since.
+  @IsOptional()
+  @Validate(StatisticsSeenConstraint)
+  statistics_seen_customers?: Record<string, unknown>;
   // Per-user order of the Roadmap Queue's built-in tabs (admin-dashboard Roadmap → Queue), as view
   // ids: 'to-triage' | 'all' | 'leading' | 'for-you'. Loose like the other keys: the frontend drops
   // an id the person's role no longer offers and appends any it doesn't find, in the default order.

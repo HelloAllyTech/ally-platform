@@ -5,7 +5,13 @@ import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { SkeletonText, logger } from "@ally-ui-mono/ui-shared";
-import { useGetUserPreferencesQuery, useUpdateUserPreferencesMutation } from "@api";
+import {
+  useGetCustomerStatisticsQuery,
+  useGetUserPreferencesQuery,
+  useUpdateUserPreferencesMutation,
+} from "@api";
+import { useUser } from "@hooks";
+import { UserRole } from "@types";
 import type {
   OrganizationMetricsRange,
   StatisticsChartLibrary,
@@ -30,6 +36,7 @@ import {
   viewChartIds,
 } from "./layout";
 import { CHART_RENDERERS } from "./renderers";
+import { StaffForYouView } from "./StaffForYouView";
 import { StatisticsView } from "./StatisticsView";
 
 type TabId = "foryou" | StatisticsViewId;
@@ -57,7 +64,12 @@ export const StatisticsPage: FunctionComponent<StatisticsPageProps> = ({ library
   const { t } = useTranslation();
   const [params, setParams] = useSearchParams();
   const [range, setRange] = useState<OrganizationMetricsRange>("90d");
+  const { user } = useUser();
   const { data: preferences, isLoading } = useGetUserPreferencesQuery();
+  // Ally staff get the Customers cards as their For you. Only they ask, and the page
+  // changes only when the server answers: it does not tell anyone else it exists.
+  const isStaff = !!user?.roles?.includes(UserRole.PLATFORM_ADMIN);
+  const customers = useGetCustomerStatisticsQuery(undefined, { skip: !isStaff });
   const [updateUserPreferences] = useUpdateUserPreferencesMutation();
 
   const views = library.views ?? [];
@@ -91,7 +103,7 @@ export const StatisticsPage: FunctionComponent<StatisticsPageProps> = ({ library
   const tab: TabId =
     requested && tabs.includes(requested)
       ? requested
-      : pinKeys.length > 0
+      : pinKeys.length > 0 || customers.data
         ? "foryou"
         : "organisation";
 
@@ -212,7 +224,13 @@ export const StatisticsPage: FunctionComponent<StatisticsPageProps> = ({ library
         ))}
       </div>
 
-      {tab === "foryou" || !activeView ? (
+      {tab === "foryou" && customers.data ? (
+        <StaffForYouView
+          overview={customers.data}
+          saved={localLayouts.customers ?? savedLayoutFor(prefs, "customers")}
+          onLayoutChange={ids => persistLayout("customers", ids)}
+        />
+      ) : tab === "foryou" || !activeView ? (
         <ForYouView
           charts={charts}
           views={views}

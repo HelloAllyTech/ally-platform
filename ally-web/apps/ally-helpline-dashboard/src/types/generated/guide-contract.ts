@@ -3,41 +3,125 @@
 export const GUIDE_CONTRACT_VERSION = 1 as const;
 
 /** Safety mode of a thread (plan §6.2). REAL_CASE and PII are per-message overlays, not modes. */
-export type GuideMode = 'NORMAL' | 'CARE' | 'CRISIS' | 'CRISIS_FOLLOWUP';
-export const GUIDE_MODE_VALUES = ['NORMAL', 'CARE', 'CRISIS', 'CRISIS_FOLLOWUP'] as const;
+export type GuideMode = "NORMAL" | "CARE" | "CRISIS" | "CRISIS_FOLLOWUP";
+export const GUIDE_MODE_VALUES = ["NORMAL", "CARE", "CRISIS", "CRISIS_FOLLOWUP"] as const;
 
 /** Visual tone of the interface (plan §5.9). */
-export type GuideAtmosphere = 'bright' | 'hushed' | 'still';
-export const GUIDE_ATMOSPHERE_VALUES = ['bright', 'hushed', 'still'] as const;
+export type GuideAtmosphere = "bright" | "hushed" | "still";
+export const GUIDE_ATMOSPHERE_VALUES = ["bright", "hushed", "still"] as const;
 
 /** How a message reached the thread. */
-export type GuideChannel = 'text' | 'voice' | 'event';
-export const GUIDE_CHANNEL_VALUES = ['text', 'voice', 'event'] as const;
+export type GuideChannel = "text" | "voice" | "event";
+export const GUIDE_CHANNEL_VALUES = ["text", "voice", "event"] as const;
 
 /** Mirror of the Track 2.0 item types (ally-be TrackItemType). */
-export type GuideItemType = 'ROLEPLAY' | 'CASE' | 'QUIZ' | 'ARTICLE' | 'VIDEO' | 'JOURNAL' | 'ANNOTATED_ARTIFACT' | 'GAME' | 'BRANCHING_SCENARIO' | 'BUCKET_SORT';
-export const GUIDE_ITEM_TYPE_VALUES = ['ROLEPLAY', 'CASE', 'QUIZ', 'ARTICLE', 'VIDEO', 'JOURNAL', 'ANNOTATED_ARTIFACT', 'GAME', 'BRANCHING_SCENARIO', 'BUCKET_SORT'] as const;
+export type GuideItemType =
+  | "ROLEPLAY"
+  | "CASE"
+  | "QUIZ"
+  | "ARTICLE"
+  | "VIDEO"
+  | "JOURNAL"
+  | "ANNOTATED_ARTIFACT"
+  | "GAME"
+  | "BRANCHING_SCENARIO"
+  | "BUCKET_SORT";
+export const GUIDE_ITEM_TYPE_VALUES = [
+  "ROLEPLAY",
+  "CASE",
+  "QUIZ",
+  "ARTICLE",
+  "VIDEO",
+  "JOURNAL",
+  "ANNOTATED_ARTIFACT",
+  "GAME",
+  "BRANCHING_SCENARIO",
+  "BUCKET_SORT",
+] as const;
 
-export type GuideCardKind = 'course_info' | 'course_item' | 'micro_activity' | 'chapter_title' | 'scene_receipt' | 'closing_ritual' | 'finale' | 'resource' | 'crisis_resources' | 'sign_in' | 'access_denied';
-export const GUIDE_CARD_KIND_VALUES = ['course_info', 'course_item', 'micro_activity', 'chapter_title', 'scene_receipt', 'closing_ritual', 'finale', 'resource', 'crisis_resources', 'sign_in', 'access_denied'] as const;
+export type GuideCardKind =
+  | "course_info"
+  | "course_item"
+  | "micro_activity"
+  | "chapter_title"
+  | "scene_receipt"
+  | "closing_ritual"
+  | "finale"
+  | "resource"
+  | "crisis_resources"
+  | "sign_in"
+  | "access_denied";
+export const GUIDE_CARD_KIND_VALUES = [
+  "course_info",
+  "course_item",
+  "micro_activity",
+  "chapter_title",
+  "scene_receipt",
+  "closing_ritual",
+  "finale",
+  "resource",
+  "crisis_resources",
+  "sign_in",
+  "access_denied",
+] as const;
 
 /** Where a card opens: in the conversation, in the right-hand Shelf, or full screen in the Theatre (plan §5.2). Fixed per item type. */
-export type GuideCardPresentation = 'inline' | 'shelf' | 'theatre';
-export const GUIDE_CARD_PRESENTATION_VALUES = ['inline', 'shelf', 'theatre'] as const;
+export type GuideCardPresentation = "inline" | "shelf" | "theatre";
+export const GUIDE_CARD_PRESENTATION_VALUES = ["inline", "shelf", "theatre"] as const;
 
-export type GuideCardState = 'announced' | 'ready' | 'active' | 'done' | 'failed' | 'superseded' | 'dismissed';
-export const GUIDE_CARD_STATE_VALUES = ['announced', 'ready', 'active', 'done', 'failed', 'superseded', 'dismissed'] as const;
+export type GuideCardState =
+  | "announced"
+  | "ready"
+  | "active"
+  | "done"
+  | "failed"
+  | "superseded"
+  | "dismissed";
+export const GUIDE_CARD_STATE_VALUES = [
+  "announced",
+  "ready",
+  "active",
+  "done",
+  "failed",
+  "superseded",
+  "dismissed",
+] as const;
 
 /** Celebration intensity, capped by trigger warnings and mode (plan §4.7). */
-export type GuideTone = 'quiet' | 'warm' | 'festive';
-export const GUIDE_TONE_VALUES = ['quiet', 'warm', 'festive'] as const;
+export type GuideTone = "quiet" | "warm" | "festive";
+export const GUIDE_TONE_VALUES = ["quiet", "warm", "festive"] as const;
 
-export type GuidePresenceState = 'idle' | 'thinking' | 'speaking';
-export const GUIDE_PRESENCE_STATE_VALUES = ['idle', 'thinking', 'speaking'] as const;
+export type GuidePresenceState = "idle" | "thinking" | "speaking";
+export const GUIDE_PRESENCE_STATE_VALUES = ["idle", "thinking", "speaking"] as const;
 
 /** Why a turn failed (plan §9.3). The client maps each to a designed state in Ally's voice. */
-export type GuideFailureCode = 'turn_in_progress' | 'guide_disabled' | 'allowance_exhausted' | 'anonymous_paused' | 'not_enrolled' | 'no_access' | 'rate_limited' | 'cooldown' | 'provider_unavailable' | 'message_too_long' | 'interrupted' | 'internal_error';
-export const GUIDE_FAILURE_CODE_VALUES = ['turn_in_progress', 'guide_disabled', 'allowance_exhausted', 'anonymous_paused', 'not_enrolled', 'no_access', 'rate_limited', 'cooldown', 'provider_unavailable', 'message_too_long', 'interrupted', 'internal_error'] as const;
+export type GuideFailureCode =
+  | "turn_in_progress"
+  | "guide_disabled"
+  | "allowance_exhausted"
+  | "anonymous_paused"
+  | "not_enrolled"
+  | "no_access"
+  | "rate_limited"
+  | "cooldown"
+  | "provider_unavailable"
+  | "message_too_long"
+  | "interrupted"
+  | "internal_error";
+export const GUIDE_FAILURE_CODE_VALUES = [
+  "turn_in_progress",
+  "guide_disabled",
+  "allowance_exhausted",
+  "anonymous_paused",
+  "not_enrolled",
+  "no_access",
+  "rate_limited",
+  "cooldown",
+  "provider_unavailable",
+  "message_too_long",
+  "interrupted",
+  "internal_error",
+] as const;
 
 export interface GuideTrackItemRef {
   id: string;
@@ -54,7 +138,7 @@ export interface GuideCardMeta {
 
 export interface GuideCardCta {
   label: string;
-  action: 'open' | 'start' | 'continue' | 'sign_in' | 'call' | 'dismiss';
+  action: "open" | "start" | "continue" | "sign_in" | "call" | "dismiss";
 }
 
 /** One unit in the conversation (plan §5.6). `payload` is learner-safe by construction: it never carries answer keys (plan §6.4). */
@@ -89,7 +173,15 @@ export interface GuideMemorySource {
 /** GET /v1/guide/memory returns an array of these: what Ally remembers about the learner in this organisation (plan §8.1), each with its provenance. */
 export interface GuideMemoryView {
   id: string;
-  kind: 'preference' | 'goal' | 'possible_self' | 'strength' | 'struggle' | 'context' | 'commitment' | 'unique_outcome';
+  kind:
+    | "preference"
+    | "goal"
+    | "possible_self"
+    | "strength"
+    | "struggle"
+    | "context"
+    | "commitment"
+    | "unique_outcome";
   body: string;
   revision: number;
   lastConfirmedAt: string | null;
@@ -120,7 +212,7 @@ export interface GuideSceneReceipt {
 
 /** One of the finale's three doors (plan §4.3 endgame). field_assignment: try one thing on the next real shift and come back to tell Ally. spaced_recall: book a short look back — the client saves `suggestedAt` (or the learner's own pick) with PUT threads/:id/appointment and purpose spaced_recall. mentor: leave a line for the next learner (`available` is false until advice lines ship; hide it then). */
 export interface GuideFinaleDoor {
-  kind: 'field_assignment' | 'spaced_recall' | 'mentor';
+  kind: "field_assignment" | "spaced_recall" | "mentor";
   title: string;
   body: string;
   /** spaced_recall: seven days from the finale, ISO. */
@@ -179,7 +271,7 @@ export interface GuideEventBase {
 }
 
 export interface GuideEventHello extends GuideEventBase {
-  type: 'hello';
+  type: "hello";
   data: {
     lastSeq: number;
     mode: GuideMode;
@@ -188,15 +280,15 @@ export interface GuideEventHello extends GuideEventBase {
 }
 
 export interface GuideEventTurnStarted extends GuideEventBase {
-  type: 'turn.started';
+  type: "turn.started";
   data: {
     turnId: string;
-    trigger: 'learner_message' | 'card_event' | 'platform_event' | 'resume' | 'intent';
+    trigger: "learner_message" | "card_event" | "platform_event" | "resume" | "intent";
   };
 }
 
 export interface GuideEventAssistantDelta extends GuideEventBase {
-  type: 'assistant.delta';
+  type: "assistant.delta";
   data: {
     turnId: string;
     messageId: string;
@@ -205,7 +297,7 @@ export interface GuideEventAssistantDelta extends GuideEventBase {
 }
 
 export interface GuideEventAssistantMessage extends GuideEventBase {
-  type: 'assistant.message';
+  type: "assistant.message";
   data: {
     messageId: string;
     turnId: string;
@@ -217,7 +309,7 @@ export interface GuideEventAssistantMessage extends GuideEventBase {
 }
 
 export interface GuideEventLearnerMessage extends GuideEventBase {
-  type: 'learner.message';
+  type: "learner.message";
   data: {
     messageId: string;
     turnId?: string | null;
@@ -229,14 +321,14 @@ export interface GuideEventLearnerMessage extends GuideEventBase {
 }
 
 export interface GuideEventCardPresented extends GuideEventBase {
-  type: 'card.presented';
+  type: "card.presented";
   data: {
     card: GuideCard;
   };
 }
 
 export interface GuideEventCardUpdated extends GuideEventBase {
-  type: 'card.updated';
+  type: "card.updated";
   data: {
     cardId: string;
     state: GuideCardState;
@@ -246,7 +338,7 @@ export interface GuideEventCardUpdated extends GuideEventBase {
 }
 
 export interface GuideEventSpineUpdated extends GuideEventBase {
-  type: 'spine.updated';
+  type: "spine.updated";
   data: {
     currentItemId: string | null;
     completedItems: number;
@@ -255,7 +347,7 @@ export interface GuideEventSpineUpdated extends GuideEventBase {
 }
 
 export interface GuideEventSceneOpened extends GuideEventBase {
-  type: 'scene.opened';
+  type: "scene.opened";
   data: {
     sceneId: string;
     sectionId: string;
@@ -265,7 +357,7 @@ export interface GuideEventSceneOpened extends GuideEventBase {
 }
 
 export interface GuideEventSceneClosed extends GuideEventBase {
-  type: 'scene.closed';
+  type: "scene.closed";
   data: {
     sceneId: string;
     sectionId: string;
@@ -274,7 +366,7 @@ export interface GuideEventSceneClosed extends GuideEventBase {
 }
 
 export interface GuideEventModeChanged extends GuideEventBase {
-  type: 'mode.changed';
+  type: "mode.changed";
   data: {
     mode: GuideMode;
     atmosphere: GuideAtmosphere;
@@ -282,30 +374,36 @@ export interface GuideEventModeChanged extends GuideEventBase {
 }
 
 export interface GuideEventCrisisResponse extends GuideEventBase {
-  type: 'crisis.response';
+  type: "crisis.response";
   data: GuideCrisisState;
 }
 
 export interface GuideEventNotebookAdded extends GuideEventBase {
-  type: 'notebook.added';
+  type: "notebook.added";
   data: {
     entryId: string;
-    kind: 'first_move' | 'possible_self' | 'journal_line' | 'rehearsed_line' | 'reflection' | 'noticing';
+    kind:
+      | "first_move"
+      | "possible_self"
+      | "journal_line"
+      | "rehearsed_line"
+      | "reflection"
+      | "noticing";
     text: string;
   };
 }
 
 export interface GuideEventMilestone extends GuideEventBase {
-  type: 'milestone';
+  type: "milestone";
   data: {
-    kind: 'boss_complete' | 'section_complete' | 'course_complete';
+    kind: "boss_complete" | "section_complete" | "course_complete";
     tone: GuideTone;
     label: string;
   };
 }
 
 export interface GuideEventPresence extends GuideEventBase {
-  type: 'presence';
+  type: "presence";
   data: {
     state: GuidePresenceState;
     caption?: string | null;
@@ -313,15 +411,15 @@ export interface GuideEventPresence extends GuideEventBase {
 }
 
 export interface GuideEventShelfOpen extends GuideEventBase {
-  type: 'shelf.open';
+  type: "shelf.open";
   data: {
     cardId: string;
-    width: 'reading' | 'utility';
+    width: "reading" | "utility";
   };
 }
 
 export interface GuideEventNextStep extends GuideEventBase {
-  type: 'next_step';
+  type: "next_step";
   data: {
     hidden: boolean;
     itemId?: string | null;
@@ -331,7 +429,7 @@ export interface GuideEventNextStep extends GuideEventBase {
 }
 
 export interface GuideEventToolActivity extends GuideEventBase {
-  type: 'tool.activity';
+  type: "tool.activity";
   data: {
     turnId: string;
     label: string;
@@ -339,19 +437,19 @@ export interface GuideEventToolActivity extends GuideEventBase {
 }
 
 export interface GuideEventAllowance extends GuideEventBase {
-  type: 'allowance';
+  type: "allowance";
   data: GuideAllowance;
 }
 
 export interface GuideEventTurnCompleted extends GuideEventBase {
-  type: 'turn.completed';
+  type: "turn.completed";
   data: {
     turnId: string;
   };
 }
 
 export interface GuideEventTurnFailed extends GuideEventBase {
-  type: 'turn.failed';
+  type: "turn.failed";
   data: {
     turnId?: string | null;
     code: GuideFailureCode;
@@ -360,7 +458,7 @@ export interface GuideEventTurnFailed extends GuideEventBase {
 }
 
 export interface GuideEventPing extends GuideEventBase {
-  type: 'ping';
+  type: "ping";
   data: Record<string, unknown>;
 }
 
@@ -388,7 +486,30 @@ export type GuideEvent =
   | GuideEventTurnCompleted
   | GuideEventTurnFailed
   | GuideEventPing;
-export const GUIDE_EVENT_TYPES = ['hello', 'turn.started', 'assistant.delta', 'assistant.message', 'learner.message', 'card.presented', 'card.updated', 'spine.updated', 'scene.opened', 'scene.closed', 'mode.changed', 'crisis.response', 'notebook.added', 'milestone', 'presence', 'shelf.open', 'next_step', 'tool.activity', 'allowance', 'turn.completed', 'turn.failed', 'ping'] as const;
+export const GUIDE_EVENT_TYPES = [
+  "hello",
+  "turn.started",
+  "assistant.delta",
+  "assistant.message",
+  "learner.message",
+  "card.presented",
+  "card.updated",
+  "spine.updated",
+  "scene.opened",
+  "scene.closed",
+  "mode.changed",
+  "crisis.response",
+  "notebook.added",
+  "milestone",
+  "presence",
+  "shelf.open",
+  "next_step",
+  "tool.activity",
+  "allowance",
+  "turn.completed",
+  "turn.failed",
+  "ping",
+] as const;
 
 /** POST /v1/guide/threads/:id/turns. `clientTurnId` makes the request idempotent. */
 export interface GuideTurnRequest {
@@ -396,7 +517,7 @@ export interface GuideTurnRequest {
   text: string;
   anchor?: GuideAnchor;
   /** A structured nudge from the UI instead of free text: start, the Continue chip, a locked-item peek, the Not now chip (which starts Ally's steering cooldown), or "I'm safe right now" on the crisis card (CRISIS → CARE, plan §6.3 step 5). */
-  intent?: 'start' | 'continue' | 'locked_peek' | 'not_now' | 'safe_now' | null;
+  intent?: "start" | "continue" | "locked_peek" | "not_now" | "safe_now" | null;
 }
 
 export interface GuideTurnAccepted {
@@ -405,9 +526,16 @@ export interface GuideTurnAccepted {
 
 /** POST /v1/guide/threads/:id/cards/:cardId/events. Claims are verified against progress on the server. */
 export interface GuideCardEventRequest {
-  type: 'opened' | 'closed' | 'completed_claim' | 'dismissed' | 'launched' | 'returned' | 'reopened';
+  type:
+    | "opened"
+    | "closed"
+    | "completed_claim"
+    | "dismissed"
+    | "launched"
+    | "returned"
+    | "reopened";
   scenarioSessionId?: string | null;
-  outcome?: 'completed' | 'aborted' | null;
+  outcome?: "completed" | "aborted" | null;
 }
 
 /** Voice worker → ally-be, POST /v1/guide/voice/turns. Authenticated with the service API key plus `token` (the voice-session token bound to thread, user and tenant). */
@@ -422,31 +550,31 @@ export interface GuideVoiceTurnRequest {
 
 /** First line of every voice turn stream: the turn's id, so a barge-in mid-stream can still name the turn it cut off. */
 export interface GuideVoiceFrameStart {
-  type: 'start';
+  type: "start";
   turnId: string;
 }
 
 export interface GuideVoiceFrameDelta {
-  type: 'delta';
+  type: "delta";
   text: string;
   /** "crisis" on the fixed crisis message (plan §6.3 step 4): the worker speaks it slowly and keeps the session open. Absent on ordinary replies. */
-  kind?: 'crisis';
+  kind?: "crisis";
 }
 
 /** A short speakable line when a card appears on screen ('I've put the article on your right'). */
 export interface GuideVoiceFrameCardHint {
-  type: 'card_hint';
+  type: "card_hint";
   text: string;
 }
 
 export interface GuideVoiceFrameDone {
-  type: 'done';
+  type: "done";
   turnId: string;
   messageId: string;
 }
 
 export interface GuideVoiceFrameError {
-  type: 'error';
+  type: "error";
   code: GuideFailureCode;
   message: string;
 }
@@ -458,7 +586,7 @@ export type GuideVoiceFrame =
   | GuideVoiceFrameCardHint
   | GuideVoiceFrameDone
   | GuideVoiceFrameError;
-export const GUIDE_VOICE_FRAME_TYPES = ['start', 'delta', 'card_hint', 'done', 'error'] as const;
+export const GUIDE_VOICE_FRAME_TYPES = ["start", "delta", "card_hint", "done", "error"] as const;
 
 /** Whether the guided experience is available for a course, for this caller (plan §9.1). */
 export interface GuideAvailability {
@@ -468,7 +596,7 @@ export interface GuideAvailability {
   /** Language codes the course is published in. */
   languages: Array<string>;
   /** Why guided is false; null when it is available. */
-  reason: 'switched_off' | 'tenant_disabled' | 'course_disabled' | 'not_found' | null;
+  reason: "switched_off" | "tenant_disabled" | "course_disabled" | "not_found" | null;
 }
 
 /** The same access answer classic gives (`GET /v1/learn/tracks/:id/access`). */
@@ -484,12 +612,12 @@ export interface GuideSpineItem {
   id: string;
   type: GuideItemType;
   title: string;
-  state: 'locked' | 'available' | 'completed';
+  state: "locked" | "available" | "completed";
   /** Novice-adjusted estimate, whole minutes. */
   minutes: number;
   /** A chapter's roleplay or case. */
   boss: boolean;
-  tension: 'low' | 'medium' | 'high';
+  tension: "low" | "medium" | "high";
   /** The item carries content warnings; the UI may hush around it. */
   hasWarnings: boolean;
   completedAt?: string | null;
@@ -516,8 +644,8 @@ export interface GuideSpine {
 export interface GuideMessageView {
   id: string;
   seq: number;
-  role: 'learner' | 'ally';
-  kind: 'chat' | 'crisis_fixed' | 'fixed' | 'recap' | 'nudge';
+  role: "learner" | "ally";
+  kind: "chat" | "crisis_fixed" | "fixed" | "recap" | "nudge";
   text: string | null;
   createdAt: string;
   turnId?: string | null;
@@ -528,25 +656,25 @@ export interface GuideMessageView {
 
 /** The learner's own settings for Ally (plan §8.1 guide_learner_prefs). */
 export interface GuidePrefs {
-  guidance: 'lead' | 'walk' | 'drive';
+  guidance: "lead" | "walk" | "drive";
   voiceEnabled: boolean;
   sideQuests: boolean;
   /** More challenge: "more" makes every side quest stretch, whatever the pacing. */
-  challenge: 'normal' | 'more';
+  challenge: "normal" | "more";
   memoryEnabled: boolean;
-  outreach: 'off' | 'in_app' | 'in_app_email';
+  outreach: "off" | "in_app" | "in_app_email";
   preferClassic: boolean;
 }
 
 /** PUT /v1/guide/prefs — any subset. */
 export interface GuidePrefsUpdate {
-  guidance?: 'lead' | 'walk' | 'drive';
+  guidance?: "lead" | "walk" | "drive";
   voiceEnabled?: boolean;
   sideQuests?: boolean;
   /** More challenge: "more" makes every side quest stretch, whatever the pacing. */
-  challenge?: 'normal' | 'more';
+  challenge?: "normal" | "more";
   memoryEnabled?: boolean;
-  outreach?: 'off' | 'in_app' | 'in_app_email';
+  outreach?: "off" | "in_app" | "in_app_email";
   preferClassic?: boolean;
 }
 
@@ -568,12 +696,19 @@ export interface GuideThreadOpened {
   mode: GuideMode;
   atmosphere: GuideAtmosphere;
   lastEventSeq: number;
-  claim?: 'claimed' | 'merged' | 'none';
+  claim?: "claimed" | "merged" | "none";
 }
 
 /** A side quest's content on its card (`card.payload.activity`, plan §4.6). Learner-safe: options carry no key and no feedback until answered. Once the card is done, bootstrap also carries `card.payload.result` (a GuideMicroActivityResult) and `card.payload.response` (the learner's own GuideMicroActivityRequest). */
 export interface GuideMicroActivity {
-  kind: 'quick_check' | 'micro_dilemma' | 'rehearse_line' | 'teach_back' | 'predict_beat' | 'reflection' | 'spaced_recall';
+  kind:
+    | "quick_check"
+    | "micro_dilemma"
+    | "rehearse_line"
+    | "teach_back"
+    | "predict_beat"
+    | "reflection"
+    | "spaced_recall";
   intro?: string;
   questions?: Array<{
     id: string;
@@ -618,7 +753,7 @@ export interface GuideAdviceLineRequest {
 export interface GuideAdviceLineView {
   id: string;
   text: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: "pending" | "approved" | "rejected";
   createdAt: string;
 }
 

@@ -10,6 +10,7 @@ export const STATISTICS_LAYOUT_KEYS = [
   'course',
   'learner',
   'pins',
+  'customers',
 ] as const;
 /** What a person last chose on the Course and Learner tabs. */
 export const STATISTICS_SUBJECT_KEYS = ['course', 'learner'] as const;
@@ -47,7 +48,7 @@ export class StatisticsLayoutsConstraint implements ValidatorConstraintInterface
   }
 
   defaultMessage(args: ValidationArguments): string {
-    return `${args.property} must map course, learner, organisation or pins to a list of at most ${MAX_CARDS} distinct card keys`;
+    return `${args.property} must map course, learner, organisation, pins or customers to a list of at most ${MAX_CARDS} distinct card keys`;
   }
 }
 
@@ -66,5 +67,51 @@ export class StatisticsSubjectsConstraint implements ValidatorConstraintInterfac
 
   defaultMessage(args: ValidationArguments): string {
     return `${args.property} must hold only a course id and a learner id`;
+  }
+}
+
+const MAX_SEEN_FINDINGS = 40;
+const SEEN_SLOTS = ['previous', 'current'] as const;
+
+const isSnapshot = (value: unknown): boolean => {
+  if (!isPlainObject(value)) return false;
+  const { at, findings, active, sessions } = value;
+  return (
+    typeof at === 'string' &&
+    !Number.isNaN(Date.parse(at)) &&
+    Array.isArray(findings) &&
+    findings.length <= MAX_SEEN_FINDINGS &&
+    findings.every(
+      (key) =>
+        typeof key === 'string' &&
+        key.length > 0 &&
+        key.length <= MAX_KEY_LENGTH,
+    ) &&
+    Number.isInteger(active) &&
+    (active as number) >= 0 &&
+    Number.isInteger(sessions) &&
+    (sessions as number) >= 0
+  );
+};
+
+/**
+ * `statistics_seen`: what a person last saw on For you, so the summary can say
+ * what changed since: `{ previous?, current }`, each `{ at, findings, active,
+ * sessions }` (when, the findings that needed a look, learners active and
+ * sessions completed over the last 30 days). Counts and finding keys only.
+ */
+@ValidatorConstraint({ name: 'statisticsSeen', async: false })
+export class StatisticsSeenConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown): boolean {
+    if (!isPlainObject(value)) return false;
+    return Object.entries(value).every(
+      ([slot, snapshot]) =>
+        (SEEN_SLOTS as readonly string[]).includes(slot) &&
+        isSnapshot(snapshot),
+    );
+  }
+
+  defaultMessage(args: ValidationArguments): string {
+    return `${args.property} must hold only a previous and a current snapshot (when, finding keys, active learners, sessions)`;
   }
 }

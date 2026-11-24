@@ -415,3 +415,67 @@ export interface LearnerCoursesData {
     lastActivityAt: string | null;
   }>;
 }
+
+/** Why Ally staff might get in touch with an organisation (Customers tab). */
+export type CustomerReasonId =
+  | "neverActive"
+  | "quiet"
+  | "neverStarted"
+  | "activityDown"
+  | "reviewsBehind"
+  | "creditsNearLimit"
+  | "lowRating"
+  | "activityUp";
+
+export interface CustomerReason {
+  id: CustomerReasonId;
+  polarity: "attention" | "celebrate";
+  severity: number;
+  /** The numbers the sentence is written from. */
+  params: Record<string, number>;
+}
+
+export interface CustomerOrgRow {
+  tenantId: string;
+  name: string;
+  code: string | null;
+  learners: number;
+  activeLearners28d: number;
+  completedLast28d: number;
+  completedPrev28d: number;
+  lastCompletedAt: string | null;
+  daysSinceLastCompleted: number | null;
+  /** Completed sessions per week, on the shared axis. */
+  trend: number[];
+  creditUtilisationPct: number | null;
+  ratingsAverage90d: number | null;
+  ratingsCount90d: number;
+  reviewSharePercent: number | null;
+  neverStartedLearners: number;
+  belowFloor: boolean;
+  reasons: CustomerReason[];
+  score: number;
+  contactedAt: string | null;
+  contactNote: string | null;
+  recentlyContacted: boolean;
+}
+
+export interface CustomerMover {
+  tenantId: string;
+  name: string;
+  from: number;
+  to: number;
+}
+
+export interface CustomerOverview {
+  generatedAt: string;
+  trendBuckets: string[];
+  summary: { orgs: number; activeOrgs: number; quietOrgs: number; needsOutreach: number };
+  orgs: CustomerOrgRow[];
+  movers: { up: CustomerMover[]; down: CustomerMover[] };
+}
+
+export interface RecordCustomerOutreachRequest {
+  tenantId: string;
+  note?: string;
+}

@@ -32,6 +32,8 @@ import { InsightsSection } from "./InsightsSection";
 import { LayoutItem, layoutKey, parseLayoutKey, viewChartIds } from "./layout";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { CHART_RENDERERS, PinSummary } from "./renderers";
+import { LiveNumbers } from "./seen";
+import { useSeenComparison } from "./useSeenComparison";
 
 /** Pinned cards compare over the last month. */
 const PIN_RANGE = "30d";
@@ -55,13 +57,18 @@ const TONE_CLASS = {
 } as const;
 
 /**
- * Two plain lines under the greeting: how the last month went, and whether
- * anything needs a look today. Written here from numbers the page already reads
- * (the headline chart and the findings), so it can never disagree with them. A
- * line whose numbers could not be read is left out.
+ * Two plain lines under the greeting: how the last month went, and what changed
+ * since the person last looked. Written here from numbers the page already reads
+ * (the headline chart and the findings), so it can never disagree with them.
+ *
+ * The comparison is with the last visit: two snapshots are kept per person
+ * (`seen.ts`), rolled when a visit comes 12 hours or more after the last one, so
+ * reopening the page the same day shows the same comparison. A first visit has
+ * nothing to compare with and says only what needs a look. A line whose numbers
+ * could not be read is left out.
  */
 const Summary: FunctionComponent<{ headlineAvailable: boolean }> = ({ headlineAvailable }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const headline = useGetStatisticsChartQuery(
     { id: "TSQ-001", range: PIN_RANGE },
     { skip: !headlineAvailable },
@@ -69,6 +76,17 @@ const Summary: FunctionComponent<{ headlineAvailable: boolean }> = ({ headlineAv
   const insights = useGetStatisticsInsightsQuery();
 
   const totals = headline.currentData?.data as HeadlineNumbersData | undefined;
+  const found = insights.data;
+  const live: LiveNumbers | null =
+    found && (!headlineAvailable || !!totals || headline.isError)
+      ? {
+          fingerprints: found.attention.map(item => item.fingerprint),
+          active: totals?.activeUsers ?? 0,
+          sessions: totals?.simulationsCompleted ?? 0,
+        }
+      : null;
+  const { since } = useSeenComparison("statistics_seen", live);
+
   const activity =
     totals && totals.totalRegisteredLearners > 0
       ? t("statisticsLibrary.forYou.summary.activity", {
@@ -78,14 +96,43 @@ const Summary: FunctionComponent<{ headlineAvailable: boolean }> = ({ headlineAv
         })
       : null;
 
-  const found = insights.data;
-  const focus = !found
-    ? null
-    : found.attention.length > 0
-      ? t("statisticsLibrary.forYou.summary.needsLook", { count: found.attention.length })
-      : found.celebrate.length > 0
-        ? t("statisticsLibrary.forYou.summary.celebrateOnly")
-        : t("statisticsLibrary.forYou.summary.nothingNeedsLook");
+  let focus: string | null = null;
+  if (found) {
+    const total = found.attention.length;
+    if (since) {
+      const date = new Date(since.at).toLocaleDateString(i18n.language, {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      });
+      if (since.added > 0 || since.resolved > 0) {
+        focus =
+          total > 0
+            ? t("statisticsLibrary.forYou.summary.since.changed", {
+                date,
+                added: since.added,
+                resolved: since.resolved,
+                count: total,
+              })
+            : t("statisticsLibrary.forYou.summary.since.allClear", {
+                date,
+                resolved: since.resolved,
+              });
+      } else {
+        focus =
+          total > 0
+            ? t("statisticsLibrary.forYou.summary.since.same", { date, count: total })
+            : t("statisticsLibrary.forYou.summary.since.sameClear", { date });
+      }
+    } else if (total > 0) {
+      focus = t("statisticsLibrary.forYou.summary.needsLook", { count: total });
+    } else {
+      focus =
+        found.celebrate.length > 0
+          ? t("statisticsLibrary.forYou.summary.celebrateOnly")
+          : t("statisticsLibrary.forYou.summary.nothingNeedsLook");
+    }
+  }
 
   if (!activity && !focus) return null;
   return (

@@ -140,6 +140,9 @@ import { TenantOutcomesRepository } from './repository/tenant-outcomes.repositor
 import { TenantChartQueryRepository } from './repository/tenant-chart-query.repository';
 import { TenantInsightStateRepository } from './repository/tenant-insight-state.repository';
 import { TenantInsightsService } from './service/tenant-insights.service';
+import { CustomerStatisticsRepository } from './repository/customer-statistics.repository';
+import { CustomerStatisticsService } from './service/customer-statistics.service';
+import { CustomerStatisticsController } from './controller/customer-statistics.controller';
 import { TenantBehaviourRepository } from './repository/tenant-behaviour.repository';
 import { TenantScopeSummaryRepository } from './repository/tenant-scope-summary.repository';
 import { TenantScopeOptionsRepository } from './repository/tenant-scope-options.repository';
@@ -210,7 +213,11 @@ import { TenantModule } from 'src/tenant/tenant.module';
     // tenant population (RSI loop, judge-side wiring).
     LanguageModule,
   ],
-  controllers: [AnalyticsController, TenantAnalyticsController],
+  controllers: [
+    AnalyticsController,
+    TenantAnalyticsController,
+    CustomerStatisticsController,
+  ],
   providers: [
     AnalyticsService,
     WeakMetricsAnalyticsService,
@@ -366,6 +373,8 @@ import { TenantModule } from 'src/tenant/tenant.module';
     TenantScopeOptionsRepository,
     TenantScopeSummaryRepository,
     TenantBehaviourRepository,
+    CustomerStatisticsRepository,
+    CustomerStatisticsService,
     TenantInsightStateRepository,
     TenantInsightsService,
     TenantChartLibraryService,

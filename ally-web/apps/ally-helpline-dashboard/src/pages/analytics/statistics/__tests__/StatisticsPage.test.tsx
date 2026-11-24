@@ -16,10 +16,27 @@ vi.mock("sonner", () => ({ toast: { error: vi.fn() } }));
 vi.mock("@ally-ui-mono/ui-shared", () => ({ SkeletonText: () => null, logger: { info: vi.fn() } }));
 
 const prefs = { data: undefined as Record<string, unknown> | undefined, isLoading: false };
+const customers = { data: undefined as unknown, asked: false };
+const account = { roles: [] as string[] };
+vi.mock("@hooks", () => ({ useUser: () => ({ user: { roles: account.roles } }) }));
 const update = vi.fn();
 vi.mock("@api", () => ({
   useGetUserPreferencesQuery: () => ({ data: { data: prefs.data }, isLoading: prefs.isLoading }),
   useUpdateUserPreferencesMutation: () => [update],
+  useGetCustomerStatisticsQuery: (_a: unknown, o?: { skip?: boolean }) => {
+    customers.asked = !o?.skip;
+    return { data: o?.skip ? undefined : customers.data };
+  },
+}));
+vi.mock("../StaffForYouView", () => ({
+  StaffForYouView: (props: { saved: unknown; onLayoutChange: (ids: string[]) => void }) => (
+    <div data-testid="staff-for-you">
+      {JSON.stringify(props.saved ?? null)}
+      <button type="button" onClick={() => props.onLayoutChange(["reach"])}>
+        save-customers
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock("../renderers", () => ({
@@ -130,10 +147,53 @@ const renderPage = (url = "/") =>
   );
 
 beforeEach(() => {
+  customers.data = undefined;
+  customers.asked = false;
+  account.roles = [];
   prefs.data = undefined;
   prefs.isLoading = false;
   update.mockReset();
   update.mockReturnValue({ unwrap: () => Promise.resolve() });
+});
+
+describe("For you for Ally staff", () => {
+  it("is not asked for, and not shown, to anyone but Ally staff", () => {
+    customers.data = { orgs: [] };
+    renderPage();
+    expect(customers.asked).toBe(false);
+    expect(screen.queryByTestId("staff-for-you")).toBeNull();
+    expect(screen.queryByTestId("statistics-tab-customers")).toBeNull();
+  });
+
+  it("changes nothing until the server answers", () => {
+    account.roles = ["PLATFORM_ADMIN"];
+    renderPage();
+    expect(customers.asked).toBe(true);
+    expect(screen.queryByTestId("staff-for-you")).toBeNull();
+  });
+
+  it("is the For you tab, and the page staff open on", () => {
+    account.roles = ["PLATFORM_ADMIN"];
+    customers.data = { orgs: [] };
+    renderPage();
+    expect(screen.getByTestId("staff-for-you")).toBeTruthy();
+    // The organisation's own tabs are still there.
+    expect(screen.getByTestId("statistics-tab-organisation")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("statistics-tab-organisation"));
+    expect(screen.getByTestId("view-organisation")).toBeTruthy();
+  });
+
+  it("saves the cards they keep with the other layouts, since preferences merge keys", async () => {
+    account.roles = ["PLATFORM_ADMIN"];
+    customers.data = { orgs: [] };
+    prefs.data = { statistics_layouts: { course: ["TSQ-041"] } };
+    renderPage();
+    fireEvent.click(screen.getByText("save-customers"));
+    await waitFor(() => expect(update).toHaveBeenCalled());
+    expect(update).toHaveBeenCalledWith({
+      statistics_layouts: { course: ["TSQ-041"], customers: ["reach"] },
+    });
+  });
 });
 
 describe("the Statistics page", () => {

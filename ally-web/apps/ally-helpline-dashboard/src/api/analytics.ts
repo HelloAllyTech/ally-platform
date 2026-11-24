@@ -22,6 +22,8 @@ import {
   GetOrganizationMetricsResponse,
   GetStatisticsChartRequest,
   GetStatisticsScopeOptionsRequest,
+  CustomerOverview,
+  RecordCustomerOutreachRequest,
   StatisticsInsights,
   UpdateStatisticsInsightStateRequest,
   StatisticsScopeOption,
@@ -136,6 +138,38 @@ const analyticsAPI = baseAPI.injectEndpoints({
           await queryFulfilled;
         } catch {
           patch.undo();
+        }
+      },
+    }),
+
+    /**
+     * How every customer organisation is doing, for Ally staff. Answers 404 or 403
+     * to anyone else, so the Customers tab is offered only when this succeeds.
+     */
+    getCustomerStatistics: builder.query<CustomerOverview, void>({
+      query: () => ({
+        url: ApiEndpoints.ANALYTICS.GET_CUSTOMER_STATISTICS,
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /** Records that Ally staff got in touch with an organisation, then reads the list again. */
+    recordCustomerOutreach: builder.mutation<void, RecordCustomerOutreachRequest>({
+      query: body => ({
+        url: ApiEndpoints.ANALYTICS.RECORD_CUSTOMER_OUTREACH,
+        method: HttpMethod.POST,
+        body,
+      }),
+      async onQueryStarted(_body, { dispatch, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          dispatch(
+            analyticsAPI.endpoints.getCustomerStatistics.initiate(undefined, {
+              forceRefetch: true,
+            }),
+          );
+        } catch {
+          // The caller shows the failure.
         }
       },
     }),
@@ -283,6 +317,8 @@ const analyticsAPI = baseAPI.injectEndpoints({
 });
 
 export const {
+  useGetCustomerStatisticsQuery,
+  useRecordCustomerOutreachMutation,
   useGetStatisticsInsightsQuery,
   useUpdateStatisticsInsightStateMutation,
   useGetStatisticsScopeOptionsQuery,

@@ -21,7 +21,7 @@ export const STATISTICS_LEGACY_LAYOUT_PREF_KEY = "statistics_dashboard";
 /** Preferences key for the course and learner last chosen. */
 export const STATISTICS_SUBJECTS_PREF_KEY = "statistics_subjects";
 
-export type StatisticsLayoutKey = "organisation" | "course" | "learner" | "pins";
+export type StatisticsLayoutKey = "organisation" | "course" | "learner" | "pins" | "customers";
 export type SavedLayouts = Partial<Record<StatisticsLayoutKey, string[]>>;
 
 /** The most cards a default layout holds, and the fewest it is topped up to. */
