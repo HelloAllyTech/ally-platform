@@ -36,7 +36,10 @@ import {
 } from '../home/home-fields';
 import { changeOwnRules, safetyView } from '../home/own-rules';
 import { SafetyLockedError } from '../safety-pack/safety-lock';
-import { GENERAL_CRISIS_TEXT, SAFETY_PACKS } from '../safety-pack/safety-packs';
+import {
+  INDIA_GENERAL_CRISIS_TEXT,
+  SAFETY_PACKS,
+} from '../safety-pack/safety-packs';
 import { memoryDrafts } from './memory-drafts';
 
 jest.mock('src/common/execution/execution-manager', () => ({
@@ -967,13 +970,8 @@ describe('Your instructions, checked like the builder checks (chunk 20d-2)', () 
     // Exactly what's sent (Q3-fast, gaps item 10): the real numbers, then the bot's helplines;
     // never the platform's old "your local crisis line" template.
     // A helpline the reply already gives isn't repeated (chunk H1 Part D).
-    // R6: the bot's own numbers first, then the findahelpline.com link; no country defaults.
-    expect(home.safety.atRiskReply).toBe(
-      GENERAL_CRISIS_TEXT.replace(
-        'you can find a helpline near you at',
-        'call 14416, or find a helpline near you at',
-      ),
-    );
+    // In India (no time zone set): 112 and Tele-MANAS 14416 first; the bot's 14416 isn't repeated.
+    expect(home.safety.atRiskReply).toBe(INDIA_GENERAL_CRISIS_TEXT);
     expect(home.safety.atRiskReply).not.toMatch(/your local crisis line/i);
     // Without the settings service the box just has no default.
     const bare = await harness().service.get('bot-1');

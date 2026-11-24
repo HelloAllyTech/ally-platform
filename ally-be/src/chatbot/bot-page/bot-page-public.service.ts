@@ -9,6 +9,7 @@ import {
   ActionPartsService,
   type ReplyParts,
 } from '../actions/action-parts.service';
+import { isIndiaAssistant } from '../agent-tools/list-tools';
 import { replyLanguageOf } from '../engine/reply-language';
 import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import {
@@ -148,6 +149,14 @@ export interface PublicBotPage {
    * (stage 7), but a pack's can't be removed.
    */
   disclaimer: string | null;
+}
+
+/** "Contact your local emergency number (or services)" becomes "call 112", for India. */
+export function indiaEmergencyWording(text: string): string {
+  return text.replace(
+    /\b(contact|call) your local emergency (number|services)\b/gi,
+    'call 112',
+  );
 }
 
 /**
@@ -467,7 +476,15 @@ export class BotPagePublicService {
     );
     const required = packFor(chatbot.safetyPack)?.disclaimer?.trim() ?? '';
     const inNotice = Boolean(required) && notice.includes(required);
-    return { notice, disclaimer: inNotice ? null : disclaimer };
+    // In India the first screen says "call 112" (24 Nov). Rewritten as it is served, so the stored
+    // wording and the pack lock that checks it stay as they are.
+    const local = isIndiaAssistant(chatbot.settings)
+      ? indiaEmergencyWording
+      : (text: string) => text;
+    return {
+      notice: local(notice),
+      disclaimer: inNotice || !disclaimer ? null : local(disclaimer),
+    };
   }
 
   // ── session and codes ─────────────────────────────────────────────────

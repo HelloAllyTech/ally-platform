@@ -22,6 +22,8 @@ import {
   GetOrganizationMetricsResponse,
   GetStatisticsChartRequest,
   GetStatisticsScopeOptionsRequest,
+  StatisticsInsights,
+  UpdateStatisticsInsightStateRequest,
   StatisticsScopeOption,
   StatisticsChartLibrary,
   StatisticsChartResponse,
@@ -100,6 +102,42 @@ const analyticsAPI = baseAPI.injectEndpoints({
         ...library,
         charts: library.charts.map(chart => ({ ...chart, filters: chart.filters ?? [] })),
       }),
+    }),
+
+    /**
+     * What is worth a look today and what is worth celebrating, for the caller's
+     * organisation, minus what the caller has already put away.
+     */
+    getStatisticsInsights: builder.query<StatisticsInsights, void>({
+      query: () => ({
+        url: ApiEndpoints.ANALYTICS.GET_STATISTICS_INSIGHTS,
+        method: HttpMethod.GET,
+      }),
+    }),
+
+    /**
+     * Marks an insight done, or snoozes it. The insight leaves the list at once
+     * and comes back if the save fails.
+     */
+    updateStatisticsInsightState: builder.mutation<void, UpdateStatisticsInsightStateRequest>({
+      query: body => ({
+        url: ApiEndpoints.ANALYTICS.SET_STATISTICS_INSIGHT_STATE,
+        method: HttpMethod.POST,
+        body,
+      }),
+      async onQueryStarted({ fingerprint }, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          analyticsAPI.util.updateQueryData("getStatisticsInsights", undefined, draft => {
+            draft.attention = draft.attention.filter(i => i.fingerprint !== fingerprint);
+            draft.celebrate = draft.celebrate.filter(i => i.fingerprint !== fingerprint);
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
     }),
 
     /** The courses, simulations or learners a card can be filtered by. */
@@ -245,6 +283,8 @@ const analyticsAPI = baseAPI.injectEndpoints({
 });
 
 export const {
+  useGetStatisticsInsightsQuery,
+  useUpdateStatisticsInsightStateMutation,
   useGetStatisticsScopeOptionsQuery,
   useLazyGetDashboardUrlQuery,
   useGetDashboardsQuery,

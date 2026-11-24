@@ -41,7 +41,9 @@ export const AGENT_RUN_LIMITS = {
  * shorter timeout and no SDK retries, so it answers `failed` inside an attempt rather than after.
  */
 export const CRISIS_CHECK_LIMITS = {
-  attemptMs: 4_000,
+  // 24 Nov: one attempt may use the whole 6 s. At 4 s a slow verdict under load was cut off and
+  // the retry got only the ~2 s left, so the check failed where it would have answered.
+  attemptMs: 6_000,
   retryDelayMs: 100,
   budgetMs: 6_000,
   /** Less than this left: no retry, the keyword rules decide. */

@@ -4026,7 +4026,10 @@
       "moduleTime": "\"{{title}}\" takes the longest: about {{time}} for a typical learner.",
       "roleplayTries": "\"{{title}}\" takes the most tries: {{attempts}} on average.",
       "skillTrend": "{{skill}} has risen the most: from {{first}} to {{latest}}.",
-      "skillTrendFlat": "No skill has risen yet across these slices."
+      "skillTrendFlat": "No skill has risen yet across these slices.",
+      "courseFacts": "{{completed}} of {{enrolled}} learners have finished this course.",
+      "courseFactsNone": "No learner has been enrolled in this course yet.",
+      "learnerCourses": "{{done}} of {{total}} courses finished."
     },
     "table": {
       "learner": "Learner",
@@ -4180,7 +4183,13 @@
       "averageScore": "Average score",
       "minutes": "Time practised",
       "activeWeeks": "Weeks practised",
-      "lastPracticed": "Last practised"
+      "lastPracticed": "Last practised",
+      "items": "Items in the course",
+      "enrolled": "Enrolled",
+      "started": "Started",
+      "completed": "Completed",
+      "completionRate": "Completion rate",
+      "medianDays": "Typical time to finish"
     },
     "performance": {
       "started": "Started",
@@ -4268,7 +4277,8 @@
       "useOverTime": "Use over time",
       "roleplays": "Roleplays",
       "learning": "Learning",
-      "progress": "Progress"
+      "progress": "Progress",
+      "allLearners": "All learners"
     },
     "subject": {
       "label": {
@@ -4284,7 +4294,8 @@
         "learner": "Choose a learner to see their record."
       },
       "heading": {
-        "course": "One course in depth"
+        "course": "One course in depth",
+        "learner": "One learner in depth"
       }
     },
     "forYou": {
@@ -4330,6 +4341,88 @@
         "sessions": "across {{count}} sessions",
         "ofCourses": "of {{courses}} courses",
         "inProgress": "{{count}} in progress"
+      }
+    },
+    "insights": {
+      "heading": "Your focus today",
+      "attention": "Needs a look",
+      "celebrate": "Worth celebrating",
+      "seeChart": "See the chart",
+      "done": "Done",
+      "later": "Remind me later",
+      "none": "Nothing needs a look today.",
+      "kinds": {
+        "learners": "Learners",
+        "courses": "Courses",
+        "reviews": "Reviews",
+        "skills": "Skills",
+        "ratings": "Learner feedback",
+        "usage": "Activity"
+      },
+      "items": {
+        "learners": {
+          "dormant": {
+            "title_one": "{{count}} learner has not practised in over 30 days",
+            "title_other": "{{count}} learners have not practised in over 30 days",
+            "evidence": "Out of {{total}} learners in your organisation."
+          },
+          "neverStarted": {
+            "title_one": "{{count}} learner has never started",
+            "title_other": "{{count}} learners have never started",
+            "evidence": "Out of {{total}} learners. They have an account but have not begun a session."
+          },
+          "improving": {
+            "title": "{{improving}} of {{total}} learners are scoring higher than when they started",
+            "evidence": "Compares each learner's first and latest scored session."
+          }
+        },
+        "courses": {
+          "stalled": {
+            "title_one": "{{count}} learner is stalled in {{title}}",
+            "title_other": "{{count}} learners are stalled in {{title}}",
+            "evidence": "They started it and stopped. See where they stop."
+          },
+          "notStarted": {
+            "title_one": "{{count}} learner has not started {{title}}",
+            "title_other": "{{count}} learners have not started {{title}}",
+            "evidence": "Open the course to see who has taken it."
+          }
+        },
+        "reviews": {
+          "backlog": {
+            "title": "Only {{percent}}% of completed sessions have been reviewed",
+            "evidence": "{{reviewed}} of {{completed}} completed sessions have a review."
+          }
+        },
+        "skills": {
+          "weakest": {
+            "title": "{{skill}} is the weakest skill, at level {{level}}",
+            "evidence": "Skill level runs from 1 to 5. See how it changed since learners' first sessions."
+          }
+        },
+        "ratings": {
+          "low": {
+            "title": "Learners rate their sessions {{average}} out of 5",
+            "evidence_one": "From {{count}} rating.",
+            "evidence_other": "From {{count}} ratings."
+          }
+        },
+        "usage": {
+          "high": {
+            "title_one": "{{count}} learner was active this week, the most in {{weeks}} weeks",
+            "title_other": "{{count}} learners were active this week, the most in {{weeks}} weeks",
+            "evidence": "Weekly active learners are at their highest in this period."
+          }
+        }
+      }
+    },
+    "learnerCourses": {
+      "none": "This learner has not been given a course.",
+      "items": "{{done}} of {{total}} items",
+      "status": {
+        "completed": "Completed",
+        "inProgress": "In progress",
+        "notStarted": "Not started"
       }
     }
   }

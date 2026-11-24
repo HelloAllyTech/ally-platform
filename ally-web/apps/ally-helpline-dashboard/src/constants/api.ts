@@ -36,6 +36,8 @@ export const ApiEndpoints = {
     GET_COURSE_USAGE_TABLE: "/v1/tenant-analytics/course-usage",
     GET_STATISTICS_CHART_LIBRARY: "/v1/tenant-analytics/chart-library",
     GET_STATISTICS_SCOPE_OPTIONS: "/v1/tenant-analytics/chart-scope-options",
+    GET_STATISTICS_INSIGHTS: "/v1/tenant-analytics/insights",
+    SET_STATISTICS_INSIGHT_STATE: "/v1/tenant-analytics/insights/state",
     // Template function: one library chart's data
     STATISTICS_CHART: (chartId: string) => `/v1/tenant-analytics/charts/${chartId}`,
     // Template functions for dynamic endpoints

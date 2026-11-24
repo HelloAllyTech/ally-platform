@@ -22,6 +22,7 @@ import { BotPageRateLimitService } from '../bot-page-rate-limit.service';
 import {
   BotPagePublicService,
   WEB_CHANNEL,
+  indiaEmergencyWording,
   publicCitations,
 } from '../bot-page-public.service';
 import type { BotPageVisitor } from '../bot-page-visitor.service';
@@ -294,6 +295,8 @@ describe('BotPagePublicService', () => {
   describe('safety notices on the page (never removable)', () => {
     const HEALTH =
       'This is an automated assistant. It is not a crisis service or medical advice: in an emergency, contact your local emergency number.';
+    // What a visitor sees from an assistant in India (no time zone set): "call 112".
+    const SHOWN = indiaEmergencyWording(HEALTH);
 
     function packed(safetyPack: string | null, stored = '') {
       const h = harness();
@@ -317,22 +320,32 @@ describe('BotPagePublicService', () => {
     it("shows a health pack's required disclaimer even though the free-text one is retired", () => {
       const { service, available } = packed('mental_health', 'Old disclaimer');
       const view = service.view(available as never);
-      expect(view.disclaimer).toBe(HEALTH);
+      expect(view.disclaimer).toBe(SHOWN);
       expect(JSON.stringify(view)).not.toContain('Old disclaimer');
     });
 
     it("shows the owner's longer wording when it still contains the pack's", () => {
       const own = `${HEALTH} Bookings only.`;
       const { service, available } = packed('medical', own);
-      expect(service.view(available as never).disclaimer).toBe(own);
+      expect(service.view(available as never).disclaimer).toBe(
+        indiaEmergencyWording(own),
+      );
     });
 
     it('does not repeat the disclaimer when the notice already carries it', () => {
       const { service, available } = packed('mental_health');
       available.botSettings.disclaimerText = `You are chatting with an AI bot; our team may read this chat. ${HEALTH}`;
       const view = service.view(available as never);
-      expect(view.notice).toContain(HEALTH);
+      expect(view.notice).toContain(SHOWN);
       expect(view.disclaimer).toBeNull();
+    });
+
+    it('outside India, keeps the local emergency number', () => {
+      const { service, available } = packed('mental_health');
+      Object.assign(available.chatbot, {
+        settings: { ...available.chatbot.settings, timeZone: 'Europe/London' },
+      });
+      expect(service.view(available as never).disclaimer).toBe(HEALTH);
     });
 
     it('a pack without a disclaimer adds none', () => {

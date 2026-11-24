@@ -1,13 +1,17 @@
 import { LimitReason, TurnBlockReason, limitReply } from './limit-reply';
 import {
   BlockedState,
+  FIND_A_HELPLINE_URL,
   blockedNotice,
+  fixedCrisisInformation,
+  newHelplines,
   ownerCreditsText,
 } from './blocked-notice';
 import { BlockedCrisisService } from 'src/billing/service/blocked-crisis.service';
 import { LimitsService } from 'src/billing/service/limits.service';
 import { usageContextFor } from './engine-usage';
 import { offMessage, offReasonOf } from '../safety/off-message';
+import { isIndiaAssistant } from '../agent-tools/list-tools';
 import { usageContext } from 'src/billing/context/usage-context';
 import { Injectable, Optional } from '@nestjs/common';
 import {
@@ -174,10 +178,42 @@ export function crisisTextFor(
     own: own ? fill(own) : null,
     // In the person's language (Q3-fast Part 1, B3): fixed English, Hindi or Hinglish text.
     language: replyLanguageOf(turn.text ?? '', turn.language),
+    // 112 and Tele-MANAS 14416 for an assistant in India (by its time zone).
+    india: isIndiaAssistant(turn.chatbot.settings),
   });
   // Q4 G7: the owner's one approved practical-help line, after the fixed reply.
   const practical = turn.settings.crisisPracticalLine?.trim();
   return practical ? `${reply}\n\n${practical}` : reply;
+}
+
+/**
+ * A reply to a message the crisis check couldn't judge (it timed out or failed) that may be at
+ * risk: the reply, then the fixed crisis information, unless it already carries it (112 and 14416
+ * in India, the link elsewhere). Never on a crisis reply, which has its own.
+ */
+export function withUnsureCrisisInformation(
+  turn: Pick<ChatTurn, 'chatbot'> &
+    Partial<Pick<ChatTurn, 'text' | 'language'>>,
+  decision: ChatbotDecision,
+): ChatbotDecision {
+  const body = decision.body ?? '';
+  if (decision.handledBy === WaHandledBy.CRISIS || !body.trim())
+    return decision;
+  const india = isIndiaAssistant(turn.chatbot.settings);
+  const carried = india
+    ? /\b112\b/.test(body) && body.includes('14416')
+    : body.includes(FIND_A_HELPLINE_URL);
+  if (carried) return decision;
+  const numbers = newHelplines(
+    crisisHelplines(turn.chatbot.settings as never) || '',
+    body,
+  );
+  const help = fixedCrisisInformation(
+    numbers || null,
+    replyLanguageOf(turn.text ?? '', turn.language),
+    india,
+  );
+  return { ...decision, body: `${body.trim()}\n\n${help}` };
 }
 
 /** Purposes with a section of their own in the Skills Store (chunk 20a-2). */
@@ -464,6 +500,7 @@ export class ChatbotEngineService {
       // The builder's own numbers only (R6): never the platform's defaults. Q4 G7: confirmed ones.
       ownNumbers: crisisHelplines(turn.chatbot.settings) || null,
       language: replyLanguageOf(turn.text, turn.language),
+      india: isIndiaAssistant(turn.chatbot.settings),
     });
   }
 
@@ -961,140 +998,161 @@ export class ChatbotEngineService {
       }
     }
     const [answerResult, crisisResult] = await Promise.all([running, checked]);
-    const agent = runBehind(answerResult);
+    // The check timed out or failed and no keyword rule decided (b3-r01, b4-r01, b2-r02 on
+    // 24 Nov): the message is "unsure", as in Q4 H1. A reply to one that could be at risk then
+    // always carries the crisis information (112 and Tele-MANAS 14416 in India), never only a
+    // contact line.
+    const unsure =
+      settings.crisisClassifierEnabled &&
+      looksEmotional(turn.text ?? '') &&
+      (crisisResult.status === 'rejected' ||
+        Boolean(crisisResult.value?.failed && !crisisResult.value.is_crisis));
+    // Upset, not at risk (Q4 H1): the reply stays warm and its own, but always carries the crisis
+    // information too, even a decline (o5-r03: "Raat ke 2 baje hain, ro raha hoon" got only an
+    // email address, as ally-ai's reply check leaves declines alone).
+    const upset =
+      mood === 'upset' ||
+      (crisisResult.status === 'fulfilled' &&
+        crisisLevelOf(crisisResult.value) === 'upset');
+    const decided = await (async (): Promise<ChatbotDecision> => {
+      const agent = runBehind(answerResult);
 
-    // Crisis wins over the answer, unconditionally. Not gated on confidence: the prompt tells the
-    // model to choose crisis when uncertain, so re-gating here would undo that instruction.
-    const crisis =
-      crisisResult.status === 'fulfilled' ? crisisResult.value : null;
-    if (crisis?.is_crisis) {
-      return {
-        ...(await this.crisisDecision(turn, crisis, ran, {
-          notOnList: false,
-        })),
-        ...(agent ? { agent } : {}),
-      };
-    }
-
-    // Alerted on the classifier's own result, so a keyword fallback still raises it.
-    const degradedAlert = this.degradedAlertFor(turn, await classified);
-
-    // The agent passed the chat to a person (chunk 3b): its `hand_over` tool already marked the
-    // chat, and the visitor gets 11a's hand-over message, as when they ask for a person. The same
-    // when the run failed after `hand_over` acted; after a list write, what it did; after anything
-    // else, the run-failed reply.
-    const acted =
-      answerResult.status === 'rejected' &&
-      answerResult.reason instanceof AgentActedError
-        ? answerResult.reason.tool
-        : null;
-    if (
-      acted === 'hand_over' ||
-      (answerResult.status === 'fulfilled' &&
-        answerResult.value.response.handover)
-    ) {
-      // Q4 G1 (Round 7 R1): the hand-over never replaces an answer. The run goes on after
-      // `hand_over`, so what the assistant could answer comes first, then the hand-over line, in
-      // the person's language.
-      const line = handoverMessage(
-        handoverOf(settings),
-        new Date(),
-        replyLanguageOf(turn.text ?? '', turn.language),
-      );
-      const response =
-        answerResult.status === 'fulfilled'
-          ? answerResult.value.response
-          : null;
-      if (response?.answer?.trim()) {
-        const answered = this.toDecision(turn, response, ran, degradedAlert);
+      // Crisis wins over the answer, unconditionally. Not gated on confidence: the prompt tells the
+      // model to choose crisis when uncertain, so re-gating here would undo that instruction.
+      const crisis =
+        crisisResult.status === 'fulfilled' ? crisisResult.value : null;
+      if (crisis?.is_crisis) {
         return {
-          ...answered,
-          handledBy: WaHandledBy.HANDOVER,
-          body: `${answered.body.trim()}\n\n${line}`,
-          handover: 'assistant',
-          unanswered: undefined,
+          ...(await this.crisisDecision(turn, crisis, ran, {
+            notOnList: false,
+          })),
           ...(agent ? { agent } : {}),
         };
       }
-      return {
-        handledBy: WaHandledBy.HANDOVER,
-        body: line,
-        handover: 'assistant',
-        alert: degradedAlert,
-        ...(agent ? { agent } : {}),
-      };
-    }
-    if (acted === 'confirm') {
-      // The run got as far as asking for a yes (chunk H1): the question is the reply.
-      const question =
+
+      // Alerted on the classifier's own result, so a keyword fallback still raises it.
+      const degradedAlert = this.degradedAlertFor(turn, await classified);
+
+      // The agent passed the chat to a person (chunk 3b): its `hand_over` tool already marked the
+      // chat, and the visitor gets 11a's hand-over message, as when they ask for a person. The same
+      // when the run failed after `hand_over` acted; after a list write, what it did; after anything
+      // else, the run-failed reply.
+      const acted =
         answerResult.status === 'rejected' &&
         answerResult.reason instanceof AgentActedError
-          ? answerResult.reason.done
-          : undefined;
-      if (question) {
+          ? answerResult.reason.tool
+          : null;
+      if (
+        acted === 'hand_over' ||
+        (answerResult.status === 'fulfilled' &&
+          answerResult.value.response.handover)
+      ) {
+        // Q4 G1 (Round 7 R1): the hand-over never replaces an answer. The run goes on after
+        // `hand_over`, so what the assistant could answer comes first, then the hand-over line, in
+        // the person's language.
+        const line = handoverMessage(
+          handoverOf(settings),
+          new Date(),
+          replyLanguageOf(turn.text ?? '', turn.language),
+        );
+        const response =
+          answerResult.status === 'fulfilled'
+            ? answerResult.value.response
+            : null;
+        if (response?.answer?.trim()) {
+          const answered = this.toDecision(turn, response, ran, degradedAlert);
+          return {
+            ...answered,
+            handledBy: WaHandledBy.HANDOVER,
+            body: `${answered.body.trim()}\n\n${line}`,
+            handover: 'assistant',
+            unanswered: undefined,
+            ...(agent ? { agent } : {}),
+          };
+        }
         return {
-          handledBy: WaHandledBy.CLARIFIED,
-          body: question,
+          handledBy: WaHandledBy.HANDOVER,
+          body: line,
+          handover: 'assistant',
           alert: degradedAlert,
           ...(agent ? { agent } : {}),
         };
       }
-    }
-    if (acted) {
-      // A list write that was done (chunk 6) says so; anything else gets the run-failed reply.
-      const done =
-        answerResult.status === 'rejected' &&
-        answerResult.reason instanceof AgentActedError
-          ? answerResult.reason.done
-          : undefined;
-      return {
-        handledBy: WaHandledBy.ERROR,
-        body: done ?? (await this.runFailedText(turn)),
-        alert: degradedAlert,
-        ...(agent ? { agent } : {}),
-      };
-    }
+      if (acted === 'confirm') {
+        // The run got as far as asking for a yes (chunk H1): the question is the reply.
+        const question =
+          answerResult.status === 'rejected' &&
+          answerResult.reason instanceof AgentActedError
+            ? answerResult.reason.done
+            : undefined;
+        if (question) {
+          return {
+            handledBy: WaHandledBy.CLARIFIED,
+            body: question,
+            alert: degradedAlert,
+            ...(agent ? { agent } : {}),
+          };
+        }
+      }
+      if (acted) {
+        // A list write that was done (chunk 6) says so; anything else gets the run-failed reply.
+        const done =
+          answerResult.status === 'rejected' &&
+          answerResult.reason instanceof AgentActedError
+            ? answerResult.reason.done
+            : undefined;
+        return {
+          handledBy: WaHandledBy.ERROR,
+          body: done ?? (await this.runFailedText(turn)),
+          alert: degradedAlert,
+          ...(agent ? { agent } : {}),
+        };
+      }
 
-    if (answerResult.status === 'rejected') {
-      // A failed run is NOT "the knowledge does not cover this": the fixed run-failed reply
-      // (Q3-fast Part 0, never v1) and an ERROR-reason queue row, so a bad afternoon for ally-ai
-      // does not fill the unanswered queue with questions the documents answer perfectly well.
-      const failure =
-        answerResult.reason instanceof AgentRunFailedError
-          ? answerResult.reason.cause
-          : answerResult.reason;
-      const reason =
-        failure instanceof Error ? failure.message : 'unknown error';
-      this.logger.error(`Agent run failed: ${reason}`);
-      return {
-        handledBy: WaHandledBy.ERROR,
-        body: await this.runFailedText(turn),
-        unanswered: {
-          reason: WaUnansweredReason.ERROR,
-          topSimilarity: null,
-          hitCount: 0,
-        },
-        alert: degradedAlert,
-        ...(agent ? { agent } : {}),
-      };
-    }
+      if (answerResult.status === 'rejected') {
+        // A failed run is NOT "the knowledge does not cover this": the fixed run-failed reply
+        // (Q3-fast Part 0, never v1) and an ERROR-reason queue row, so a bad afternoon for ally-ai
+        // does not fill the unanswered queue with questions the documents answer perfectly well.
+        const failure =
+          answerResult.reason instanceof AgentRunFailedError
+            ? answerResult.reason.cause
+            : answerResult.reason;
+        const reason =
+          failure instanceof Error ? failure.message : 'unknown error';
+        this.logger.error(`Agent run failed: ${reason}`);
+        return {
+          handledBy: WaHandledBy.ERROR,
+          body: await this.runFailedText(turn),
+          unanswered: {
+            reason: WaUnansweredReason.ERROR,
+            topSimilarity: null,
+            hitCount: 0,
+          },
+          alert: degradedAlert,
+          ...(agent ? { agent } : {}),
+        };
+      }
 
-    const { response: answer } = answerResult.value;
-    const decision = this.toDecision(
-      this.withNoAnswerReply(
-        await this.withDeclineContact(
-          turn,
+      const { response: answer } = answerResult.value;
+      const decision = this.toDecision(
+        this.withNoAnswerReply(
+          await this.withDeclineContact(
+            turn,
+            answer,
+            crisisLevelOf(crisis) === 'upset' || mood === 'upset',
+          ),
           answer,
-          crisisLevelOf(crisis) === 'upset' || mood === 'upset',
         ),
         answer,
-      ),
-      answer,
-      ran,
-      degradedAlert,
-    );
-    if (agent) decision.agent = agent;
-    return this.withConflictCheck(turn, answer, decision);
+        ran,
+        degradedAlert,
+      );
+      if (agent) decision.agent = agent;
+      return this.withConflictCheck(turn, answer, decision);
+    })();
+    return unsure || upset
+      ? withUnsureCrisisInformation(turn, decided)
+      : decided;
   }
 
   /**
@@ -1258,6 +1316,7 @@ export class ChatbotEngineService {
             selfHarm: Boolean(crisis.self_harm),
             animal: aboutAnAnimal(turn.text),
             helplineNumbers: crisisHelplines(turn.settings) || null,
+            india: isIndiaAssistant(chatbot.settings),
           })
         : crisisTextFor(turn),
       crisis: { level: emergency ? 2 : 1, path: 'classifier' },

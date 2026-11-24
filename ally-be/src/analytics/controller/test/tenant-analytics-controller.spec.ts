@@ -3,6 +3,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { TenantAnalyticsController } from '../tenant-analytics.controller';
 import { AnalyticsService } from '../../service/analytics.service';
 import { TenantAnalyticsService } from '../../service/tenant-analytics.service';
+import { TenantInsightsService } from '../../service/tenant-insights.service';
 import { TenantChartLibraryService } from '../../service/tenant-chart-library.service';
 import { CourseAssessmentReportService } from '../../service/course-assessment-report.service';
 import { DataSource } from 'typeorm';
@@ -17,6 +18,7 @@ import { OrganizationMetricsResponseDto } from '../../dto/tenant-analytics.dto';
 import { ExecutionManager } from '../../../common/execution/execution-manager';
 
 describe('TenantAnalyticsController', () => {
+  let module_: TestingModule;
   let controller: TenantAnalyticsController;
   let analyticsService: jest.Mocked<AnalyticsService>;
   let tenantAnalyticsService: jest.Mocked<TenantAnalyticsService>;
@@ -30,7 +32,7 @@ describe('TenantAnalyticsController', () => {
       getOrganizationMetrics: jest.fn(),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
+    module_ = await Test.createTestingModule({
       controllers: [TenantAnalyticsController],
       providers: [
         {
@@ -52,6 +54,10 @@ describe('TenantAnalyticsController', () => {
         {
           provide: CourseAssessmentReportService,
           useValue: { getCoursePairs: jest.fn() },
+        },
+        {
+          provide: TenantInsightsService,
+          useValue: { getInsights: jest.fn(), setState: jest.fn() },
         },
         { provide: DataSource, useValue: { query: jest.fn() } },
         {
@@ -96,9 +102,9 @@ describe('TenantAnalyticsController', () => {
       ],
     }).compile();
 
-    controller = module.get(TenantAnalyticsController);
-    analyticsService = module.get(AnalyticsService);
-    tenantAnalyticsService = module.get(TenantAnalyticsService);
+    controller = module_.get(TenantAnalyticsController);
+    analyticsService = module_.get(AnalyticsService);
+    tenantAnalyticsService = module_.get(TenantAnalyticsService);
   });
 
   afterEach(() => {
@@ -196,6 +202,51 @@ describe('TenantAnalyticsController', () => {
       expect(
         tenantAnalyticsService.getOrganizationMetrics,
       ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('insights', () => {
+    const tenantId = '8b3f2f0e-1c0a-4d6e-9a53-3d1c0d2f4a11';
+    let insights: { getInsights: jest.Mock; setState: jest.Mock };
+
+    beforeEach(() => {
+      insights = module_.get(TenantInsightsService);
+      jest.spyOn(ExecutionManager, 'getTenantId').mockReturnValue(tenantId);
+      jest.spyOn(ExecutionManager, 'getUserId').mockReturnValue('42');
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it('reads the insights for the caller in their own organisation', async () => {
+      insights.getInsights.mockResolvedValue({ attention: [], celebrate: [] });
+      await expect(controller.getInsights()).resolves.toEqual({
+        attention: [],
+        celebrate: [],
+      });
+      expect(insights.getInsights).toHaveBeenCalledWith(tenantId, 42);
+    });
+
+    it('puts an insight away for the caller only', async () => {
+      await controller.setInsightState({
+        fingerprint: 'learners.dormant:2026-W48',
+        state: 'snoozed',
+        days: 3,
+      });
+      expect(insights.setState).toHaveBeenCalledWith(
+        tenantId,
+        42,
+        'learners.dormant:2026-W48',
+        'snoozed',
+        3,
+      );
+    });
+
+    it('refuses a caller with no organisation or no user', async () => {
+      jest.spyOn(ExecutionManager, 'getTenantId').mockReturnValue(undefined);
+      await expect(controller.getInsights()).rejects.toThrow('No tenant');
+      jest.spyOn(ExecutionManager, 'getTenantId').mockReturnValue(tenantId);
+      jest.spyOn(ExecutionManager, 'getUserId').mockReturnValue(undefined);
+      await expect(controller.getInsights()).rejects.toThrow('No user');
     });
   });
 });

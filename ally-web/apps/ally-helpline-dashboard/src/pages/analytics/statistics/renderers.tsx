@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { useGetStatisticsChartQuery } from "@api";
 import type {
   ActivationData,
+  LearnerCoursesData,
   ModuleFunnelData,
   ModuleTimeData,
   RoleplayAttemptsData,
@@ -1888,6 +1889,73 @@ const skillTrendTakeaway = (data: SkillTrendData, t: TFunction) => {
     : t("statisticsLibrary.takeaway.skillTrendFlat");
 };
 
+// ── TSQ-041 Course facts ───────────────────────────────────────
+
+const courseFactsTakeaway = (data: MeasuresData, t: TFunction) => {
+  const enrolled = measureValue(data, "enrolled");
+  return enrolled === 0
+    ? t("statisticsLibrary.takeaway.courseFactsNone")
+    : t("statisticsLibrary.takeaway.courseFacts", {
+        completed: measureValue(data, "completed"),
+        enrolled,
+      });
+};
+
+// ── TSQ-064 Progress in each course ────────────────────────────
+
+const STATUS_COLOUR: Record<LearnerCoursesData["rows"][number]["status"], string> = {
+  completed: "#1e6b3a",
+  inProgress: "#2a5db0",
+  notStarted: "#8f8a7e",
+};
+
+const LearnerCourses = ({ data }: DataRendererProps<LearnerCoursesData>) => {
+  const { t } = useTranslation();
+  if (data.rows.length === 0) {
+    return (
+      <p className="text-sm text-typography-600">{t("statisticsLibrary.learnerCourses.none")}</p>
+    );
+  }
+  return (
+    <ul className="flex flex-col gap-3" data-testid="statistics-learner-courses">
+      {data.rows.map(row => {
+        const percent =
+          row.totalItems > 0 ? Math.round((row.completedItems / row.totalItems) * 100) : 0;
+        return (
+          <li key={row.courseId} className="flex flex-col gap-1 text-sm">
+            <span className="flex items-center justify-between gap-3">
+              <span className="truncate text-typography-900" title={row.title}>
+                {row.title}
+              </span>
+              <span className="flex-none text-typography-600">
+                {t(`statisticsLibrary.learnerCourses.status.${row.status}`)} ·{" "}
+                {t("statisticsLibrary.learnerCourses.items", {
+                  done: row.completedItems,
+                  total: row.totalItems,
+                })}
+              </span>
+            </span>
+            <span className="h-3 rounded-md bg-[#efebe0]">
+              <span
+                className="block h-3 rounded-md"
+                style={{ width: `${percent}%`, background: STATUS_COLOUR[row.status] }}
+              />
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+};
+
+const learnerCoursesTakeaway = (data: LearnerCoursesData, t: TFunction) =>
+  data.rows.length > 0
+    ? t("statisticsLibrary.takeaway.learnerCourses", {
+        done: data.rows.filter(r => r.status === "completed").length,
+        total: data.rows.length,
+      })
+    : null;
+
 // ── Pinned cards ───────────────────────────────────────────────
 
 /** "9 more than the previous period", with whether that is good news. */
@@ -2005,6 +2073,8 @@ export const CHART_RENDERERS: Record<string, ChartRenderer> = {
   "TSQ-018": { kind: "data", Component: ItemFormats, takeaway: makeItemFormatsTakeaway() },
   "TSQ-019": { kind: "data", Component: QuizPass, takeaway: quizPassTakeaway },
   "TSQ-024": { kind: "data", Component: SkillChange, takeaway: skillChangeTakeaway },
+  "TSQ-041": { kind: "data", Component: Measures, takeaway: courseFactsTakeaway },
+  "TSQ-064": { kind: "data", Component: LearnerCourses, takeaway: learnerCoursesTakeaway },
   "TSQ-043": { kind: "data", Component: TimeToFinish, takeaway: timeToFinishTakeaway },
   "TSQ-045": { kind: "data", Component: ModuleFunnel, takeaway: moduleFunnelTakeaway },
   "TSQ-046": { kind: "data", Component: ModuleTime, takeaway: moduleTimeTakeaway },

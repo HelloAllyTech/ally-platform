@@ -19,10 +19,11 @@ import { useTranslation } from "react-i18next";
 
 import { useGetStatisticsChartQuery } from "@api";
 import { useUser } from "@hooks";
-import type { StatisticsChartEntry, StatisticsViewConfig } from "@types";
+import type { StatisticsChartEntry, StatisticsInsight, StatisticsViewConfig } from "@types";
 
 import { SortableMetricBlock } from "../SortableMetricBlock";
 import { filterParams } from "./ChartHost";
+import { InsightsSection } from "./InsightsSection";
 import { LayoutItem, layoutKey, parseLayoutKey, viewChartIds } from "./layout";
 import { LibraryDrawer } from "./LibraryDrawer";
 import { CHART_RENDERERS, PinSummary } from "./renderers";
@@ -38,6 +39,8 @@ interface ForYouViewProps {
   onPinsChange: (keys: string[]) => void;
   /** Opens the chart a pinned card is about, on the tab it lives on. */
   onOpen: (item: LayoutItem) => void;
+  /** Opens the chart a finding comes from. */
+  onOpenInsight: (insight: StatisticsInsight) => void;
 }
 
 const TONE_CLASS = {
@@ -149,6 +152,7 @@ export const ForYouView: FunctionComponent<ForYouViewProps> = ({
   pinKeys,
   onPinsChange,
   onOpen,
+  onOpenInsight,
 }) => {
   const { t } = useTranslation();
   const { user } = useUser();
@@ -173,21 +177,19 @@ export const ForYouView: FunctionComponent<ForYouViewProps> = ({
     onPinsChange(arrayMove(keys, from, to));
   };
 
-  // Every chart that can be pinned, listed under the tab it lives on.
-  const libraryEntries = views.flatMap(view =>
+  // Every chart that can be pinned, listed once, under the tab it belongs on.
+  const entries = views.flatMap(view =>
     viewChartIds(view)
       .map(id => byId.get(id))
       .filter(
         (chart): chart is StatisticsChartEntry =>
           !!chart &&
+          chart.home === view.id &&
           CHART_RENDERERS[chart.id]?.kind === "data" &&
           !!(CHART_RENDERERS[chart.id] as { pin?: unknown }).pin,
       )
       .map(chart => ({ chart, group: view.id })),
   );
-  // A chart on two tabs is listed once, under the first.
-  const seen = new Set<string>();
-  const entries = libraryEntries.filter(({ chart }) => !seen.has(chart.id) && !!seen.add(chart.id));
   const groups = views.map(view => ({
     key: view.id,
     label: t(`statisticsLibrary.tabs.${view.id}`),
@@ -207,6 +209,8 @@ export const ForYouView: FunctionComponent<ForYouViewProps> = ({
           ? t(`statisticsLibrary.forYou.greeting.${part}`, { name: firstName })
           : t(`statisticsLibrary.forYou.greetingNoName.${part}`)}
       </h2>
+
+      <InsightsSection onOpen={onOpenInsight} />
 
       <section className="flex flex-col gap-3" aria-label={t("statisticsLibrary.pins.heading")}>
         <div className="flex flex-wrap items-center justify-between gap-3">

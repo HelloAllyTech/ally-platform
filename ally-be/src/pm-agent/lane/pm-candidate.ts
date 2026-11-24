@@ -39,6 +39,10 @@ const RECOMMENDATION_SCHEMA = {
     problem: str,
     plan: {
       type: 'object',
+      description:
+        'Only steps, files, acceptanceCriteria, testPlan and defaultsChosen. size, risk, ' +
+        'evidenceIds, opportunity and the rest sit beside plan, not inside it.',
+      additionalProperties: false,
       properties: {
         steps: strList,
         files: {
@@ -148,6 +152,42 @@ const RECOMMENDATION_SCHEMA = {
   ],
 };
 
+/**
+ * Recommendation fields that belong beside `plan` (every top-level property except `plan` and
+ * the names `plan` itself defines). Derived from the schema so a new field is covered for free.
+ */
+const PLAN_SIBLING_KEYS: readonly string[] = Object.keys(
+  RECOMMENDATION_SCHEMA.properties,
+).filter(
+  (key) =>
+    key !== 'plan' &&
+    !(key in RECOMMENDATION_SCHEMA.properties.plan.properties),
+);
+
+/**
+ * Models (gpt-5-mini in prod, 2026-11-24) nest the recommendation's own fields inside `plan`
+ * — size, risk, evidenceIds, opportunity… — and keep doing it after the repair note, so every
+ * candidate was discarded. Moving a misplaced field up is lossless: it only happens when the
+ * top level does not already hold that field, and the moved value is validated like any other.
+ */
+export function hoistMisplacedPlanFields(
+  body: Record<string, any>,
+): Record<string, any> {
+  const plan = body.plan;
+  if (!plan || typeof plan !== 'object' || Array.isArray(plan)) return body;
+  const misplaced = PLAN_SIBLING_KEYS.filter(
+    (key) => key in plan && !(key in body),
+  );
+  if (!misplaced.length) return body;
+  const nextPlan = { ...plan };
+  const hoisted: Record<string, any> = {};
+  for (const key of misplaced) {
+    hoisted[key] = nextPlan[key];
+    delete nextPlan[key];
+  }
+  return { ...body, ...hoisted, plan: nextPlan };
+}
+
 const QUESTION_SCHEMA = {
   type: 'object',
   description: 'Required when kind = question.',
@@ -254,7 +294,12 @@ export function checkCandidate(
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return { errors: [`${kind}: the ${kind} object is missing`] };
   }
-  const payload: Record<string, any> = { ...body, schemaVersion: 1 };
+  const payload: Record<string, any> = {
+    ...(kind === PmCardKind.RECOMMENDATION
+      ? hoistMisplacedPlanFields(body)
+      : body),
+    schemaVersion: 1,
+  };
   if (kind === PmCardKind.QUESTION) {
     payload.questionKey = slug(payload.questionKey || payload.title);
   }

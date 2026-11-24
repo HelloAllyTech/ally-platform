@@ -87,20 +87,37 @@ describe('a way to reach a person (stage 4)', () => {
 });
 
 describe('the off message for archived and paused chatbots (stage 4)', () => {
+  // Outside India (R6); an assistant with no time zone is in India.
+  const away = { timeZone: 'Europe/London' };
+
   it('always carries the crisis link, even with the owner’s own words', () => {
-    expect(offMessage({ settings: {} }, 'en')).toBe(
+    expect(offMessage({ settings: away }, 'en')).toBe(
       `This assistant isn't available right now. If you need support now, you can find a helpline near you at ${LINK}`,
     );
     const own = offMessage(
-      { settings: { archivedMessage: 'We have moved to a new number.' } },
+      {
+        settings: {
+          ...away,
+          archivedMessage: 'We have moved to a new number.',
+        },
+      },
       'en',
     );
     expect(own).toMatch(/^We have moved to a new number\. /);
     expect(own).toContain(LINK);
     // The builder's numbers first.
     expect(
-      offMessage({ settings: { helplineNumbers: '1800 111 222' } }, 'hi-latn'),
+      offMessage(
+        { settings: { ...away, helplineNumbers: '1800 111 222' } },
+        'hi-latn',
+      ),
     ).toMatch(/1800 111 222 par call karein.*findahelpline/);
+  });
+
+  it('in India, carries 112 and Tele-MANAS 14416 before the link', () => {
+    expect(offMessage({ settings: {} }, 'en')).toBe(
+      `This assistant isn't available right now. If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7). Or find a helpline near you at ${LINK}`,
+    );
   });
 
   it('archived and paused are off; live and draft are not', () => {

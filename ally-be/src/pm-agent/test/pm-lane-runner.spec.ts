@@ -83,6 +83,49 @@ describe('PmLaneRunner', () => {
     expect(repairMessage).toContain('title must be at most 12 words');
   });
 
+  it('after a repair note, refuses research instead of running it and still gets the resubmit', async () => {
+    // Production 2026-11-24: gpt-5-mini answered the repair note with research calls on
+    // every remaining pass; they ran, and the lane ended `no_submit` with nothing kept.
+    let submits = 0;
+    let afterRepair = 0;
+    const { run, llm, toolbox } = setup((req) => {
+      const ids = evidenceIdsIn(req);
+      if (!ids.length) return callTool('analytics_section', {});
+      if (submits === 0) {
+        submits += 1;
+        return submitTurn([
+          recCandidate(0, ids, PmCardCategory.PRODUCT, {
+            title:
+              'This title is far too long to ever pass the twelve word limit set by code',
+          }),
+        ]);
+      }
+      afterRepair += 1;
+      if (afterRepair <= 2) return callTool('analytics_section', {});
+      submits += 1;
+      return submitTurn([recCandidate(0, ids)]);
+    });
+    const result = await run();
+
+    expect(result.outcome).toBe('ok');
+    expect(result.candidates).toHaveLength(1);
+    expect(submits).toBe(2);
+    // Only the first, pre-repair research call ran.
+    expect(toolbox.calls).toHaveLength(1);
+    expect(result.toolCalls).toBe(1);
+    expect(result.repairErrors.join(' ')).toContain(
+      'title must be at most 12 words',
+    );
+    // Every submit-only pass asked the provider to make the call mandatory.
+    const submitOnly = llm.calls.filter((c) => c.tools.length === 1);
+    expect(submitOnly.length).toBe(3);
+    expect(submitOnly.every((c) => c.toolChoice === 'required')).toBe(true);
+    expect(llm.calls[0].toolChoice).toBeUndefined();
+    expect(JSON.stringify(llm.calls[llm.calls.length - 1].messages)).toContain(
+      'only submit_candidates is available now',
+    );
+  });
+
   it('rejects evidence ids that were not fetched in this run', async () => {
     const forged = '22222222-2222-4222-8222-222222222222';
     const { run } = setup((req) =>

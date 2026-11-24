@@ -40,6 +40,11 @@ export class TenantChartLibraryEntryDto {
   @ApiProperty({ description: 'The question the chart answers' })
   question!: string;
   @ApiProperty({ enum: CHART_GROUPS }) group!: ChartGroup;
+  @ApiProperty({
+    enum: ['organisation', 'course', 'learner'],
+    description: 'The tab the chart belongs on',
+  })
+  home!: 'organisation' | 'course' | 'learner';
   @ApiProperty({ enum: CHART_SHAPES }) shape!: ChartShape;
   @ApiProperty({ enum: CHART_TYPES }) chart!: ChartType;
   @ApiProperty({ enum: ['s', 'm', 'wide'] }) size!: ChartSize;

@@ -52,6 +52,8 @@ export interface StatisticsChartEntry {
   /** The question the chart answers. */
   question: string;
   group: StatisticsChartGroup;
+  /** The tab the chart belongs on. */
+  home: StatisticsViewId;
   shape: string;
   chart: string;
   size: StatisticsChartSize;
@@ -334,4 +336,45 @@ export interface RoleplayAttemptsData {
 /** TSQ-065 */
 export interface SkillTrendData {
   skills: Array<{ skill: string; points: Array<{ slice: number; level: number }> }>;
+}
+
+/** One finding on For you: what a rule found in the organisation's own charts. */
+export interface StatisticsInsight {
+  /** Names the finding and the week it was found in; used to put it away. */
+  fingerprint: string;
+  /** The rule. The sentence is written from it, in the reader's language. */
+  ruleId: string;
+  polarity: "attention" | "celebrate";
+  severity: number;
+  /** The numbers and names the sentence is written from. */
+  params: Record<string, string | number>;
+  /** The chart the finding comes from, and the tab it is on. */
+  chartId: string;
+  view: StatisticsViewId;
+  /** The course or learner that shows the finding, when it is about one. */
+  filters?: Partial<Record<StatisticsFilterKey, string>>;
+}
+
+export interface StatisticsInsights {
+  attention: StatisticsInsight[];
+  celebrate: StatisticsInsight[];
+}
+
+export interface UpdateStatisticsInsightStateRequest {
+  fingerprint: string;
+  state: "done" | "snoozed";
+  /** How many days "snoozed" hides it. */
+  days?: number;
+}
+
+/** TSQ-064 */
+export interface LearnerCoursesData {
+  rows: Array<{
+    courseId: string;
+    title: string;
+    completedItems: number;
+    totalItems: number;
+    status: "completed" | "inProgress" | "notStarted";
+    lastActivityAt: string | null;
+  }>;
 }

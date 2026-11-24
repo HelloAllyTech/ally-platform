@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { CareTopic, Industry, SafetyPackId } from '../enum/bot-draft.enum';
 import {
+  GENERAL_CRISIS_TEXT,
   isHealthPack,
   PACK_FOR_INDUSTRY,
   packForBusiness,
@@ -145,9 +146,7 @@ describe('crisis and emergency replies in the person language (Q3-fast Part 1)',
       /^This sounds like an emergency\. Please go to the nearest emergency department or your nearest vet now/,
     );
     // One at-risk reply on every pack (stop 1): Tele-MANAS first, never "if this is an emergency".
-    expect(packs.crisisReply({ pack: 'medical' })).toBe(
-      packs.GENERAL_CRISIS_TEXT,
-    );
+    expect(packs.crisisReply({ pack: 'medical' })).toBe(GENERAL_CRISIS_TEXT);
     expect(packs.crisisReply({ pack: 'medical', language: 'hi' })).toMatch(
       /^लगता है कि यह गंभीर स्थिति हो सकती है।/,
     );

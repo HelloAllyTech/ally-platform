@@ -618,6 +618,16 @@ describe('TenantChartLibraryService', () => {
       });
     });
 
+    it('says which tab each chart belongs on', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(caps());
+      const lib = await service.getLibrary(TENANT);
+      const home = Object.fromEntries(lib.charts.map((c) => [c.id, c.home]));
+      expect(home['TSQ-001']).toBe('organisation');
+      expect(home['TSQ-008']).toBe('learner');
+      expect(home['TSQ-045']).toBe('course');
+    });
+
     it('describes each card filter, required only where there is no all-organisation view', async () => {
       enabled();
       repo.getCapabilities.mockResolvedValue(caps());

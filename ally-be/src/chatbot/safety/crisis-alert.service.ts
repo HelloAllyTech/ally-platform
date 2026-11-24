@@ -13,6 +13,7 @@ import {
   WaMessageDirection,
   WaMessageStatus,
 } from '../../whatsapp/enum/whatsapp.enum';
+import { isIndiaAssistant } from '../agent-tools/list-tools';
 import { crisisHelplines } from '../engine/crisis-helplines';
 import { replyLanguageOf } from '../engine/reply-language';
 import {
@@ -540,6 +541,7 @@ export class CrisisAlertService implements OnModuleInit {
     make: (
       language: ReturnType<typeof replyLanguageOf>,
       numbers?: string | null,
+      india?: boolean,
     ) => string,
   ): Promise<string> {
     const said = await this.lastInbound(conversationId);
@@ -552,7 +554,25 @@ export class CrisisAlertService implements OnModuleInit {
     } catch {
       numbers = undefined;
     }
-    return make(replyLanguageOf(said.text, said.language), numbers);
+    return make(
+      replyLanguageOf(said.text, said.language),
+      numbers,
+      isIndiaAssistant(await this.chatbotSettings(chatbot)),
+    );
+  }
+
+  /** The chatbot's own settings row (for its time zone), or null when it can't be read. */
+  private async chatbotSettings(chatbot: ChatbotRef): Promise<unknown> {
+    if (chatbot.settings) return chatbot.settings;
+    try {
+      const [row] = (await this.dataSource.query(
+        `SELECT settings FROM chatbots WHERE id = $1`,
+        [chatbot.id],
+      )) as { settings: unknown }[];
+      return row?.settings ?? null;
+    } catch {
+      return null;
+    }
   }
 
   private async assistantName(chatbot: ChatbotRef): Promise<string> {
