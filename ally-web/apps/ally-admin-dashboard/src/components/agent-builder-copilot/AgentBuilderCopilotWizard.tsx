@@ -138,9 +138,16 @@ const nextStepText = (step: ReturnType<typeof suggestNextSteps>[number]): string
 const QUESTIONS: Record<Exclude<WizardStepId, "generate" | "restored">, string> = {
   describe: "Describe roleplay actor",
   competency: "Select one competency",
-  mode: modeStrings.question,
-  character: en.agentBuilderCharacter.question,
-  languages: en.agentBuilderLanguages.question,
+  // Read when shown, not when this file loads (tests replace `en` with a partial copy).
+  get mode() {
+    return modeStrings.question;
+  },
+  get character() {
+    return characterStrings.question;
+  },
+  get languages() {
+    return languageStrings.question;
+  },
   goals: "Select agent test cases",
 };
 

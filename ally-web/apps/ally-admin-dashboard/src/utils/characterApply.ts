@@ -1,4 +1,4 @@
-import { FORM_FIELD_IDS } from "../constants/SimulationCreator";
+import { FORM_FIELD_IDS } from "@constants";
 import type { CharacterData } from "../types/simulation";
 import { asList } from "./characterData";
 
