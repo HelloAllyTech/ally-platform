@@ -286,7 +286,7 @@ const matches = (row: CreditAccountRow, q: string) =>
   !q || (row.name ?? "").toLowerCase().includes(q) || (row.email ?? "").toLowerCase().includes(q);
 
 /** Ally admin -> Credits (`manage_costs`, checked by ally-be and by the route). */
-export const StaffCredits: React.FC = () => {
+export const StaffCredits: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const { data, isLoading, isError } = useGetCreditAccountsQuery();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -296,11 +296,13 @@ export const StaffCredits: React.FC = () => {
   );
   const a = C.accounts;
   return (
-    <div className="p-4 md:p-6 space-y-4" data-testid="staff-credits">
-      <header>
-        <h1 className="text-2xl font-medium">{C.title}</h1>
-        <p className="text-sm text-typography-600">{C.intro}</p>
-      </header>
+    <div className={embedded ? "space-y-4" : "p-4 md:p-6 space-y-4"} data-testid="staff-credits">
+      {!embedded && (
+        <header>
+          <h1 className="text-2xl font-medium">{C.title}</h1>
+          <p className="text-sm text-typography-600">{C.intro}</p>
+        </header>
+      )}
       {open ? (
         <Ledger accountId={open} onBack={() => setOpen(null)} />
       ) : (
@@ -365,5 +367,3 @@ export const StaffCredits: React.FC = () => {
     </div>
   );
 };
-
-export default StaffCredits;

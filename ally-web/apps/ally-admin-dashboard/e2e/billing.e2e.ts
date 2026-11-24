@@ -78,8 +78,9 @@ const expectNoPageScrollX = async (page: Page) => {
 test("Models: prices per million tokens, the unpriced banner and WhatsApp rates", async ({
   page,
 }) => {
-  await open(page, "/billing/models");
-  const pageRoot = page.getByTestId("billing-models-page");
+  // Models now lives in Assistants admin → Pricing & costs → Model prices.
+  await open(page, "/assistants-admin/pricing?view=models");
+  const pageRoot = page.getByTestId("aa-panel-pricing-models");
   await expect(pageRoot).toBeVisible();
   await expect(page.getByTestId("billing-unknown-models")).toContainText("gpt-5.1-mini");
   const table = page.getByTestId("billing-models-table");
@@ -94,7 +95,7 @@ test("Models: prices per million tokens, the unpriced banner and WhatsApp rates"
   await expect(page.getByTestId("billing-model-delete")).toBeDisabled();
   await page.getByRole("button", { name: "Close panel" }).click();
 
-  await page.getByRole("button", { name: "WhatsApp rates" }).click();
+  await page.getByRole("tab", { name: "WhatsApp rates" }).click();
   await expect(page.getByTestId("billing-whatsapp-table").getByText("$0.0118")).toBeVisible();
 });
 

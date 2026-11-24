@@ -442,7 +442,7 @@ const PackCard: React.FC<{
 };
 
 /** Ally admin -> Safety packs (stage 9). Gated by `manage:safety-packs`. */
-export const SafetyPacks: React.FC = () => {
+export const SafetyPacks: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const { data, isLoading, isError, refetch } = useGetSafetyPacksQuery();
   const [open, setOpen] = useState<string | null>(null);
 
@@ -451,10 +451,10 @@ export const SafetyPacks: React.FC = () => {
   const openPack = open ? data.packs.find(p => p.releases.some(r => r.id === open)) : undefined;
 
   return (
-    <div className="space-y-4 p-4 md:p-6 max-w-5xl">
+    <div className={embedded ? "space-y-4 max-w-5xl" : "space-y-4 p-4 md:p-6 max-w-5xl"}>
       <header className="space-y-1">
-        <h1 className="text-2xl font-medium">{C.title}</h1>
-        <p className="text-sm">{C.intro}</p>
+        {!embedded && <h1 className="text-2xl font-medium">{C.title}</h1>}
+        {!embedded && <p className="text-sm">{C.intro}</p>}
         <p className="text-sm text-typography-600">{C.languages(data.languages)}</p>
         {!data.enabled && <Message ok={false} text={C.switchedOff} />}
       </header>
@@ -472,5 +472,3 @@ export const SafetyPacks: React.FC = () => {
     </div>
   );
 };
-
-export default SafetyPacks;

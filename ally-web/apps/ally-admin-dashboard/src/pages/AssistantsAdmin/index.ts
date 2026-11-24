@@ -1,0 +1,1 @@
+export { AssistantsAdmin } from "./AssistantsAdmin";

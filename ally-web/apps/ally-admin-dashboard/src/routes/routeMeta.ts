@@ -165,10 +165,6 @@ const buildTable = (): RouteMetaEntry[] => {
     { path: ROUTES.MANAGE_GUARDRAILS, title: i.guardrails, section: "ai-languages" },
     { path: ROUTES.MANAGE_STT_CONFIGS, title: i.speechRecognition, section: "ai-languages" },
     { path: ROUTES.MANAGE_LLM_MODEL_CATALOG, title: i.languageModels, section: "ai-languages" },
-    { path: ROUTES.BILLING_MODELS, title: i.billingModels, section: "ai-languages" },
-    { path: ROUTES.BILLING_COSTS, title: i.billingCosts, section: "ai-languages" },
-    { path: ROUTES.BILLING_PLANS, title: i.billingPlans, section: "ai-languages" },
-    { path: ROUTES.BILLING_CREDITS, title: i.billingCredits, section: "ai-languages" },
     { path: ROUTES.MANAGE_SCENARIO_VOICES, title: i.voices, section: "ai-languages" },
     { path: ROUTES.AI_TASKS, title: i.aiTasks, section: "ai-languages" },
     { path: ROUTES.MANAGE_SCENARIO_LANGUAGES, title: i.languages, section: "ai-languages" },
@@ -254,13 +250,9 @@ const buildTable = (): RouteMetaEntry[] => {
       section: "product",
       fullBleed: true,
     },
-    // Staff only (stage 2): the defaults, shared quick replies, library and numbers.
-    {
-      path: ROUTES.ASSISTANT_DEFAULTS,
-      title: en.assistantDefaults.title,
-      section: "product",
-      parent: ROUTES.WHATSAPP_BOT,
-    },
+    // Ally staff's one home for the Assistants product (`/assistants-admin/<section>`).
+    { path: ROUTES.ASSISTANTS_ADMIN, title: i.assistantsAdmin, section: "product" },
+    { path: `${ROUTES.ASSISTANTS_ADMIN}/:section`, title: i.assistantsAdmin, section: "product" },
     { path: ROUTES.DIRECTORY, title: "Resources directory", section: "product", fullBleed: true },
     {
       path: ROUTES.DIRECTORY_COLLECTION,
