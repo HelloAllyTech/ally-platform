@@ -26,8 +26,12 @@ export const PM_PIPELINE = {
   MAX_PASSES: 6,
   /** Tool calls a single pass may make (extra calls are refused, not run). */
   MAX_TOOL_CALLS_PER_PASS: 6,
-  /** Output cap per lane pass and per critic call. */
-  LANE_MAX_TOKENS: 4000,
+  /**
+   * Output cap per lane pass and per critic call. Reasoning models (gpt-5-mini) spend part of
+   * it thinking: at 4000, prod submits were cut off at max_tokens and discarded (2026-11-24,
+   * infra_cost). 12000 leaves room for a full recommendation; the ledger still reserves per pass.
+   */
+  LANE_MAX_TOKENS: 12000,
   CRITIC_MAX_TOKENS: 3000,
   /** Per-call SDK deadline (passed to the provider, so a hung call stops billing). */
   CALL_TIMEOUT_MS: 90_000,
