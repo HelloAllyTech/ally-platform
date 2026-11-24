@@ -5,8 +5,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * sessions and transcript. It produces normal Studio roleplays and keeps no
  * engine of its own.
  */
-export class CreateRoleplayInterview1986600000000 implements MigrationInterface {
-  name = 'CreateRoleplayInterview1986600000000';
+export class CreateRoleplayInterview1987700000000 implements MigrationInterface {
+  name = 'CreateRoleplayInterview1987700000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
