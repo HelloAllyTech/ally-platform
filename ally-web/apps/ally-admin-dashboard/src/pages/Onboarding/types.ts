@@ -154,4 +154,6 @@ export interface PublishResult {
   slug: string;
   link: string;
   access: "public" | "organisation" | "invite";
+  /** TF1 S2: what is set aside for its customers' replies, and whether going live added it. */
+  budget?: { setAsideUsd: number; added: boolean } | null;
 }

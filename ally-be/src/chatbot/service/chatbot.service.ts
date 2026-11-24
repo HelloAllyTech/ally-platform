@@ -636,6 +636,14 @@ export class ChatbotService {
     );
     if (status === ChatbotStatus.LIVE) {
       await this.plans?.ensureIncludedSeats(id).catch(() => undefined);
+      // TF1 S2: without a budget a live assistant answers nobody.
+      await this.ledger
+        ?.ensureStartingBudget(id, currentUserId() || null)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `Starting budget not set for chatbot ${id}: ${error instanceof Error ? error.message : 'unknown'}`,
+          ),
+        );
     }
     // One switch: live means people can use it, so its page (and website chat) turns on with it.
     // Pausing leaves the page on, where visitors see that it's away rather than a missing page.

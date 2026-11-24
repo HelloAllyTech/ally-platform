@@ -15,10 +15,12 @@ import { BUILD_COPY, GO_LIVE_ACCESS_COPY } from "./copy";
 import { PurposeInput } from "./Fields";
 import { codeOf, errorOf, isCreditsRequired, messageOf } from "./logic";
 import { SAFETY_PRIVACY_COPY } from "../../AssistantHome/copy/safetyPrivacy";
+import { TF1_COPY } from "../../AssistantHome/copy/tf1";
 import { AudienceAgeField, HumanContactField } from "../../AssistantHome/safety/SafetyFields";
 import { useSafetySettings } from "../../AssistantHome/safety/useSafetySettings";
 
 import type { FieldCommon } from "./Fields";
+import type { PublishResult } from "../types";
 
 const G = BUILD_COPY.goLive;
 const S = SAFETY_PRIVACY_COPY;
@@ -162,6 +164,7 @@ export const GoLiveSection: React.FC<{
   const [ask, setAsk] = useState<{ message: string; belowGate: boolean } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
+  const [budget, setBudget] = useState<PublishResult["budget"]>(null);
   const [missing, setMissing] = useState<Missing>({});
   const safety = useSafetySettings(chatbotId ?? "");
   const data = checklist.data?.items ? checklist.data : null;
@@ -179,6 +182,7 @@ export const GoLiveSection: React.FC<{
       }).unwrap();
       setAsk(null);
       setLink(result.link);
+      setBudget(result.budget ?? null);
       onLive();
     } catch (error) {
       const code = codeOf(error);
@@ -253,7 +257,15 @@ export const GoLiveSection: React.FC<{
             </a>
           )}
         </p>
-      ) : (
+      ) : null}
+      {live && budget ? (
+        <p className="ally-small" role="status" data-testid="golive-budget">
+          {budget.setAsideUsd > 0
+            ? TF1_COPY.goLive.budgetAdded.replace("{amount}", budget.setAsideUsd.toFixed(2))
+            : TF1_COPY.goLive.budgetNone}
+        </p>
+      ) : null}
+      {live ? null : (
         <>
           {blocked && <p className="ally-small">{G.refused}</p>}
           {ask ? (

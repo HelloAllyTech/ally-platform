@@ -31,6 +31,7 @@ vi.mock("@api", async importOriginal => ({
 /* eslint-disable import/first */
 import { BUILD_COPY, GO_LIVE_ACCESS_COPY } from "../create/copy";
 import { GoLiveSection } from "../create/GoLive";
+import { TF1_COPY } from "../../AssistantHome/copy/tf1";
 /* eslint-enable import/first */
 
 const green = {
@@ -92,5 +93,20 @@ describe("GoLiveSection", () => {
       (screen.getByRole("button", { name: BUILD_COPY.goLive.publish }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+  });
+
+  // TF1 S2: it went live into "answers nobody" without a word about the budget.
+  it.each([
+    [{ setAsideUsd: 2, added: true }, TF1_COPY.goLive.budgetAdded.replace("{amount}", "2.00")],
+    [{ setAsideUsd: 0, added: false }, TF1_COPY.goLive.budgetNone],
+  ])("says what is set aside for replies once live (%o)", async (budget, line) => {
+    h.publish = vi.fn().mockResolvedValue({ link: "https://ally.example/b/x", budget });
+    const props = { draftId: "draft-1", chatbotId: "bot-1", onCreditsOut: vi.fn() };
+    const onLive = vi.fn();
+    const { rerender } = render(<GoLiveSection {...props} live={false} onLive={onLive} />);
+    fireEvent.click(screen.getByRole("button", { name: BUILD_COPY.goLive.publish }));
+    await waitFor(() => expect(onLive).toHaveBeenCalled());
+    rerender(<GoLiveSection {...props} live onLive={onLive} />);
+    expect(screen.getByTestId("golive-budget").textContent).toBe(line);
   });
 });
