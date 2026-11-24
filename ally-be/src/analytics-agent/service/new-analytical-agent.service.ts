@@ -27,6 +27,7 @@ import {
   parseToolResult,
 } from './analytical-agent-trace';
 import { createDatalyzeTaskTokenMiddleware } from '../util/datalyze-task-token.util';
+import { analyticsGoogleAuthOptions } from '../util/analytics-google-credentials.util';
 
 const logger = new Logger('AnalyticalAgent');
 
@@ -58,9 +59,10 @@ function requireEnv(name: string): string {
 }
 
 function buildMcpClient(): MultiServerMCPClient {
-  const google = new GoogleAuth({
-    scopes: ['https://www.googleapis.com/auth/bigquery'],
-  });
+  // Its own credential (ANALYTICS_GOOGLE_CREDENTIALS), not the shared GOOGLE_APPLICATION_CREDENTIALS.
+  const google = new GoogleAuth(
+    analyticsGoogleAuthOptions(['https://www.googleapis.com/auth/bigquery']),
+  );
 
   const authProvider: OAuthClientProvider = {
     get redirectUrl() {
