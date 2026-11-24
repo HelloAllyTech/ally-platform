@@ -60,6 +60,44 @@ describe('gate layer 1 — deterministic', () => {
     expect(gate(rec())).toEqual({ pass: true, reasons: [] });
   });
 
+  describe('privacy: full public filter on the roadmap entry, leak rules elsewhere', () => {
+    const codeLike =
+      'Add migration 1988000000000-FirstPracticeTile keyed by toggle 0b7e7c1e-2f7a-4a43-9a6b-2a6d1f1c0042';
+    const withDefault = (line: string) =>
+      rec({
+        plan: {
+          ...recFor(0, [E1]).plan,
+          defaultsChosen: ['Keep the API shape: nothing depends on it', line],
+        },
+      });
+
+    it('lets code-like text through in an admin-only field', () => {
+      // Prod 2026-11-24: a gpt-5 card died on one plan.defaultsChosen line.
+      expect(gate(withDefault(codeLike))).toEqual({ pass: true, reasons: [] });
+    });
+
+    it('still refuses the same text in the published description, naming the rule', () => {
+      const published = rec({
+        opportunity: {
+          ...recFor(0, [E1]).opportunity,
+          description: `${recFor(0, [E1]).opportunity.description} ${codeLike}`,
+        },
+      });
+      const reasons = gate(published).reasons.join(' ');
+      expect(reasons).toContain('opportunity.description');
+      expect(reasons).toMatch(/\((?:phone|id)(?:, (?:phone|id))*\)/);
+    });
+
+    it('still refuses a real leak in an admin-only field', () => {
+      const tenant = gate(withDefault('Pilot it with Acme Health first'));
+      expect(tenant.reasons.join()).toContain(
+        'plan.defaultsChosen[1]: contains text a public PRD must not carry (tenant_name)',
+      );
+      const email = gate(withDefault('Ask ops@example.com to enable it'));
+      expect(email.reasons.join()).toContain('(email)');
+    });
+  });
+
   it("never treats the platform's own organisation as a customer to redact", () => {
     // Prod 2026-11-24: Ally's own org is a `tenants` row, so `ally-be` and every repo path
     // were redacted and every recommendation failed. The real customer name still is.
