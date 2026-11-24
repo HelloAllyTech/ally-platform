@@ -13,6 +13,7 @@ import { ButtonVariant } from "@components/types";
 import { ChatbotAccessMode } from "@types";
 
 import { ACCESS_COPY as C } from "../../Credits/copy";
+import { TF1_COPY } from "../copy/tf1";
 import { Group } from "../fields";
 
 import type { SectionProps } from "./props";
@@ -49,7 +50,7 @@ export const parseEntries = (text: string): { entries: AccessEntryInput[]; bad: 
  * Channels -> Who may chat (stage 6): the chatbot's invite list. Invite only is the one mode for
  * now. Removing someone takes effect at once (the engine reads the list on every message).
  */
-export const WhoMayChat: React.FC<SectionProps> = ({ bot, canEdit }) => {
+export const WhoMayChat: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
   const { data, isError } = useGetAccessListQuery(bot.id);
   const [add, { isLoading: adding }] = useAddAccessEntriesMutation();
   const [remove] = useRemoveAccessEntryMutation();
@@ -101,7 +102,14 @@ export const WhoMayChat: React.FC<SectionProps> = ({ bot, canEdit }) => {
           </span>
         </label>
       </fieldset>
-      <p className="ally-field__hint">{C.mode.note}</p>
+      {/* TF1 B2: who can chat now, in one plain line, from the page's own access. */}
+      <p className="ally-field__hint" data-testid="who-can-chat-line">
+        {home?.fields?.pageAccess?.value === "organisation"
+          ? TF1_COPY.access.organisation
+          : home?.fields?.pageAccess?.value === "public"
+            ? TF1_COPY.access.public
+            : TF1_COPY.access.invite}
+      </p>
 
       {canEdit && (
         <form onSubmit={submit} noValidate>

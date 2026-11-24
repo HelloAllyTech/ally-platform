@@ -46,4 +46,10 @@ export const TF1_COPY = {
     /** F5: a card for an assistant still in setup also opens its home. */
     openHome: "Knowledge, lists and settings",
   },
+  access: {
+    /** B2: who can chat, in one plain line, in Channels (the cover says the same to visitors). */
+    invite: "Who can chat: only the people on this list. Share the link with them yourself.",
+    organisation: "Who can chat: people in your organisation, after they confirm their work email.",
+    public: "Who can chat: anyone with the link.",
+  },
 } as const;
