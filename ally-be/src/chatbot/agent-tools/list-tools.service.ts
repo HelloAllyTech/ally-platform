@@ -573,6 +573,17 @@ export class ListToolsService {
     data: Record<string, unknown>,
     personName: unknown,
   ): Promise<void> {
+    // TF1 F1: "my number is this one" on WhatsApp is not a phone number: it counts as empty, and
+    // the number they are messaging from fills it below.
+    for (const f of list.fields) {
+      if (
+        f.type === ListFieldType.PHONE &&
+        typeof data[f.key] === 'string' &&
+        (String(data[f.key]).match(/\d/g) ?? []).length < 7
+      ) {
+        delete data[f.key];
+      }
+    }
     const empty = (key: string) =>
       data[key] === undefined || data[key] === null || data[key] === '';
     const writable = list.fields.filter(
@@ -615,6 +626,25 @@ export class ListToolsService {
             : undefined) ?? answer('name', /name/i);
       }
       if (value?.trim()) data[f.key] = value.trim();
+    }
+    // TF1 F1: on WhatsApp the person's phone is the number they write from: never asked for.
+    const phoneField = writable.find(
+      (f) => f.type === ListFieldType.PHONE && empty(f.key),
+    );
+    if (phoneField && ctx.contactId) {
+      try {
+        const [row] = (await this.dataSource.query(
+          `SELECT external_id FROM chatbot_contact_identities
+            WHERE contact_id = $1 AND channel = 'whatsapp'
+            ORDER BY "createdAt" LIMIT 1`,
+          [ctx.contactId],
+        )) as { external_id: string }[];
+        if (row?.external_id && /^\d{8,15}$/.test(row.external_id)) {
+          data[phoneField.key] = `+${row.external_id}`;
+        }
+      } catch {
+        // Left empty: the assistant asks, as before.
+      }
     }
   }
 

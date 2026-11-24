@@ -198,7 +198,8 @@ function valueHint(f: FieldView): string {
     case ListFieldType.RELATION:
       return `the id of a ${relationTarget(f)} entry from find_${relationTarget(f)}`;
     case ListFieldType.PHONE:
-      return 'a phone number';
+      // TF1 F1: never ask a WhatsApp person for the number they are writing from.
+      return 'a phone number; on WhatsApp leave it empty unless they give a different number: the number they write from is used';
     case ListFieldType.EMAIL:
       return 'an email address';
     case ListFieldType.URL:
