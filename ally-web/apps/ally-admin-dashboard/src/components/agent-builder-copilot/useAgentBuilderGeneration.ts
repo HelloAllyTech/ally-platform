@@ -126,7 +126,7 @@ export interface GenerationInputs {
 /** The challenge description's other language tabs, translated once the batch is in. */
 const TRANSLATE_TASK = {
   key: "challenge_description_translations",
-  label: "Challenge description in other languages",
+  label: "Challenge description and reminders in other languages",
 };
 
 /** The cover row: not a field generator, an image job (start, then poll until it settles). */
@@ -380,6 +380,11 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
             : {}),
           ...(task.field === "states" && inputs.roleplayMode
             ? { roleplayMode: inputs.roleplayMode }
+            : {}),
+          // Reminders fill the main language's tab: say which, or the writer follows the brief's
+          // language (Hindi reminders in the English tab when the client speaks Hindi).
+          ...(task.field === "reminders" && primaryLanguageIdRef.current != null
+            ? { languageId: String(primaryLanguageIdRef.current) }
             : {}),
         });
         handles.push(handle);
@@ -685,40 +690,48 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
        * text was just generated. Runs last, once the description and the voices are both in.
        */
       const translateDescription = async (): Promise<void> => {
-        const source = String(formMethods.getValues("description") ?? "").trim();
         const voices = (formMethods.getValues("languageVoices") ?? {}) as Record<string, string>;
         const primary = String(primaryLanguageIdRef.current ?? "");
         const targets = catalogLanguagesRef.current
           .filter(l => voices[String(l.language_id)] && String(l.language_id) !== primary)
           .map(l => ({ languageId: String(l.language_id), languageCode: l.value }));
-        if (!source || !targets.length || abortedRef.current) return;
+        // The main-language fields with a tab per language: the challenge description, and the
+        // reminders the learner reads during the session.
+        const fields = [
+          { source: "description", target: "translationDescription" },
+          { source: "reminders", target: "translationReminders" },
+        ]
+          .map(f => ({ ...f, text: String(formMethods.getValues(f.source) ?? "").trim() }))
+          .filter(f => f.text);
+        if (!fields.length || !targets.length || abortedRef.current) return;
         setTasks(prev => [...prev, { ...TRANSLATE_TASK, status: "active" }]);
-        try {
-          const handle = translateField({ text: source, targets });
-          handles.push(handle);
-          const { translations } = await handle.unwrap();
-          if (abortedRef.current) return;
-          const current = (formMethods.getValues("translationDescription") ?? {}) as Record<
-            string,
-            string
-          >;
-          formMethods.setValue(
-            "translationDescription",
-            { ...current, ...translations },
-            { shouldDirty: true, shouldValidate: false },
-          );
-          patchTask(TRANSLATE_TASK.key, {
-            status: "done",
-            label: `${TRANSLATE_TASK.label} (${Object.keys(translations).length})`,
-          });
-        } catch (err) {
-          patchTask(
-            TRANSLATE_TASK.key,
-            abortedRef.current
-              ? { status: "aborted" }
-              : { status: "error", error: errorMessage(err) },
-          );
+        const results = await Promise.allSettled(
+          fields.map(async f => {
+            const handle = translateField({ text: f.text, targets });
+            handles.push(handle);
+            const { translations } = await handle.unwrap();
+            if (abortedRef.current) return;
+            const current = (formMethods.getValues(f.target) ?? {}) as Record<string, string>;
+            formMethods.setValue(
+              f.target,
+              { ...current, ...translations },
+              { shouldDirty: true, shouldValidate: false },
+            );
+          }),
+        );
+        if (abortedRef.current) {
+          patchTask(TRANSLATE_TASK.key, { status: "aborted" });
+          return;
         }
+        const failed = results.find(r => r.status === "rejected") as
+          | PromiseRejectedResult
+          | undefined;
+        patchTask(
+          TRANSLATE_TASK.key,
+          failed
+            ? { status: "error", error: errorMessage(failed.reason) }
+            : { status: "done", label: `${TRANSLATE_TASK.label} (${targets.length})` },
+        );
       };
 
       void Promise.allSettled(runs).then(async () => {

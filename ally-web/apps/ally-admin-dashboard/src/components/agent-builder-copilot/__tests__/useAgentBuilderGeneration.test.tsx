@@ -574,9 +574,12 @@ describe("useAgentBuilderGeneration — roleplay mode", () => {
     act(() => result.current.start({ ...INPUTS, generateCover: false }));
     await waitFor(() => expect(result.current.phase).toBe("done"));
 
-    expect(mocks.translate).toHaveBeenCalledTimes(1);
+    // The description and the reminders, each into the other voiced languages.
+    expect(mocks.translate).toHaveBeenCalledTimes(2);
+    expect(mocks.translate.mock.calls.map(c => c[0].text)).toEqual(["She minimises.", "Slow down"]);
+    expect(store.translationReminders).toEqual({ "2": "translated 2" });
+    expect(requests.find(r => r.field === "reminders")?.languageId).toBe("1");
     const body = mocks.translate.mock.calls[0][0];
-    expect(body.text).toBe("She minimises.");
     // Hindi got a voice in this batch; English is the main language and is not translated.
     expect(body.targets).toEqual([{ languageId: "2", languageCode: "hi-IN" }]);
     expect(store.translationDescription).toEqual({ "2": "translated 2" });

@@ -4080,12 +4080,28 @@ export class ScenarioService {
     // are each told the ONE language to write in. Every other field is
     // language-agnostic and skips the catalog query entirely.
     let catalog: ScenarioVoiceLanguage[] = [];
+    // Reminders are shown to the learner in the roleplay's main language tab, so a caller can name
+    // that language: without it the writer followed the brief and wrote, say, Hindi reminders
+    // into the English (India) tab when the client speaks Hindi.
+    const remindersLanguage =
+      field === AgentBuilderField.REMINDERS && dto.languageId;
     if (
       field === AgentBuilderField.SPOKEN_LANGUAGES ||
       field === AgentBuilderField.LANGUAGE_VOICES ||
-      isLanguageScopedAgentBuilderField(field)
+      isLanguageScopedAgentBuilderField(field) ||
+      remindersLanguage
     ) {
       catalog = await this.getAgentBuilderLanguageCatalog();
+    }
+    if (remindersLanguage) {
+      const language = this.resolveAgentBuilderLanguage(
+        catalog,
+        dto.languageId,
+      );
+      variables.actorDescription =
+        `${variables.actorDescription}\n\nWrite every reminder in ${language.label} ` +
+        `(${language.code}), whatever language the client speaks: the ` +
+        'learner reads them in that language.';
     }
     if (field === AgentBuilderField.SPOKEN_LANGUAGES) {
       variables.availableLanguages = catalog
