@@ -364,9 +364,55 @@ describe('lane-level candidate check', () => {
       PmLane.STRATEGY_CONTENT,
       new Set([E1]),
     );
-    // The top-level size stays; the stray one is left in plan, where validation refuses it.
+    // Prod 2026-11-24: `size` beside AND inside plan. The top-level value wins; the copy in
+    // plan is dropped (never merged), so the card is no longer discarded for it.
+    expect(out.errors).toEqual([]);
+    expect(out.candidate?.payload.size).toBe(good.size);
+    expect(out.candidate?.payload.plan).not.toHaveProperty('size');
+  });
+
+  it('accepts a list sent as one string and trims an over-long supporting list', () => {
+    const good = recFor(0, [E1]);
+    const many = Array.from({ length: 25 }, (_, i) => `Option ${i + 1}`);
+    const out = checkCandidate(
+      {
+        kind: 'recommendation',
+        category: 'product',
+        recommendation: {
+          ...good,
+          alternativesDropped: 'A larger redesign',
+          plan: { ...good.plan, steps: many },
+        },
+      },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
+    expect(out.errors).toEqual([]);
+    expect(out.candidate?.payload.alternativesDropped).toEqual([
+      'A larger redesign',
+    ]);
+    expect(out.candidate?.payload.plan.steps).toHaveLength(20);
+  });
+
+  it('still refuses meaning-bearing slips: too many change bullets, an over-long description', () => {
+    const good = recFor(0, [E1]);
+    const out = checkCandidate(
+      {
+        kind: 'recommendation',
+        category: 'product',
+        recommendation: {
+          ...good,
+          change: ['One', 'Two', 'Three', 'Four'],
+          opportunity: { ...good.opportunity, description: 'x'.repeat(1001) },
+        },
+      },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
     expect(out.candidate).toBeUndefined();
-    expect(out.errors.join(' ')).toContain('plan.size');
+    const errors = out.errors.join(' ');
+    expect(errors).toContain('change');
+    expect(errors).toContain('opportunity.description');
   });
 
   it('forces the original category on a revision', () => {
