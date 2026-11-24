@@ -8,7 +8,9 @@ import {
   InboundWhatsAppMessage,
   WhatsAppConnectionCheck,
   WaNumberCredentials,
+  WhatsAppInteractive,
   WhatsAppProvider,
+  whatsappInteractiveFits,
 } from '../type/whatsapp-provider.interface';
 
 /** Message types that carry no readable text. */
@@ -204,8 +206,8 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
               text?: { body?: string };
               button?: { text?: string };
               interactive?: {
-                button_reply?: { title?: string };
-                list_reply?: { title?: string };
+                button_reply?: { id?: string; title?: string };
+                list_reply?: { id?: string; title?: string };
               };
             }[];
           };
@@ -234,10 +236,15 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
             message.interactive?.list_reply?.title ??
             '';
 
+          // BT1: a tap on our own list row or reply button carries its action token as the id.
+          const actionId =
+            message.interactive?.button_reply?.id ??
+            message.interactive?.list_reply?.id;
           out.push({
             providerMessageId: message.id,
             from: this.normalisePhone(message.from),
             text: text.trim(),
+            ...(actionId ? { actionId } : {}),
             isUnsupportedMedia: !text.trim() && UNSUPPORTED_TYPES.has(type),
             timestamp: message.timestamp
               ? new Date(Number(message.timestamp) * 1000)
@@ -251,9 +258,55 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
     return out;
   }
 
+  /**
+   * BT1: a list message or reply buttons, checked against Meta's limits first (a message that
+   * doesn't fit is never sent: the caller sends the numbered text instead).
+   */
+  async sendInteractive(
+    to: string,
+    message: WhatsAppInteractive,
+    creds?: WaNumberCredentials,
+  ): Promise<{ providerMessageId: string }> {
+    if (!whatsappInteractiveFits(message)) {
+      throw new Error('The interactive message is outside WhatsApp limits');
+    }
+    const interactive =
+      message.type === 'list'
+        ? {
+            type: 'list',
+            body: { text: message.body },
+            action: { button: message.button, sections: message.sections },
+          }
+        : {
+            type: 'button',
+            body: { text: message.body },
+            action: {
+              buttons: message.buttons.map((b) => ({
+                type: 'reply',
+                reply: { id: b.id, title: b.title },
+              })),
+            },
+          };
+    return this.postMessage(to, { type: 'interactive', interactive }, creds);
+  }
+
   async sendText(
     to: string,
     body: string,
+    creds?: WaNumberCredentials,
+  ): Promise<{ providerMessageId: string }> {
+    // preview_url off: a link preview would fetch whatever URL a citation contains and render it
+    // in the worker's chat, which is neither wanted nor predictable.
+    return this.postMessage(
+      to,
+      { type: 'text', text: { body, preview_url: false } },
+      creds,
+    );
+  }
+
+  private async postMessage(
+    to: string,
+    content: Record<string, unknown>,
     creds?: WaNumberCredentials,
   ): Promise<{ providerMessageId: string }> {
     const { phoneNumberId, accessToken } = this.creds(creds);
@@ -273,10 +326,7 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
           to,
-          type: 'text',
-          // preview_url off: a link preview would fetch whatever URL a citation contains and render
-          // it in the worker's chat, which is neither wanted nor predictable.
-          text: { body, preview_url: false },
+          ...content,
         },
         {
           headers: {

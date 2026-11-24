@@ -22,8 +22,12 @@ import { InboundWhatsAppMessage } from '../type/whatsapp-provider.interface';
 import {
   WaNumberCredentials,
   WHATSAPP_PROVIDER,
+  WhatsAppInteractive,
   WhatsAppProvider,
 } from '../type/whatsapp-provider.interface';
+import { ActionsService } from 'src/chatbot/actions/actions.service';
+import { ActionPartsService } from 'src/chatbot/actions/action-parts.service';
+import { whatsappReplyFor } from 'src/chatbot/actions/whatsapp-parts';
 import { WhatsAppBotSettings } from '../type/whatsapp-settings.type';
 import {
   ResolvedWaNumber,
@@ -181,6 +185,9 @@ export class WhatsAppInboundService {
     /** Stage 5: erase in chat and memory consent; conflicts stored as owner questions. */
     @Optional() private readonly privacy?: ChatPrivacyService,
     @Optional() private readonly answerConflict?: AnswerConflictService,
+    // BT1: taps (list rows, reply buttons, typed numbers) and a reply's chips and cards.
+    @Optional() private readonly actions?: ActionsService,
+    @Optional() private readonly parts?: ActionPartsService,
   ) {}
 
   async handle(inbound: InboundWhatsAppMessage): Promise<void> {
@@ -293,7 +300,9 @@ export class WhatsAppInboundService {
         contact,
         conversation,
         inboundId,
-        inbound.text,
+        // BT1: a tapped button's title ("Cancel") is never STOP; an opted-out number's tap is
+        // still dropped.
+        inbound.actionId ? '' : inbound.text,
         settings,
         startedAt,
         chatbot.id,
@@ -385,10 +394,30 @@ export class WhatsAppInboundService {
         });
 
       // ── 7. The bot decides ───────────────────────────────────────────────
+      // BT1: a tapped list row or button (its id is an action token), or a typed number from the
+      // last numbered list, is a tap: it counts only in this conversation, for this person, and
+      // the message kept and answered is what it stands for.
+      const tap = this.actions
+        ? await this.actions
+            .whatsappTap(
+              { actionId: inbound.actionId, text: inbound.text },
+              {
+                chatbotId: chatbot.id,
+                conversationId: conversation.id,
+                contactId: sharedContactId,
+              },
+            )
+            .catch(() => undefined)
+        : undefined;
+      const said = tap?.ok ? tap.claims.text : inbound.text;
+      if (tap?.ok) {
+        await this.messageRepository.update({ id: inboundId }, { body: said });
+      }
       let decision = await this.engine.respond({
         chatbot,
         settings,
-        text: inbound.text,
+        text: said,
+        ...(tap ? { tap } : {}),
         language: contact.locale,
         history: await this.recentHistory(
           conversation.id,
@@ -496,11 +525,30 @@ export class WhatsAppInboundService {
           { lastLanguage: decision.language },
         );
       }
+      // BT1: chips and cards from what this run's tools did, as a list message or reply buttons
+      // (the numbered text if that can't be sent). None on a crisis, blocked or off reply.
+      const language = replyLanguageOf(
+        said,
+        decision.language ?? contact.locale,
+      );
+      const parts = await this.parts?.partsFor({
+        chatbotId: chatbot.id,
+        conversationId: conversation.id,
+        contactId: sharedContactId,
+        runId: decision.agent?.runId,
+        language,
+        suppressed:
+          decision.handledBy === WaHandledBy.CRISIS ||
+          Boolean(decision.blocked) ||
+          Boolean(decision.off),
+        answered: false,
+      });
+      const shaped = whatsappReplyFor(body, parts, language);
       const copied = await this.reply(
         identified,
         conversation,
         inboundId,
-        body,
+        shaped.text,
         decision.handledBy,
         startedAt,
         {
@@ -509,6 +557,8 @@ export class WhatsAppInboundService {
           retrievalMeta: decision.retrievalMeta,
           language: decision.language ?? undefined,
           agent: decision.agent,
+          interactive: shaped.interactive,
+          numbered: shaped.numbered,
         },
       );
       void this.afterReply(chatbot, conversation.id, decision, copied.copied);
@@ -889,6 +939,26 @@ export class WhatsAppInboundService {
    * that never went out, rather than invisible. A send failure is recorded and swallowed — see the
    * class invariant.
    */
+  /** BT1: the reply with its numbered choices when it has any (remembered for a typed number). */
+  private async sendNumberedOrText(
+    contact: WaContact,
+    conversation: WaConversation,
+    body: string,
+    numbered: { text: string; tokens: string[] } | null | undefined,
+    creds: WaNumberCredentials,
+  ): Promise<{ providerMessageId: string }> {
+    if (!numbered) {
+      return this.provider.sendText(contact.phoneE164, body, creds);
+    }
+    const sent = await this.provider.sendText(
+      contact.phoneE164,
+      numbered.text,
+      creds,
+    );
+    await this.actions?.rememberNumbered(conversation.id, numbered.tokens);
+    return sent;
+  }
+
   private async reply(
     contact: WaContact,
     conversation: WaConversation,
@@ -903,6 +973,10 @@ export class WhatsAppInboundService {
       language?: string;
       /** The Agents v2 run behind this reply; v1 replies leave the run columns unset. */
       agent?: AgentRunRef;
+      /** BT1: the reply's taps as a list message or reply buttons, tried first. */
+      interactive?: WhatsAppInteractive | null;
+      /** BT1: the same taps as numbered text, when the interactive send can't go. */
+      numbered?: { text: string; tokens: string[] } | null;
     } = {},
   ): Promise<{ copied: Promise<boolean> | undefined }> {
     const outbound = await this.messageRepository.save(
@@ -950,11 +1024,41 @@ export class WhatsAppInboundService {
             "This organisation's WhatsApp number has been disconnected",
           );
         }
-        const { providerMessageId } = await this.provider.sendText(
-          contact.phoneE164,
-          body,
-          creds,
-        );
+        // BT1: the interactive message first (a reply to the person's message is inside the
+        // 24-hour window); if it can't go, the numbered text, where a typed number is the tap.
+        let providerMessageId: string;
+        const interactive =
+          attempt === 1 && extra.interactive && this.provider.sendInteractive
+            ? extra.interactive
+            : null;
+        if (interactive) {
+          try {
+            ({ providerMessageId } = await this.provider.sendInteractive!(
+              contact.phoneE164,
+              interactive,
+              creds,
+            ));
+          } catch (error) {
+            this.logger.warn(
+              `Interactive send failed; sending the numbered text: ${error instanceof Error ? error.message : 'unknown'}`,
+            );
+            ({ providerMessageId } = await this.sendNumberedOrText(
+              contact,
+              conversation,
+              body,
+              extra.numbered,
+              creds,
+            ));
+          }
+        } else {
+          ({ providerMessageId } = await this.sendNumberedOrText(
+            contact,
+            conversation,
+            body,
+            extra.numbered,
+            creds,
+          ));
+        }
         await this.messageRepository.update(
           { id: outbound.id },
           { providerMessageId, status: WaMessageStatus.SENT },

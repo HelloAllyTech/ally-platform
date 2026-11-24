@@ -113,6 +113,51 @@ export class ActionTokenService {
     return { ok: true, claims, firstUse };
   }
 
+  /**
+   * WhatsApp's numbered text (BT1 §3): which token each number stands for in this conversation,
+   * until the next numbered list or 30 minutes. A typed number then counts as that tap.
+   */
+  async rememberNumbered(
+    conversationId: string,
+    tokens: string[],
+  ): Promise<void> {
+    try {
+      await this.redis.set(
+        this.numberedKey(conversationId),
+        JSON.stringify(tokens),
+        ACTION_TTL_S,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Could not store a numbered list: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
+    }
+  }
+
+  /** The token a typed number stands for, or null when there is no such list or number. */
+  async numbered(conversationId: string, n: number): Promise<string | null> {
+    try {
+      const raw = await this.redis.get(this.numberedKey(conversationId));
+      const tokens = raw ? (JSON.parse(raw) as string[]) : [];
+      return tokens[n - 1] ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** A typed message that isn't a number ends the numbered list: "2" later means 2. */
+  async forgetNumbered(conversationId: string): Promise<void> {
+    try {
+      await this.redis.del(this.numberedKey(conversationId));
+    } catch {
+      // Nothing to do: it expires in 30 minutes.
+    }
+  }
+
+  private numberedKey(conversationId: string): string {
+    return `bot:numbered:${conversationId}`;
+  }
+
   private key(id: string): string {
     return `bot:action:${id}`;
   }

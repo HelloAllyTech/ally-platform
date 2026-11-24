@@ -12,7 +12,12 @@ import { ListToolsService } from '../agent-tools/list-tools.service';
 import type { CardHeadline } from '../agent-tools/entry-words';
 import { replyLanguageOf } from '../engine/reply-language';
 import type { ReplyLanguage } from '../engine/reply-language';
-import type { ChatTurn, ChatbotDecision } from '../engine/chatbot-engine.types';
+import type {
+  ChatTurn,
+  ChatbotDecision,
+  TapTurn,
+} from '../engine/chatbot-engine.types';
+import { typedNumber } from './whatsapp-parts';
 import { DONE_LINE, TAP_REPLY, fillCopy } from './action-copy';
 import type { ReplyParts } from './action-parts.service';
 import { ActionTokenService } from './action-token.service';
@@ -48,6 +53,35 @@ export class ActionsService {
     },
   ): ReturnType<ActionTokenService['redeem']> {
     return this.tokens.redeem(token, where);
+  }
+
+  /**
+   * WhatsApp (BT1 §3): a tapped list row or reply button carries its token as its id; a typed
+   * number counts as the tap it stands for in the last numbered list. Anything else is typed, and
+   * ends that list.
+   */
+  async whatsappTap(
+    inbound: { actionId?: string; text: string },
+    where: {
+      chatbotId: string;
+      conversationId: string;
+      contactId: string | null;
+    },
+  ): Promise<TapTurn | undefined> {
+    if (inbound.actionId) return this.tokens.redeem(inbound.actionId, where);
+    const n = typedNumber(inbound.text);
+    if (n) {
+      const token = await this.tokens.numbered(where.conversationId, n);
+      if (token) return this.tokens.redeem(token, where);
+      return undefined;
+    }
+    await this.tokens.forgetNumbered(where.conversationId);
+    return undefined;
+  }
+
+  /** The numbered text went out: a typed number now stands for these taps. */
+  rememberNumbered(conversationId: string, tokens: string[]): Promise<void> {
+    return this.tokens.rememberNumbered(conversationId, tokens);
   }
 
   /** A crisis reply went out: the pending write is dropped (BT1, crisis between taps). */
