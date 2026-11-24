@@ -16096,6 +16096,11 @@ export const en = {
       stop: "Stop",
       loading: "Loading…",
       chooseLink: "Choose voices",
+      confirm: "Confirm languages and voices",
+      confirmed: "Languages and voices chosen. You can change them in the Brief tab.",
+      pickOne: "Tick at least one language.",
+      pickedCount: (n: number) => (n === 1 ? "1 language" : `${n} languages`),
+      otherIds: (ids: string[]) => `also language ids ${ids.join(", ")}`,
     },
     tabs: {
       label: "Roleplay agent",

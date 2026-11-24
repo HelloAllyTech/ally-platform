@@ -20,6 +20,7 @@ import {
 import { useRoleplayInterviewStream } from "../../hooks/useRoleplayInterviewStream";
 import { AgentAnswerPayload, AgentReceipt, ChatComposer, ChatMessage } from "../agent-chat";
 import { LanguageVoiceChoice, LanguageVoicePicker } from "./LanguageVoicePicker";
+import { LanguageVoiceQuestion } from "./LanguageVoiceQuestion";
 import { RoleplayBriefPanel } from "./RoleplayBriefPanel";
 import { RoleplayPlanCard } from "./RoleplayPlanCard";
 
@@ -143,6 +144,35 @@ export const RoleplayInterviewPanel: React.FC<RoleplayInterviewPanelProps> = ({
   const handleAnswer = (payload: AgentAnswerPayload) =>
     send(payload.message, { questionId: payload.questionId, answer: payload.answer });
 
+  /**
+   * The language question answered with the picker: the languages go back as the question's
+   * options (by their language-id values), so the server records them in the brief; a language the
+   * agent did not offer goes as text. The voices stay here, for the build.
+   */
+  const handleLanguageVoices = (
+    question: { id: string; options?: { id: string; label: string; value?: string }[] },
+    choice: LanguageVoiceChoice,
+  ) => {
+    setLanguagesTouched(true);
+    setLanguageVoices(choice);
+    const ids = Object.keys(choice);
+    const options = question.options ?? [];
+    const optionIds = options.filter(o => o.value && ids.includes(String(o.value))).map(o => o.id);
+    const offered = new Set(options.map(o => String(o.value)));
+    const extra = ids.filter(id => !offered.has(id));
+    const labels = options.filter(o => optionIds.includes(o.id)).map(o => o.label);
+    const summary = [...labels, ...(extra.length ? [strings.voices.otherIds(extra)] : [])].join(
+      ", ",
+    );
+    void send(summary, {
+      questionId: question.id,
+      answer: {
+        ...(optionIds.length ? { selectedOptionIds: optionIds } : {}),
+        ...(extra.length ? { customValues: [strings.voices.otherIds(extra)] } : {}),
+      },
+    });
+  };
+
   const handleApprove = async () => {
     if (!session || !plan) return;
     try {
@@ -196,11 +226,21 @@ export const RoleplayInterviewPanel: React.FC<RoleplayInterviewPanelProps> = ({
         )}
         {messages.map(message => (
           <div key={message.id} className="flex flex-col gap-1">
-            <ChatMessage
-              message={message}
-              onAnswerQuestion={handleAnswer}
-              disabled={isStreaming || approved}
-            />
+            {message.question?.field === "languageIds" ? (
+              <LanguageVoiceQuestion
+                question={message.question}
+                value={languageVoices}
+                answered={Boolean(message.answeredWith || message.answeredAnswer)}
+                disabled={isStreaming || approved}
+                onConfirm={choice => handleLanguageVoices(message.question!, choice)}
+              />
+            ) : (
+              <ChatMessage
+                message={message}
+                onAnswerQuestion={handleAnswer}
+                disabled={isStreaming || approved}
+              />
+            )}
             {message.role === "assistant" && (message as { receipt?: unknown }).receipt ? (
               <AgentReceipt receipt={(message as { receipt?: unknown }).receipt} />
             ) : null}

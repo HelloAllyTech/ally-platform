@@ -292,3 +292,35 @@ describe('checks found in local test runs', () => {
     expect(outOfTen.ok).toBe(false);
   });
 });
+
+describe('the language question', () => {
+  it('may list the whole catalog and recommend several languages', () => {
+    const options = Array.from({ length: 13 }, (_, i) => ({
+      id: `l${i + 1}`,
+      label: `Language ${i + 1}`,
+      value: String(i + 1),
+      recommended: i < 2,
+    }));
+    const question = buildQuestion({
+      kind: 'multiSelect',
+      prompt: 'Choose the languages and a voice for each',
+      field: 'languageIds',
+      options,
+    });
+    expect(question.field).toBe('languageIds');
+    expect(question.options).toHaveLength(13);
+    expect(question.options!.filter((o) => o.recommended)).toHaveLength(2);
+    expect(
+      roleplayInterviewQuestionProblems({
+        name: 'ask_trainer',
+        input: {
+          kind: 'multiSelect',
+          prompt: 'Choose',
+          field: 'languageIds',
+          options,
+        },
+        message: 'Pick the languages.',
+      }).map((p) => p.key),
+    ).not.toContain('too_many_options');
+  });
+});

@@ -468,7 +468,10 @@ export function buildQuestion(
   let kind = String(input?.kind ?? 'singleSelect');
   if (![...SELECT_KINDS, 'freeText'].includes(kind)) kind = 'singleSelect';
   const isSelect = SELECT_KINDS.includes(kind);
-  const options = isSelect ? normaliseOptions(input?.options) : [];
+  // The language question may recommend several languages (all the ones the trainer named).
+  const options = isSelect
+    ? normaliseOptions(input?.options, input?.field === 'languageIds')
+    : [];
   return {
     id: uuidv4(),
     prompt: String(input?.prompt ?? '').trim(),
@@ -496,6 +499,7 @@ export function buildQuestion(
 
 export function normaliseOptions(
   raw: unknown,
+  manyRecommended = false,
 ): RoleplayInterviewQuestionOption[] {
   if (!Array.isArray(raw)) return [];
   const options = raw
@@ -530,7 +534,7 @@ export function normaliseOptions(
   );
   let seen = false;
   for (const option of unique) {
-    if (!option.recommended) continue;
+    if (!option.recommended || manyRecommended) continue;
     if (seen) delete option.recommended;
     else seen = true;
   }

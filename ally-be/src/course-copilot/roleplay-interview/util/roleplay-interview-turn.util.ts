@@ -178,7 +178,10 @@ export function roleplayInterviewQuestionProblems(ending: {
         'The agent asked an open question where a choice would have been quicker.',
     });
   }
-  if (options.length > limits.maxOptions) {
+  // The language question lists the whole catalog: the trainer's screen draws it as a language
+  // and voice picker, not as a row of option buttons.
+  const isLanguageQuestion = input.field === 'languageIds';
+  if (options.length > limits.maxOptions && !isLanguageQuestion) {
     problems.push({
       key: 'too_many_options',
       toModel: `Offer at most ${limits.maxOptions} options.`,

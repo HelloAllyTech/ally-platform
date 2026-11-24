@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   },
   approve: vi.fn(),
   play: vi.fn(),
+  messages: [] as any[],
+  send: vi.fn(),
 }));
 
 vi.mock("@store", () => ({
@@ -57,9 +59,9 @@ vi.mock("@hooks/useVoicePreview", () => ({
 }));
 vi.mock("../../../hooks/useRoleplayInterviewStream", () => ({
   useRoleplayInterviewStream: () => ({
-    messages: [],
+    messages: mocks.messages,
     isStreaming: false,
-    send: vi.fn(),
+    send: mocks.send,
     stop: vi.fn(),
     hydrate: vi.fn(),
     reset: vi.fn(),
@@ -86,6 +88,8 @@ const plan = {
 };
 
 beforeEach(() => {
+  mocks.messages = [];
+  mocks.send.mockReset();
   mocks.session.plan = null;
   mocks.session.status = "INTERVIEWING";
   mocks.approve.mockReset();
@@ -169,5 +173,51 @@ describe("RoleplayInterviewPanel languages and voices", () => {
     });
     expect(onApproved).toHaveBeenCalledWith({ mode: "learning" }, "s1", { "1": "", "2": "v-hi" });
     delete (mocks.session.brief as any).languages;
+  });
+});
+
+describe("RoleplayInterviewPanel: the agent asks for languages and voices", () => {
+  it("draws the language question as the picker and answers it with the languages", async () => {
+    mocks.messages = [
+      {
+        id: "m1",
+        role: "assistant",
+        content: "Choose the languages the client speaks and a voice for each",
+        question: {
+          id: "q-lang",
+          prompt: "Choose the languages the client speaks and a voice for each",
+          kind: "multiSelect",
+          field: "languageIds",
+          options: [
+            { id: "en", label: "English (India)", value: "1" },
+            { id: "hi", label: "Hindi (India)", value: "2", recommended: true },
+          ],
+        },
+      },
+    ];
+    await act(async () => {
+      render(<RoleplayInterviewPanel onApproved={vi.fn()} />);
+    });
+    const card = screen.getByTestId("language-voice-question");
+    // The recommended language starts ticked.
+    expect((screen.getByLabelText("Hindi (India)") as HTMLInputElement).checked).toBe(true);
+    fireEvent.change(screen.getByLabelText(en.roleplayInterview.voices.voiceFor("Hindi (India)")), {
+      target: { value: "v-hi" },
+    });
+    fireEvent.click(screen.getByText(en.roleplayInterview.voices.confirm));
+    expect(card).toBeTruthy();
+    expect(mocks.send).toHaveBeenCalledWith("Hindi (India)", {
+      questionId: "q-lang",
+      answer: { selectedOptionIds: ["hi"] },
+    });
+    // The voice is kept for the build: the Brief tab shows the same choice.
+    fireEvent.click(screen.getByRole("tab", { name: /Brief/ }));
+    expect(
+      (
+        screen
+          .getAllByLabelText(en.roleplayInterview.voices.voiceFor("Hindi (India)"))
+          .at(-1) as HTMLSelectElement
+      ).value,
+    ).toBe("v-hi");
   });
 });
