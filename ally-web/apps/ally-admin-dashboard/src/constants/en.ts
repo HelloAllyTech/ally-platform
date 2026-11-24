@@ -16087,6 +16087,17 @@ export const en = {
       "e.g. A practice roleplay for teachers talking to a withdrawn 15-year-old student…",
     placeholder: "Answer, or tell me anything else…",
     useSteps: "Use the quick steps instead",
+    tabs: {
+      label: "Roleplay agent",
+      build: "Build",
+      brief: "Brief",
+      updated: "Updated",
+      neededCount: (n: number) => `${n} needed`,
+      noPlanYet: "The plan appears here once nothing is still needed.",
+      planReady: (title: string) => `The plan is ready: ${title}.`,
+      planApproved: "Plan approved: building the roleplay.",
+      reviewPlan: "Review in Brief",
+    },
     subtitle:
       "Describe the roleplay you want. I'll ask a few short questions, fill in the brief and propose a plan; approve it and I'll build the roleplay for you to review.",
     historyQuestion: "Roleplay interview",

@@ -1332,7 +1332,7 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
               <div
                 className={
                   copilotFocus
-                    ? "w-full max-w-6xl h-[80dvh] lg:h-full min-h-0 flex flex-col pt-2"
+                    ? "w-full max-w-4xl h-[80dvh] lg:h-full min-h-0 flex flex-col pt-2"
                     : "min-h-0 h-[80dvh] lg:h-full overflow-hidden border-t lg:border-t-0 lg:border-l border-border-light pt-4 lg:pt-0 lg:pl-6 flex flex-col"
                 }
               >

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { toast } from "sonner";
 
@@ -22,6 +22,9 @@ import { AgentAnswerPayload, AgentReceipt, ChatComposer, ChatMessage } from "../
 import { RoleplayBriefPanel } from "./RoleplayBriefPanel";
 import { RoleplayPlanCard } from "./RoleplayPlanCard";
 
+const PANEL_TABS = ["build", "brief"] as const;
+type PanelTab = (typeof PANEL_TABS)[number];
+
 interface RoleplayInterviewPanelProps {
   /** The roleplay being edited, once it has been saved: the interview is kept with it. */
   scenarioId?: number | null;
@@ -29,7 +32,7 @@ interface RoleplayInterviewPanelProps {
   onApproved: (generation: RoleplayInterviewGeneration, sessionId: string) => void;
   /** Use the six quick steps instead. */
   onUseSteps?: () => void;
-  /** The form is beside the panel: stack the brief above the chat instead of beside it. */
+  /** Kept for callers; the tabs work the same beside the form. */
   compact?: boolean;
 }
 
@@ -42,7 +45,6 @@ export const RoleplayInterviewPanel: React.FC<RoleplayInterviewPanelProps> = ({
   scenarioId,
   onApproved,
   onUseSteps,
-  compact = false,
 }) => {
   const strings = en.roleplayInterview;
   const [session, setSession] = useState<RoleplayInterviewSession | null>(null);
@@ -56,6 +58,15 @@ export const RoleplayInterviewPanel: React.FC<RoleplayInterviewPanelProps> = ({
   const [link] = useLinkRoleplayInterviewMutation();
   const [abandon] = useAbandonRoleplayInterviewMutation();
   const feedEndRef = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState<PanelTab>("build");
+  // The brief changed while the trainer was in the chat: a dot on the Brief tab.
+  const [briefUnseen, setBriefUnseen] = useState(false);
+  const tabRefs = useRef<Partial<Record<PanelTab, HTMLButtonElement | null>>>({});
+  const idPrefix = useId();
+  const selectTab = (next: PanelTab) => {
+    setTab(next);
+    if (next === "brief") setBriefUnseen(false);
+  };
 
   const adopt = useCallback((next: RoleplayInterviewSession) => {
     setSession(next);
@@ -69,10 +80,14 @@ export const RoleplayInterviewPanel: React.FC<RoleplayInterviewPanelProps> = ({
     onBrief: (nextBrief, nextStillNeeded) => {
       setBrief(nextBrief);
       setStillNeeded(nextStillNeeded);
+      setBriefUnseen(true);
       // A changed brief retires the plan it was made from.
       setPlan(previous => (previous ? null : previous));
     },
-    onPlan: (nextPlan, version) => setPlan({ plan: nextPlan, version }),
+    onPlan: (nextPlan, version) => {
+      setPlan({ plan: nextPlan, version });
+      setBriefUnseen(true);
+    },
   });
 
   // Open (or resume) the interview for this roleplay.
@@ -175,12 +190,33 @@ export const RoleplayInterviewPanel: React.FC<RoleplayInterviewPanelProps> = ({
           </div>
         ))}
         {plan && (
-          <RoleplayPlanCard
-            plan={plan.plan}
-            onApprove={approved ? undefined : handleApprove}
-            approving={approving}
-            approved={approved}
-          />
+          <div
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary-200 bg-primary-50 px-4 py-3 text-sm"
+            data-testid="plan-notice"
+          >
+            <span className="text-typography-900">
+              {approved ? strings.tabs.planApproved : strings.tabs.planReady(plan.plan.title)}
+            </span>
+            <span className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => selectTab("brief")}
+                className="text-primary-700 underline"
+              >
+                {strings.tabs.reviewPlan}
+              </button>
+              {!approved && (
+                <button
+                  type="button"
+                  onClick={() => void handleApprove()}
+                  disabled={approving}
+                  className="rounded bg-primary px-3 py-1.5 text-white disabled:opacity-60"
+                >
+                  {approving ? strings.plan.approving : strings.plan.approve}
+                </button>
+              )}
+            </span>
+          </div>
         )}
         <div ref={feedEndRef} />
       </div>
@@ -216,22 +252,99 @@ export const RoleplayInterviewPanel: React.FC<RoleplayInterviewPanelProps> = ({
     </div>
   );
 
+  const tabIds = (tab: PanelTab) => ({
+    tab: `${idPrefix}-tab-${tab}`,
+    panel: `${idPrefix}-panel-${tab}`,
+  });
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const index = PANEL_TABS.indexOf(tab);
+    const next =
+      event.key === "Home"
+        ? PANEL_TABS[0]
+        : event.key === "End"
+          ? PANEL_TABS[PANEL_TABS.length - 1]
+          : PANEL_TABS[
+              (index + (event.key === "ArrowRight" ? 1 : -1) + PANEL_TABS.length) %
+                PANEL_TABS.length
+            ];
+    selectTab(next);
+    tabRefs.current[next]?.focus();
+  };
+
   return (
-    <div
-      className={`flex h-full min-h-0 gap-6 ${compact ? "flex-col" : "flex-col lg:flex-row"}`}
-      data-testid="roleplay-interview"
-    >
-      <div className={`flex min-h-0 flex-col ${compact ? "flex-1" : "flex-1 lg:basis-3/5"}`}>
-        {chat}
+    <div className="flex h-full min-h-0 flex-col" data-testid="roleplay-interview">
+      {/* Course Copilot's two panes for one roleplay: Build is the chat, Brief what it has
+          gathered and the plan to approve. A dot marks the pane that changed out of sight. */}
+      <div
+        role="tablist"
+        aria-label={strings.tabs.label}
+        onKeyDown={handleTabKeyDown}
+        className="flex shrink-0 gap-1 border-b border-neutral-200"
+      >
+        {PANEL_TABS.map(name => {
+          const isActive = name === tab;
+          return (
+            <button
+              key={name}
+              ref={node => {
+                tabRefs.current[name] = node;
+              }}
+              id={tabIds(name).tab}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              aria-controls={tabIds(name).panel}
+              tabIndex={isActive ? 0 : -1}
+              onClick={() => selectTab(name)}
+              className={`-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-500 ${
+                isActive
+                  ? "border-primary-500 font-medium text-primary-700"
+                  : "border-transparent text-typography-800 hover:text-typography-900"
+              }`}
+            >
+              {strings.tabs[name]}
+              {name === "brief" && briefUnseen && (
+                <span
+                  role="img"
+                  aria-label={strings.tabs.updated}
+                  title={strings.tabs.updated}
+                  className="inline-block h-1.5 w-1.5 rounded-full bg-primary-500"
+                />
+              )}
+              {name === "brief" && stillNeeded.length > 0 && (
+                <span className="rounded-full bg-amber-100 px-1.5 text-[11px] text-amber-900">
+                  {strings.tabs.neededCount(stillNeeded.length)}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
       <div
-        className={
-          compact
-            ? "shrink-0 max-h-48 overflow-y-auto custom-scrollbar rounded border border-border-light p-3"
-            : "shrink-0 lg:basis-2/5 lg:border-l lg:border-border-light lg:pl-6 overflow-y-auto custom-scrollbar"
-        }
+        role="tabpanel"
+        id={tabIds(tab).panel}
+        aria-labelledby={tabIds(tab).tab}
+        className={`flex min-h-0 flex-1 flex-col pt-3 ${tab === "brief" ? "overflow-y-auto custom-scrollbar" : ""}`}
       >
-        <RoleplayBriefPanel brief={brief} stillNeeded={stillNeeded} />
+        {tab === "build" ? (
+          chat
+        ) : (
+          <div className="flex flex-col gap-4 pb-4">
+            <RoleplayBriefPanel brief={brief} stillNeeded={stillNeeded} />
+            {plan ? (
+              <RoleplayPlanCard
+                plan={plan.plan}
+                onApprove={approved ? undefined : handleApprove}
+                approving={approving}
+                approved={approved}
+              />
+            ) : (
+              <p className="text-sm text-typography-600">{strings.tabs.noPlanYet}</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
