@@ -76,3 +76,14 @@ export interface RoleplayInterviewGeneration {
   triggerWarningIds?: string[];
   states: { name: string; guidelines: string }[];
 }
+
+/** A persisted transcript row, as GET sessions/:id returns it. */
+export interface RoleplayInterviewServerMessage {
+  seq: number;
+  role: "user" | "assistant";
+  content: string;
+  questions?: import("./agentChat").AgentQuestionEvent[];
+  receipt?: unknown;
+  plan?: RoleplayInterviewPlan;
+  error?: string;
+}

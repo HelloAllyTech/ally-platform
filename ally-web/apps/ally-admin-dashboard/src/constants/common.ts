@@ -177,6 +177,14 @@ export const ApiEndpoints = {
     AGENT_BUILDER_ROLEPLAY_DESIGN: "/v1/learn/agent-builder/roleplay-design",
     AGENT_BUILDER_CHARACTER_SUGGESTIONS: "/v1/learn/agent-builder/character-suggestions",
     AGENT_BUILDER_REVISE_PLAN: "/v1/learn/agent-builder/revise-plan",
+    ROLEPLAY_INTERVIEW_SESSIONS: "/v1/learn/roleplay-interview/sessions",
+    ROLEPLAY_INTERVIEW_SESSION: (id: string) => `/v1/learn/roleplay-interview/sessions/${id}`,
+    ROLEPLAY_INTERVIEW_STREAM: (id: string) =>
+      `/v1/learn/roleplay-interview/sessions/${id}/messages/stream`,
+    ROLEPLAY_INTERVIEW_APPROVE: (id: string) =>
+      `/v1/learn/roleplay-interview/sessions/${id}/approve`,
+    ROLEPLAY_INTERVIEW_ABANDON: (id: string) =>
+      `/v1/learn/roleplay-interview/sessions/${id}/abandon`,
     COMPETENCIES: "/v1/learn/competencies",
     COMPETENCY_BY_ID: (id: string) => `/v1/learn/competencies/${id}`,
     COMPETENCY_BEHAVIOURS: (id: string) => `/v1/learn/competencies/${id}/behaviours`,

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   suggest: vi.fn(),
   fetchCharacter: vi.fn(),
   revisePlan: vi.fn(),
+  generation_: null as any,
   enhance: vi.fn(),
   catalog: [
     {
@@ -57,6 +58,15 @@ vi.mock("react-hook-form", () => ({
 
 vi.mock("../../competency", () => ({ Competency: () => <div>competency picker</div> }));
 
+vi.mock("../../roleplay-interview", () => ({
+  RoleplayInterviewPanel: ({ onApproved, onUseSteps }: any) => (
+    <div data-testid="interview-panel">
+      <button onClick={onUseSteps}>use steps</button>
+      <button onClick={() => onApproved(mocks.generation_)}>approve plan</button>
+    </div>
+  ),
+}));
+
 vi.mock("@api", () => ({
   ROLEPLAY_MODES: ["learning", "practice", "performance", "pre_assessment", "post_assessment"],
   useGetAgentTestCasesQuery: () => mocks.goals,
@@ -64,6 +74,7 @@ vi.mock("@api", () => ({
   useLazyGetRoleplayDesignQuery: () => [mocks.fetchDesign, { isFetching: false }],
   useSuggestAgentBuilderCharactersMutation: () => [mocks.suggest, { isLoading: false }],
   useLazyGetCharacterByIdQuery: () => [mocks.fetchCharacter, { isFetching: false }],
+  useLinkRoleplayInterviewMutation: () => [vi.fn(() => ({ unwrap: () => Promise.resolve({}) }))],
   useRevisePlanMutation: () => [mocks.revisePlan],
   useEnhanceFieldMutation: () => [mocks.enhance],
 }));
@@ -122,7 +133,7 @@ beforeEach(() => {
 
 describe("AgentBuilderCopilotWizard suggestions", () => {
   it("offers actor ideas that fill the description, and hides them once there is text", () => {
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
     const idea = strings.ideas[0];
     fireEvent.click(screen.getByText(idea.label));
     expect((screen.getByLabelText("actor") as HTMLTextAreaElement).value).toBe(idea.text);
@@ -130,7 +141,7 @@ describe("AgentBuilderCopilotWizard suggestions", () => {
   });
 
   it("pre-picks the recommended mode with its reason, then applies the chosen one", async () => {
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
     fireEvent.change(screen.getByLabelText("actor"), {
       target: { value: "A cooperative student, the learner's first try" },
     });
@@ -155,7 +166,7 @@ describe("AgentBuilderCopilotWizard suggestions", () => {
 
   it("lists what to review once generation is done", async () => {
     mocks.generation = { phase: "done", tasks: [], checks: [] };
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
     fireEvent.change(screen.getByLabelText("actor"), { target: { value: "Meera calls" } });
     fireEvent.click(screen.getByText("Next"));
     fireEvent.click(screen.getByText("Next"));
@@ -182,7 +193,7 @@ describe("AgentBuilderCopilotWizard suggestions", () => {
 
   it("goes on without test cases when they can't be listed", async () => {
     mocks.goals = { data: undefined, isLoading: false, isError: true };
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
     fireEvent.change(screen.getByLabelText("actor"), { target: { value: "Meera calls" } });
     fireEvent.click(screen.getByText("Next"));
     fireEvent.click(screen.getByText("Next"));
@@ -223,7 +234,7 @@ describe("AgentBuilderCopilotWizard saved conversation", () => {
 
   it("shows the earlier conversation when a roleplay is reopened", () => {
     mocks.formValues.agentBuilderChat = saved;
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
 
     expect(screen.getByTestId("restored-chat").textContent).toContain("12 of 14 fields");
     expect(screen.getByText("Aarav, 15")).toBeTruthy();
@@ -237,7 +248,7 @@ describe("AgentBuilderCopilotWizard saved conversation", () => {
 
   it("saves the conversation on the form when generation finishes", () => {
     mocks.generation = { phase: "done", tasks: [{}, {}], checks: [] };
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
 
     const call = mocks.setValue.mock.calls.find(([field]) => field === "agentBuilderChat");
     expect(call?.[1]).toMatchObject({ version: 1, result: { total: 2, stopped: false } });
@@ -249,7 +260,7 @@ describe("AgentBuilderCopilotWizard casting from the Character Library", () => {
   const characterStrings = en.agentBuilderCharacter;
 
   const toCharacterStep = async () => {
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
     fireEvent.change(screen.getByLabelText("actor"), {
       target: { value: "A 52-year-old farmer near Mandya" },
     });
@@ -347,14 +358,14 @@ describe("AgentBuilderCopilotWizard chat box", () => {
   };
 
   const toModeStep = () => {
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
     fireEvent.change(screen.getByLabelText("actor"), { target: { value: "Meera calls" } });
     fireEvent.click(screen.getByText("Next"));
     fireEvent.click(screen.getByText("Next"));
   };
 
   it("is not shown on the first step, which is already free text", () => {
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
     expect(screen.queryByTestId("agent-chat-box")).toBeNull();
   });
 
@@ -439,7 +450,7 @@ describe("AgentBuilderCopilotWizard chat box", () => {
       result: { applied: 5, total: 5, stopped: false, checks: [] },
       generatedAt: "2026-11-23T10:00:00.000Z",
     };
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
 
     await send("make him more guarded");
     await waitFor(() => expect(screen.getByText("I'll make him more guarded.")).toBeTruthy());
@@ -473,7 +484,7 @@ describe("AgentBuilderCopilotWizard languages and voices", () => {
   const strings = en.agentBuilderLanguages;
 
   const toLanguagesStep = async () => {
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
     fireEvent.change(screen.getByLabelText("actor"), { target: { value: "Meera calls" } });
     fireEvent.click(screen.getByText("Next"));
     fireEvent.click(screen.getByText("Next"));
@@ -543,7 +554,7 @@ describe("AgentBuilderCopilotWizard languages and voices", () => {
 
 describe("AgentBuilderCopilotWizard layout", () => {
   it("shows where the trainer is in the six steps", () => {
-    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    render(<AgentBuilderCopilotWizard defaultFlow="steps" formMethods={form()} />);
     expect(screen.getByTestId("step-tracker").textContent).toContain("Step 1 of 6");
     fireEvent.change(screen.getByLabelText("actor"), { target: { value: "Meera calls" } });
     fireEvent.click(screen.getByText("Next"));
@@ -553,7 +564,12 @@ describe("AgentBuilderCopilotWizard layout", () => {
   it("in focus layout, titles the tab and offers the form", () => {
     const onShowForm = vi.fn();
     render(
-      <AgentBuilderCopilotWizard formMethods={form()} layout="focus" onShowForm={onShowForm} />,
+      <AgentBuilderCopilotWizard
+        defaultFlow="steps"
+        formMethods={form()}
+        layout="focus"
+        onShowForm={onShowForm}
+      />,
     );
     expect(screen.getByText(en.agentBuilderWizard.title)).toBeTruthy();
     fireEvent.click(screen.getByText(en.agentBuilderWizard.showForm));
@@ -564,6 +580,7 @@ describe("AgentBuilderCopilotWizard layout", () => {
     const onGenerationStart = vi.fn();
     render(
       <AgentBuilderCopilotWizard
+        defaultFlow="steps"
         formMethods={form()}
         layout="focus"
         onGenerationStart={onGenerationStart}
@@ -580,5 +597,60 @@ describe("AgentBuilderCopilotWizard layout", () => {
     fireEvent.click(screen.getByText("Client deflects"));
     fireEvent.click(screen.getByText("Generate"));
     expect(onGenerationStart).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AgentBuilderCopilotWizard interview", () => {
+  it("opens on the interview, with the quick steps one click away", () => {
+    render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    expect(screen.getByTestId("interview-panel")).toBeTruthy();
+    fireEvent.click(screen.getByText("use steps"));
+    expect(screen.getByTestId("step-tracker").textContent).toContain("Step 1 of 6");
+  });
+
+  it("builds from an approved plan: competency, mode, the plan's states, languages", async () => {
+    mocks.generation_ = {
+      actorDescription: "Aarav, 15, withdrawn.",
+      competencyId: "c1",
+      competencyIds: ["c1"],
+      competencyName: "Assessment of Harm",
+      mode: "learning",
+      languages: [{ languageId: "1", label: "English (India)", code: "en-IN" }],
+      agentTestCases: "Helpful behaviours:\n- Asks directly",
+      states: [
+        { name: "Guarded", guidelines: "Short answers." },
+        { name: "Opening up", guidelines: "Shares more." },
+      ],
+    };
+    const onGenerationStart = vi.fn();
+    render(
+      <AgentBuilderCopilotWizard formMethods={form()} onGenerationStart={onGenerationStart} />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByText("approve plan"));
+    });
+
+    expect(mocks.setValue).toHaveBeenCalledWith(
+      "competency",
+      { id: "c1", name: "Assessment of Harm" },
+      expect.anything(),
+    );
+    expect(mocks.fetchDesign).toHaveBeenCalledWith("learning");
+    const statesCall = mocks.setValue.mock.calls.find(([field]: any[]) => field === "states");
+    expect(statesCall[1].map((s: any) => [s.name, s.scoreLower, s.scoreUpper])).toEqual([
+      ["Pulling away", -100, 0],
+      ["Guarded", 0, 50],
+      ["Opening up", 50, 100],
+    ]);
+    const inputs = mocks.start.mock.calls[0][0];
+    expect(inputs).toMatchObject({
+      actorDescription: "Aarav, 15, withdrawn.",
+      competency: "Assessment of Harm",
+      roleplayMode: "learning",
+      statesOnForm: true,
+      includeStates: false,
+      languages: [{ languageId: "1", label: "English (India)", code: "en-IN" }],
+    });
+    expect(onGenerationStart).toHaveBeenCalled();
   });
 });

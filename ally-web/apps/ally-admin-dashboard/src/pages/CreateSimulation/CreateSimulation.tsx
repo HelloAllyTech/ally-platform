@@ -423,7 +423,15 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
   // Agent Builder Copilot tab, chat first: the form joins the wizard once there is something in
   // it (a role instruction, a saved wizard conversation), generation starts, or the trainer asks.
   const [showCopilotForm, setShowCopilotForm] = useState(false);
-  const watchedRoleInstruction = formMethods.watch("prompt");
+  // Set once an Agent Builder build starts on this page (see the first save below).
+  const agentBuilderBuildStartedRef = useRef(false);
+  const handleAgentBuilderBuildStart = useCallback(() => {
+    agentBuilderBuildStartedRef.current = true;
+    setShowCopilotForm(true);
+  }, []);
+  // The title, not the role instruction: a new roleplay's role instruction can start from the
+  // skill version's template, while its title stays empty until the trainer or the build sets it.
+  const watchedTitle = formMethods.watch("title");
   const watchedAgentBuilderChat = formMethods.watch("agentBuilderChat");
   // True while the first-switch (or "Re-map") memory mapping runs, ~20-35s.
   // Saving, previewing or publishing in that window would store or run the
@@ -960,7 +968,15 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
         response = await createSimulationQuery({
           scenarios: [simulationData],
         });
-        navigate(ROUTES.EDIT_SIMULATION(response?.data?.[0]?.id), { replace: true });
+        const createdId = response?.data?.[0]?.id;
+        if (agentBuilderBuildStartedRef.current) {
+          // The create and edit routes are separate <Route>s, so navigating remounts this page,
+          // which would cut off an Agent Builder build running in the browser. The id is already
+          // in state; only the address changes, so a reload opens the saved roleplay.
+          window.history.replaceState(window.history.state, "", ROUTES.EDIT_SIMULATION(createdId));
+        } else {
+          navigate(ROUTES.EDIT_SIMULATION(createdId), { replace: true });
+        }
       }
     }
     return response;
@@ -1264,43 +1280,38 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
         // mirror — the Copilot is an editing tool, so it's never shown there.
         const copilotCollapsed = viewMode || isCopilotCollapsed;
         // Chat first: until there is something to look at, the wizard has the whole tab and the
-        // technical form stays out of the way. A roleplay that already has a role instruction or
+        // technical form stays out of the way. A roleplay that already has a title or
         // a saved wizard conversation opens split, as does one the trainer asked to see.
         const copilotFocus =
           !copilotCollapsed &&
           !showCopilotForm &&
-          !String(watchedRoleInstruction ?? "").trim() &&
+          !String(watchedTitle ?? "").trim() &&
           !watchedAgentBuilderChat;
-        if (copilotFocus) {
-          return renderStep(
-            <div className="lg:h-full min-h-0 flex justify-center">
-              <div className="w-full max-w-2xl h-[80dvh] lg:h-full min-h-0 flex flex-col pt-2">
-                <AgentBuilderCopilotWizard
-                  formMethods={formMethods}
-                  layout="focus"
-                  onShowForm={() => setShowCopilotForm(true)}
-                  onGenerationStart={() => setShowCopilotForm(true)}
-                />
-              </div>
-            </div>,
-          );
-        }
+        // ONE element tree for both layouts: the wizard must keep its place (the same slot of the
+        // same parent) when the form slides in, or React remounts it and a build running in the
+        // browser stops half-way, with the chat lost.
         return renderStep(
           <div
-            className={`grid ${
-              copilotCollapsed ? "grid-cols-1" : "grid-cols-1 gap-6 lg:grid-cols-2"
-            } lg:h-full min-h-0 relative`}
+            className={
+              copilotFocus
+                ? "lg:h-full min-h-0 relative flex justify-center"
+                : `grid ${
+                    copilotCollapsed ? "grid-cols-1" : "grid-cols-1 gap-6 lg:grid-cols-2"
+                  } lg:h-full min-h-0 relative`
+            }
           >
             {/* Left half — mirror of Basic Settings, independent vertical scroll.
-                Spans the full canvas when the Copilot is collapsed. Below lg the
-                halves stack and the form scrolls with the tab content. */}
-            <div className="min-h-0 lg:h-full lg:overflow-y-auto custom-scrollbar">
-              <CreateSimulationSubSection
-                items={basicSettingsSection?.fields ?? []}
-                formMethods={formMethods}
-                readOnly={viewMode}
-              />
-            </div>
+                Spans the full canvas when the Copilot is collapsed; absent in the chat-first
+                layout. Below lg the halves stack and the form scrolls with the tab content. */}
+            {!copilotFocus && (
+              <div className="min-h-0 lg:h-full lg:overflow-y-auto custom-scrollbar">
+                <CreateSimulationSubSection
+                  items={basicSettingsSection?.fields ?? []}
+                  formMethods={formMethods}
+                  readOnly={viewMode}
+                />
+              </div>
+            )}
             {/* Floating re-open control, shown only while the Copilot is
                 collapsed so the pane can always be brought back. */}
             {copilotCollapsed && !viewMode && (
@@ -1315,26 +1326,36 @@ export const CreateSimulation: FC<CreateSimulationProps> = ({ viewMode = false }
                 <span className="text-sm">Copilot</span>
               </button>
             )}
-            {/* Right half — chat-style agent-builder wizard. Scrolls on its own
-                (the wizard pins its composer and scrolls the chat internally).
-                Hidden when collapsed. */}
+            {/* Right half — chat-style agent-builder wizard (the whole tab, centred, in the
+                chat-first layout). Scrolls on its own. Hidden when collapsed. */}
             {!copilotCollapsed && (
-              <div className="min-h-0 h-[80dvh] lg:h-full overflow-hidden border-t lg:border-t-0 lg:border-l border-border-light pt-4 lg:pt-0 lg:pl-6 flex flex-col">
-                <div className="shrink-0 flex justify-end pb-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsCopilotCollapsed(true)}
-                    title="Hide Copilot"
-                    aria-label="Hide Copilot"
-                    className="flex items-center justify-center h-10 w-10 lg:h-[32px] lg:w-[32px] rounded text-typography-700 hover:bg-secondary-50 transition-colors"
-                  >
-                    <DoubleArrowRight size={18} />
-                  </button>
-                </div>
+              <div
+                className={
+                  copilotFocus
+                    ? "w-full max-w-2xl h-[80dvh] lg:h-full min-h-0 flex flex-col pt-2"
+                    : "min-h-0 h-[80dvh] lg:h-full overflow-hidden border-t lg:border-t-0 lg:border-l border-border-light pt-4 lg:pt-0 lg:pl-6 flex flex-col"
+                }
+              >
+                {!copilotFocus && (
+                  <div className="shrink-0 flex justify-end pb-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsCopilotCollapsed(true)}
+                      title="Hide Copilot"
+                      aria-label="Hide Copilot"
+                      className="flex items-center justify-center h-10 w-10 lg:h-[32px] lg:w-[32px] rounded text-typography-700 hover:bg-secondary-50 transition-colors"
+                    >
+                      <DoubleArrowRight size={18} />
+                    </button>
+                  </div>
+                )}
                 <div className="flex-1 min-h-0">
                   <AgentBuilderCopilotWizard
                     formMethods={formMethods}
-                    onGenerationStart={() => setShowCopilotForm(true)}
+                    layout={copilotFocus ? "focus" : "split"}
+                    onShowForm={() => setShowCopilotForm(true)}
+                    onGenerationStart={handleAgentBuilderBuildStart}
+                    scenarioId={simulationId ? Number(simulationId) : null}
                   />
                 </div>
               </div>

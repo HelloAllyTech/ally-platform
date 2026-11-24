@@ -115,6 +115,11 @@ export interface GenerationInputs {
    * from the brief; voices already on the form for them are kept, and only the rest are cast.
    */
   languages?: AgentBuilderSpokenLanguage[];
+  /**
+   * The states are already on the form (an approved interview plan): they are not generated
+   * again, so the roleplay keeps the states the trainer approved.
+   */
+  statesOnForm?: boolean;
 }
 
 /** The cover row: not a field generator, an image job (start, then poll until it settles). */
@@ -318,7 +323,9 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
         inputs.includeStates && !fieldPlan.some(t => t.field === STATES_FIELD.field)
           ? [...BASE_FIELD_PLAN, STATES_FIELD, SPOKEN_LANGUAGES_FIELD]
           : fieldPlan
-      ).filter(t => !(inputs.libraryCharacter && CHARACTER_FIELDS.has(t.field)));
+      )
+        .filter(t => !(inputs.libraryCharacter && CHARACTER_FIELDS.has(t.field)))
+        .filter(t => !(inputs.statesOnForm && t.field === STATES_FIELD.field));
       const withCover = inputs.generateCover !== false;
       setTasks([
         ...plan.map(t => ({

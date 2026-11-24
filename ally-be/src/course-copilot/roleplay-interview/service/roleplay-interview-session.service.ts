@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { IsNull, Not } from 'typeorm';
+import { In, IsNull, Not } from 'typeorm';
 import { RoleplayInterviewSession } from '../../entity/roleplay-interview-session.entity';
 import { RoleplayInterviewMessage } from '../../entity/roleplay-interview-message.entity';
 import {
@@ -41,11 +41,19 @@ export class RoleplayInterviewSessionService {
     tenantId: string | null,
     scenarioId?: number | null,
   ): Promise<RoleplayInterviewSessionView> {
+    // A saved roleplay reopens its own interview, finished or not. A roleplay not saved yet only
+    // picks up an interview still in progress: an approved one has already built its roleplay,
+    // and handing it to the next new roleplay would show someone else's finished plan.
     const existing = await this.sessionRepository.findOne({
       where: {
         createdBy: userId,
         scenarioId: scenarioId ? scenarioId : IsNull(),
-        status: Not(RoleplayInterviewStatus.ABANDONED),
+        status: scenarioId
+          ? Not(RoleplayInterviewStatus.ABANDONED)
+          : In([
+              RoleplayInterviewStatus.INTERVIEWING,
+              RoleplayInterviewStatus.PLAN_READY,
+            ]),
       },
       order: { updatedAt: 'DESC' },
     });

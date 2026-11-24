@@ -16081,6 +16081,23 @@ export const en = {
 
   // Roleplay interview (Agent Builder tab, Copilot-style): the brief panel and the plan card.
   roleplayInterview: {
+    welcome:
+      "Tell me about the roleplay you want: who the learners are, the skill, and the client. I'll ask a few short questions, fill in the brief on the right and propose a plan for you to approve.",
+    firstPlaceholder:
+      "e.g. A practice roleplay for teachers talking to a withdrawn 15-year-old student…",
+    placeholder: "Answer, or tell me anything else…",
+    useSteps: "Use the quick steps instead",
+    subtitle:
+      "Describe the roleplay you want. I'll ask a few short questions, fill in the brief and propose a plan; approve it and I'll build the roleplay for you to review.",
+    historyQuestion: "Roleplay interview",
+    historyAnswer: (competency: string, mode: string) =>
+      `Plan approved: ${mode} roleplay for ${competency}. Building it now.`,
+    startOver: "Start over",
+    openFailed: "The interview couldn't be opened. Refresh the page to try again.",
+    failed: "That turn didn't go through. Your answers are kept; send it again.",
+    busy: "Still working on the last message. Wait for it to finish, then send again.",
+    planChanged: "The brief changed since this plan. Ask for the plan again in the chat.",
+    approveFailed: "The plan couldn't be approved. Try again.",
     brief: {
       title: "Roleplay brief",
       stillNeeded: "Still needed:",

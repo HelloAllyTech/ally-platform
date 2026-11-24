@@ -13,10 +13,15 @@ import {
   useGetAvailableLanguageVoicesQuery,
   useLazyGetCharacterByIdQuery,
   useLazyGetRoleplayDesignQuery,
+  useLinkRoleplayInterviewMutation,
   useSuggestAgentBuilderCharactersMutation,
 } from "@api";
 import { en } from "@constants";
 import { applyCharacterToForm } from "@utils/characterApply";
+import { layOutPlanStates } from "@utils/roleplayStates";
+import { RoleplayInterviewGeneration } from "@types";
+
+import { RoleplayInterviewPanel } from "../roleplay-interview";
 import {
   ModeRecommendation,
   recommendMode,
@@ -105,6 +110,7 @@ const restoredStrings = en.agentBuilderRestored;
 const characterStrings = en.agentBuilderCharacter;
 const chatStrings = en.agentBuilderChatBox;
 const wizardStrings = en.agentBuilderWizard;
+const interviewStrings = en.roleplayInterview;
 const languageStrings = en.agentBuilderLanguages;
 /** "The agent picks a voice" in a language's voice menu. */
 const AGENT_VOICE = "";
@@ -167,6 +173,10 @@ interface AgentBuilderCopilotWizardProps {
   onShowForm?: () => void;
   /** Called as generation starts, so the page can bring the form in to fill live. */
   onGenerationStart?: () => void;
+  /** The roleplay being edited, once saved: the interview is kept with it. */
+  scenarioId?: number | null;
+  /** Where the tab starts: the interview (default) or the six quick steps. */
+  defaultFlow?: "interview" | "steps";
 }
 
 /** The questions in order, for the step tracker. */
@@ -286,8 +296,22 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   layout = "split",
   onShowForm,
   onGenerationStart,
+  scenarioId,
+  defaultFlow = "interview",
 }) => {
   const [step, setStep] = useState<WizardStepId>("describe");
+  // The interview (Course Copilot's way) by default; the six quick steps on request.
+  const [flow, setFlow] = useState<"interview" | "steps">(defaultFlow);
+  // The approved interview, linked to the roleplay once the roleplay has an id.
+  const [interviewSessionId, setInterviewSessionId] = useState<string | null>(null);
+  const [linkInterview] = useLinkRoleplayInterviewMutation();
+  useEffect(() => {
+    if (interviewSessionId && scenarioId) {
+      void linkInterview({ id: interviewSessionId, scenarioId })
+        .unwrap()
+        .catch(() => undefined);
+    }
+  }, [interviewSessionId, scenarioId, linkInterview]);
   const [history, setHistory] = useState<ChatEntry[]>([]);
   const [description, setDescription] = useState("");
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
@@ -604,6 +628,78 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     });
   };
 
+  /**
+   * An approved interview plan builds the roleplay: the competency, the mode's settings, a
+   * library character and the languages go on the form, the plan's own states are laid out for
+   * the mode, and the generation writes everything else. Values are passed straight in: the
+   * wizard's state set here is not read until the next render.
+   */
+  const runFromInterview = async (generation: RoleplayInterviewGeneration) => {
+    formMethods.setValue(
+      "competency",
+      { id: generation.competencyId, name: generation.competencyName },
+      { shouldDirty: true, shouldValidate: false },
+    );
+    let picked: RoleplayDesign | null = null;
+    try {
+      picked = await fetchDesign(generation.mode).unwrap();
+      Object.entries(picked.settings).forEach(([field, value]) =>
+        formMethods.setValue(field, value, { shouldDirty: true, shouldValidate: false }),
+      );
+      setDesign(picked);
+    } catch {
+      /* the supports stay as they are; the trainer sets them on the left */
+    }
+    let libraryCharacter: { id: string; name: string; profile: string } | null = null;
+    if (generation.characterId) {
+      try {
+        const loaded = await fetchCharacter(generation.characterId).unwrap();
+        applyCharacterToForm(formMethods, loaded);
+        libraryCharacter = {
+          id: generation.characterId,
+          name: loaded.name,
+          profile: loaded.characterProfileText ?? "",
+        };
+        setCharacter(libraryCharacter);
+      } catch {
+        /* a new character is written from the description instead */
+      }
+    }
+    const states =
+      picked?.states === false ? [] : layOutPlanStates(generation.states, generation.mode);
+    if (states.length) {
+      formMethods.setValue("states", states, { shouldDirty: true, shouldValidate: false });
+    }
+    const actorDescription = libraryCharacter
+      ? `${generation.actorDescription}\n\n${characterStrings.briefNote(libraryCharacter.name)}\n${libraryCharacter.profile.slice(0, 2500)}`
+      : generation.actorDescription;
+    setDescription(generation.actorDescription);
+    setChosenLanguages(generation.languages ?? []);
+    setGoalTitlesUsed([generation.agentTestCases]);
+    setHistory(previous => [
+      ...previous,
+      {
+        question: interviewStrings.historyQuestion,
+        answer: interviewStrings.historyAnswer(
+          generation.competencyName,
+          en.agentBuilderMode.labels[generation.mode] ?? generation.mode,
+        ),
+      },
+    ]);
+    setStep("generate");
+    onGenerationStart?.();
+    start({
+      actorDescription,
+      competency: generation.competencyName,
+      agentTestCases: generation.agentTestCases,
+      roleplayMode: generation.mode,
+      includeStates: Boolean(picked?.states) && !states.length,
+      statesOnForm: states.length > 0,
+      ...(libraryCharacter ? { libraryCharacter: true } : {}),
+      ...(generation.languages?.length ? { languages: generation.languages } : {}),
+    });
+  };
+
   /** The chat box: a note for the agent, which also acts on the step it is sent at. */
   const handleSendNote = () => {
     const note = noteDraft.trim();
@@ -653,6 +749,41 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     setModeError(false);
     setStep("describe");
   };
+
+  if (flow === "interview" && step === "describe") {
+    return (
+      <div className="flex flex-col h-full min-h-0">
+        {layout === "focus" && (
+          <div className="shrink-0 flex items-start justify-between gap-3 pb-3">
+            <div>
+              <h2 className="text-lg font-medium text-typography-900">{wizardStrings.title}</h2>
+              <p className="text-sm text-typography-600">{interviewStrings.subtitle}</p>
+            </div>
+            {onShowForm && (
+              <button
+                type="button"
+                onClick={onShowForm}
+                className="shrink-0 text-sm text-primary-600 hover:underline"
+              >
+                {wizardStrings.showForm}
+              </button>
+            )}
+          </div>
+        )}
+        <div className="flex-1 min-h-0">
+          <RoleplayInterviewPanel
+            scenarioId={scenarioId}
+            onApproved={(generation, sessionId) => {
+              setInterviewSessionId(sessionId);
+              void runFromInterview(generation);
+            }}
+            onUseSteps={() => setFlow("steps")}
+            compact={layout !== "focus"}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0">
