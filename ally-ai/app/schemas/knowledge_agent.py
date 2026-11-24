@@ -13,6 +13,9 @@ from pydantic import BaseModel, Field, SerializerFunctionWrapHandler, model_seri
 from app.core.knowledge_agent.schemas import AnswerIntent, AnswerMode, DeclineReason
 from app.schemas.knowledge_chunk import AudienceSelector
 
+#: The longest safety block a run accepts (ally-be keeps its worst case under it).
+SAFETY_RULES_MAX_CHARS = 12_000
+
 
 class AgentTurn(BaseModel):
     """One previous message, so a follow-up like 'what about for children?' resolves."""
@@ -38,7 +41,11 @@ class PersonaSelector(BaseModel):
     tone: Optional[str] = Field(None, max_length=120)
     safety_rules: Optional[str] = Field(
         None,
-        max_length=3000,
+        # 24 Nov: was 3000. The Medical pack with SB1's base and minors lines is
+        # about 3,300 characters alone, so every Medical assistant's run was
+        # refused (422). Room for the longest pack plus an owner's 20 rules of
+        # 200 characters and their topics.
+        max_length=SAFETY_RULES_MAX_CHARS,
         description=(
             "The bot's safety pack and its owner's own Never rules (chunk 20a), "
             "rendered as a fixed block after the instructions, so editing the "

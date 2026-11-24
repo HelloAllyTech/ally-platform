@@ -481,6 +481,12 @@ function cleanDeclineExtras(
   ];
 }
 
+/**
+ * The longest safety block ally-ai accepts (`persona.safety_rules`, ally-ai
+ * `SAFETY_RULES_MAX_CHARS`). A longer one is refused with a 422 and the assistant can't answer.
+ */
+export const SAFETY_RULES_MAX_CHARS = 12_000;
+
 export function packRulesBlock(
   id: SafetyPackId | string | null | undefined,
   ownerNever: string[] = [],
