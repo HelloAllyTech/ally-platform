@@ -303,6 +303,45 @@ describe('lane-level candidate check', () => {
     expect(bad.candidate).toBeUndefined();
   });
 
+  it('moves recommendation fields a model nested inside plan back beside it', () => {
+    // Prod 2026-11-24 (strategy_content): every sibling of `plan` arrived inside it.
+    const good = recFor(0, [E1]);
+    const { plan, ...siblings } = good;
+    const keep = ['title', 'whyHeadline', 'change', 'problem'];
+    const nested: Record<string, any> = { plan: { ...plan } };
+    for (const [key, value] of Object.entries(siblings)) {
+      if (keep.includes(key)) nested[key] = value;
+      else nested.plan[key] = value;
+    }
+    const out = checkCandidate(
+      { kind: 'recommendation', category: 'product', recommendation: nested },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
+    expect(out.errors).toEqual([]);
+    expect(out.candidate?.payload.evidenceIds).toEqual([E1]);
+    expect(out.candidate?.payload.size).toBe(good.size);
+    expect(Object.keys(out.candidate?.payload.plan).sort()).toEqual(
+      Object.keys(plan).sort(),
+    );
+  });
+
+  it('never lets a value nested in plan overwrite the one beside it', () => {
+    const good = recFor(0, [E1]);
+    const out = checkCandidate(
+      {
+        kind: 'recommendation',
+        category: 'product',
+        recommendation: { ...good, plan: { ...good.plan, size: 'XL' } },
+      },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
+    // The top-level size stays; the stray one is left in plan, where validation refuses it.
+    expect(out.candidate).toBeUndefined();
+    expect(out.errors.join(' ')).toContain('plan.size');
+  });
+
   it('forces the original category on a revision', () => {
     const out = checkCandidate(
       {
