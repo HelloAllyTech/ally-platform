@@ -93,9 +93,11 @@ test("Try it draws the bot page chat in the page's brand", async ({ page }) => {
 test("a field changed in another tab keeps your text and offers theirs", async ({ page }) => {
   const { workingCopy } = await mockAssistantHome(page);
   await open(page, "build");
+  const name = page.getByLabel("Name it uses in chat", { exact: true });
+  // Wait until the form holds the working copy it will be compared against.
+  await expect(name).toHaveValue("Asha");
   // Another tab saves first: the field's version moves on.
   workingCopy.fields.assistantName = { value: "Ravi", version: "ffffffffffffffff" };
-  const name = page.getByLabel("Name it uses in chat", { exact: true });
   await name.fill("Meera");
   await name.blur();
   const stale = page.getByTestId("field-stale-assistantName");

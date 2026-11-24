@@ -120,5 +120,6 @@ test("someone not on an assistant's team is told so, with the way back", async (
     "You don't have access to this assistant. Ask its owner to add you.",
   );
   await page.getByRole("link", { name: "Go to your assistants" }).click();
-  await expect(page).toHaveURL(/\/assistants$/);
+  // With exactly one assistant, the list opens it straight away.
+  await expect(page).toHaveURL(new RegExp(`/assistants(/${BOT_ID})?$`));
 });
