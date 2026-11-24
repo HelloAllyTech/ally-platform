@@ -1,3 +1,4 @@
+import { withoutStopLine } from '../../safety/chat-notice';
 import { DEFAULT_WHATSAPP_SETTINGS } from 'src/whatsapp/type/whatsapp-settings.type';
 import { WaHandledBy } from 'src/whatsapp/enum/whatsapp.enum';
 import { AgentRuntimeUsed } from '../../enum/chatbot.enum';
@@ -41,7 +42,8 @@ describe('ChatbotService and Agent mode', () => {
       // An empty chat stands for a new person: the agent's hello gets the notice too.
       // Stage 4: the fixed start notice (an AI and people may read this chat) comes first.
       expect(result.reply).toBe(
-        `Hi there!\n\nYou are chatting with an AI assistant. The AI and people at Ally FAQ may read this chat.\n${DEFAULT_WHATSAPP_SETTINGS.disclaimerText}`,
+        // TF1 P3: no "Reply STOP" in Try it's notice.
+        `Hi there!\n\nYou are chatting with an AI assistant. The AI and people at Ally FAQ may read this chat.\n${withoutStopLine(DEFAULT_WHATSAPP_SETTINGS.disclaimerText)}`,
       );
       expect(respond.mock.calls[0][0].isFirstMessage).toBe(true);
     });

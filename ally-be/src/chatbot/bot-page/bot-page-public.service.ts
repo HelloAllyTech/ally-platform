@@ -2,6 +2,8 @@ import { usageContext } from 'src/billing/context/usage-context';
 import { withFirstMessageParts } from '../engine/first-reply';
 import { startNotice } from '../safety/chat-notice';
 import { offMessage } from '../safety/off-message';
+import { withoutStopLine } from '../safety/chat-notice';
+export { withoutStopLine } from '../safety/chat-notice';
 import { ActionsService } from '../actions/actions.service';
 import { LANGUAGE_CHOICE } from '../actions/action-copy';
 import { enabledLanguagesOf } from '../languages/reply-language-for';
@@ -157,14 +159,6 @@ export function indiaEmergencyWording(text: string): string {
     /\b(contact|call) your local emergency (number|services)\b/gi,
     'call 112',
   );
-}
-
-/** TF1 P3: the WhatsApp opt-out sentence, which means nothing on the web page. */
-export function withoutStopLine(text: string): string {
-  return text
-    .replace(/\s*Reply STOP to opt out\.?/gi, '')
-    .replace(/\s*STOP (?:लिखें|likhein)[^.।]*[.।]?/gi, '')
-    .trim();
 }
 
 /**
@@ -987,7 +981,8 @@ export class BotPagePublicService {
           handledBy: decision.handledBy,
           bodyIsWelcome: decision.isWelcome,
           notice: startNotice({
-            disclaimer: botSettings.disclaimerText ?? '',
+            // TF1 P3: no "Reply STOP" in a web chat.
+            disclaimer: withoutStopLine(botSettings.disclaimerText ?? ''),
             language: replyLanguageOf(text),
             organisation: chatbot.name,
           }),

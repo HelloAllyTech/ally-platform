@@ -1,3 +1,4 @@
+import { withoutStopLine } from '../../safety/chat-notice';
 import { HttpException } from '@nestjs/common';
 import { ErrorCode } from '../../../exception/error-code.enum';
 import {
@@ -73,7 +74,10 @@ function availableFor(access: BotPageAccess, prechat = false) {
   };
 }
 
-const DEFAULT_NOTICE = DEFAULT_WHATSAPP_SETTINGS.disclaimerText;
+// TF1 P3: the web chat's notice leaves out WhatsApp's "Reply STOP to opt out".
+const DEFAULT_NOTICE = withoutStopLine(
+  DEFAULT_WHATSAPP_SETTINGS.disclaimerText,
+);
 
 const DECISION = {
   handledBy: WaHandledBy.RAG,

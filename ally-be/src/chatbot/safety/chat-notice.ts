@@ -76,3 +76,11 @@ export function startNotice(options: {
   const fixed = aiNotice(options.language, options.organisation);
   return own ? `${fixed}\n${own}` : fixed;
 }
+
+/** TF1 P3: the WhatsApp opt-out sentence, which means nothing on the web page. */
+export function withoutStopLine(text: string): string {
+  return text
+    .replace(/\s*Reply STOP to opt out\.?/gi, '')
+    .replace(/\s*STOP (?:लिखें|likhein)[^.।]*[.।]?/gi, '')
+    .trim();
+}

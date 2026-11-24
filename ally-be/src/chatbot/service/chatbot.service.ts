@@ -1,3 +1,4 @@
+import { withoutStopLine } from '../safety/chat-notice';
 import { realName } from '../../bot-draft/name-placeholders';
 import { ActionsService } from '../actions/actions.service';
 import {
@@ -1158,9 +1159,12 @@ export class ChatbotService {
           bodyIsWelcome: decision.isWelcome,
           // Stage 4: the fixed start notice, exactly as a new person receives it.
           notice: startNotice({
-            disclaimer: this.settingsService.renderPlaceholders(
-              settings.disclaimerText ?? '',
-              settings,
+            // TF1 P3: Try it is the web page's chat: no "Reply STOP".
+            disclaimer: withoutStopLine(
+              this.settingsService.renderPlaceholders(
+                settings.disclaimerText ?? '',
+                settings,
+              ),
             ),
             language: replyLanguageOf(dto.message ?? ''),
             organisation: bot.name,
