@@ -15,3 +15,7 @@ Every new line a person or an owner can see, from the TF1 fixes. In code each on
 | S4 | the same, after confirming | Crisis replies now give {numbers} beside the national numbers. |
 | S4 | the same, when it fails | Couldn't confirm it. Try again. |
 | S4 | Helpline and Mental-health practice templates, the helpline question's hint (was "Every crisis reply gives this number beside the national ones.") | Crisis replies give this number beside the national ones once you confirm it in Settings, under Safety. |
+| S7 | the end of every reply to a worry about a child's safety (India) | If a child is in danger right now, call 112. Childline: 1098, free, any time. |
+| S7 | the same, in Hindi | अगर किसी बच्चे को अभी खतरा है, तो 112 पर कॉल करें। चाइल्डलाइन: 1098, मुफ़्त, किसी भी समय। |
+| S7 | the same, outside India | If a child is in danger right now, call your local emergency number. |
+| S7 | the same, outside India, in Hindi | अगर किसी बच्चे को अभी खतरा है, तो अपने यहाँ के आपातकालीन नंबर पर कॉल करें। |
