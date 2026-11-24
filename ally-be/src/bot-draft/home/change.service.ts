@@ -20,6 +20,19 @@ import { AssistantHomeService } from './assistant-home.service';
 import { versionOf } from './home-fields';
 
 /** A field change by chat can propose, by ally-ai's name → the home's field. */
+/**
+ * TF1 F8: the working copy's key for each field change by chat can make. The owner sees and
+ * publishes the working copy (Build's form); writing only the live row lost the change at Go live.
+ */
+const WORKING_COPY_KEYS: Record<string, string> = {
+  assistantName: 'assistantName',
+  introduction: 'introduction',
+  tone: 'tone',
+  instructions: 'instructions',
+  declineText: 'declineText',
+  suggestedQuestions: 'suggestedQuestions',
+};
+
 const FIELDS: Record<string, string> = {
   assistant_name: 'assistantName',
   introduction: 'introduction',
@@ -77,7 +90,10 @@ export class ChangeService {
       'change_by_chat',
     );
     const view = await this.home.get(chatbotId);
-    const f = view.fields as Record<string, { value: unknown }>;
+    const f = await this.withWorkingCopy(
+      chatbotId,
+      view.fields as Record<string, { value: unknown; version: string }>,
+    );
     const prompts = await this.prompts();
     const out = await this.ai.proposeChange({
       request,
@@ -187,10 +203,10 @@ export class ChangeService {
       return;
     }
     const view = await this.home.get(chatbotId);
-    const fields = view.fields as Record<
-      string,
-      { value: unknown; version: string }
-    >;
+    const fields = await this.withWorkingCopy(
+      chatbotId,
+      view.fields as Record<string, { value: unknown; version: string }>,
+    );
     if (field === 'avoid_topic') {
       const current = (fields.avoidTopics?.value as string[]) ?? [];
       const topic = String(undoing ? from : to);
@@ -223,6 +239,35 @@ export class ChangeService {
       { field: name, value: to, version: fields[name].version },
       { record: false },
     );
+    // TF1 F8: and the working copy, which the form shows and Go live publishes.
+    const key = WORKING_COPY_KEYS[name];
+    const draft = key ? await this.drafts.findByChatbot(chatbotId) : null;
+    if (draft && key) {
+      await this.drafts.update(draft, {
+        draftConfig: { ...draft.draftConfig, [key]: to } as never,
+      });
+    }
+  }
+
+  /**
+   * TF1 F8: the fields as the owner sees them: the working copy's value where it has one (before
+   * go-live the live row is still empty, so the preview's "before" read "—").
+   */
+  private async withWorkingCopy(
+    chatbotId: string,
+    fields: Record<string, { value: unknown; version: string }>,
+  ): Promise<Record<string, { value: unknown; version: string }>> {
+    const draft = await this.drafts.findByChatbot(chatbotId).catch(() => null);
+    const config = (draft?.draftConfig ?? {}) as Record<string, unknown>;
+    const out = { ...fields };
+    for (const [name, key] of Object.entries(WORKING_COPY_KEYS)) {
+      const value = config[key];
+      const has = Array.isArray(value)
+        ? value.length > 0
+        : typeof value === 'string' && value.trim() !== '';
+      if (has) out[name] = { ...(out[name] ?? { version: '' }), value };
+    }
+    return out;
   }
 
   private async record(chatbotId: string, changes: ProposedChange[]) {
