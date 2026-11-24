@@ -1,6 +1,8 @@
 import {
   FIND_A_HELPLINE_URL,
+  carriesIndiaLines,
   fixedCrisisInformation,
+  newHelplines,
 } from '../../chatbot/engine/blocked-notice';
 import { CareTopic, Industry, SafetyPackId } from '../enum/bot-draft.enum';
 import { livePack, packOverride } from './live-packs';
@@ -479,6 +481,12 @@ function cleanDeclineExtras(
   ];
 }
 
+/**
+ * The longest safety block ally-ai accepts (`persona.safety_rules`, ally-ai
+ * `SAFETY_RULES_MAX_CHARS`). A longer one is refused with a 422 and the assistant can't answer.
+ */
+export const SAFETY_RULES_MAX_CHARS = 12_000;
+
 export function packRulesBlock(
   id: SafetyPackId | string | null | undefined,
   ownerNever: string[] = [],
@@ -511,6 +519,8 @@ export function packRulesBlock(
  */
 export const CRISIS_NUMBERS_LINE = fixedCrisisInformation(null, 'en');
 export const GENERAL_CRISIS_TEXT = `It sounds like this may be urgent. This assistant can't help in a crisis. ${CRISIS_NUMBERS_LINE}`;
+/** The same for an assistant in India: 112 and Tele-MANAS 14416, then the link. */
+export const INDIA_GENERAL_CRISIS_TEXT = `It sounds like this may be urgent. This assistant can't help in a crisis. ${fixedCrisisInformation(null, 'en', true)}`;
 
 /**
  * The fixed crisis and emergency texts in each language a reply can go out in (Q3-fast Part 1).
@@ -530,27 +540,13 @@ const CRISIS_LEAD: Record<CrisisLanguage, string> = {
 const curated = (language?: string | null): CrisisLanguage =>
   language === 'hi' || language === 'hi-latn' ? language : 'en';
 
-/**
- * The helplines (comma, semicolon, slash or line separated) whose numbers don't already appear
- * in `already`, joined back as written. Empty when every one is already there.
- */
-export function newHelplines(helplines: string, already: string): string {
-  if (!helplines) return '';
-  const digits = (text: string) => text.replace(/\D/g, '');
-  const known = digits(already);
-  const numbersIn = (text: string) =>
-    (text.match(/\d(?:[\s-]?\d){2,}/g) ?? []).map(digits);
-  return helplines
-    .split(/\s*(?:[,;\n]|\s\/\s)\s*/)
-    .filter((item) => item.trim())
-    .filter((item) => {
-      const numbers = numbersIn(item);
-      return !numbers.length || numbers.some((n) => !known.includes(n));
-    })
-    .join(', ');
-}
+// Moved to blocked-notice.ts so the India crisis lines can use it; still exported from here.
+export { newHelplines };
 
-/** The at-risk reply (6b item 25; languages Q3-fast Part 1; R6 link-only default). */
+/**
+ * The at-risk reply (6b item 25; languages Q3-fast Part 1; R6 link-only default). In India
+ * (`india`), 112 and Tele-MANAS 14416 lead the crisis information (`fixedCrisisInformation`).
+ */
 export function crisisReply(options: {
   pack: SafetyPackId | string | null | undefined;
   helplineNumbers?: string | null;
@@ -558,18 +554,23 @@ export function crisisReply(options: {
   own?: string | null;
   /** The person's language (Q3-fast); English when not given or not curated. */
   language?: CrisisLanguage | string | null;
+  /** The assistant is in India (`isIndiaAssistant`). */
+  india?: boolean;
 }): string {
   const language = curated(options.language);
   const own = (options.own ?? '').trim();
   const numbers = (options.helplineNumbers ?? '').trim();
+  const india = Boolean(options.india);
   if (own) {
     // The owner's own wording is theirs, in whatever language they wrote it; the crisis
-    // information is locked, so it follows whenever the wording leaves the link out.
-    if (own.includes(FIND_A_HELPLINE_URL)) return own;
+    // information is locked, so it follows whenever the wording leaves the link out (in India,
+    // also 112 or 14416).
+    if (india ? carriesIndiaLines(own) : own.includes(FIND_A_HELPLINE_URL))
+      return own;
     const missing = newHelplines(numbers, own);
-    return `${own} ${fixedCrisisInformation(missing || null, language)}`;
+    return `${own} ${fixedCrisisInformation(missing || null, language, india)}`;
   }
-  return `${CRISIS_LEAD[language]} ${fixedCrisisInformation(numbers || null, language)}`;
+  return `${CRISIS_LEAD[language]} ${fixedCrisisInformation(numbers || null, language, india)}`;
 }
 
 /**
@@ -612,6 +613,29 @@ const EMERGENCY_TEXTS: Record<
   },
 };
 
+/** In India the first line names 112 instead of "your local emergency number" (approved 24 Nov). */
+// COPY: needs approval (India crisis lines; English approved 24 Nov)
+const INDIA_EMERGENCY_FIRST: Record<
+  CrisisLanguage,
+  { base: string; animal: string }
+> = {
+  en: {
+    base: 'This sounds like an emergency. Please go to the nearest emergency department now, or call 112.',
+    animal:
+      'This sounds like an emergency. Please go to the nearest emergency department or your nearest vet now, or call 112.',
+  },
+  hi: {
+    base: 'यह आपात स्थिति लगती है। कृपया अभी सबसे नज़दीकी इमरजेंसी विभाग जाएँ, या 112 पर कॉल करें।',
+    animal:
+      'यह आपात स्थिति लगती है। कृपया अभी सबसे नज़दीकी इमरजेंसी विभाग या अपने नज़दीकी पशु चिकित्सक के पास जाएँ, या 112 पर कॉल करें।',
+  },
+  'hi-latn': {
+    base: 'Yeh emergency lagti hai. Kripya abhi sabse nazdeeki emergency department jaayein, ya 112 par call karein.',
+    animal:
+      'Yeh emergency lagti hai. Kripya abhi sabse nazdeeki emergency department ya apne nazdeeki vet ke paas jaayein, ya 112 par call karein.',
+  },
+};
+
 export function emergencyReply(options: {
   language?: CrisisLanguage | string | null;
   organisation?: string | null;
@@ -622,16 +646,19 @@ export function emergencyReply(options: {
   animal?: boolean;
   /** The builder's helpline numbers, named first in the crisis information (R6). */
   helplineNumbers?: string | null;
+  /** The assistant is in India (`isIndiaAssistant`): "call 112", and India's crisis lines. */
+  india?: boolean;
 }): string {
   const language = curated(options.language);
   const texts = EMERGENCY_TEXTS[language];
+  const first = options.india ? INDIA_EMERGENCY_FIRST[language] : texts;
   const organisation = (options.organisation ?? '').trim();
   const number = (options.emergencyNumber ?? '').trim();
   return [
-    options.animal ? texts.animal : texts.base,
+    options.animal ? first.animal : first.base,
     organisation && number ? texts.business(organisation, number) : '',
     options.selfHarm
-      ? ` ${fixedCrisisInformation(options.helplineNumbers ?? null, language)}`
+      ? ` ${fixedCrisisInformation(options.helplineNumbers ?? null, language, options.india)}`
       : '',
   ].join('');
 }

@@ -4,7 +4,7 @@ import type {
   CrisisCheckResponse,
 } from '../../../ai/dto/knowledge.dto';
 import { AiUpstreamError } from '../../../ai/exception/ai-upstream.exception';
-import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
+import { INDIA_GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import { ErrorCode } from '../../../exception/error-code.enum';
 import { WaHandledBy } from '../../../whatsapp/enum/whatsapp.enum';
 import { DEFAULT_WHATSAPP_SETTINGS } from '../../../whatsapp/type/whatsapp-settings.type';
@@ -215,7 +215,7 @@ describe('ChatbotEngineService streaming a reply', () => {
     const decision = await decided;
 
     expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-    expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
+    expect(decision.body).toBe(INDIA_GENERAL_CRISIS_TEXT);
     expect(cancelled?.aborted).toBe(true);
     expect(seen.some((e) => e.event === 'token')).toBe(false);
   });

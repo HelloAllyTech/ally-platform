@@ -55,25 +55,100 @@ const LEAD: Record<
   },
 };
 
-/** The chatbot's crisis information: the builder's own numbers first when set, then the link. */
+/**
+ * India's national lines, ahead of everything else for an assistant in India (its time zone,
+ * `isIndiaAssistant`). Elsewhere R6 stands: the builder's numbers, then the link.
+ */
+// COPY: needs approval (India crisis lines)
+export const INDIA_CRISIS_LINES: Record<ReplyLanguage, string> = {
+  en: "If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7).",
+  hi: 'अगर आप ख़तरे में हैं, तो अभी 112 पर कॉल करें। अगर आप ख़ुद को नुकसान पहुँचाने के बारे में सोच रहे हैं, तो Tele-MANAS को 14416 पर कॉल करें (मुफ़्त, 24×7)।',
+  'hi-latn':
+    'Agar aap khatre mein hain, toh abhi 112 par call karein. Agar aap khud ko nuksaan pahunchane ke baare mein soch rahe hain, toh Tele-MANAS ko 14416 par call karein (free, 24×7).',
+};
+
+// COPY: needs approval (India crisis lines)
+const INDIA_AFTER: Record<
+  ReplyLanguage,
+  { link: string; withNumbers: string }
+> = {
+  en: {
+    link: `Or find a helpline near you at ${FIND_A_HELPLINE_URL}`,
+    withNumbers: `You can also call {numbers}, or find other helplines at ${FIND_A_HELPLINE_URL}`,
+  },
+  hi: {
+    link: `या ${FIND_A_HELPLINE_URL} पर अपने पास की हेल्पलाइन खोजें`,
+    withNumbers: `आप {numbers} पर भी कॉल कर सकते हैं, या ${FIND_A_HELPLINE_URL} पर दूसरी हेल्पलाइन खोजें`,
+  },
+  'hi-latn': {
+    link: `Ya ${FIND_A_HELPLINE_URL} par apne paas ki helpline dhoondhein`,
+    withNumbers: `Aap {numbers} par bhi call kar sakte hain, ya ${FIND_A_HELPLINE_URL} par doosri helpline dhoondhein`,
+  },
+};
+
+/**
+ * The helplines (comma, semicolon, slash or line separated) whose numbers don't already appear
+ * in `already`, joined back as written. Empty when every one is already there.
+ */
+export function newHelplines(helplines: string, already: string): string {
+  if (!helplines) return '';
+  const digits = (text: string) => text.replace(/\D/g, '');
+  const known = digits(already);
+  const numbersIn = (text: string) =>
+    (text.match(/\d(?:[\s-]?\d){2,}/g) ?? []).map(digits);
+  return helplines
+    .split(/\s*(?:[,;\n]|\s\/\s)\s*/)
+    .filter((item) => item.trim())
+    .filter((item) => {
+      const numbers = numbersIn(item);
+      return !numbers.length || numbers.some((n) => !known.includes(n));
+    })
+    .join(', ');
+}
+
+/**
+ * The chatbot's crisis information: the builder's own numbers first when set, then the link. In
+ * India (`india`), 112 and Tele-MANAS 14416 come first, then the builder's numbers (any that repeat
+ * 112 or 14416 dropped), then the link.
+ */
 export function fixedCrisisInformation(
   ownNumbers: string | null | undefined,
   language: ReplyLanguage,
+  india = false,
 ): string {
   const numbers = ownNumbers?.trim();
+  if (india) {
+    const lines = INDIA_CRISIS_LINES[language] ?? INDIA_CRISIS_LINES.en;
+    const after = INDIA_AFTER[language] ?? INDIA_AFTER.en;
+    const extra = numbers ? newHelplines(numbers, lines) : '';
+    return `${lines} ${extra ? after.withNumbers.replace('{numbers}', extra) : after.link}`;
+  }
   const text = CRISIS_INFO[language] ?? CRISIS_INFO.en;
   return numbers ? text.withNumbers.replace('{numbers}', numbers) : text.link;
+}
+
+/** Whether a crisis text already carries India's lines and the link, so nothing need follow it. */
+export function carriesIndiaLines(text: string): boolean {
+  return (
+    /\b112\b/.test(text) &&
+    text.includes('14416') &&
+    text.includes(FIND_A_HELPLINE_URL)
+  );
 }
 
 /** The fixed notification for a blocked state (no model call). Empty for ABUSE_BLOCKED. */
 export function blockedNotice(
   state: BlockedState,
-  options: { ownNumbers?: string | null; language: ReplyLanguage },
+  options: {
+    ownNumbers?: string | null;
+    language: ReplyLanguage;
+    india?: boolean;
+  },
 ): string {
   if (state === 'ABUSE_BLOCKED') return '';
   const lead = LEAD[state][options.language] ?? LEAD[state].en;
   // No full stop after the link: some clients would make it part of the address.
-  return `${lead} ${fixedCrisisInformation(options.ownNumbers, options.language)}`;
+  return `${lead} ${fixedCrisisInformation(options.ownNumbers, options.language, options.india)}`;
 }
 
 /** The owner's own test at a zero free balance (shown in the test pane, never to customers). */
