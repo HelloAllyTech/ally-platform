@@ -18,6 +18,83 @@ export interface InboundWhatsAppMessage {
    * messages queued before multi-number support, which belong to the env-configured number.
    */
   phoneNumberId?: string;
+  /**
+   * BT1: the id of the list row or reply button tapped (an action token), when the message is a
+   * tap on an interactive message; `text` is then its title.
+   */
+  actionId?: string;
+}
+
+/**
+ * BT1: an interactive message (Meta's list message or reply buttons), inside the 24-hour window
+ * only. `whatsappInteractiveFits` checks Meta's limits before anything is sent.
+ */
+export type WhatsAppInteractive =
+  | {
+      type: 'list';
+      body: string;
+      /** The button that opens the list: at most 20 characters. */
+      button: string;
+      sections: {
+        /** At most 24 characters. */
+        title: string;
+        /** At most 10 rows in all; a title at most 24, a description at most 72, an id 200. */
+        rows: { id: string; title: string; description?: string }[];
+      }[];
+    }
+  | {
+      type: 'button';
+      body: string;
+      /** At most 3; a title at most 20 characters, an id at most 256. */
+      buttons: { id: string; title: string }[];
+    };
+
+/** Meta's limits for interactive messages (BT1 §3). */
+export const WHATSAPP_INTERACTIVE_LIMITS = {
+  body: 1024,
+  listButton: 20,
+  sectionTitle: 24,
+  rows: 10,
+  rowTitle: 24,
+  rowDescription: 72,
+  rowId: 200,
+  buttons: 3,
+  buttonTitle: 20,
+  buttonId: 256,
+} as const;
+
+/** Whether an interactive message is within Meta's limits (sent only when it is). */
+export function whatsappInteractiveFits(m: WhatsAppInteractive): boolean {
+  const L = WHATSAPP_INTERACTIVE_LIMITS;
+  if (!m.body.trim() || m.body.length > L.body) return false;
+  if (m.type === 'button') {
+    return (
+      m.buttons.length >= 1 &&
+      m.buttons.length <= L.buttons &&
+      m.buttons.every(
+        (b) =>
+          b.title.trim() &&
+          b.title.length <= L.buttonTitle &&
+          b.id.length <= L.buttonId,
+      ) &&
+      new Set(m.buttons.map((b) => b.title)).size === m.buttons.length
+    );
+  }
+  const rows = m.sections.flatMap((s) => s.rows);
+  return (
+    m.button.trim().length > 0 &&
+    m.button.length <= L.listButton &&
+    rows.length >= 1 &&
+    rows.length <= L.rows &&
+    m.sections.every((s) => s.title.length <= L.sectionTitle) &&
+    rows.every(
+      (r) =>
+        r.title.trim() &&
+        r.title.length <= L.rowTitle &&
+        (r.description ?? '').length <= L.rowDescription &&
+        r.id.length <= L.rowId,
+    )
+  );
 }
 
 /**
@@ -79,6 +156,16 @@ export interface WhatsAppProvider {
   sendText(
     to: string,
     body: string,
+    creds?: WaNumberCredentials,
+  ): Promise<{ providerMessageId: string }>;
+
+  /**
+   * BT1: send a list message or reply buttons. Optional: a provider without it gets the numbered
+   * text instead. Throws like `sendText`.
+   */
+  sendInteractive?(
+    to: string,
+    message: WhatsAppInteractive,
     creds?: WaNumberCredentials,
   ): Promise<{ providerMessageId: string }>;
 

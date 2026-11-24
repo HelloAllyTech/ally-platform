@@ -62,17 +62,19 @@
 ## 3. Where we are today (23 Nov)
 
 - **Production rounds 20–22 Nov:** six NGO use cases on real organisations, Robin Hood Army on its live page (2 pass, 10 partly, 6 fail of 18), Round 7 (template-built iCall), Round 8 (Akshaya Patra, Jaipur Foot, Vandrevala live, Uday Foundation: 11 / 9 / 7 of 27). Six root causes (`FIXES-22NOV.md`): hand-over replacing answers; search tied to the question's language; key facts left to search; WhatsApp rules leaking onto the web; the booking question naming the wrong fields; templates not fitting the organisation. Plus: publishing blocked by the safety recheck, the wrong safety pack, the word "unchanged" leaking into a name and a reply.
-- **▶ Q4 light is building** on `fix/agents-v2-q4`. The use-case suite is built (11 assistants, 246 cases). Baseline (one run, old grader): 127 pass, 110 partly, 9 fail; in-data facts right 20–80% per assistant; hand-over replaced the answer 14 times; the wrong pack on 6 of 9 setups; the database ran out of connections with four setups at once. First fix group committed (publishing, hand-over keeps the answer, verified crisis numbers, emergency keywords per pack, pack choice, safe previews, the "Replace them" link). Prompt texts approved 23 Nov with three edits. Next: rebuild, re-grade the baseline with the fixed grader, measure, then the rest.
+- **▶ Q4 light is building** on `fix/agents-v2-q4`. The use-case suite is built (13 sets, about 297 cases). Done: the suite and grader (three grading views, hand rulings), publishing prompts (A0), safety prompts A1–A5, hand-over never replaces an answer (14 → 0), key facts in context, search in English as well, hybrid (keyword + vector) search with neighbour chunks, struck-out prices, "answer instead of which one?" (D1). Measured 23 Nov, like for like: in-data right 57% → 62% (target 85%; the rest moves to Phase 3), non-English in-data 41% → 53%, "asked back instead of answering" 27 → 12, saves with exactly one confirmation 8 of 8, emergencies 25 of 26 (a bystander emergency missed on a non-health pack). Still to do: the rest of A, section H from the demo build (an at-risk message missed mid-conversation on the live page; emergencies on every pack), B, D (stop 3), E, F and G+. About Fri 28 Nov.
+- **Demo build on production (23 Nov, `DEMO-FINDINGS-23NOV.md`):** Sukoon, Haq Seva and Annapoorna live (invite-only); Raah and Mann Collective blocked by the publish 409. Every finding is in Q4 section H, RC1, BT1 or later.
+- **WhatsApp on production (23 Nov):** the Ally number (+91 96199 99081) is connected to Sukoon Therapy through the owner's Connect flow and answers; invite-only applies on WhatsApp (an unlisted number gets the refusal, after the crisis check). The server needed `WHATSAPP_CREDENTIALS_ENCRYPTION_KEY` (added to production's settings and in RC1's `launch:check`).
 - **WhatsApp today is a reply engine:** it answers people who write first, in plain text, safely; it can't send templates, buttons, lists, images or documents, declines voice notes and files, keeps delivery status only for cost, and its contacts have no names, tags or segments.
 - **Live test data to tidy:** Vandrevala is live at `/b/unchanged` (rename or unpublish until Q4 ships); BHIVE, Robin Hood Army and the 20–22 Nov drafts.
 
-## 4. Phase 1 — Invite-only launch (target about Mon 8 Dec)
+## 4. Phase 1 — Invite-only launch (target about Fri 27 Nov, fast track decided 23 Nov; see the decisions log)
 
 Ally onboards each organisation itself: no sign-up, no online payment, Ally connects their WhatsApp number. Two pilots first (one an organisation), then the first 10–20 invited, one at a time, watched daily; a weekly feedback review sets Phase 2's order. One session at a time: Q4 → Book by tap → RC1.
 
 ### 1.1 T1 Use-case templates — ✅ released 22 Nov (`chunk-t1.md`)
 
-### 1.2 Q4 light: fix what the rounds found — ▶ building, about 27 Nov (`chunk-q4.md`)
+### 1.2 Q4 light: fix what the rounds found — ▶ building, about 28 Nov (`chunk-q4.md`)
 
 - **§0 The use-case suite** (`EVAL-USECASES.md`): the six organisation templates on iCall, CanSupport, Goonj, Teach For India (plus a staff handbook) and Robin Hood Army; five business assistants that failed before (Dr Agarwal's, Cloudnine, The Souled Store, Scripbox, 91springboard/BHIVE); the Robin Hood Army and Round 8 sets with their "should be" answers; about 25 messages each (facts incl. Hindi and Hinglish, not-in-data, look-alikes, emergencies, the template's action, off-topic, use-case checks) plus the owner side; 3 runs for final numbers; launch targets per template.
 - **Grader first** (hand rulings at 95%, only what was asked, referrals not "invented", refusals pass, conflicting facts named; the checkup's counts add up; similar size per assistant; every pack's safety questions).
@@ -83,7 +85,9 @@ Ally onboards each organisation itself: no sign-up, no online payment, Ally conn
 - **E — Setup under load:** no "Something went wrong" with five setups at once (the database connections); first checkup question and publishing under 15 s.
 - **F and G+ — Small fixes:** setup copy, the share domain, live counts, the shouted headline, the "Replace them" link, the Campaigns template's "Set it up"; quick questions skip what the template asked; template answers (locations, hours) used; checkups built around the template.
 
-### 1.3 WhatsApp Stage 0: your number — Shehbaz, this week (no code)
+### 1.3 WhatsApp Stage 0: your number — Shehbaz, this week (no code) — 🟡 mostly done
+
+Done 23 Nov: business verified; number connected and answering on Sukoon; webhook subscribed; system-user token. Left: a payment method (in rupees), the 5 templates submitted, two-factor authentication for everyone in the portfolio, the Tech Provider application, App Review and publishing the Meta app.
 
 Verify the business with Meta; display name and profile; connect the number to an internal assistant; subscribe to message, template-status and quality webhooks; submit 5 templates (appointment reminder, booking confirmed, callback follow-up, event update, opt-in confirmation), wording approved by you; note the 250-a-day starting limit; confirm rupee billing before 31 Dec.
 
@@ -91,7 +95,7 @@ Verify the business with Meta; display name and profile; connect the number to a
 
 The suite's action conversations on the live page and WhatsApp; real bookings, two customers and one slot, a move, the per-person limit, memory across chats, the callback email; on WhatsApp the booking conversation, memory, a failed run; emergencies 3 times each on a medical and a maternity assistant; Hindi and Hinglish at-risk messages; +custb asking for +custa's booking; five chats at once; the spend-cap replies.
 
-### 1.5 BT1 Book by tap — about 2 Dec (`chunk-bt1.md`; decided 22 Nov in place of T2)
+### 1.5 BT1 Act by tap — ▶ built 24 Nov, waiting for review (`chunk-bt1.md`, `CHUNK-BT1-NOTES.md`; decided 22 Nov in place of T2)
 
 Slot chips from the list (never from text); a confirmation card built in code (what, when, where, how many, for whom) with Confirm and Change; Confirm is the yes, written once through the same rules, no model call; done cards titled by list ("Booked", "Registered", "Callback requested", "Application received") with Cancel and Move, each confirmed; callbacks, applications, volunteer shifts and registrations too; Try it marks "Test, not saved"; up to 3 suggested-question chips; **WhatsApp's first interactive sends** (list messages, reply buttons) with a numbered-text fallback outside 24 hours; signed single-use action tokens; a crisis between taps wins.
 
@@ -232,6 +236,7 @@ Board and calendar views, bulk edit and saved filters in lists · a dark home (t
 | 23 Nov | Grader fixed first; prompt texts approved with edits (conflicts named, Young people for schools, Hinglish crisis line); template-written crisis numbers unconfirmed until the owner confirms |
 | 23 Nov | WhatsApp: close the outbound gap straight after launch (Stages A–D), beat competitors after the broadcast lands, skip commerce |
 | 23 Nov | Demos are template-led, with fictional organisations |
+| 23 Nov (evening) | **Fast track:** Q4 is the last block before launch. Part 1 (safety, publishing, answers and search) merges once the live-path must-pass cases pass; part 2 adds only the must-dos (G+9 "unchanged", H5–H10, H12, G2, C16, B4, B7, the setup pool fix, G+15, A3). BT1, speed tuning (D, stop 3), answer quality to 85% and Q4's polish items move after launch. RC1 waits until after this launch: the first launch is internal (Ally's own team and invited testers), so erasure requests are handled by hand and errors watched in the logs. In-data at 62–75% is accepted for an internal launch watched daily. Internal launch about Fri 27 Nov; RC1 before any outside organisation's real users |
 | Open | The speed gate for launch (suggested: status under 2 s, median under 12 s, first words under 8 s); reasoning effort "minimal" (measured in Q4); whose Meta app pilots' numbers sit on |
 
 ## 15. Follow-ups and known debt
@@ -251,8 +256,8 @@ Board and calendar views, bulk edit and saved filters in lists · a dark home (t
 |---|---|
 | Rename or unpublish Vandrevala's `/b/unchanged` page | Now |
 | Enter the Free and Pro cap amounts; tick the launch checklist on production | Now |
-| Meta business verification and the Tech Provider application | Start now |
-| WhatsApp Stage 0: your number, webhooks, 5 templates submitted, wording approved | This week |
+| Meta business verification ✅ (verified); the Tech Provider application | Start now |
+| WhatsApp Stage 0: number and webhook ✅; a payment method in rupees, 5 templates submitted, two-factor for everyone | This week |
 | Decide the speed gate and "minimal" reasoning (Q4 stops for it) | During Q4 |
 | Pick the two pilots (one an organisation), a contact at each, and the first invite list | Before the gate round |
 | Decide whose Meta app the pilots' numbers sit on until self-serve | Before launch |

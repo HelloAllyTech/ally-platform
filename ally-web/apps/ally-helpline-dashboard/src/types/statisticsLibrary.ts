@@ -92,6 +92,8 @@ export interface StatisticsChartLibrary {
   charts: StatisticsChartEntry[];
   /** The tabs that show charts. Absent from a backend older than the tabs. */
   views?: StatisticsViewConfig[];
+  /** Chart ids pinned to For you until the person pins their own. */
+  defaultPins?: string[];
 }
 
 export interface StatisticsChartResponse<T = unknown> {
@@ -336,6 +338,41 @@ export interface RoleplayAttemptsData {
 /** TSQ-065 */
 export interface SkillTrendData {
   skills: Array<{ skill: string; points: Array<{ slice: number; level: number }> }>;
+}
+
+/** TSQ-049 */
+export interface NewCharacterData {
+  learners: number;
+  pairs: number;
+  /** Helping-skills level (1 to 4) with a familiar character; null while under the floor. */
+  familiar: number | null;
+  unfamiliar: number | null;
+  change: number | null;
+  up: number;
+  down: number;
+  same: number;
+}
+
+/** TSQ-050 */
+export interface HelpfulBehavioursData {
+  learners: number;
+  rows: Array<{
+    code: string;
+    skill: string;
+    text: string;
+    beforePercent: number;
+    afterPercent: number;
+  }>;
+}
+
+/** TSQ-051 */
+export interface UnhelpfulTrendData {
+  points: Array<{ slice: number; sharePercent: number; assessments: number }>;
+}
+
+/** TSQ-055 */
+export interface ScoreByAttemptData {
+  steps: Array<{ attempt: number; learners: number; averageScore: number }>;
 }
 
 /** One finding on For you: what a rule found in the organisation's own charts. */

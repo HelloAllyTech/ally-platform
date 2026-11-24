@@ -1,0 +1,36 @@
+{
+  "assistant": "b4-scripbox",
+  "cases": [
+    {
+      "id": "b4-t1",
+      "kind": "action",
+      "lang": "en",
+      "_note": "A lead by tap.",
+      "turns": [
+        {
+          "user": "I'm interested in starting a SIP. Please have someone contact me. I'm Leela Test, 9800000015, leela@example.com.",
+          "expect": {
+            "partsAny": [
+              "offer"
+            ]
+          }
+        },
+        {
+          "user": "[tap] Confirm",
+          "tap": "confirm",
+          "orSay": "Yes, please go ahead.",
+          "expect": {
+            "records": {
+              "list": [
+                "leads",
+                "callback_requests"
+              ],
+              "count": 1
+            },
+            "maxTaps": 3
+          }
+        }
+      ]
+    }
+  ]
+}

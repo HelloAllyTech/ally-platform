@@ -10,6 +10,7 @@ import {
   placesFor,
   placesWords,
   placesWordsHi,
+  type CardHeadline,
   type RelatedWords,
 } from './entry-words';
 /**
@@ -41,6 +42,22 @@ export interface WriteOffer {
   list: string;
   questions: OfferQuestions;
   createdAt: number;
+  /**
+   * BT1: the tool's input as the agent sent it, so a Confirm tap writes exactly this entry through
+   * the same tool, with no model call; and the card the tap confirms, built from the dry-run entry.
+   * Absent on offers stored before BT1 (those are confirmed by a typed yes only).
+   */
+  input?: Record<string, string | number>;
+  card?: OfferCard;
+}
+
+/** What a confirmation card shows (BT1): built in code from the dry-run entry, never from text. */
+export interface OfferCard {
+  action: 'create' | 'update' | 'cancel';
+  list: string;
+  title: string;
+  headline: CardHeadline;
+  details: { label: string; value: string }[];
 }
 
 export interface OfferQuestions {
@@ -195,6 +212,18 @@ const said = (d: Described, fallback: string): string =>
 /** Whether a change ends the entry ("cancelled", "no show"…): then the question says cancel. */
 const ENDS = /cancel|withdraw|no.?show|rejected|declined/i;
 
+/** Whether an update ends the entry (BT1: its card says cancel, its done card "Cancelled"). */
+export function endsEntry(
+  list: ListDefinitionView,
+  after: ListRecordView,
+  before: ListRecordView | null,
+): boolean {
+  if (!before) return false;
+  const a = describe(list, after).status;
+  const b = describe(list, before).status;
+  return Boolean(a && ENDS.test(a) && !(b && ENDS.test(b)));
+}
+
 /**
  * What exactly a write would do, as a key (the same key or no write) and the question that names
  * it. `before` is the entry an update changes; `booking` is a list people book into.
@@ -264,12 +293,16 @@ export function offerFor(
     // The related entry names the day, time and place (Q4 G5): "Shall I book Bandra Sunday food
     // drive on Sun 29 Nov, 11:00 at Bandra West station (1 place)?", never "book 0 on…".
     if (a.when || a.where) {
-      const what = [a.title, ...a.details].filter(Boolean).join(', ');
+      // BT1: the time is named once. An appointment's title is its slot's time, which "on {when}"
+      // already says ("Shall I book Sat 28 Nov 2026, 10:00, Antenatal check-up on Sat 28 Nov…").
+      const named = [a.title, ...a.details].filter(
+        (v) => v && !(a.when && a.when.includes(v)),
+      );
       return {
         key,
         questions: {
-          en: `Shall I book ${what}${whenWhere(a)}${forWhom}?`,
-          hi: `क्या मैं ${forWhomHi}${what}${whenWhereHi(a)} बुक कर दूँ?`,
+          en: `Shall I book ${named.join(', ') || 'this'}${whenWhere(a)}${forWhom}?`,
+          hi: `क्या मैं ${forWhomHi}${named.join(', ') || 'यह'}${whenWhereHi(a)} बुक कर दूँ?`,
         },
       };
     }

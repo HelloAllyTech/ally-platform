@@ -5,7 +5,15 @@ import { Orb } from "../../components/v2/core/Orb";
 import { initials } from "../theme";
 
 import type { BotPageCopy } from "../copy";
-import type { AnswerFeedback, BotPageBranding, PublicCitation, PublicConfirmation } from "../types";
+import type {
+  AnswerFeedback,
+  BotPageBranding,
+  PartCard,
+  PublicCitation,
+  PublicConfirmation,
+  ReplyParts,
+  TapButton,
+} from "../types";
 
 /**
  * Whether a screen's heading takes focus when it appears. Off in the dashboard's live preview, so
@@ -344,10 +352,13 @@ export function ConfirmationCard({
   confirmation,
   copy,
   when,
+  children,
 }: {
   confirmation: PublicConfirmation;
   copy: BotPageCopy;
   when: string;
+  /** BT1: Cancel and Move, and Try it's "Test only, not saved". */
+  children?: React.ReactNode;
 }) {
   return (
     <section className="bp-card" data-testid="confirmation-card" aria-label={confirmation.list}>
@@ -369,7 +380,145 @@ export function ConfirmationCard({
           ))}
         </dl>
       )}
+      {children}
     </section>
+  );
+}
+
+/**
+ * The buttons a card carries (BT1): Confirm is the primary one. Every label is the
+ * server's fixed text; a tap sends the label as the person's message with the button's token.
+ */
+export function TapButtons({
+  buttons,
+  active,
+  onTap,
+}: {
+  buttons: TapButton[];
+  active: boolean;
+  onTap(button: TapButton): void;
+}) {
+  if (!buttons.length) return null;
+  return (
+    <div className="bp-card__actions">
+      {buttons.map((b, i) => (
+        <button
+          key={b.token}
+          type="button"
+          className={
+            // Only Confirm is the main button; Cancel is never pushed.
+            i === 0 && b.kind === "confirm"
+              ? "ally-btn ally-btn--primary ally-press"
+              : "bp-pill ally-press"
+          }
+          data-kind={b.kind}
+          disabled={!active}
+          onClick={() => onTap(b)}
+        >
+          {b.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** One entry as a card (BT1): its title, then its details. */
+export function PartCardView({
+  card,
+  testId,
+  children,
+}: {
+  card: PartCard;
+  testId: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <section className="bp-card" data-testid={testId} aria-label={card.list}>
+      <p className="bp-card__what">{card.list}</p>
+      <p className="bp-card__when">{card.title}</p>
+      {card.details.length > 0 && (
+        <dl className="bp-card__details">
+          {card.details.map(d => (
+            <div key={`${d.label}:${d.value}`}>
+              <dt>{d.label}</dt>
+              <dd>{d.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {children}
+    </section>
+  );
+}
+
+/** Try it's mark on a card: nothing a test chat confirms is saved. */
+export function TestOnly({ text }: { text?: string }) {
+  return text ? (
+    <p className="bp-card__test" data-testid="test-only">
+      {text}
+    </p>
+  ) : null;
+}
+
+/**
+ * What a reply carries beside its text (BT1), built by the server from what the assistant looked
+ * up or is about to write, never from its words: a card to confirm, chips to choose from, one
+ * entry's card, or up to 3 next questions. Only the latest reply's buttons can be tapped.
+ */
+export function ReplyPartsView({
+  parts,
+  active,
+  onTap,
+}: {
+  parts: ReplyParts;
+  active: boolean;
+  onTap(button: TapButton): void;
+}) {
+  return (
+    <>
+      {parts.offer && (
+        <PartCardView card={parts.offer.card} testId="offer-card">
+          <TapButtons buttons={parts.offer.buttons} active={active} onTap={onTap} />
+          <TestOnly text={parts.offer.testOnly} />
+        </PartCardView>
+      )}
+      {parts.entry && <PartCardView card={parts.entry} testId="entry-card" />}
+      {parts.choices && parts.choices.options.length > 0 && (
+        <div
+          className="bp-choices"
+          role="group"
+          aria-label={parts.choices.list}
+          data-testid="choices"
+        >
+          {parts.choices.options.map(b => (
+            <button
+              key={b.token}
+              type="button"
+              className="bp-pill ally-press"
+              disabled={!active}
+              onClick={() => onTap(b)}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {parts.suggestions && parts.suggestions.length > 0 && (
+        <div className="ally-chips bp-next" data-testid="suggestions">
+          {parts.suggestions.map(b => (
+            <button
+              key={b.token}
+              type="button"
+              className="ally-chip ally-press"
+              disabled={!active}
+              onClick={() => onTap(b)}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </>
   );
 }
 

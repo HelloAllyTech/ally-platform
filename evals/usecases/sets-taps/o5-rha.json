@@ -1,0 +1,46 @@
+{
+  "assistant": "o5-rha",
+  "cases": [
+    {
+      "id": "o5-t1",
+      "kind": "action",
+      "lang": "en",
+      "_note": "A food-drive registration in 2 taps: a chip, then Confirm.",
+      "turns": [
+        {
+          "user": "Which food drives can I join? I'm Priya Test, 9800000011.",
+          "expect": {
+            "partsAny": [
+              "choices",
+              "entry"
+            ]
+          }
+        },
+        {
+          "user": "[tap] first drive",
+          "tap": {
+            "chip": 1
+          },
+          "orSay": "Show me the food drives I can join.",
+          "expect": {
+            "partsAny": [
+              "offer"
+            ]
+          }
+        },
+        {
+          "user": "[tap] Confirm",
+          "tap": "confirm",
+          "orSay": "Yes, please go ahead.",
+          "expect": {
+            "records": {
+              "list": "registrations",
+              "count": 1
+            },
+            "maxTaps": 3
+          }
+        }
+      ]
+    }
+  ]
+}

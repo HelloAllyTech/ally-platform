@@ -13,6 +13,7 @@ import {
   PmEvidenceRef,
 } from '../pipeline/pm-pipeline.types';
 import { fence, looksLikeInjection } from '../util/fence.util';
+import { customerTenantNames } from '../util/scrub.util';
 import { similarity } from '../util/text-similarity.util';
 import { questionFor, recFor } from './pm-pipeline.fakes';
 
@@ -57,6 +58,32 @@ describe('gate layer 1 — deterministic', () => {
 
   it('passes a well-formed, grounded candidate', () => {
     expect(gate(rec())).toEqual({ pass: true, reasons: [] });
+  });
+
+  it("never treats the platform's own organisation as a customer to redact", () => {
+    // Prod 2026-11-24: Ally's own org is a `tenants` row, so `ally-be` and every repo path
+    // were redacted and every recommendation failed. The real customer name still is.
+    const tenants = customerTenantNames(['Ally', 'Hello Ally', 'Acme Health']);
+    expect(tenants).toEqual(['Acme Health']);
+    const paths = rec({
+      repos: ['ally-be', 'ally-web'],
+      plan: {
+        ...recFor(0, [E1]).plan,
+        files: [
+          'ally-be/src/debrief/debrief.service.ts',
+          'ally-web/apps/ally-admin-dashboard/src/pages/Debrief/Share.tsx',
+        ],
+      },
+    });
+    expect(deterministicGate(paths, evidence, tenants)).toEqual({
+      pass: true,
+      reasons: [],
+    });
+    expect(deterministicGate(paths, evidence, ['Ally']).pass).toBe(false);
+    const customer = rec({ problem: 'Acme Health learners cannot share.' });
+    expect(
+      deterministicGate(customer, evidence, tenants).reasons.join(),
+    ).toContain('problem: contains text a public PRD must not carry');
   });
 
   it('fails evidence from another run', () => {

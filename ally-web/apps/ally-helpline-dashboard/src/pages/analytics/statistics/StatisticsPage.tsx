@@ -76,8 +76,14 @@ export const StatisticsPage: FunctionComponent<StatisticsPageProps> = ({ library
   const savedFor = (tab: StatisticsLayoutKey) => localLayouts[tab] ?? savedLayoutFor(prefs, tab);
 
   const pinKeys = useMemo(
-    () => resolvePins(localLayouts.pins ?? savedLayoutFor(prefs, "pins"), charts, canPin),
-    [localLayouts.pins, prefs, charts],
+    () =>
+      resolvePins(
+        localLayouts.pins ?? savedLayoutFor(prefs, "pins"),
+        charts,
+        canPin,
+        library.defaultPins,
+      ),
+    [localLayouts.pins, prefs, charts, library.defaultPins],
   );
 
   const tabs = TAB_ORDER.filter(id => id === "foryou" || views.some(v => v.id === id));

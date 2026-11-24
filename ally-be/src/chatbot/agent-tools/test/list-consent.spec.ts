@@ -94,6 +94,22 @@ describe('consent for list writes (chunk H1)', () => {
     expect(offer.questions.hi).toContain('Sat 21 Nov 2026, 13:00');
   });
 
+  it('names the time once when the slot says it too (BT1)', () => {
+    const offer = offerFor(
+      list,
+      'create',
+      record('new', 'Sat 28 Nov 2026, 10:00', 'Antenatal check-up'),
+      null,
+      true,
+      { when: 'Sat 28 Nov 2026, 10:00' },
+      'Anita Test',
+    );
+    expect(offer.questions.en).toBe(
+      'Shall I book Antenatal check-up on Sat 28 Nov 2026, 10:00 for Anita Test?',
+    );
+    expect(offer.questions.hi.match(/Sat 28 Nov 2026, 10:00/g)).toHaveLength(1);
+  });
+
   it('a booking for someone else says their name back (Q4 B13)', () => {
     const offer = offerFor(
       list,

@@ -73,6 +73,8 @@ export interface PublicBotPage {
   access: BotPageAccess;
   branding: BotPageBranding;
   suggestedQuestions: string[];
+  /** BT1: English / हिंदी / Hinglish at the start; a tap sends its fixed request. */
+  languageChoice?: { label: string; text: string }[];
   prechat: PrechatField[];
   maxMessageChars: number;
   language: BotPageLanguage;
@@ -134,6 +136,45 @@ export interface PublicFinal {
   steps?: PublicStep[];
   /** A booking or change made in this reply, from the stored record (chunk 6b). */
   confirmation?: PublicConfirmation;
+  /** BT1: chips and cards built from what the assistant looked up or is about to write. */
+  parts?: ReplyParts;
+}
+
+/**
+ * Something to tap (BT1). Its label is the server's own fixed text or an entry's title; its token
+ * goes back with the label as the message, and counts once, for 30 minutes, in this chat only.
+ */
+export interface TapButton {
+  kind: "choose" | "confirm" | "change" | "cancel" | "move" | "keep" | "ask";
+  label: string;
+  token: string;
+}
+
+/** One entry as a card (BT1): an offer to confirm, or one entry of a list. */
+export interface PartCard {
+  list: string;
+  title: string;
+  details: { label: string; value: string }[];
+}
+
+/** What a reply carries beside its text (BT1), never built from the reply's words. */
+export interface ReplyParts {
+  /** Entries to pick from a lookup, with their day and time. */
+  choices?: { list: string; options: TapButton[] };
+  /** One entry of a list (a service, a way to give, the latest update). */
+  entry?: PartCard;
+  /** A write waiting for the person's yes: the card, Confirm and Change (or Keep it). */
+  offer?: {
+    question: string;
+    action: "create" | "update" | "cancel";
+    card: PartCard;
+    buttons: TapButton[];
+    testOnly?: string;
+  };
+  /** Cancel and Move on the done card. */
+  done?: { buttons: TapButton[]; testOnly?: string };
+  /** Up to 3 starter questions after an answer. */
+  suggestions?: TapButton[];
 }
 
 /**

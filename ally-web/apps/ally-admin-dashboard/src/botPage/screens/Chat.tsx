@@ -5,10 +5,13 @@ import {
   ErrorText,
   Feedback,
   PageHeader,
+  ReplyPartsView,
   SafetyNotice,
   Sources,
   StepLine,
   StepsDone,
+  TapButtons,
+  TestOnly,
   TypingDots,
 } from "../components/parts";
 import { fill, type BotPageCopy } from "../copy";
@@ -21,7 +24,9 @@ import type {
   PublicCitation,
   PublicConfirmation,
   PublicStep,
+  ReplyParts,
   StatusCode,
+  TapButton,
 } from "../types";
 
 export interface ChatItem {
@@ -41,6 +46,8 @@ export interface ChatItem {
   steps?: PublicStep[];
   /** A booking or change made in it (chunk 6b). */
   confirmation?: PublicConfirmation;
+  /** BT1: its chips and cards; only the latest reply's can be tapped. */
+  parts?: ReplyParts;
 }
 
 /** The reply being written: what the agent is doing, and the checked text revealed so far. */
@@ -68,6 +75,7 @@ export function Chat({
   onRate,
   onAskPerson,
   onClose,
+  onTap,
 }: {
   page: PublicBotPage;
   copy: BotPageCopy;
@@ -88,7 +96,10 @@ export function Chat({
   onAskPerson?(): void;
   /** Close the website widget's panel (chunk 13); without it, no button. */
   onClose?(): void;
+  /** BT1: a chip or a card's button was tapped; without it, no chips or buttons. */
+  onTap?(button: TapButton): void;
 }) {
+  const lastAssistantId = [...messages].reverse().find(m => m.role === "assistant")?.id;
   const { branding } = page;
   const [draft, setDraft] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -193,6 +204,24 @@ export function Chat({
                     confirmation={m.confirmation}
                     copy={copy}
                     when={shortWhen(m.confirmation.title)}
+                  >
+                    {m.parts?.done && onTap && (
+                      <>
+                        <TapButtons
+                          buttons={m.parts.done.buttons}
+                          active={m.id === lastAssistantId && !busy}
+                          onTap={onTap}
+                        />
+                        <TestOnly text={m.parts.done.testOnly} />
+                      </>
+                    )}
+                  </ConfirmationCard>
+                )}
+                {m.parts && onTap && (
+                  <ReplyPartsView
+                    parts={m.parts}
+                    active={m.id === lastAssistantId && !busy}
+                    onTap={onTap}
                   />
                 )}
                 <Sources citations={m.citations} copy={copy} />
@@ -230,6 +259,24 @@ export function Chat({
           (pending && !pending.text && pending.status ? copy.chat.status[pending.status] : "")}
       </p>
 
+      {!messages.length && !pending && (page.languageChoice?.length ?? 0) > 0 && (
+        <div className="bp-suggested" data-testid="language-choice">
+          <div className="ally-chips">
+            {page.languageChoice!.map(c => (
+              <button
+                key={c.label}
+                type="button"
+                className="ally-chip ally-press"
+                lang={c.label === "हिंदी" ? "hi" : "en"}
+                onClick={() => send(c.text)}
+                disabled={busy}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {!messages.length && !pending && page.suggestedQuestions.length > 0 && (
         <div className="bp-suggested">
           <p className="ally-sr-only">{copy.chat.suggested}</p>

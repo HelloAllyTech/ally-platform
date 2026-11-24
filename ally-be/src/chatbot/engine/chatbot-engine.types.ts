@@ -1,3 +1,8 @@
+import type { CardHeadline } from '../agent-tools/entry-words';
+import type {
+  ActionClaims,
+  RedeemFailure,
+} from '../actions/action-token.service';
 import type {
   AgentActivity,
   AgentStreamEvent,
@@ -101,7 +106,19 @@ export interface ChatTurn {
    * empty chat). `history` can't say: on WhatsApp it already holds the message being answered.
    */
   isFirstMessage?: boolean;
+  /**
+   * BT1: the message is a tap, already redeemed by the channel (`ActionTokenService.redeem`);
+   * `text` is what the tap stands for. A Confirm, Keep it or a button that no longer works is
+   * answered in code, after the same gates as a typed message; every other tap is answered like
+   * its text.
+   */
+  tap?: TapTurn;
 }
+
+/** A redeemed tap (BT1), or why it couldn't be. */
+export type TapTurn =
+  | { ok: true; claims: ActionClaims; firstUse: boolean }
+  | { ok: false; reason: RedeemFailure };
 
 /**
  * Why a v2 run failed, as a short stable key: what the degraded alert is throttled on. Codes and
@@ -147,6 +164,17 @@ export type AgentRunRef = { runId: string; conversationId: string } & (
 export interface ChatbotDecision {
   handledBy: WaHandledBy;
   body: string;
+  /**
+   * BT1: a Confirm tap's done card, from what was written (or, in Try it, from the card the
+   * person confirmed: nothing is saved there).
+   */
+  tapDone?: {
+    action: 'create' | 'update' | 'cancel';
+    list: string;
+    title: string;
+    headline: CardHeadline;
+    details: { label: string; value: string }[];
+  };
   /** CR1: no run started because a limit was reached; `body` is the fixed limit reply. */
   limited?:
     | 'customers'

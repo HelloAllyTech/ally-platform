@@ -11,6 +11,10 @@ import type {
   ModuleFunnelData,
   ModuleTimeData,
   RoleplayAttemptsData,
+  NewCharacterData,
+  HelpfulBehavioursData,
+  UnhelpfulTrendData,
+  ScoreByAttemptData,
   SkillTrendData,
   TimeToFinishData,
   CoursePerformanceData,
@@ -1889,6 +1893,210 @@ const skillTrendTakeaway = (data: SkillTrendData, t: TFunction) => {
     : t("statisticsLibrary.takeaway.skillTrendFlat");
 };
 
+// ── TSQ-049 Score with a new character ─────────────────────────
+
+/** Two bars on the 1 to 4 helping-skills scale: with a familiar character, then a new one. */
+const NewCharacter = ({ data }: DataRendererProps<NewCharacterData>) => {
+  const { t } = useTranslation();
+  if (data.familiar === null || data.unfamiliar === null) {
+    return (
+      <p className="text-sm text-typography-600">{t("statisticsLibrary.newCharacter.none")}</p>
+    );
+  }
+  const bars = [
+    { key: "familiar", value: data.familiar, colour: "#8f8a7e" },
+    { key: "unfamiliar", value: data.unfamiliar, colour: "#2a5db0" },
+  ];
+  return (
+    <div className="flex flex-col gap-3" data-testid="statistics-new-character">
+      {bars.map(bar => (
+        <div key={bar.key} className="flex flex-col gap-1 text-sm">
+          <span className="flex items-center justify-between gap-3">
+            <span className="text-typography-900">
+              {t(`statisticsLibrary.newCharacter.${bar.key}`)}
+            </span>
+            <span className="text-typography-600">
+              {t("statisticsLibrary.newCharacter.value", { value: bar.value })}
+            </span>
+          </span>
+          <span className="h-3 rounded-md bg-[#efebe0]">
+            <span
+              className="block h-3 rounded-md"
+              style={{ width: `${levelPercent(bar.value)}%`, background: bar.colour }}
+            />
+          </span>
+        </div>
+      ))}
+      <span className="text-xs text-typography-500">
+        {t("statisticsLibrary.newCharacter.learners", { count: data.learners })}
+      </span>
+    </div>
+  );
+};
+
+/** A change under this (of 4) reads as no change. */
+const NEW_CHARACTER_SAME = 0.1;
+
+const newCharacterTakeaway = (data: NewCharacterData, t: TFunction) => {
+  if (data.familiar === null || data.unfamiliar === null || data.change === null) return null;
+  const values = { familiar: data.familiar, unfamiliar: data.unfamiliar };
+  return data.change <= -NEW_CHARACTER_SAME
+    ? t("statisticsLibrary.takeaway.newCharacterDip", values)
+    : t("statisticsLibrary.takeaway.newCharacter", values);
+};
+
+// ── TSQ-050 Helpful behaviours before and after ────────────────
+
+const HelpfulBehaviours = ({ data }: DataRendererProps<HelpfulBehavioursData>) => {
+  const { t } = useTranslation();
+  if (data.rows.length === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.behaviours.none")}</p>;
+  }
+  return (
+    <div className="flex flex-col gap-3" data-testid="statistics-helpful-behaviours">
+      <div className="flex flex-wrap gap-4 text-xs text-typography-600">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-sm bg-[#c9c3b3]" />
+          {t("statisticsLibrary.behaviours.first")}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-3 w-3 rounded-sm bg-[#2a5db0]" />
+          {t("statisticsLibrary.behaviours.latest")}
+        </span>
+      </div>
+      <ul className="flex flex-col gap-4">
+        {data.rows.map(row => (
+          <li key={row.code} className="flex flex-col gap-1 text-sm">
+            <span className="text-typography-900">{row.text}</span>
+            {[
+              { key: "first", value: row.beforePercent, colour: "#c9c3b3" },
+              { key: "latest", value: row.afterPercent, colour: "#2a5db0" },
+            ].map(bar => (
+              <span key={bar.key} className="flex items-center gap-2">
+                <span className="h-2.5 flex-1 rounded-md bg-[#efebe0]">
+                  <span
+                    className="block h-2.5 rounded-md"
+                    style={{ width: `${bar.value}%`, background: bar.colour }}
+                  />
+                </span>
+                <span className="w-10 flex-none text-right text-xs text-typography-600">
+                  {bar.value}%
+                </span>
+              </span>
+            ))}
+          </li>
+        ))}
+      </ul>
+      <span className="text-xs text-typography-500">
+        {t("statisticsLibrary.behaviours.learners", { count: data.learners })}
+      </span>
+    </div>
+  );
+};
+
+const helpfulBehavioursTakeaway = (data: HelpfulBehavioursData, t: TFunction) => {
+  const top = data.rows[0];
+  if (!top) return null;
+  return top.afterPercent > top.beforePercent
+    ? t("statisticsLibrary.takeaway.behaviours", {
+        text: shorten(top.text, 60),
+        from: top.beforePercent,
+        to: top.afterPercent,
+      })
+    : t("statisticsLibrary.takeaway.behavioursFlat");
+};
+
+// ── TSQ-051 Unhelpful responses over time ──────────────────────
+
+const UnhelpfulTrend = ({ data }: DataRendererProps<UnhelpfulTrendData>) => {
+  const { t } = useTranslation();
+  const rows = useMemo(
+    () =>
+      data.points.map(point => ({
+        group: t("statisticsLibrary.unhelpful.share"),
+        key: String(point.slice),
+        value: point.sharePercent,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data],
+  );
+  if (data.points.length === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.unhelpful.none")}</p>;
+  }
+  return (
+    <div data-testid="statistics-unhelpful-trend">
+      <LineChart
+        data={rows}
+        options={lineOpts({
+          leftTitle: t("statisticsLibrary.unhelpful.share"),
+          bottomTitle: t("statisticsLibrary.unhelpful.slice"),
+          extra: { curve: "curveLinear" },
+        })}
+      />
+    </div>
+  );
+};
+
+/** A move under this many points of share reads as flat. */
+const UNHELPFUL_FLAT_POINTS = 3;
+
+const unhelpfulTakeaway = (data: UnhelpfulTrendData, t: TFunction) => {
+  if (data.points.length < 2) return null;
+  const first = data.points[0].sharePercent;
+  const latest = data.points[data.points.length - 1].sharePercent;
+  const values = { first, latest };
+  if (first - latest >= UNHELPFUL_FLAT_POINTS)
+    return t("statisticsLibrary.takeaway.unhelpfulDown", values);
+  if (latest - first >= UNHELPFUL_FLAT_POINTS)
+    return t("statisticsLibrary.takeaway.unhelpfulUp", values);
+  return t("statisticsLibrary.takeaway.unhelpfulFlat", values);
+};
+
+// ── TSQ-055 Score by attempt number ────────────────────────────
+
+const ScoreByAttempt = ({ data }: DataRendererProps<ScoreByAttemptData>) => {
+  const { t } = useTranslation();
+  if (data.steps.length === 0) {
+    return <p className="text-sm text-typography-600">{t("statisticsLibrary.attempts.none")}</p>;
+  }
+  return (
+    <ul className="flex flex-col gap-3" data-testid="statistics-score-by-attempt">
+      {data.steps.map(step => (
+        <li key={step.attempt} className="flex flex-col gap-1 text-sm">
+          <span className="flex items-center justify-between gap-3">
+            <span className="text-typography-900">
+              {t(`statisticsLibrary.attempts.step${step.attempt}`)}
+            </span>
+            <span className="flex-none text-typography-600">
+              {t("statisticsLibrary.attempts.score", { score: step.averageScore })}
+              {" · "}
+              {t("statisticsLibrary.attempts.learners", { count: step.learners })}
+            </span>
+          </span>
+          <span className="h-3 rounded-md bg-[#efebe0]">
+            <span
+              className="block h-3 rounded-md bg-[#2a5db0]"
+              style={{ width: `${Math.min(100, step.averageScore)}%` }}
+            />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+/** A rise under this many points reads as no rise. */
+const ATTEMPT_RISE_POINTS = 2;
+
+const scoreByAttemptTakeaway = (data: ScoreByAttemptData, t: TFunction) => {
+  if (data.steps.length < 2) return null;
+  const first = data.steps[0].averageScore;
+  const latest = data.steps[data.steps.length - 1].averageScore;
+  return latest - first >= ATTEMPT_RISE_POINTS
+    ? t("statisticsLibrary.takeaway.attempts", { first, latest })
+    : t("statisticsLibrary.takeaway.attemptsFlat", { first, latest });
+};
+
 // ── TSQ-041 Course facts ───────────────────────────────────────
 
 const courseFactsTakeaway = (data: MeasuresData, t: TFunction) => {
@@ -2081,6 +2289,10 @@ export const CHART_RENDERERS: Record<string, ChartRenderer> = {
   "TSQ-053": { kind: "data", Component: RoleplayAttempts, takeaway: roleplayAttemptsTakeaway },
   "TSQ-063": { kind: "data", Component: Measures, takeaway: practiceRhythmTakeaway },
   "TSQ-065": { kind: "data", Component: SkillTrend, takeaway: skillTrendTakeaway },
+  "TSQ-049": { kind: "data", Component: NewCharacter, takeaway: newCharacterTakeaway },
+  "TSQ-050": { kind: "data", Component: HelpfulBehaviours, takeaway: helpfulBehavioursTakeaway },
+  "TSQ-051": { kind: "data", Component: UnhelpfulTrend, takeaway: unhelpfulTakeaway },
+  "TSQ-055": { kind: "data", Component: ScoreByAttempt, takeaway: scoreByAttemptTakeaway },
   "TSQ-038": {
     kind: "data",
     Component: Measures,

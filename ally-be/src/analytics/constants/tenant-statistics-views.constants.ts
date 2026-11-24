@@ -45,6 +45,16 @@ export const STATISTICS_DEFAULT_LAYOUT_CAP = 10;
 /** A default layout is topped up from the rest of the view to at least this many. */
 export const STATISTICS_DEFAULT_LAYOUT_FLOOR = 5;
 
+/**
+ * The cards pinned to For you until a person pins their own. Two, so the page
+ * is never empty and never crowded. They are shown only if the organisation can
+ * fill them, and a person who removes them or pins others keeps their own list.
+ */
+export const STATISTICS_DEFAULT_PINS: readonly string[] = [
+  'TSQ-001', // Headline numbers
+  'TSQ-007', // Learner status
+];
+
 export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
   {
     id: 'organisation',
@@ -104,6 +114,11 @@ export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
           'TSQ-017',
         ],
       },
+      {
+        key: 'acrossCourses',
+        subject: false,
+        charts: ['TSQ-049', 'TSQ-055'],
+      },
       { key: 'courseFacts', subject: true, charts: ['TSQ-041'] },
       {
         key: 'useOverTime',
@@ -111,7 +126,11 @@ export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
         charts: ['TSQ-042', 'TSQ-043', 'TSQ-045', 'TSQ-046'],
       },
       { key: 'roleplays', subject: true, charts: ['TSQ-053', 'TSQ-020'] },
-      { key: 'learning', subject: true, charts: ['TSQ-018', 'TSQ-019'] },
+      {
+        key: 'learning',
+        subject: true,
+        charts: ['TSQ-018', 'TSQ-019', 'TSQ-050', 'TSQ-051'],
+      },
       { key: 'feedback', subject: true, charts: ['TSQ-026', 'TSQ-022'] },
     ],
     defaultLayout: [
@@ -138,7 +157,11 @@ export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
       },
       { key: 'practice', subject: true, charts: ['TSQ-063'] },
       { key: 'progress', subject: true, charts: ['TSQ-064'] },
-      { key: 'skills', subject: true, charts: ['TSQ-065', 'TSQ-024'] },
+      {
+        key: 'skills',
+        subject: true,
+        charts: ['TSQ-065', 'TSQ-051', 'TSQ-024'],
+      },
     ],
     defaultLayout: [
       'TSQ-023',

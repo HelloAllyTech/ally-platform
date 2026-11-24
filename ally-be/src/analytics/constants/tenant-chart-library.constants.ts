@@ -806,15 +806,16 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
   entry({
     id: 'TSQ-049',
     title: 'Score with a new character',
-    question: 'Can they do it with someone new?',
+    question:
+      'Do learners keep their skills with a character they have not met?',
     group: 'outcomes',
     home: 'course',
     shape: 'value_by_step',
     size: 'm',
     sources: ['doc'],
-    scopes: ['course'],
-    needs: [{ signal: 'scoredSessions90', min: 10, sparseMin: 1 }],
-    live: false,
+    scopes: ['organisation'],
+    needs: [{ signal: 'skillScoredCuts', min: 10, sparseMin: 1 }],
+    live: true,
   }),
   entry({
     id: 'TSQ-050',
@@ -825,9 +826,9 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     shape: 'before_after',
     size: 'm',
     sources: ['doc'],
-    scopes: ['course'],
+    scopes: ['organisation', 'course'],
     needs: [{ signal: 'skillScoredCuts', min: 10, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-051',
@@ -840,7 +841,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['organisation', 'course', 'learner'],
     needs: [{ signal: 'skillScoredCuts', min: 10, sparseMin: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-053',
@@ -869,7 +870,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     needs: [
       { signal: 'learnersWithRepeatScoredSessions', min: 5, sparseMin: 1 },
     ],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-058',

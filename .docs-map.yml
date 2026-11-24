@@ -130,8 +130,13 @@ rules:
       - "ally-be/src/**/service/*-ai.service.ts"
       - "ally-be/src/**/service/*autofill*.service.ts"
       - "ally-be/src/**/service/*-orchestrator.service.ts"
-      - "ally-be/src/**/provider/*.ts"
-      - "ally-be/src/**/providers/*.ts"
+      # The model providers by name: not every provider is a model (whatsapp/provider sends
+      # messages and calls none). A new model provider folder goes here.
+      - "ally-be/src/ai-chat/provider/*.ts"
+      - "ally-be/src/image-generation/provider/*.ts"
+      - "ally-be/src/llm-agent/provider/*.ts"
+      - "ally-be/src/llm-preview/providers/*.ts"
+      - "ally-be/src/voice-preview/providers/*.ts"
       - "ally-be/src/learn/enum/llm-task.enum.ts"
     requires: ally-be/src/llm/constants/ai-task-registry.constants.ts
     why: >

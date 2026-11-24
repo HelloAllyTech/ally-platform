@@ -1,4 +1,5 @@
 import type { WaBotSettings, WaHandledBy, WaOrgSettings } from "./whatsappBot";
+import type { PublicConfirmation, ReplyParts } from "../botPage/types";
 
 export enum ChatbotStatus {
   DRAFT = "draft",
@@ -237,6 +238,8 @@ export interface TestChatbotRequest {
   checkAccess?: boolean;
   /** The Preview thread (`preview-<uuid>`), kept until "New thread". */
   conversationId?: string;
+  /** BT1: a tap's token from a reply's parts; `message` is then the label tapped. */
+  action?: string;
 }
 
 /** What a streamed Preview reply is doing now (ally-be relays ally-ai's codes). */
@@ -284,4 +287,10 @@ export interface TestChatbotResponse {
   conversationId: string;
   /** Agent mode: what the agent understood the message to be. */
   turnType?: AgentTurnType | null;
+  /** BT1: chips and cards, as on the bot page. */
+  parts?: ReplyParts;
+  /** BT1: a Confirm tap's done card, marked "Test only, not saved". */
+  confirmation?: PublicConfirmation & { testOnly?: string };
+  /** BT1: what the tap stood for. */
+  tapped?: string;
 }
