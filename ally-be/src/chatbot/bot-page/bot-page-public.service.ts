@@ -159,6 +159,14 @@ export function indiaEmergencyWording(text: string): string {
   );
 }
 
+/** TF1 P3: the WhatsApp opt-out sentence, which means nothing on the web page. */
+export function withoutStopLine(text: string): string {
+  return text
+    .replace(/\s*Reply STOP to opt out\.?/gi, '')
+    .replace(/\s*STOP (?:लिखें|likhein)[^.।]*[.।]?/gi, '')
+    .trim();
+}
+
 /**
  * The disclaimer a page must show: the pack's own text, or the owner's stored wording when it still
  * contains it (the draft lock only lets an owner lengthen it). Null without a pack that needs one.
@@ -463,10 +471,12 @@ export class BotPagePublicService {
   ): Pick<PublicBotPage, 'notice' | 'disclaimer'> {
     const { settings, chatbot } = available;
     const notice = startNotice({
-      disclaimer:
+      // TF1 P3: "Reply STOP to opt out" is WhatsApp's; on the page there's nothing to reply STOP to.
+      disclaimer: withoutStopLine(
         available.botSettings?.disclaimerText ??
-        chatbot.settings?.disclaimerText ??
-        '',
+          chatbot.settings?.disclaimerText ??
+          '',
+      ),
       language: replyLanguageOf('', settings.language),
       organisation: settings.branding.title || chatbot.name,
     });
