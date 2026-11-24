@@ -1,0 +1,51 @@
+"You:
+How can I donate?
+
+Pawsome Animal Shelter:
+Thanks — you can give by bank transfer, UPI, cheque or dropping in-kind items at the shelter. Details from our supporters’ guide:
+
+- Bank transfer: Pawsome Animal Trust, account 50200011223344, IFSC HDFC0001234, HDFC Bank, Hennur branch.
+- UPI: pawsome@upi-example. (12)
+- Cheque: payable to “Pawsome Animal Trust”, posted to the shelter address (Survey No. 42, Hennur–Bagalur Road, Bengaluru 560077). (12,1)
+- In-kind donations (dry dog food, old bedsheets, newspapers): drop at the shelter gate any day 9 am to 6 pm. (12)
+
+Some giving notes:
+- ₹1,500 feeds one dog for a month; ₹3,000 pays for a sterilisation surgery. (12)
+- Money donations are eligible for a 50% deduction under Section 80G (registration AABTP1234Q24BL01). (6,12)
+- To get an 80G receipt, email your name, PAN, amount and transaction reference to donate@pawsome-blr.example within 30 days; receipts are emailed within 10 working days. Cash donations above ₹2,000 and in-kind gifts are not eligible for 80G. (7,8,12)
+
+-----
+"You:
+If I donate dog food, do I get 80G?
+
+Pawsome Animal Shelter:
+No — in-kind donations such as dog food are not eligible for an 80G tax deduction. Money donations are eligible for a 50% deduction under Section 80G (registration AABTP1234Q24BL01). To get an 80G receipt for a money donation, email your name, PAN, amount and transaction reference to donate@pawsome-blr.example within 30 days; receipts are emailed within 10 working days (team details as above).
+What do you do?
+What do you offer, and what does it cost?
+What are your opening hours?
+
+Sources
+
+What we learned
+Show what I did:
+Searched Pawsome Animal Shelter's information
+
+"
+-----
+"You:
+I'm Kiran. I'd like to volunteer this weekend, which shifts are there?
+
+Pawsome Animal Shelter:
+Hi Kiran — thanks for offering to help. This weekend we have these volunteer shifts: Sat morning 8:00–11:00 (dog walking & kennel cleaning, 10 places); Sat afternoon 15:00–18:00 (socialising puppies & cats, 8 places); Sun morning 8:00–11:00 (dog walking & bathing, 10 places). There is also a scheduled weekend shift listed as Sat 28 Nov 2026 at 10:00, Centre 1, 10 places (this is one of the Saturday morning slots). First-time volunteers attend a 30-minute orientation at the start of their first shift, and please wear closed shoes. Would you like me to book a place for you on one of these shifts?
+
+Volunteer shifts
+
+Weekend shift
+
+Time
+Sat 28 Nov 2026, 10:00
+Place
+Centre 1
+Places
+10
+-----

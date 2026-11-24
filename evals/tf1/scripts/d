@@ -1,0 +1,3 @@
+#!/bin/sh
+# Shorthand: evals/tf1/scripts/d <who> <cmd> key=value…
+exec node "$(dirname "$0")/do.mjs" "$@"

@@ -1,0 +1,78 @@
+
+## a2 Create, from your documents
+  chatbot 335063c5-65e8-411f-ba6a-7add80619cf8, draft 2827162a-0ce1-4f13-8db7-619350f157d9
+  name in working copy: Pawsome Animal Shelter
+  document: needs_review chunks=0
+  API errors: 401 GET /api/v1/chatbots/4d370005-8efd-4bed-8ad4-c55fe96ebee6/home {"statusCode":401,"timestamp":"2026-11-24T14:18:45.477Z","path":"/api/v1/chatbots/4d370005-8efd-4bed-8ad4-c55fe96ebee6/home","message":"Unauthorized","error":"Error"}
+  401 GET /api/v1/settings/character-library-enabled {"statusCode":401,"timestamp":"2026-11-24T14:18:45.478Z","path":"/api/v1/settings/character-library-enabled","message":"Unauthorized","error":"Error"}
+  401 GET /api/v1/users/me {"statusCode":401,"timestamp":"2026-11-24T14:18:45.480Z","path":"/api/v1/users/me","message":"jwt expired","error":"Unauthorized"}
+  401 GET /api/v1/users/me/feature-toggles {"statusCode":401,"timestamp":"2026-11-24T14:18:45.481Z","path":"/api/v1/users/me/feature-toggles","message":"jwt expired","error":"Unauthorized"}
+  401 GET /api/v1/chatbots/4d370005-8efd-4bed-8ad4-c55fe96ebee6 {"statusCode":401,"timestamp":"2026-11-24T14:18:45.483Z","path":"/api/v1/chatbots/4d370005-8efd-4bed-8ad4-c55fe96ebee6","message":"Unauthorized","error":"Error"}
+  401 GET /api/v1/authorization/permissions {"statusCode":401,"timestamp":"2026-11-24T14:18:45.484Z","path":"/api/v1/authorization/permissions","message":"jwt expired","error":"Unauthorized"}
+  401 GET /api/v1/me/plan {"statusCode":401,"timestamp":"2026-11-24T14:18:45.487Z","path":"/api/v1/me/plan","message":"Unauthorized","error":"Error"}
+  401 GET /api/v1/chatbots/4d370005-8efd-4bed-8ad4-c55fe96ebee6/page {"statusCode":401,"timestamp":"2026-11-24T14:18:45.505Z","path":"/api/v1/chatbots/4d370005-8efd-4bed-8ad4-c55fe96ebee6/page","message":"Unauthorized","error":"Error"}
+
+## a2 Knowledge review
+  "What it knows": 25 facts with a page citation
+  approved the held source
+  API errors: 404 GET /api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false {"statusCode":404,"timestamp":"2026-11-24T14:20:02.144Z","path":"/api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false","message":"Not Found","error":"Error"}
+
+## a2 Add from a template: Donors and volunteers
+  17 cards; "Donors and volunteers" is #3
+   | Donors and volunteers | How can people give? | One way per line, like “UPI - scan the code at the office”. | We'll add examples you can replace later. | Are donations tax-exempt? What should donors know? | We'll add examples you can replace later. | What do volunteers do with you? | A few words each, one per line or separated by commas. | We'll add examples you can replace later. | Do you have volunteer shifts coming up? | You can add their times in Tools with Repeat weekly. | We'll add exa
+  : your pages, its memory, your team, and your own lists. | DONORS AND VOLUNTEERS | Added: Ways to give, Donor enquiries, Volunteer sign-ups, Volunteer shifts, Shift bookings. | 7 checkup questions added. | 
+  API errors: (none)
+
+## a2 Lists and abilities
+  Look things up in it: Do it · Add entries: Do it · Change entries: Never
+  lists: ways_to_give, donor_enquiries, volunteer_signups, volunteer_shifts, shift_bookings
+  pack (live): 
+  memory: (unset)
+
+## a3 Checkup
+  45% · Ready for clients
+  FAILED: Can I pay you here in the chat?
+  FAILED: Where does my money go?
+  PASSED: How can I donate?
+  PASSED: Will I get a tax receipt?
+  PASSED: I donated last month and didn’t get my receipt.
+  PASSED: I’d like to volunteer.
+  PASSED: What volunteer shifts are coming up?
+
+## b1 Go live
+  "Before going live |  | ○ Say who will use it: adults only, or people who may be under 18. | ✓ Add a way for people to reach a person: a phone number, an email or a web page. | ○ Choose what the assistant is for. | ✓ Read and accept the safety terms. | ✓ Run the crisis check. It must pass in at least one language, and every language you turn on must be checked. |  | Crisis check by language |  | English | Passed | Run the crisis check |  | This can't go live yet. Finish the checklist first. | 
+  Go live is disabled in the UI (N18); publishing through POST /v1/bot-drafts/:id/publish
+  publish 409: {"statusCode":409,"timestamp":"2026-11-24T14:22:24.713Z","path":"/api/v1/bot-drafts/2827162a-0ce1-4f13-8db7-619350f157d9/publish","message":"This assistant can’t go live yet. Finish the go-live checklist first.","error":"Error","errorCode":"go_live_incomplete","details":{"missing":[{"item":"audience
+  API errors: (none)
+  live row: Your assistant | draft | listed | purpose=
+  page: 
+
+## b2 Budget and invites
+  budget: 1.00000000000000000000
+file:///Users/shehbazsayed/Desktop/ally/ally-platform/evals/tf1/scripts/build-case.mjs:26
+  if (!res.ok) throw new Error(`${cmd} ${JSON.stringify(args)}: ${text.split('\n')[0]}`);
+                     ^
+
+Error: fill {"sel":"textarea[placeholder*='name@example.com']","value":"kiran.tf1@example.com, +919800000003"}: locator.fill: Timeout 15000ms exceeded.
+
+Node.js v24.22.0
+
+## a2 Lists and abilities
+  Look things up in it: Do it · Add entries: Do it · Change entries: Never
+  lists: ways_to_give, donor_enquiries, volunteer_signups, volunteer_shifts, shift_bookings
+  pack (live): 
+  memory: (unset)
+
+## b1 Go live
+  "Before going live |  | ✓ Say who will use it: adults only, or people who may be under 18. | ✓ Add a way for people to reach a person: a phone number, an email or a web page. | ○ Choose what the assistant is for. | ✓ Read and accept the safety terms. | ✓ Run the crisis check. It must pass in at least one language, and every language you turn on must be checked. |  | Crisis check by language |  |
+  Go live is disabled in the UI (N18); publishing through POST /v1/bot-drafts/:id/publish
+  publish 201: {"chatbotId":"335063c5-65e8-411f-ba6a-7add80619cf8","slug":"pawsome-animal-shelter","link":"http://localhost:8081/chat/cdltkam8","access":"invite"}
+  API errors: 404 GET /api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false {"statusCode":404,"timestamp":"2026-11-24T14:23:19.587Z","path":"/api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false","message":"Not Found","error":"Error"}
+  live row: Pawsome Animal Shelter | live | listed | purpose=enquiries
+  page: pawsome-animal-shelter cdltkam8
+
+## b2 Budget and invites
+  budget: 2.0000000000000000
+  Added 2.
+
+RESULT {"chatbotId":"335063c5-65e8-411f-ba6a-7add80619cf8","draftId":"2827162a-0ce1-4f13-8db7-619350f157d9","page":"pawsome-animal-shelter cdltkam8"}

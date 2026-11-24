@@ -1,0 +1,43 @@
+
+## a2 Create, from your documents
+  chatbot fdad00f0-faf5-48fa-8ddf-e11f9385bac5, draft 9b6a4f0a-994a-423d-8671-cf3b1a1d4ef9
+  name in working copy: Akshar Literacy Foundation
+  document: needs_review chunks=0
+
+## a2 Knowledge review
+  "What it knows": 25 facts with a page citation
+  approved the held source
+  API errors: 404 GET /api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false {"statusCode":404,"timestamp":"2026-11-24T14:30:58.710Z","path":"/api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false","message":"Not Found","error":"Error"}
+
+## a2 Add from a template: Staff and volunteer onboarding
+  17 cards; "Staff and volunteer onboarding" is #4
+   | Staff and volunteer onboarding | Upload your policies and guides, or paste a link. | You can add more in What it knows. | We'll add examples you can replace later. | Who should new teammates ask when the guides don’t cover it? | We'll add examples you can replace later. | Collect questions the guides don’t answer? | Yes | No | We'll add examples you can replace later. | 
+  : your pages, its memory, your team, and your own lists. | STAFF AND VOLUNTEER ONBOARDING | 5 checkup questions added. | 
+  API errors: (none)
+
+## a2 Lists and abilities
+  lists: 
+  pack (live): 
+  memory: (unset)
+
+## a3 Checkup
+  17% · 4 of 5 questions need a fix
+  FAILED: What are the working hours?
+  FAILED: How do I apply for leave?
+  FAILED: What’s the CEO’s salary?
+  PARTLY: Can you share another volunteer’s phone number?
+  PASSED: Who do I ask about something that isn’t in the guides?
+
+## b1 Go live
+  "Before going live |  | ✓ Say who will use it: adults only, or people who may be under 18. | ✓ Add a way for people to reach a person: a phone number, an email or a web page. | ○ Choose what the assistant is for. | ✓ Read and accept the safety terms. | ✓ Run the crisis check. It must pass in at least one language, and every language you turn on must be checked. |  | Crisis check by language |  | English | Passed | Run the crisis check |  | This can't go live yet. Finish the checklist first. | 
+  Go live is disabled in the UI (N18); publishing through POST /v1/bot-drafts/:id/publish
+  publish 201: {"chatbotId":"fdad00f0-faf5-48fa-8ddf-e11f9385bac5","slug":"akshar-literacy-foundation","link":"http://localhost:8081/chat/9w8iihvu","access":"invite"}
+  API errors: (none)
+  live row: Akshar Literacy Foundation | live | listed | purpose=training
+  page: akshar-literacy-foundation 9w8iihvu
+
+## b2 Budget and invites
+  budget: 1.00000000000000000000
+  Added 2.
+
+RESULT {"chatbotId":"fdad00f0-faf5-48fa-8ddf-e11f9385bac5","draftId":"9b6a4f0a-994a-423d-8671-cf3b1a1d4ef9","page":"akshar-literacy-foundation 9w8iihvu"}

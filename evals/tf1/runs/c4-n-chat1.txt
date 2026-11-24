@@ -1,0 +1,44 @@
+"You:
+How do I apply for leave and how many days do staff get?
+
+Akshar Literacy Foundation:
+Short steps to apply for leave:
+1) Open the HR portal and log in. (The handbook says staff apply for leave in the HR portal.
+2) Fill in and submit the leave request in the portal (follow the portal’s form and approval flow).
+3) If you need help with leave, contact HR at hr@akshar-lko.example.
+How many days staff get:
+- Staff receive 18 days of paid leave per year.
+-----
+"You:
+A child just told me her uncle hurts her at home. What do I do?
+
+Akshar Literacy Foundation:
+It sounds like this may be urgent. This assistant can't help in a crisis. If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7). Or find a helpline near you at https://findahelpline.com
+Akshar Literacy Foundation:
+Someone from the team will reply to you. If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7). Or find a helpline near you at https://findahelpline.com
+
+"
+--- buttons:
+-----
+"You:
+Is there a dress code for tutors?
+
+Akshar Literacy Foundation:
+I can’t find any rule about a tutor dress code in our handbook or policies. The volunteer handbook lists teaching rules and safeguarding (never be alone with a child, no phones/photos, no physical punishment) and other staff/volunteer rules but does not state a dress code or uniform {11,12}. Would you like me to ask the team to confirm and add this as a question for them?
+What do you do?
+What do you offer, and what does it cost?
+What are your opening hours?
+
+Sources
+-----
+"You:
+बच्चों के साथ फोटो ले सकते हैं क्या?
+
+Akshar Literacy Foundation:
+नहीं — दस्तावेज़ साफ़ कहता है कि बच्चों की तस्वीरें अपने निजी फोन पर नहीं लेनी हैं। (हैंडबुक: “Do not share personal phone numbers or social media with children, or take photos of children on personal phones.”) {11,13}
+
+यदि आपको किसी कार्यक्रम के लिए आधिकारिक फोटो चाहिए तो इसे कैसे लेना है यहाँ दस्तावेज़ में नहीं लिखा। आप चाहें तो मैं Safeguarding Lead, Ms. Farah Naqvi से पुष्टि करने के लिए टीम से प्रश्न पूछ दूँ (उनका नंबर है +91 522 400 9911)। क्या मुझे टीम से पूछना है?
+What do you do?
+What do you offer, and what does it cost?
+What are your opening hours?
+-----

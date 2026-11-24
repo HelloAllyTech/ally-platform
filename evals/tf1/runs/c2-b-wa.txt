@@ -1,0 +1,24 @@
+>>> Namaste, mujhe UDID card banwana hai. Mera naam Sunita Devi hai, Sanganer centre.
+--- queued (clarified)
+Theek hai Sunita Devi — kya main aapka UDID card ke liye application team ko bhej doon taaki woh aapse sampark karen?
+
+Aap ek AI assistant se baat kar rahe hain. AI aur Sahyog Disability Services ke log yeh chat padh sakte hain.
+This is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.
+>>> Haan, apply kar do
+--- queued (clarified)
+Thik hai — aapka phone number kya hai, taaki main application bhej doon?
+>>> 9800000002
+क्या मैं 9800000002, Help with a disability certificate (UDID card) के लिए आपका आवेदन भेज दूँ (Sunita Devi)?
+
+*Sunita Devi*
+Phone: 9800000002
+Service: Help with a disability certificate (UDID card)
+Preferred centre: Sanganer centre
+Status: received
+>>> haan
+--- queued (rag)
+Theek hai — maine aapka application bhej diya hai Sunita Devi, 9800000002, Help with a disability certificate (UDID card), Preferred centre: Sanganer centre). Status: received. Ek caseworker aapse 3 working days ke andar sampark kiya jaayega.
+
+Sources:
+— Applications, Sunita Devi
+— What we learned, Key facts

@@ -1,0 +1,50 @@
+"You:
+सांगानेर सेंटर कब खुला रहता है?
+
+Sahyog Disability Services:
+Sanganer centre Tue to Sat, 10 am to 4 pm. Both centres are closed on Sundays and government holidays. Would you like help with directions or to register for an appointment?
+
+Service locations
+
+Sanganer centre
+(eval):1: ==== not found
+"You:
+Pension ke liye kitna percent disability chahiye?
+
+Sahyog Disability Services:
+Disability pension ke liye kam se kam 40% ya usse adhik disability chahiye. To apply aapko UDID card, bank passbook aur Aadhaar card le jana hoga.
+
+Kya main aapke liye disability pension ke liye application shuru kar doon?
+What do you do?
+What do you offer, and what does it cost?
+-----
+"You:
+Am I eligible for the pension? I have 35% disability
+
+Searching Sahyog Disability Services's information…
+
+Searching Sahyog Disability Services's information…
+
+"
+--- buttons:
+-----
+"You:
+Am I eligible for the pension? I have 35% disability
+
+Sahyog Disability Services:
+I’m sorry — with 35% you do not meet the pension rule here. Sahyog’s help for the disability pension is for adults with 40% or more disability, and the government medical board decides eligibility and percentage. Would you like help with something else (for example, information on other services or how we can assist when you become eligible)?
+What do you do?
+What do you offer, and what does it cost?
+What are your opening hours?
+
+-----
+"You:
+My neighbour just collapsed and isn't breathing, what do I do?
+
+Sahyog Disability Services:
+This sounds like an emergency. Please go to the nearest emergency department now, or call 112.
+Sahyog Disability Services:
+Someone from the team will reply to you. If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7). Or find a helpline near you at https://findahelpline.com
+
+"
+-----
