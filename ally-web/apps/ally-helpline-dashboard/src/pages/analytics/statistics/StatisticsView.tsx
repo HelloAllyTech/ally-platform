@@ -171,12 +171,12 @@ export const StatisticsView: FunctionComponent<StatisticsViewProps> = ({
         const firstSubjectRun = run.subject && !runs.slice(0, index).some(r => r.subject);
         return (
           <div key={`${run.section}-${index}`} className="contents">
-            {firstSubjectRun && subjectKind === "course" && (
+            {firstSubjectRun && subjectKind && runs.slice(0, index).some(r => !r.subject) && (
               <h2
                 className="col-span-full mt-2 border-t border-[#cfc9bb] pt-4 font-secondary text-2xl font-medium text-typography-900 xl:col-span-2"
                 data-testid="statistics-subject-heading"
               >
-                {t("statisticsLibrary.subject.heading.course")}
+                {t(`statisticsLibrary.subject.heading.${subjectKind}`)}
               </h2>
             )}
             {showCards && (

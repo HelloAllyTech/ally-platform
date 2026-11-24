@@ -410,6 +410,7 @@ export class TenantChartLibraryService {
         title: entry.title,
         question: entry.question,
         group: entry.group,
+        home: entry.home,
         shape: entry.shape,
         chart: entry.chart,
         size: entry.size,

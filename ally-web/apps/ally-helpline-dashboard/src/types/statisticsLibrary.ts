@@ -52,6 +52,8 @@ export interface StatisticsChartEntry {
   /** The question the chart answers. */
   question: string;
   group: StatisticsChartGroup;
+  /** The tab the chart belongs on. */
+  home: StatisticsViewId;
   shape: string;
   chart: string;
   size: StatisticsChartSize;

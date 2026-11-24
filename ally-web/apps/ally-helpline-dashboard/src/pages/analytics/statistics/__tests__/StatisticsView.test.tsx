@@ -106,6 +106,17 @@ describe("a chart tab", () => {
     expect(screen.getAllByTestId("statistics-subject-heading")).toHaveLength(1);
   });
 
+  it("draws no subject heading on a tab that has no overview above it", () => {
+    renderView({
+      view: {
+        ...courseView,
+        sections: [{ key: "useOverTime", subject: true, charts: ["TSQ-042", "TSQ-043"] }],
+      },
+      layoutKeys: ["TSQ-042", "TSQ-043"],
+    });
+    expect(screen.queryByTestId("statistics-subject-heading")).toBeNull();
+  });
+
   it("hands the chosen course to the cards of a subject section, and not the others", () => {
     renderView();
     expect(screen.getByTestId("filters-TSQ-042").textContent).toBe('{"course":"c1"}');

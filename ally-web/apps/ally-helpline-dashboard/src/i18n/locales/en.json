@@ -4268,7 +4268,8 @@
       "useOverTime": "Use over time",
       "roleplays": "Roleplays",
       "learning": "Learning",
-      "progress": "Progress"
+      "progress": "Progress",
+      "allLearners": "All learners"
     },
     "subject": {
       "label": {
@@ -4284,7 +4285,8 @@
         "learner": "Choose a learner to see their record."
       },
       "heading": {
-        "course": "One course in depth"
+        "course": "One course in depth",
+        "learner": "One learner in depth"
       }
     },
     "forYou": {

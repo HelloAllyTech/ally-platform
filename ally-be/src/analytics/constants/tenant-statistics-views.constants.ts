@@ -5,7 +5,9 @@ import { ChartFilterKey } from './tenant-chart-library.constants';
  *
  * A view is configuration, not code: its sections, the charts in each (in the
  * order the questions are asked in the Statistics questions doc), and the
- * layout a person gets before they customise. One chart can be in several
+ * layout a person gets before they customise. Organisation is about the
+ * organisation as a whole; Course and Learner each start with an overview of
+ * all courses or all learners (lists, rankings), then one course or learner in depth. One chart can be in several
  * views; the chart registry says what a chart can do, this file says where it
  * is shown. `foryou` is not here: it has no chart layout of its own, only the
  * pins a person chooses.
@@ -51,38 +53,17 @@ export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
       {
         key: 'learners',
         subject: false,
-        charts: [
-          'TSQ-001',
-          'TSQ-007',
-          'TSQ-008',
-          'TSQ-023',
-          'TSQ-009',
-          'TSQ-011',
-          'TSQ-012',
-        ],
+        charts: ['TSQ-001', 'TSQ-007', 'TSQ-011', 'TSQ-012'],
       },
       {
         key: 'practice',
         subject: false,
-        charts: ['TSQ-002', 'TSQ-005', 'TSQ-006', 'TSQ-003', 'TSQ-063'],
+        charts: ['TSQ-002', 'TSQ-005', 'TSQ-006', 'TSQ-003'],
       },
       {
         key: 'courses',
         subject: false,
-        charts: [
-          'TSQ-038',
-          'TSQ-039',
-          'TSQ-014',
-          'TSQ-013',
-          'TSQ-015',
-          'TSQ-016',
-          'TSQ-017',
-          'TSQ-042',
-          'TSQ-043',
-          'TSQ-053',
-          'TSQ-018',
-          'TSQ-019',
-        ],
+        charts: ['TSQ-038', 'TSQ-014', 'TSQ-013'],
       },
       {
         key: 'results',
@@ -90,17 +71,17 @@ export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
         charts: ['TSQ-020', 'TSQ-021', 'TSQ-022'],
       },
       { key: 'reviews', subject: false, charts: ['TSQ-027'] },
-      { key: 'skills', subject: false, charts: ['TSQ-024', 'TSQ-065'] },
+      { key: 'skills', subject: false, charts: ['TSQ-024'] },
       { key: 'feedback', subject: false, charts: ['TSQ-026'] },
     ],
     defaultLayout: [
       'TSQ-001',
       'TSQ-007',
-      'TSQ-008',
       'TSQ-002',
       'TSQ-038',
       'TSQ-014',
       'TSQ-013',
+      'TSQ-020',
       'TSQ-027',
       'TSQ-024',
       'TSQ-026',
@@ -113,7 +94,15 @@ export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
       {
         key: 'allCourses',
         subject: false,
-        charts: ['TSQ-038', 'TSQ-039', 'TSQ-014', 'TSQ-013'],
+        charts: [
+          'TSQ-038',
+          'TSQ-039',
+          'TSQ-014',
+          'TSQ-013',
+          'TSQ-015',
+          'TSQ-016',
+          'TSQ-017',
+        ],
       },
       { key: 'courseFacts', subject: true, charts: ['TSQ-041'] },
       {
@@ -142,10 +131,23 @@ export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
     id: 'learner',
     subject: 'learner',
     sections: [
+      {
+        key: 'allLearners',
+        subject: false,
+        charts: ['TSQ-023', 'TSQ-008', 'TSQ-009'],
+      },
       { key: 'practice', subject: true, charts: ['TSQ-063'] },
       { key: 'progress', subject: true, charts: ['TSQ-064'] },
       { key: 'skills', subject: true, charts: ['TSQ-065', 'TSQ-024'] },
     ],
-    defaultLayout: ['TSQ-063', 'TSQ-064', 'TSQ-065', 'TSQ-024'],
+    defaultLayout: [
+      'TSQ-023',
+      'TSQ-008',
+      'TSQ-009',
+      'TSQ-063',
+      'TSQ-064',
+      'TSQ-065',
+      'TSQ-024',
+    ],
   },
 ];

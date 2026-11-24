@@ -173,21 +173,19 @@ export const ForYouView: FunctionComponent<ForYouViewProps> = ({
     onPinsChange(arrayMove(keys, from, to));
   };
 
-  // Every chart that can be pinned, listed under the tab it lives on.
-  const libraryEntries = views.flatMap(view =>
+  // Every chart that can be pinned, listed once, under the tab it belongs on.
+  const entries = views.flatMap(view =>
     viewChartIds(view)
       .map(id => byId.get(id))
       .filter(
         (chart): chart is StatisticsChartEntry =>
           !!chart &&
+          chart.home === view.id &&
           CHART_RENDERERS[chart.id]?.kind === "data" &&
           !!(CHART_RENDERERS[chart.id] as { pin?: unknown }).pin,
       )
       .map(chart => ({ chart, group: view.id })),
   );
-  // A chart on two tabs is listed once, under the first.
-  const seen = new Set<string>();
-  const entries = libraryEntries.filter(({ chart }) => !seen.has(chart.id) && !!seen.add(chart.id));
   const groups = views.map(view => ({
     key: view.id,
     label: t(`statisticsLibrary.tabs.${view.id}`),

@@ -71,3 +71,59 @@ describe('STATISTICS_VIEWS', () => {
     },
   );
 });
+
+describe('where every chart lives', () => {
+  const homes = ['organisation', 'course', 'learner'];
+  const viewOf = (id: string) => STATISTICS_VIEWS.find((v) => v.id === id)!;
+  const listedIn = (view: string, chartId: string) =>
+    viewOf(view)
+      .sections.flatMap((s) => s.charts)
+      .includes(chartId);
+
+  it('gives every chart in the registry, live or planned, a home tab', () => {
+    TENANT_CHART_LIBRARY.forEach((chart) => {
+      expect({ id: chart.id, home: homes.includes(chart.home) }).toEqual({
+        id: chart.id,
+        home: true,
+      });
+    });
+  });
+
+  it('lists every live chart in its home view', () => {
+    TENANT_CHART_LIBRARY.filter((c) => c.live).forEach((chart) => {
+      expect({
+        id: chart.id,
+        home: chart.home,
+        listed: listedIn(chart.home, chart.id),
+      }).toEqual({
+        id: chart.id,
+        home: chart.home,
+        listed: true,
+      });
+    });
+  });
+
+  it('lists a live chart only on tabs that can draw it, and never leaves it unplaced', () => {
+    TENANT_CHART_LIBRARY.filter((c) => c.live).forEach((chart) => {
+      const placed = STATISTICS_VIEWS.filter((v) => listedIn(v.id, chart.id));
+      expect({ id: chart.id, placed: placed.length > 0 }).toEqual({
+        id: chart.id,
+        placed: true,
+      });
+    });
+  });
+
+  it('keeps per-learner lists off the Organisation tab and course internals off it too', () => {
+    const organisation = STATISTICS_VIEWS.find(
+      (v) => v.id === 'organisation',
+    )!.sections.flatMap((s) => s.charts);
+    // Top learners, learners who need attention, the learner table: the Learner tab.
+    ['TSQ-008', 'TSQ-009', 'TSQ-023'].forEach((id) =>
+      expect(organisation).not.toContain(id),
+    );
+    // Items, quizzes, performance since launch, time to finish, roleplays: the Course tab.
+    ['TSQ-018', 'TSQ-019', 'TSQ-042', 'TSQ-043', 'TSQ-053'].forEach((id) =>
+      expect(organisation).not.toContain(id),
+    );
+  });
+});
