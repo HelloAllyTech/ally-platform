@@ -1,3 +1,4 @@
+import type { CardHeadline } from '../agent-tools/entry-words';
 import type {
   ActionClaims,
   RedeemFailure,
@@ -163,6 +164,17 @@ export type AgentRunRef = { runId: string; conversationId: string } & (
 export interface ChatbotDecision {
   handledBy: WaHandledBy;
   body: string;
+  /**
+   * BT1: a Confirm tap's done card, from what was written (or, in Try it, from the card the
+   * person confirmed: nothing is saved there).
+   */
+  tapDone?: {
+    action: 'create' | 'update' | 'cancel';
+    list: string;
+    title: string;
+    headline: CardHeadline;
+    details: { label: string; value: string }[];
+  };
   /** CR1: no run started because a limit was reached; `body` is the fixed limit reply. */
   limited?:
     | 'customers'

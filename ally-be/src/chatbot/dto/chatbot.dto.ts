@@ -337,6 +337,15 @@ export class TestChatbotDto {
   @MaxLength(4000)
   message!: string;
 
+  @ApiPropertyOptional({
+    description:
+      "BT1: a tap's token from a reply's parts; `message` is then the label tapped.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  action?: string;
+
   @ApiPropertyOptional({ type: [ChatbotHistoryTurnDto] })
   @IsOptional()
   @IsArray()

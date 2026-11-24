@@ -221,11 +221,11 @@ describe('ActionsService (BT1: taps answered in code)', () => {
   it('an old or foreign button says so; Keep it drops the pending cancel; a reused chip does nothing', async () => {
     const { service, consent } = setup({});
     expect(
-      (await service.perform(turn({ ok: false, reason: 'expired' }), 'x'))
+      (await service.perform(turn({ ok: false, reason: 'expired' }, 'x')))
         ?.body,
     ).toMatch(/expired/);
     expect(
-      (await service.perform(turn({ ok: false, reason: 'not_yours' }), 'x'))
+      (await service.perform(turn({ ok: false, reason: 'not_yours' }, 'x')))
         ?.body,
     ).toMatch(/isn't for this chat/);
     const kept = await service.perform(

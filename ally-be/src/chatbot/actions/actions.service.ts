@@ -132,6 +132,13 @@ export class ActionsService {
           trace: [],
           activity: [activity],
         },
+        tapDone: {
+          action: card.action,
+          list: shown.list,
+          title: shown.title,
+          headline,
+          details: shown.details,
+        },
       };
     }
     // The entry was taken, or a rule refused it, between the card and the tap: say so. The free
