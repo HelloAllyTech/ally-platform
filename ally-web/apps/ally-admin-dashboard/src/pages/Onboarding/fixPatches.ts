@@ -8,7 +8,6 @@ export const OWNER_SOURCE = "owner";
 export const FACT_MAX_CHARS = 500;
 /** ally-be BotDraftDto.extraNever: at most 20 rules of at most 200 characters. */
 export const RULE_MAX_COUNT = 20;
-export const RULE_MAX_CHARS = 200;
 /** The topic itself is kept short, as on the assistant home's "avoid" list. */
 export const TOPIC_MAX_CHARS = 80;
 

@@ -1,5 +1,3 @@
-import { useSyncExternalStore } from "react";
-
 /**
  * What the build half and the test pane tell each other in split build: the pane says which
  * questions it couldn't answer, and the build half asks the pane to show them. A tiny store
@@ -36,6 +34,3 @@ export const createSplitBridge = (): SplitBridge => {
     openUnanswered: () => opener?.(),
   };
 };
-
-export const useBridgeUnanswered = (bridge: SplitBridge): number =>
-  useSyncExternalStore(bridge.subscribe, bridge.get, bridge.get);
