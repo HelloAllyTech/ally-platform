@@ -89,47 +89,120 @@ export function customerTenantNames(names: readonly string[]): string[] {
   );
 }
 
-/** Scrub one string for a public repo. */
-export function scrubForPublic(
-  text: string,
-  options: ScrubOptions = {},
-): string {
-  if (!text) return text;
-  let out = text;
+/** One named redaction rule. Order matters for the redacted output, not for detection. */
+interface ScrubRule {
+  name: ScrubRuleName;
+  apply: (text: string, options: ScrubOptions) => string;
+}
 
+export type ScrubRuleName =
+  | 'tenant_name'
+  | 'private_key'
+  | 'internal_url'
+  | 'url_with_query'
+  | 'email'
+  | 'id'
+  | 'secret'
+  | 'ip'
+  | 'phone'
+  | 'labelled_org'
+  | 'long_quote';
+
+const tenantNameRule = (text: string, options: ScrubOptions): string => {
   // Named tenants first, longest first so "Acme Health" wins over "Acme".
   const names = [...new Set((options.tenantNames ?? []).map((n) => n.trim()))]
     .filter((name) => name.length >= 3)
     .sort((a, b) => b.length - a.length);
+  let out = text;
   for (const name of names) {
     out = out.replace(
       new RegExp(`(?<![\\w])${escapeRegExp(name)}(?![\\w])`, 'gi'),
       REDACTED.ORG,
     );
   }
-
-  out = out.replace(
-    /-----BEGIN [\s\S]*?-----END [A-Z ]*-----/g,
-    REDACTED.SECRET,
-  );
-  out = out.replace(INTERNAL_URL, REDACTED.URL);
-  out = out.replace(URL_WITH_QUERY, REDACTED.URL);
-  out = out.replace(EMAIL, REDACTED.EMAIL);
-  out = out.replace(UUID, REDACTED.ID);
-  for (const pattern of SECRET_PATTERNS) {
-    out = out.replace(pattern, REDACTED.SECRET);
-  }
-  out = out.replace(IPV4, REDACTED.IP);
-  out = out.replace(PHONE, (match) =>
-    // Leave plain numbers (percentages, counts, years): a phone has 10+ digits.
-    match.replace(/\D/g, '').length >= 10 ? REDACTED.PHONE : match,
-  );
-  out = out.replace(
-    LABELLED_ORG,
-    (_match, label: string, sep: string) => `${label}${sep}${REDACTED.ORG}`,
-  );
-  out = out.replace(LONG_QUOTE, REDACTED.QUOTE);
   return out;
+};
+
+const SCRUB_RULES: ScrubRule[] = [
+  { name: 'tenant_name', apply: tenantNameRule },
+  {
+    name: 'private_key',
+    apply: (t) =>
+      t.replace(/-----BEGIN [\s\S]*?-----END [A-Z ]*-----/g, REDACTED.SECRET),
+  },
+  { name: 'internal_url', apply: (t) => t.replace(INTERNAL_URL, REDACTED.URL) },
+  {
+    name: 'url_with_query',
+    apply: (t) => t.replace(URL_WITH_QUERY, REDACTED.URL),
+  },
+  { name: 'email', apply: (t) => t.replace(EMAIL, REDACTED.EMAIL) },
+  { name: 'id', apply: (t) => t.replace(UUID, REDACTED.ID) },
+  {
+    name: 'secret',
+    apply: (t) =>
+      SECRET_PATTERNS.reduce(
+        (out, pattern) => out.replace(pattern, REDACTED.SECRET),
+        t,
+      ),
+  },
+  { name: 'ip', apply: (t) => t.replace(IPV4, REDACTED.IP) },
+  {
+    name: 'phone',
+    apply: (t) =>
+      t.replace(PHONE, (match) =>
+        // Leave plain numbers (percentages, counts, years): a phone has 10+ digits.
+        match.replace(/\D/g, '').length >= 10 ? REDACTED.PHONE : match,
+      ),
+  },
+  {
+    name: 'labelled_org',
+    apply: (t) =>
+      t.replace(
+        LABELLED_ORG,
+        (_match, label: string, sep: string) => `${label}${sep}${REDACTED.ORG}`,
+      ),
+  },
+  { name: 'long_quote', apply: (t) => t.replace(LONG_QUOTE, REDACTED.QUOTE) },
+];
+
+/** Every rule: what a PUBLISHED text (the roadmap entry) must pass. */
+export const PUBLIC_SCRUB_RULES: readonly ScrubRuleName[] = SCRUB_RULES.map(
+  (rule) => rule.name,
+);
+
+/**
+ * Real leaks only: what an admin-only text must still never carry. The pattern rules that
+ * misfire on code-like text (ids, IPs, long digit runs read as phones, labelled names, long
+ * quotes) are left out: a build plan names migrations, ids and paths.
+ */
+export const LEAK_SCRUB_RULES: readonly ScrubRuleName[] = [
+  'tenant_name',
+  'private_key',
+  'internal_url',
+  'url_with_query',
+  'email',
+  'secret',
+];
+
+/** Scrub one string for a public repo. */
+export function scrubForPublic(
+  text: string,
+  options: ScrubOptions = {},
+): string {
+  if (!text) return text;
+  return SCRUB_RULES.reduce((out, rule) => rule.apply(out, options), text);
+}
+
+/** The rules (of `only`, default all) that would change this text. Empty = clean. */
+export function scrubHits(
+  text: string,
+  options: ScrubOptions = {},
+  only: readonly ScrubRuleName[] = PUBLIC_SCRUB_RULES,
+): ScrubRuleName[] {
+  if (!text) return [];
+  return SCRUB_RULES.filter(
+    (rule) => only.includes(rule.name) && rule.apply(text, options) !== text,
+  ).map((rule) => rule.name);
 }
 
 /** Scrub every string in a JSON-like value (arrays and plain objects), returning a copy. */
