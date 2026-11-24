@@ -658,7 +658,10 @@ const HealthSection: React.FC = () => {
             } pts`,
     },
   ];
-  const lanes = Object.entries(data.spendByLane ?? {});
+  const lanes: [string, number][] = (data.spendByLane ?? []).map(row => [
+    row.lane,
+    Number(row.costUsd),
+  ]);
   return (
     <section aria-label={a.healthTitle} className="flex max-w-2xl flex-col gap-4">
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
