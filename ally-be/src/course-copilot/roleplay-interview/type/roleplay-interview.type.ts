@@ -143,7 +143,22 @@ export interface RoleplayInterviewQuestionOption {
   description?: string;
   /** At most one option carries this. */
   recommended?: boolean;
+  /** What picking this option records in the question's brief field (an id, a mode, a number). */
+  value?: string;
 }
+
+/** The brief fields a question can fill by itself when the trainer picks an option. */
+export const QUESTION_BRIEF_FIELDS = [
+  'mode',
+  'difficulty',
+  'competencyIds',
+  'learnerProfileId',
+  'characterId',
+  'languageIds',
+  'minScore',
+  'lengthMinutes',
+] as const;
+export type QuestionBriefField = (typeof QUESTION_BRIEF_FIELDS)[number];
 
 export interface RoleplayInterviewQuestion {
   id: string;
@@ -155,6 +170,8 @@ export interface RoleplayInterviewQuestion {
   minSelections?: number;
   maxSelections?: number;
   rationale?: string;
+  /** The brief field this question fills: a pick is recorded by the server, not left to the model. */
+  field?: QuestionBriefField;
 }
 
 /**

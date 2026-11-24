@@ -244,20 +244,26 @@ export class RoleplayInterviewOrchestratorService {
       createdBy: userId,
     });
 
+    const context: RoleplayInterviewToolContext = {
+      session,
+      userId,
+      changes: { briefFields: new Set(), planVersion: null },
+    };
+    // A pick on a question that fills a brief field is recorded here, by the server, before the
+    // model reads it: left to the model, an answer was sometimes never recorded and the trainer
+    // was asked the next question with the brief still missing it.
+    const recorded = await this.recordAnswer(dto, history, context);
+    for (const frame of recorded.frames) yield frame;
+
     const system = await this.buildSystemPrompt();
     const messages: AgentMessage[] = [
       ...this.rebuildHistory(history),
       // The brief rides on the newest user turn only; it is not persisted.
       {
         role: 'user',
-        content: `${userContent}\n\n${this.briefBlock(session)}`,
+        content: `${userContent}${recorded.note ? `\n${recorded.note}` : ''}\n\n${this.briefBlock(session)}`,
       },
     ];
-    const context: RoleplayInterviewToolContext = {
-      session,
-      userId,
-      changes: { briefFields: new Set(), planVersion: null },
-    };
     const turn: RoleplayInterviewTurnState = {
       ...createValidatedTurnState(),
       plan: null,
@@ -547,6 +553,60 @@ export class RoleplayInterviewOrchestratorService {
       .filter(Boolean)
       .join(' — ');
     return { content, displayText };
+  }
+
+  /**
+   * Record a pick on a question that names a brief field (`field`, options with `value`). The
+   * same checks as update_brief apply; the note tells the model what was recorded, or why not.
+   */
+  async recordAnswer(
+    dto: RoleplayInterviewMessageDto,
+    history: RoleplayInterviewMessage[],
+    context: RoleplayInterviewToolContext,
+  ): Promise<{ frames: RoleplayInterviewSseFrame[]; note: string | null }> {
+    const none = { frames: [], note: null };
+    if (!dto.questionId || !dto.answer?.optionIds?.length) return none;
+    let question: RoleplayInterviewQuestion | undefined;
+    for (const row of [...history].reverse()) {
+      question = (row.metadata?.questions ?? []).find(
+        (q: RoleplayInterviewQuestion) => q.id === dto.questionId,
+      );
+      if (question) break;
+    }
+    if (!question?.field) return none;
+    const values = dto.answer.optionIds
+      .map((id) => question!.options?.find((o) => o.id === id)?.value)
+      .filter((value): value is string => Boolean(value));
+    if (!values.length) return none;
+    const field = question.field;
+    const patch: Record<string, unknown> =
+      field === 'competencyIds' || field === 'languageIds'
+        ? { [field]: values }
+        : field === 'characterId'
+          ? { client: { characterId: values[0] } }
+          : field === 'minScore' || field === 'lengthMinutes'
+            ? { [field]: Number(values[0]) }
+            : { [field]: values[0] };
+    try {
+      const outcome = await this.toolsService.updateBrief(patch, context);
+      const frames = (outcome.events ?? []) as RoleplayInterviewSseFrame[];
+      return outcome.modelResult.ok
+        ? {
+            frames,
+            note: `[Recorded in the brief from this answer: ${field} = ${values.join(', ')}. Do not record it again.]`,
+          }
+        : {
+            frames,
+            note: `[This answer could not be recorded (${(outcome.modelResult.errors ?? [outcome.modelResult.message]).join('; ')}). Record the right value with update_brief.]`,
+          };
+    } catch (error) {
+      this.logger.warn(
+        `Roleplay interview ${context.session.id}: recording an answer failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return none;
+    }
   }
 
   /** Persisted rows back into the model's message list (the character interview's). */

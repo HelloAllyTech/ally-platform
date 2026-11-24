@@ -1,3 +1,4 @@
+import { QUESTION_BRIEF_FIELDS } from '../type/roleplay-interview.type';
 import { isUUID } from 'class-validator';
 import { Injectable, Optional } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
@@ -75,6 +76,12 @@ const ASK_TRAINER: AgentToolDefinition = {
             label: { type: 'string' },
             description: { type: 'string' },
             recommended: { type: 'boolean' },
+            value: {
+              type: 'string',
+              description:
+                'With field: what this option records (the mode name, the competency id, the ' +
+                'learner profile id, the character id, the language id, the number).',
+            },
           },
           required: ['id', 'label'],
         },
@@ -82,6 +89,13 @@ const ASK_TRAINER: AgentToolDefinition = {
       allowNone: { type: 'boolean' },
       minSelections: { type: 'number' },
       maxSelections: { type: 'number' },
+      field: {
+        type: 'string',
+        enum: [...QUESTION_BRIEF_FIELDS],
+        description:
+          'When the answer fills one brief field, name it and give every option a value: the ' +
+          'trainer’s pick is then recorded for you, and you never need update_brief for it.',
+      },
     },
     required: ['prompt', 'kind'],
   },

@@ -1,3 +1,4 @@
+import { QUESTION_BRIEF_FIELDS } from '../type/roleplay-interview.type';
 import { v4 as uuidv4 } from 'uuid';
 import {
   roleplaySettingsForMode,
@@ -476,6 +477,11 @@ export function buildQuestion(
       : kind) as RoleplayInterviewQuestion['kind'],
     ...(input?.rationale ? { rationale: String(input.rationale) } : {}),
     ...(options.length ? { options } : {}),
+    ...(isSelect &&
+    options.length &&
+    (QUESTION_BRIEF_FIELDS as readonly string[]).includes(String(input?.field))
+      ? { field: input.field }
+      : {}),
     // Every card takes a typed answer.
     allowCustom: true,
     ...(input?.allowNone ? { allowNone: true } : {}),
@@ -510,6 +516,9 @@ export function normaliseOptions(
             ? { description: String(source.description) }
             : {}),
           ...(source.recommended ? { recommended: true } : {}),
+          ...(source.value !== undefined && String(source.value).trim()
+            ? { value: String(source.value).trim() }
+            : {}),
         };
       }
       return null;

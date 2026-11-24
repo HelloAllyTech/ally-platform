@@ -203,3 +203,80 @@ describe('RoleplayInterviewOrchestratorService', () => {
     expect(frames.filter((f) => f.event === 'error')).toEqual([]);
   });
 });
+
+describe('RoleplayInterviewOrchestratorService.recordAnswer', () => {
+  const question = {
+    id: 'q-mode',
+    prompt: 'Which mode?',
+    kind: 'singleSelect',
+    field: 'mode',
+    options: [
+      { id: 'a', label: 'Practice', value: 'practice', recommended: true },
+      { id: 'b', label: 'Learning', value: 'learning' },
+    ],
+  };
+  const history = [
+    { role: 'assistant', metadata: { questions: [question] } },
+  ] as any;
+  const build = (updateBrief: jest.Mock) =>
+    new RoleplayInterviewOrchestratorService(
+      {} as any,
+      {} as any,
+      {} as any,
+      { updateBrief } as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
+  const context = { session: { id: 's-1' } } as any;
+
+  it('records a pick on a field question before the model reads it', async () => {
+    const updateBrief = jest.fn().mockResolvedValue({
+      modelResult: { ok: true },
+      events: [
+        {
+          event: 'brief',
+          data: { brief: { mode: 'practice' }, stillNeeded: [] },
+        },
+      ],
+    });
+    const out = await build(updateBrief).recordAnswer(
+      { questionId: 'q-mode', answer: { optionIds: ['a'] } } as any,
+      history,
+      context,
+    );
+    expect(updateBrief).toHaveBeenCalledWith({ mode: 'practice' }, context);
+    expect(out.frames[0].event).toBe('brief');
+    expect(out.note).toMatch(
+      /Recorded in the brief from this answer: mode = practice/,
+    );
+  });
+
+  it('leaves a typed answer, or a question without a field, to the model', async () => {
+    const updateBrief = jest.fn();
+    const service = build(updateBrief);
+    expect(
+      await service.recordAnswer(
+        { questionId: 'q-mode', answer: { text: 'something else' } } as any,
+        history,
+        context,
+      ),
+    ).toEqual({ frames: [], note: null });
+    const plain = [
+      {
+        role: 'assistant',
+        metadata: { questions: [{ ...question, field: undefined }] },
+      },
+    ] as any;
+    expect(
+      (
+        await service.recordAnswer(
+          { questionId: 'q-mode', answer: { optionIds: ['a'] } } as any,
+          plain,
+          context,
+        )
+      ).note,
+    ).toBeNull();
+    expect(updateBrief).not.toHaveBeenCalled();
+  });
+});
