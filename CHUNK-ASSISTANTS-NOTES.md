@@ -29,7 +29,7 @@ Paths are under `ally-be/src/` unless prefixed. Migration ids 1986540000000 to 1
 - `bot-draft/working-copy/`: `working-copy.service.ts`, `staged-fields.ts`, `safety-apply-check.ts`, `judged-safety-apply-check.ts`, `credits-gate.ts`; controller `bot-draft/controller/working-copy.controller.ts`, `draft-tools.controller.ts`.
 - `bot-draft/blank/blank-chatbot.service.ts` (idempotent blank, cap 3, 24h cleanup), `bot-draft/templates/library-template.service.ts` + `library-templates.ts` + `knowledge-base/constants/template-knowledge.ts`, `bot-draft/copilot/copilot.service.ts`, `bot-draft/service/{bot-draft-preview,bot-draft-likely,draft-change,starter-bot}.ts`.
 - ally-ai: `app/core/agent_runtime/instructions_judge.py` plus prompt `app/prompts/agent/instructions_judge.txt` (the model judge for the instruction check).
-- Web: `src/components/v2/SplitBuild.tsx`, `src/pages/Onboarding/create/` (`BuildScreen`, `ChatbotBuild`, `Copilot`, `DirectForm`, `GoLive`, `PendingBar`, `Sources`, `StartPanel`, `TemplateCatalog`, `fieldQueue.ts`, `useWorkingCopy.ts`), `Onboarding/{DraftTestPane,FixThis,LikelyQuestions,fixPatches,betterItems}`. Deleted: `pages/WhatsAppBot/WhatsAppBot.tsx`, `FirstAssistantOverlay.tsx`.
+- Web: `src/components/v2/SplitBuild.tsx`, `src/pages/Onboarding/create/` (`BuildScreen`, `ChatbotBuild`, `Copilot`, `DirectForm`, `GoLive`, `PendingBar`, `Sources`, `StartPanel`, `TemplateCatalog`, `fieldQueue.ts`, `useWorkingCopy.ts`), `Onboarding/{DraftTestPane,FixThis,LikelyQuestions,fixPatches,betterItems}`. Deleted: `pages/WhatsAppBot/WhatsAppBot.tsx`, `FirstAssistantOverlay.tsx`. <!-- docs-path-lint: ignore -->
 
 ### Stage 4: safety core
 - Migration `1987000000000-CreateChatbotSafetyState`.
