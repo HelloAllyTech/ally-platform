@@ -13,13 +13,13 @@ import { isBlankDraft } from "./blank";
 import { BUILDER_HOME, CREATE_MIN_WIDTH } from "./copy";
 import { chatbotAccess } from "../AssistantHome/access";
 import { HOME } from "../AssistantHome/copy";
+import { TF1_COPY } from "../AssistantHome/copy/tf1";
 import { day } from "../AssistantHome/dates";
 import { MoreMenu } from "../AssistantHome/ui/Menu";
 import { RemoveDialog } from "../AssistantHome/ui/RemoveDialog";
 import { useRestoreAssistant } from "../AssistantHome/ui/useRestoreAssistant";
 import { useMedia } from "../AssistantHome/userLists/useMedia";
 import { COPY as ONBOARDING_COPY } from "../Onboarding/copy";
-import { TF1_COPY } from "../AssistantHome/copy/tf1";
 import { PlanAlertsBanner } from "../Plan/ui";
 import { fill, LoadError } from "../WhatsAppBot/shared";
 

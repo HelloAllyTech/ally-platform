@@ -10,9 +10,9 @@ import {
   useSetBuildModeMutation,
 } from "@api";
 import type { BotTemplateCard, BuildMode, StartPath } from "@api";
-import type { TemplateAnswers } from "@types";
 import { Button, Orb, SplitBuild } from "@components/v2";
 import { ROUTES } from "@constants";
+import type { TemplateAnswers } from "@types";
 
 import { Copilot } from "./Copilot";
 import { BUILD_COPY } from "./copy";

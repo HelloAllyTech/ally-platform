@@ -13,9 +13,9 @@ import { ButtonVariant } from "@components/types";
 
 import { channelLabel, fill, INBOX } from "./copy";
 import { MemoryPanel } from "./MemoryPanel";
-import { TF1_COPY } from "../AssistantHome/copy/tf1";
 import { useAgreementGate } from "../AssistantHome/agreement/context";
 import { PEOPLE } from "../AssistantHome/copy/people";
+import { TF1_COPY } from "../AssistantHome/copy/tf1";
 import { useReadOnly } from "../AssistantHome/readOnly";
 import { CheckupCaseEditor } from "../AssistantHome/sections/CheckupCaseEditor";
 import { needsAgreement } from "../AssistantHome/teamErrors";

@@ -10,8 +10,8 @@ import type { HomeSafety, RuleChange, SafetyRule } from "@types";
 import { COPY, fill } from "../../Onboarding/copy";
 import { HOME } from "../copy";
 import { TF1_COPY } from "../copy/tf1";
-import { useSafetySettings } from "../safety/useSafetySettings";
 import { Group, LinesField, SectionHead, TextField } from "../fields";
+import { useSafetySettings } from "../safety/useSafetySettings";
 import { useHomeField } from "../useHomeField";
 
 import type { SectionProps } from "./props";

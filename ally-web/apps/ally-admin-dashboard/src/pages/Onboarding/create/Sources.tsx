@@ -7,9 +7,9 @@ import { Button } from "@components/v2";
 import { BUILD_COPY, PAUSED_REASON_COPY, PausedKind, pausedKindOf } from "./copy";
 import { crawlFailureText, isCreditsRequired, codeOf, messageOf } from "./logic";
 import { SOURCE_ACCEPT, filesOk } from "./useSources";
-import { fill } from "../copy";
 import { TF1_COPY } from "../../AssistantHome/copy/tf1";
 import { Review as KnowledgeReview } from "../../AssistantHome/sections/KnowledgeTools";
+import { fill } from "../copy";
 
 const T = BUILD_COPY.form;
 

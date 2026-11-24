@@ -25,8 +25,8 @@ import {
   soundOn,
 } from "./notifications";
 import { useInboxStream } from "./useInboxStream";
-import { TF1_COPY } from "../AssistantHome/copy/tf1";
 import { chatbotAccess } from "../AssistantHome/access";
+import { TF1_COPY } from "../AssistantHome/copy/tf1";
 import { useReadOnly } from "../AssistantHome/readOnly";
 
 import "../../components/v2/v2.css";

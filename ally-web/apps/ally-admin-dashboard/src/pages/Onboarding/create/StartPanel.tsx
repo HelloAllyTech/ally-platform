@@ -8,9 +8,9 @@ import type { TemplateAnswers } from "@types";
 import { BUILD_COPY } from "./copy";
 import { TemplateCatalog } from "./TemplateCatalog";
 import { SOURCE_ACCEPT, filesOk } from "./useSources";
-import { fill } from "../copy";
 import { TF1_COPY } from "../../AssistantHome/copy/tf1";
 import { TemplateSetup } from "../../Templates/TemplateSetup";
+import { fill } from "../copy";
 
 const S = BUILD_COPY.start;
 
