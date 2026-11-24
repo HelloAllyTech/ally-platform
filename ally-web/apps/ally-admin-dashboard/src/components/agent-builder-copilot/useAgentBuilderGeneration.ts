@@ -10,6 +10,7 @@ import {
   useGenerateAgentBuilderFieldMutation,
   useLazyGetCoverImageJobQuery,
   useStartCoverImageJobMutation,
+  useTranslateForAgentBuilderMutation,
   useGetAvailableLanguageVoicesQuery,
 } from "@api";
 import type { LanguageOption } from "@components/linguistic-style-samples/scenarioLanguageUtils";
@@ -121,6 +122,12 @@ export interface GenerationInputs {
    */
   statesOnForm?: boolean;
 }
+
+/** The challenge description's other language tabs, translated once the batch is in. */
+const TRANSLATE_TASK = {
+  key: "challenge_description_translations",
+  label: "Challenge description in other languages",
+};
 
 /** The cover row: not a field generator, an image job (start, then poll until it settles). */
 const COVER_TASK = { key: "cover_image", label: "Cover image" };
@@ -255,6 +262,7 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
   const [trigger] = useGenerateAgentBuilderFieldMutation();
   const [startCoverJob] = useStartCoverImageJobMutation();
   const [pollCoverJob] = useLazyGetCoverImageJobQuery();
+  const [translateField] = useTranslateForAgentBuilderMutation();
   const [phase, setPhase] = useState<GenerationPhase>("idle");
   const [tasks, setTasks] = useState<GenerationTask[]>([]);
   // What the post-batch check changed, in words, for the feed.
@@ -671,7 +679,50 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
       // them too even though they don't exist yet at this point.
       handlesRef.current = handles;
 
-      void Promise.allSettled(runs).then(() => {
+      /**
+       * The challenge description in the roleplay's other languages: every catalog language with
+       * a voice on the form (the languages a learner can play in), apart from the main one whose
+       * text was just generated. Runs last, once the description and the voices are both in.
+       */
+      const translateDescription = async (): Promise<void> => {
+        const source = String(formMethods.getValues("description") ?? "").trim();
+        const voices = (formMethods.getValues("languageVoices") ?? {}) as Record<string, string>;
+        const primary = String(primaryLanguageIdRef.current ?? "");
+        const targets = catalogLanguagesRef.current
+          .filter(l => voices[String(l.language_id)] && String(l.language_id) !== primary)
+          .map(l => ({ languageId: String(l.language_id), languageCode: l.value }));
+        if (!source || !targets.length || abortedRef.current) return;
+        setTasks(prev => [...prev, { ...TRANSLATE_TASK, status: "active" }]);
+        try {
+          const handle = translateField({ text: source, targets });
+          handles.push(handle);
+          const { translations } = await handle.unwrap();
+          if (abortedRef.current) return;
+          const current = (formMethods.getValues("translationDescription") ?? {}) as Record<
+            string,
+            string
+          >;
+          formMethods.setValue(
+            "translationDescription",
+            { ...current, ...translations },
+            { shouldDirty: true, shouldValidate: false },
+          );
+          patchTask(TRANSLATE_TASK.key, {
+            status: "done",
+            label: `${TRANSLATE_TASK.label} (${Object.keys(translations).length})`,
+          });
+        } catch (err) {
+          patchTask(
+            TRANSLATE_TASK.key,
+            abortedRef.current
+              ? { status: "aborted" }
+              : { status: "error", error: errorMessage(err) },
+          );
+        }
+      };
+
+      void Promise.allSettled(runs).then(async () => {
+        await translateDescription();
         runningRef.current = false;
         if (abortedRef.current) {
           setPhase("aborted");
@@ -684,7 +735,7 @@ export const useAgentBuilderGeneration = (formMethods: UseFormReturn<any>) => {
         void formMethods.trigger();
       });
     },
-    [trigger, startCoverJob, pollCoverJob, formMethods, patchTask, fieldPlan],
+    [trigger, startCoverJob, pollCoverJob, translateField, formMethods, patchTask, fieldPlan],
   );
 
   const abort = useCallback(() => {

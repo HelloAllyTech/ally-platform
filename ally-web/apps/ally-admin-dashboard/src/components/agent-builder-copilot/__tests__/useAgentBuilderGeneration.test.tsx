@@ -81,7 +81,16 @@ const mocks = vi.hoisted(() => {
         Promise.resolve({ jobId: "job-1", status: "succeeded", imageUrl: "https://img/cover.png" }),
     })),
   };
-  return { state, requests, aborts, trigger, cover };
+  const translate = vi.fn((body: { targets: { languageId: string }[] }) => ({
+    abort: vi.fn(),
+    unwrap: () =>
+      Promise.resolve({
+        translations: Object.fromEntries(
+          body.targets.map(t => [t.languageId, `translated ${t.languageId}`]),
+        ),
+      }),
+  }));
+  return { state, requests, aborts, trigger, cover, translate };
 });
 
 const { state, requests, aborts, trigger } = mocks;
@@ -90,6 +99,7 @@ vi.mock("@api", () => ({
   useGenerateAgentBuilderFieldMutation: () => [mocks.trigger],
   useStartCoverImageJobMutation: () => [mocks.cover.start],
   useLazyGetCoverImageJobQuery: () => [mocks.cover.poll],
+  useTranslateForAgentBuilderMutation: () => [mocks.translate],
   useGetAvailableLanguageVoicesQuery: () => ({ data: CATALOG_FOR_MOCK, isLoading: false }),
 }));
 
@@ -554,5 +564,24 @@ describe("useAgentBuilderGeneration — roleplay mode", () => {
     expect(result.current.tasks.find(t => t.field === "spoken_languages")?.label).toBe(
       "Languages you chose: Hindi (India)",
     );
+  });
+
+  it("translates the challenge description into the other voiced languages, last", async () => {
+    mocks.translate.mockClear();
+    const { form, store } = makeForm();
+    const { result } = renderHook(() => useAgentBuilderGeneration(form));
+
+    act(() => result.current.start({ ...INPUTS, generateCover: false }));
+    await waitFor(() => expect(result.current.phase).toBe("done"));
+
+    expect(mocks.translate).toHaveBeenCalledTimes(1);
+    const body = mocks.translate.mock.calls[0][0];
+    expect(body.text).toBe("She minimises.");
+    // Hindi got a voice in this batch; English is the main language and is not translated.
+    expect(body.targets).toEqual([{ languageId: "2", languageCode: "hi-IN" }]);
+    expect(store.translationDescription).toEqual({ "2": "translated 2" });
+    expect(
+      result.current.tasks.find(t => t.key === "challenge_description_translations")?.status,
+    ).toBe("done");
   });
 });

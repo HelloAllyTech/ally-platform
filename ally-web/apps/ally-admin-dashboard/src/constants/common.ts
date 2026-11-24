@@ -177,6 +177,7 @@ export const ApiEndpoints = {
     AGENT_BUILDER_ROLEPLAY_DESIGN: "/v1/learn/agent-builder/roleplay-design",
     AGENT_BUILDER_CHARACTER_SUGGESTIONS: "/v1/learn/agent-builder/character-suggestions",
     AGENT_BUILDER_REVISE_PLAN: "/v1/learn/agent-builder/revise-plan",
+    AGENT_BUILDER_TRANSLATE: "/v1/learn/agent-builder/translate",
     ROLEPLAY_INTERVIEW_SESSIONS: "/v1/learn/roleplay-interview/sessions",
     ROLEPLAY_INTERVIEW_SESSION: (id: string) => `/v1/learn/roleplay-interview/sessions/${id}`,
     ROLEPLAY_INTERVIEW_STREAM: (id: string) =>

@@ -206,6 +206,18 @@ const agentBuilderAPI = baseAPI.injectEndpoints({
       }),
     }),
 
+    /** A generated field's text in the roleplay's other languages, keyed by languageId. */
+    translateForAgentBuilder: builder.mutation<
+      { translations: Record<string, string> },
+      { text: string; targets: { languageId: string; languageCode: string }[] }
+    >({
+      query: body => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.AGENT_BUILDER_TRANSLATE,
+        method: HttpMethod.POST,
+        body,
+      }),
+    }),
+
     /** Which fields a trainer's change request touches, and what to change in each. */
     revisePlan: builder.mutation<
       { fields: { id: string; change: string }[]; reply: string },
@@ -234,4 +246,5 @@ export const {
   useLazyGetRoleplayDesignQuery,
   useSuggestAgentBuilderCharactersMutation,
   useRevisePlanMutation,
+  useTranslateForAgentBuilderMutation,
 } = agentBuilderAPI;

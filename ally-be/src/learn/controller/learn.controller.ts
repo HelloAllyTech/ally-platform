@@ -1,3 +1,4 @@
+import { AgentBuilderTranslateDto } from '../dto/agent-builder-translate.dto';
 import {
   ROLEPLAY_DESIGN_MODES,
   RoleplayDesignMode,
@@ -483,6 +484,16 @@ export class LearnController {
       'Agent Builder Copilot: what a roleplay mode sets (supports, experience mode, the ' +
       'state-aware main prompt), from the Course Design Manual',
   })
+  @ApiOperation({
+    summary:
+      'Agent Builder Copilot: translate a generated field into the roleplay’s other languages',
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO])
+  @Post('agent-builder/translate')
+  async translateForAgentBuilder(@Body() dto: AgentBuilderTranslateDto) {
+    return this.scenarioService.translateForAgentBuilder(dto.text, dto.targets);
+  }
+
   @AuthPermissions([PERMISSIONS.EDIT_SCENARIO])
   @Get('agent-builder/roleplay-design')
   async getAgentBuilderRoleplayDesign(@Query('mode') mode: string) {

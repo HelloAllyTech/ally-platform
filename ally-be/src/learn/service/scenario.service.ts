@@ -4168,6 +4168,32 @@ export class ScenarioService {
   }
 
   /**
+   * Agent Builder wizard: a generated field's text in the roleplay's other languages (the
+   * challenge description's language tabs), with the same translation the Improve button uses.
+   * A language whose translation fails keeps the source text (translateText's behaviour).
+   */
+  async translateForAgentBuilder(
+    text: string,
+    targets: { languageId: string; languageCode: string }[],
+  ): Promise<{ translations: Record<string, string> }> {
+    const source = String(text ?? '').trim();
+    if (!source || !targets?.length) return { translations: {} };
+    const entries = await Promise.all(
+      targets.map(
+        async (target) =>
+          [
+            String(target.languageId),
+            await this.openaiTranslationsService.translateText(
+              source,
+              target.languageCode,
+            ),
+          ] as const,
+      ),
+    );
+    return { translations: Object.fromEntries(entries) };
+  }
+
+  /**
    * What a roleplay mode sets in Studio (Agent Builder wizard): the supports, the experience
    * mode and the state-aware main prompt to run on — the first of STATE_AWARE_MAIN_PROMPTS that
    * exists and still reads `{state_x_guidelines}`. No such prompt: no states, `states: false`.
