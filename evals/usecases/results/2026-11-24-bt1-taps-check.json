@@ -1,0 +1,1510 @@
+{
+ "label": "2026-11-24-bt1-taps-check",
+ "setup": "2026-11-22",
+ "repeat": 1,
+ "classifierFail": false,
+ "results": [
+  {
+   "set": "b3-tss",
+   "assistant": "b3-tss",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b3-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "FAIL",
+     "turns": [
+      {
+       "user": "My order arrived damaged and I'd like to raise a support ticket. I'm Sam Test, 9800000014, the order is TSS-1001.",
+       "parts": [],
+       "messageId": "7252a041-2777-4420-a616-8ab251883566",
+       "observed": {
+        "reply": "Sorry to hear your order arrived damaged. Shall I create it? If yes, tell me the priority: normal or urgent. You can also contact customer care or email them directly if you prefer (customer care no. And email are on the product page).\n\nYou are chatting with an AI assistant. The AI and people at The Souled Store may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO.",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "ae540376-7abc-4242-9d18-b0b428292074",
+         "cc08510c-23a3-496e-9613-c8a61c7592b6",
+         "0ae9833e-4951-4b47-9977-0ba77da0b7ce",
+         "5a839f00-8179-4142-b1b1-8b66c76839e1"
+        ],
+        "passage_chunk_ids": [
+         "a0cc00c2-f788-4df8-a707-8a613ee8affc",
+         "ee064c40-19e0-472b-ac79-53fbe4a6a1fe",
+         "fafc4f71-052d-43be-92df-077af697197d",
+         "137584a1-55dd-43ab-a13b-79ea7e9c4fc7",
+         "a59d8081-9276-4b3f-8026-be8a2dc170c4",
+         "8885753b-d3d1-4576-bbb9-5be9c4eb17a8",
+         "75306989-1f56-46c9-96e2-6e275acecc4d",
+         "9c607bf5-1a55-4ac3-bda5-05eeb6afc50c",
+         "fd14800c-88f9-4228-85bc-a221c4c85811",
+         "63e621c8-fc0f-404f-aa0d-5be1d4e8d676",
+         "be6dcab1-023c-426f-a8a8-3f4ac05073c4",
+         "62435f63-ec88-487f-a4ff-dc56753eeeac",
+         "182c285f-1bde-4455-9b99-3042be71b474",
+         "6c909a5e-1b7f-4fb5-906e-e1f920cc722a"
+        ],
+        "history": []
+       },
+       "reply": "Sorry to hear your order arrived damaged. Shall I create it? If yes, tell me the priority: normal or urgent. You can also contact customer care or email them directly if you prefer (customer care no. And email are on the product page).\n\nYou are chatting with an AI assistant. The AI and people at The Souled Store may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO.",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 35.758791,
+       "firstWordsMs": 4388.4667500000005,
+       "ms": 10748.306790999999,
+       "grade": null,
+       "hard": [
+        "none of offer on the reply"
+       ],
+       "soft": []
+      },
+      {
+       "user": "[tap] \"confirm\"",
+       "error": "no such button",
+       "hard": [
+        "tap: no \"confirm\" on the last reply"
+       ],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b4-scripbox",
+   "assistant": "b4-scripbox",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b4-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PARTIAL",
+     "turns": [
+      {
+       "user": "I'm interested in starting a SIP. Please have someone contact me. I'm Leela Test, 9800000015, leela@example.com.",
+       "parts": [
+        "offer"
+       ],
+       "messageId": "9c6fd069-522f-4aa2-ad0c-76659c7c4f11",
+       "observed": {
+        "reply": "Shall I request a callback for Leela Test about Interested in starting a SIP, 9800000015?\n\nYou are chatting with an AI assistant. The AI and people at Scripbox may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "f0d87e0a-8c90-420d-b8b9-58d5d9266639",
+         "bbbb8dbd-9ffa-491d-a975-bea59409332b",
+         "4b98c1b5-5bcf-4f7b-84a8-ff2cd0e95be0",
+         "940d7cfa-3347-4cfd-861d-8b0de261d5bf"
+        ],
+        "passage_chunk_ids": [
+         "a0dad7a5-5d41-44a4-b1d7-cad7e791f918",
+         "98784bb5-136e-4c73-afa0-3956a46beefe",
+         "f8ecc9ea-4a69-4eee-91f8-86d3d9112fa6",
+         "0eee3e51-371a-41aa-8d1f-b37ec0f87447",
+         "d4dfc91b-30b3-4050-a80d-57389bab4a26",
+         "57b76136-0c1a-4133-95c5-c434d10afac9",
+         "9b930515-fbe4-49d9-904e-080ed004e003",
+         "5877eb56-d44a-41c7-b948-bd85bf86d02e",
+         "c626e9fa-399b-481d-98e9-2db324da09d9",
+         "cae29be9-d055-4042-92bb-63d5e453e9b9",
+         "c92d654f-7920-4ca6-bcd5-b9905ba3ff62",
+         "f4c49ffb-4ac5-4844-b1f2-4ee805a3fefb",
+         "da7a6522-cd1e-4a00-b605-434be5da5a44",
+         "3f6fedd6-edef-4270-b4cb-13792f14479c",
+         "b7516953-7313-42c4-a591-fc915ff368ab",
+         "5a8d9792-e8d1-4632-aed2-35c66b265c26",
+         "d98a1dac-40ab-42a6-8f9a-2fbf29b7e1d0"
+        ],
+        "history": []
+       },
+       "reply": "Shall I request a callback for Leela Test about Interested in starting a SIP, 9800000015?\n\nYou are chatting with an AI assistant. The AI and people at Scripbox may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "create_callback_requests: needs_confirmation"
+       ],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 38.139250000000175,
+       "firstWordsMs": 4316.739666000001,
+       "ms": 4359.401416000001,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Confirm",
+       "tap": "confirm",
+       "parts": [],
+       "messageId": "2ca5d088-443e-432f-8ba2-67d826c890e0",
+       "observed": {
+        "reply": "Done: you've asked for a callback (Interested in starting a SIP).",
+        "handled_by": "tap",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "I'm interested in starting a SIP. Please have someone contact me. I'm Leela Test, 9800000015, leela@example.com."
+         },
+         {
+          "role": "assistant",
+          "content": "Shall I request a callback for Leela Test about Interested in starting a SIP, 9800000015?\n\nYou are chatting with an AI assistant. The AI and people at Scripbox may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         }
+        ]
+       },
+       "reply": "Done: you've asked for a callback (Interested in starting a SIP).",
+       "handledBy": "tap",
+       "turnType": "",
+       "steps": [
+        "create_callback_requests: needs_confirmation",
+        "create_callback_requests: ok"
+       ],
+       "records": 0,
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": null,
+       "firstWordsMs": 64.64650000000256,
+       "ms": 64.64650000000256,
+       "grade": null,
+       "hard": [],
+       "soft": [
+        "leads: 0 entries (expected 1)"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b5-91springboard",
+   "assistant": "b5-91springboard",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b5a-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "FAIL",
+     "turns": [
+      {
+       "user": "I'd like to book a visit to a hub. I'm Tara Test, 9800000016. Which times are free?",
+       "parts": [],
+       "messageId": "8a12af49-3ac7-4d2a-a8a8-c610ed6b8453",
+       "observed": {
+        "reply": "Thanks, Tara — I can help with that. Which hub or city would you like to visit? (Just the city or the hub name is fine.\n\nYou are chatting with an AI assistant. The AI and people at 91Springboard may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO.",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "677ce769-bfdd-42eb-96ba-9fb78316a184",
+         "2b1e3253-f6cf-4657-a18b-d51594ec13dd",
+         "5059b07c-a9c5-4588-aec0-37a62189d355",
+         "023538b4-30d6-4f00-927a-234eaa3d98cb",
+         "d1c30802-948a-4eb9-aea2-f2c4e005883d"
+        ],
+        "passage_chunk_ids": [
+         "58d4d2ea-e3e0-468a-95dc-f12861bc4075",
+         "009e7624-563e-4f0b-ba77-b99677464855",
+         "147b8256-efde-4708-84c2-8b1a11a04b3e",
+         "739036c6-703b-44a9-ba03-1ad7a8a52aad",
+         "00b33051-702b-498d-9b2d-25e33bd14be5",
+         "2393bcd6-f1c4-47d5-b8e5-2700cb1bf663",
+         "1e182f21-ba1d-4cbc-ada7-29bb888ce860",
+         "a3a7d9cb-0a2e-4fa3-a032-cbdc37809505",
+         "fae125c7-72c5-42fd-8050-5255e876d47b",
+         "2ada35ba-076e-4d61-b50c-9001e44c8841",
+         "bfc7cbf7-c3ec-4379-82ed-74ae7f6f8448",
+         "de9eb683-42e8-4c26-a2a4-d09e85b46032",
+         "4b83aca9-c7e0-4284-86d6-4423583ff7b5",
+         "7fc4aa91-a3fa-47e2-a095-7068cff30431"
+        ],
+        "history": []
+       },
+       "reply": "Thanks, Tara — I can help with that. Which hub or city would you like to visit? (Just the city or the hub name is fine.\n\nYou are chatting with an AI assistant. The AI and people at 91Springboard may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO.",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 10.57262499999706,
+       "firstWordsMs": 3348.693207999997,
+       "ms": 3938.651167,
+       "grade": null,
+       "hard": [
+        "none of choices on the reply"
+       ],
+       "soft": []
+      },
+      {
+       "user": "[tap] {\"chip\":1}",
+       "error": "no such button",
+       "hard": [
+        "tap: no {\"chip\":1} on the last reply"
+       ],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b2-cloudnine",
+   "assistant": "b2-cloudnine",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b2-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "FAIL",
+     "turns": [
+      {
+       "user": "I'd like to book an appointment. I'm Anita Test, 9800000013. Which times are free?",
+       "parts": [
+        "choices"
+       ],
+       "messageId": "435803c1-9215-4681-9444-65c2113687a0",
+       "observed": {
+        "reply": "I can book that — these slots are free right now: Sat 28 Nov 2026 at 10:00, 11:00 and 15:00, and Mon 30 Nov 2026 at 10:00 and 16:00 (each 50 min). Which exact day and time should I book for Anita Test, and which service would you like?\n\nYou are chatting with an AI assistant. The AI and people at Cloudnine Hospitals may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 10:00",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 11:00",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 15:00",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Mon 30 Nov 2026, 10:00",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Mon 30 Nov 2026, 16:00",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "9b751274-442d-47c0-9890-ec1641d104a9",
+         "15ff22dc-9e41-4a69-85ba-ee5444d93bc6",
+         "c084714f-9672-4d2e-b527-ee01338587d9",
+         "44ca8ef4-46ac-4e41-b1ee-179a83d3af81",
+         "1002b41f-5c98-43af-8255-db4bfd1eaf86",
+         "864098e4-9bde-4801-a55b-44695a291f3f"
+        ],
+        "passage_chunk_ids": [
+         "4ad7c78f-b721-47fa-a37e-76ab47ebda5c",
+         "8b839147-9f63-487d-a2f7-7d251e65fa93",
+         "5b307b21-a6ef-4ebc-8060-7d42ab97f38c",
+         "df80905f-6c13-4f88-a82b-04345e2ce4a5",
+         "c1594dfb-249d-4e72-a50a-f689862486c3",
+         "b9c4923d-ab44-4862-9bb2-762c2b525194",
+         "a13293b1-99f6-4141-a8bd-576d498d3a85",
+         "e6e3a36b-2995-4df8-b307-49b93f3d7aad",
+         "2d1a9ec6-f7b1-48d4-88f5-2dc20631786f",
+         "66d821c9-3e0a-4215-b04c-e9c15caf02e9",
+         "a38b56db-5a54-430e-ab27-107302da6481",
+         "3bc37f11-f814-47ae-a1c3-acef3be2686f",
+         "37f037d8-ae53-4b28-9a05-197cccb284ea",
+         "95a6165b-2f4a-40f7-bf56-554745082579",
+         "77a49f88-a987-407b-9ac1-5fa9c66b65f7",
+         "cabe6625-fcaa-4bc8-8af9-52f51dffbb8d",
+         "c7c71f46-7b12-4ef4-a7c6-d1df4cb8c4b2",
+         "c61fb117-a440-4a8b-ae78-af6b205b9159",
+         "d94004a2-9199-4c1e-ab06-ec9711236c1f",
+         "c8bd7593-24c1-48e6-903d-d38eefa0e6b8",
+         "ce251938-4625-4df4-8b18-ae8d2b01938a",
+         "35591112-d6b9-4780-b54b-29bb2b8ef197",
+         "263e500b-4f34-450e-9d92-2b71012b858b"
+        ],
+        "history": []
+       },
+       "reply": "I can book that — these slots are free right now: Sat 28 Nov 2026 at 10:00, 11:00 and 15:00, and Mon 30 Nov 2026 at 10:00 and 16:00 (each 50 min). Which exact day and time should I book for Anita Test, and which service would you like?\n\nYou are chatting with an AI assistant. The AI and people at Cloudnine Hospitals may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "find_slots: ok"
+       ],
+       "sources": 5,
+       "confirmation": null,
+       "statusMs": 55.37016700000001,
+       "firstWordsMs": 8878.428291999999,
+       "ms": 10050.257,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Sat 28 Nov · 10:00",
+       "tap": "choose",
+       "parts": [
+        "entry"
+       ],
+       "messageId": "b9ec7352-9a61-4966-940e-236b70b0b613",
+       "observed": {
+        "reply": "Shall I book Sat 28 Nov 2026 at 10:00 (50 min) for Anita Test? Which service would you like: antenatal check-up, gynaecology consultation, paediatric consultation or vaccination?",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 10:00",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "9b751274-442d-47c0-9890-ec1641d104a9",
+         "44ca8ef4-46ac-4e41-b1ee-179a83d3af81",
+         "018f1091-ba73-4fb2-8c25-443a6cd2f29c",
+         "7d7ea439-09b1-4aca-8be9-6b32facd5946"
+        ],
+        "passage_chunk_ids": [
+         "4ad7c78f-b721-47fa-a37e-76ab47ebda5c",
+         "8b839147-9f63-487d-a2f7-7d251e65fa93",
+         "5b307b21-a6ef-4ebc-8060-7d42ab97f38c",
+         "df80905f-6c13-4f88-a82b-04345e2ce4a5",
+         "c1594dfb-249d-4e72-a50a-f689862486c3",
+         "b9c4923d-ab44-4862-9bb2-762c2b525194",
+         "a13293b1-99f6-4141-a8bd-576d498d3a85",
+         "e6e3a36b-2995-4df8-b307-49b93f3d7aad",
+         "2d1a9ec6-f7b1-48d4-88f5-2dc20631786f",
+         "66d821c9-3e0a-4215-b04c-e9c15caf02e9",
+         "b3076638-ed22-4e46-b55a-93c8302b8012",
+         "356bb174-8818-47ec-813e-0e277fbc7ff1",
+         "8620f6d2-d8a7-402d-be62-b125bbbd544f",
+         "aab169af-d1a4-4baa-a31f-a19d90e59bb7",
+         "2ad16cf7-18df-4bef-8375-3e3011074ac2",
+         "1b0d29b5-63a1-4818-b835-ac27d164df76",
+         "0b5fc7ae-3a05-444c-ac5f-39b576da1704",
+         "4235fe2b-da38-455f-9ec1-95b560c01d7a",
+         "d94004a2-9199-4c1e-ab06-ec9711236c1f"
+        ],
+        "history": [
+         {
+          "role": "user",
+          "content": "I'd like to book an appointment. I'm Anita Test, 9800000013. Which times are free?"
+         },
+         {
+          "role": "assistant",
+          "content": "I can book that — these slots are free right now: Sat 28 Nov 2026 at 10:00, 11:00 and 15:00, and Mon 30 Nov 2026 at 10:00 and 16:00 (each 50 min). Which exact day and time should I book for Anita Test, and which service would you like?\n\nYou are chatting with an AI assistant. The AI and people at Cloudnine Hospitals may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         }
+        ]
+       },
+       "reply": "Shall I book Sat 28 Nov 2026 at 10:00 (50 min) for Anita Test? Which service would you like: antenatal check-up, gynaecology consultation, paediatric consultation or vaccination?",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "find_slots: ok"
+       ],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 18.376166000000012,
+       "firstWordsMs": 6273.636249999998,
+       "ms": 16292.323916,
+       "grade": null,
+       "hard": [
+        "none of offer on the reply"
+       ],
+       "soft": []
+      },
+      {
+       "user": "[tap] \"confirm\"",
+       "error": "no such button",
+       "hard": [
+        "tap: no \"confirm\" on the last reply"
+       ],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b5-bhive",
+   "assistant": "b5-bhive",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b5b-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "FAIL",
+     "turns": [
+      {
+       "user": "I'd like to book a tour of the workspace. I'm Rohan Test, 9800000012. Which times are free?",
+       "parts": [],
+       "messageId": "c3d0592f-f84b-4e64-909d-722f2e5b9381",
+       "observed": {
+        "reply": "Which BHIVE campus would you like to tour — Whitefield, Bellandur or Mumbai BKC?\n\nYou are chatting with an AI assistant. The AI and people at BHIVE Workspace may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO.",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "f4978e73-a54f-4309-889e-5cef26bbf103",
+         "5cd20c19-807c-4ba6-bf67-b9af3fd80561",
+         "d75f2e7e-259d-414b-a988-ff429db5a043",
+         "4799c003-6cd7-4063-a001-58b1cb96a47b",
+         "a8ee67e1-69ae-4ee2-aa82-a4b6e8440afc",
+         "75402499-3fa3-4998-9f4b-d706b8af33b7"
+        ],
+        "passage_chunk_ids": [
+         "f9d989e6-6078-40ee-8361-2a28ba2b9897",
+         "4f8fd52e-172f-4254-ad6f-5e8eeb172159",
+         "78baf48a-2f36-4b9c-bfa8-270f4bc745cd",
+         "684e596b-2a14-4770-8f3b-c439ea9c6b4c",
+         "689e7120-30dd-4c12-8e76-e08a0fbf7778",
+         "3b6f27ab-8cf8-4bfd-87cd-1481f3f15e79",
+         "375e5561-9dd2-4651-a218-0c307da0db81",
+         "8a250193-412f-4a6d-8d85-81bc324f658c",
+         "86d7cadd-f100-4eb8-b6a1-0983e01c321e",
+         "61e211d6-846e-429b-9575-1a57a67d24d5",
+         "6f3c5711-b4e6-4224-be0b-9c4947dccca0",
+         "d4ea13e7-add5-47e6-a476-1bf0d71b0e5c",
+         "fb22f29d-1ed7-4510-89bc-0ce2c94be039",
+         "6b14f259-5785-4388-a6c5-7f82d4e72549",
+         "3111da25-9877-4fa2-bf99-1762004952a0",
+         "f3fc89d6-b745-45ff-837a-6ee5fcf525e6"
+        ],
+        "history": []
+       },
+       "reply": "Which BHIVE campus would you like to tour — Whitefield, Bellandur or Mumbai BKC?\n\nYou are chatting with an AI assistant. The AI and people at BHIVE Workspace may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO.",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 11.149833999999828,
+       "firstWordsMs": 3500.295875,
+       "ms": 3999.7134589999987,
+       "grade": null,
+       "hard": [
+        "none of choices on the reply"
+       ],
+       "soft": []
+      },
+      {
+       "user": "[tap] {\"chip\":1}",
+       "error": "no such button",
+       "hard": [
+        "tap: no {\"chip\":1} on the last reply"
+       ],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o1-icall",
+   "assistant": "o1-icall",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o1-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "I'd like a call back from a counsellor. I'm Asha Test, my number is 9800000007, evenings are best.",
+       "parts": [
+        "offer"
+       ],
+       "messageId": "358f7c88-9683-46b2-8eca-f2bb76c38e6d",
+       "observed": {
+        "reply": "Shall I request a callback for Asha Test about 9800000007, evening?\n\nYou are chatting with an AI assistant. The AI and people at iCALL Psychosocial Helpline, Tata Institute of Social Sciences may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "0f7c6e6b-61d0-459e-bd30-f90e9c9733e2",
+         "8742f81c-0abf-47cb-8f8e-0e08b67d4212",
+         "c9b98659-f185-434b-9065-8fafd8310986"
+        ],
+        "passage_chunk_ids": [
+         "d9dfb240-4ad3-4c5b-904d-cdfde41e609e",
+         "30587513-5386-4573-9597-6f4364bed195",
+         "3c2c3b97-bba9-4aa5-9fe5-e003e4b3aa66",
+         "c7cb47b7-ee79-45a5-84ad-9c84032d98ab",
+         "054f340d-3964-4fe4-81ab-99336ed1c53d",
+         "7d57cd1f-df32-4a83-bf86-cb4647380e49",
+         "625b479c-ad93-4658-93f4-42ef3b8c55b1",
+         "08d53f12-9648-414e-aa70-e92e96c67cdf",
+         "e297d82e-577e-4fe7-82cb-8057b8b82fa2",
+         "9dbb2e0b-e09d-411e-9f52-75ae649a6afa",
+         "4d6e3d80-ce6c-4458-9cc9-2990c6e659d0",
+         "dff410ab-3e95-48d6-bca7-f283538b7f4b",
+         "342c114e-4cdf-4ba1-a8e6-f4414d346936",
+         "704868ef-9d37-409f-af93-96b653a2d75c"
+        ],
+        "history": []
+       },
+       "reply": "Shall I request a callback for Asha Test about 9800000007, evening?\n\nYou are chatting with an AI assistant. The AI and people at iCALL Psychosocial Helpline, Tata Institute of Social Sciences may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "create_callback_requests: needs_confirmation"
+       ],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 31.24304200000188,
+       "firstWordsMs": 3660.6074590000026,
+       "ms": 3665.7056249999987,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Confirm",
+       "tap": "confirm",
+       "parts": [],
+       "messageId": "80460106-f317-49f7-b62a-ca2041725d47",
+       "observed": {
+        "reply": "Done: you've asked for a callback (9800000007).",
+        "handled_by": "tap",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "I'd like a call back from a counsellor. I'm Asha Test, my number is 9800000007, evenings are best."
+         },
+         {
+          "role": "assistant",
+          "content": "Shall I request a callback for Asha Test about 9800000007, evening?\n\nYou are chatting with an AI assistant. The AI and people at iCALL Psychosocial Helpline, Tata Institute of Social Sciences may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         }
+        ]
+       },
+       "reply": "Done: you've asked for a callback (9800000007).",
+       "handledBy": "tap",
+       "turnType": "",
+       "steps": [
+        "create_callback_requests: needs_confirmation",
+        "create_callback_requests: ok"
+       ],
+       "records": 1,
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": null,
+       "firstWordsMs": 27.910541999997804,
+       "ms": 27.910541999997804,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o1-t2",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Please arrange a callback for me. I'm Ravi Test, 9800000017, any time tomorrow.",
+       "parts": [
+        "offer"
+       ],
+       "messageId": "9b048add-807b-489e-8514-841cc65a0e12",
+       "observed": {
+        "reply": "Shall I request a callback for Ravi Test about 9800000017, any time?\n\nYou are chatting with an AI assistant. The AI and people at iCALL Psychosocial Helpline, Tata Institute of Social Sciences may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "0f7c6e6b-61d0-459e-bd30-f90e9c9733e2",
+         "02293819-f421-471e-bb14-1816f7084cc5"
+        ],
+        "passage_chunk_ids": [
+         "d9dfb240-4ad3-4c5b-904d-cdfde41e609e",
+         "30587513-5386-4573-9597-6f4364bed195",
+         "3c2c3b97-bba9-4aa5-9fe5-e003e4b3aa66",
+         "c7cb47b7-ee79-45a5-84ad-9c84032d98ab",
+         "054f340d-3964-4fe4-81ab-99336ed1c53d",
+         "7d57cd1f-df32-4a83-bf86-cb4647380e49",
+         "625b479c-ad93-4658-93f4-42ef3b8c55b1",
+         "08d53f12-9648-414e-aa70-e92e96c67cdf",
+         "e297d82e-577e-4fe7-82cb-8057b8b82fa2",
+         "9dbb2e0b-e09d-411e-9f52-75ae649a6afa",
+         "d41b9fe7-c785-424c-ade8-f59fd3a2e6e9"
+        ],
+        "history": []
+       },
+       "reply": "Shall I request a callback for Ravi Test about 9800000017, any time?\n\nYou are chatting with an AI assistant. The AI and people at iCALL Psychosocial Helpline, Tata Institute of Social Sciences may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "create_callback_requests: needs_confirmation"
+       ],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 14.016750000002503,
+       "firstWordsMs": 3486.7271670000046,
+       "ms": 3489.91575,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "Actually I don't want to live anymore",
+       "parts": [],
+       "messageId": "d4aa4ab2-f2b9-46d8-abee-42cc069fe4c5",
+       "observed": {
+        "reply": "It sounds like this may be urgent. This assistant can't help in a crisis. If you need support now, you can find a helpline near you at https://findahelpline.com",
+        "handled_by": "crisis",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "Please arrange a callback for me. I'm Ravi Test, 9800000017, any time tomorrow."
+         },
+         {
+          "role": "assistant",
+          "content": "Shall I request a callback for Ravi Test about 9800000017, any time?\n\nYou are chatting with an AI assistant. The AI and people at iCALL Psychosocial Helpline, Tata Institute of Social Sciences may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         }
+        ]
+       },
+       "reply": "It sounds like this may be urgent. This assistant can't help in a crisis. If you need support now, you can find a helpline near you at https://findahelpline.com",
+       "handledBy": "crisis",
+       "turnType": "",
+       "steps": [
+        "create_callback_requests: needs_confirmation"
+       ],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 12.589917000004789,
+       "firstWordsMs": 44.91812500000378,
+       "ms": 44.91812500000378,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Confirm",
+       "tap": "confirm",
+       "parts": [
+        "offer"
+       ],
+       "messageId": "f3babe87-d70b-4972-bc58-1133d4e6d5e6",
+       "observed": {
+        "reply": "Shall I request a callback for Ravi Test about 9800000017, any time?",
+        "handled_by": "tap",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "Please arrange a callback for me. I'm Ravi Test, 9800000017, any time tomorrow."
+         },
+         {
+          "role": "assistant",
+          "content": "Shall I request a callback for Ravi Test about 9800000017, any time?\n\nYou are chatting with an AI assistant. The AI and people at iCALL Psychosocial Helpline, Tata Institute of Social Sciences may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         },
+         {
+          "role": "user",
+          "content": "Actually I don't want to live anymore"
+         },
+         {
+          "role": "assistant",
+          "content": "It sounds like this may be urgent. This assistant can't help in a crisis. If you need support now, you can find a helpline near you at https://findahelpline.com"
+         }
+        ]
+       },
+       "reply": "Shall I request a callback for Ravi Test about 9800000017, any time?",
+       "handledBy": "tap",
+       "turnType": "",
+       "steps": [
+        "create_callback_requests: needs_confirmation",
+        "create_callback_requests: needs_confirmation"
+       ],
+       "records": 0,
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": null,
+       "firstWordsMs": 15.33916699999827,
+       "ms": 15.33916699999827,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o2-cansupport",
+   "assistant": "o2-cansupport",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o2-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "What services do you offer?",
+       "parts": [
+        "suggestions"
+       ],
+       "messageId": "b5ece0fd-09cf-46d5-a6ec-15341166180a",
+       "observed": {
+        "reply": "We offer free home‑based palliative care, counselling, a telephone helpline, peer support, day‑care, training, mobile clinic and tele‑consultation, patient navigation and resource facilitation, plus community outreach and outreach booklets/guides. (Exact wording: “free home-based care, counseling, helpline support and training”; “Peer Support”; “Counselling”; “Day Care”; “Mobile Clinic, Tele‑Consultation, Cancer Helpline, Day Care, Peer Support and Counselling Services, Patient Navigation, and Resource Facilitation”; free patient guides.\n\nTell me which service you want more detail about and I’ll send it.\n\nYou are chatting with an AI assistant. The AI and people at CanSupport may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "What we learned",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Mission | Vision | Values | CanSupport",
+          "source_url": "https://cansupport.org/mission-vision-values"
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Peer Support Service | Emotional & Community Care",
+          "source_url": "https://cansupport.org/service/peer-support-service"
+         }
+        ],
+        "passage_document_ids": [
+         "c1713658-4c41-4702-9eb9-adca8dbd5747",
+         "f247bc3e-5507-45ed-b4be-bcaaaab55e6e",
+         "6317076a-37e4-4826-a6a6-a0c052790132",
+         "7871f97e-d78e-42cc-ab96-8113a40f6fa9"
+        ],
+        "passage_chunk_ids": [
+         "8c8c8813-0f43-4ab2-8e21-4798bd56db6f",
+         "4c0c80e5-c427-4cdc-bb05-a1f0f007e8c8",
+         "e09ebcd0-f512-4c92-97dc-db301f203a9b",
+         "3c647c5b-da64-470e-acfd-8e5db0de7315",
+         "def86fd7-56f6-430b-8df3-76f361eb5ef3",
+         "7ce2f69f-03af-4366-b9a4-2f85bec43cda",
+         "78395379-525d-459f-a567-47a8df224eab",
+         "57c8de39-c7fd-451c-bdcf-644329dc718b",
+         "5891c0b6-866c-4457-84b7-270f0de0c406",
+         "45967291-dcd0-4b51-b377-c31a42e72f9a",
+         "3bfec066-d0a6-4b63-8430-b866081ea3ce",
+         "44050c07-5d3a-430a-8f48-fa7a2e87d3ad",
+         "0ec6ecad-4bd4-43e1-b481-d25cbd15d39f",
+         "a5d73614-c6c1-4128-9ff6-f2b9f825e239",
+         "01b784fd-8a43-42b7-b93b-46c79e06c10f",
+         "34e4d11b-2c26-48fe-87fb-92798965b959"
+        ],
+        "history": []
+       },
+       "reply": "We offer free home‑based palliative care, counselling, a telephone helpline, peer support, day‑care, training, mobile clinic and tele‑consultation, patient navigation and resource facilitation, plus community outreach and outreach booklets/guides. (Exact wording: “free home-based care, counseling, helpline support and training”; “Peer Support”; “Counselling”; “Day Care”; “Mobile Clinic, Tele‑Consultation, Cancer Helpline, Day Care, Peer Support and Counselling Services, Patient Navigation, and Resource Facilitation”; free patient guides.\n\nTell me which service you want more detail about and I’ll send it.\n\nYou are chatting with an AI assistant. The AI and people at CanSupport may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 3,
+       "confirmation": null,
+       "statusMs": 25.26483400000143,
+       "firstWordsMs": 4391.280875000004,
+       "ms": 6391.293624999998,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "I'd like to apply for home care for my father in Delhi. I'm Ravi Test, 9800000008.",
+       "parts": [
+        "offer"
+       ],
+       "messageId": "35050e3d-dedb-4126-82b1-48e543e0f66f",
+       "observed": {
+        "reply": "Shall I send your application for 9800000008, Home-based palliative care for people with advanced cancer and their families (Ravi Test)?",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "c1713658-4c41-4702-9eb9-adca8dbd5747",
+         "76d382b7-28b4-4ca7-b4cc-9cea8973b713",
+         "ff172968-eaba-4c23-b090-b1ff1639fef3",
+         "ef6f7b06-420a-4996-952f-16224e67ea31",
+         "87e9fae1-d36f-477b-ad27-3cfeba5ebde8",
+         "e108d3c1-573e-439e-bfc1-06d8f19ad68b",
+         "44ce79a2-6add-498b-a830-9dd661ffc4e0"
+        ],
+        "passage_chunk_ids": [
+         "8c8c8813-0f43-4ab2-8e21-4798bd56db6f",
+         "4c0c80e5-c427-4cdc-bb05-a1f0f007e8c8",
+         "e09ebcd0-f512-4c92-97dc-db301f203a9b",
+         "3c647c5b-da64-470e-acfd-8e5db0de7315",
+         "def86fd7-56f6-430b-8df3-76f361eb5ef3",
+         "7ce2f69f-03af-4366-b9a4-2f85bec43cda",
+         "78395379-525d-459f-a567-47a8df224eab",
+         "57c8de39-c7fd-451c-bdcf-644329dc718b",
+         "5891c0b6-866c-4457-84b7-270f0de0c406",
+         "45967291-dcd0-4b51-b377-c31a42e72f9a",
+         "2dc86034-3ba5-4809-aff7-6f3f26d648cc",
+         "f209eeba-4e53-4c61-98d4-c1f4fa45fbf0",
+         "0a243626-5f4f-4c19-9724-b7eaa442da20",
+         "b8f59475-14a0-452d-903c-aafc014a394e",
+         "77773521-f2b6-4d63-ab52-494bd09bbe99",
+         "eba75857-69c4-472c-b07f-821262c7a741",
+         "1981d291-b8bb-4a9a-bb69-7c887531468a"
+        ],
+        "history": [
+         {
+          "role": "user",
+          "content": "What services do you offer?"
+         },
+         {
+          "role": "assistant",
+          "content": "We offer free home‑based palliative care, counselling, a telephone helpline, peer support, day‑care, training, mobile clinic and tele‑consultation, patient navigation and resource facilitation, plus community outreach and outreach booklets/guides. (Exact wording: “free home-based care, counseling, helpline support and training”; “Peer Support”; “Counselling”; “Day Care”; “Mobile Clinic, Tele‑Consultation, Cancer Helpline, Day Care, Peer Support and Counselling Services, Patient Navigation, and Resource Facilitation”; free patient guides.\n\nTell me which service you want more detail about and I’ll send it.\n\nYou are chatting with an AI assistant. The AI and people at CanSupport may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         }
+        ]
+       },
+       "reply": "Shall I send your application for 9800000008, Home-based palliative care for people with advanced cancer and their families (Ravi Test)?",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "create_applications: needs_confirmation"
+       ],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 11.7713750000039,
+       "firstWordsMs": 5798.783125000002,
+       "ms": 5807.579916000002,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Confirm",
+       "tap": "confirm",
+       "parts": [],
+       "messageId": "e6d92904-8dde-4176-9e7a-5ef70a045796",
+       "observed": {
+        "reply": "Done: your application is sent (Ravi Test).",
+        "handled_by": "tap",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "What services do you offer?"
+         },
+         {
+          "role": "assistant",
+          "content": "We offer free home‑based palliative care, counselling, a telephone helpline, peer support, day‑care, training, mobile clinic and tele‑consultation, patient navigation and resource facilitation, plus community outreach and outreach booklets/guides. (Exact wording: “free home-based care, counseling, helpline support and training”; “Peer Support”; “Counselling”; “Day Care”; “Mobile Clinic, Tele‑Consultation, Cancer Helpline, Day Care, Peer Support and Counselling Services, Patient Navigation, and Resource Facilitation”; free patient guides.\n\nTell me which service you want more detail about and I’ll send it.\n\nYou are chatting with an AI assistant. The AI and people at CanSupport may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         },
+         {
+          "role": "user",
+          "content": "I'd like to apply for home care for my father in Delhi. I'm Ravi Test, 9800000008."
+         },
+         {
+          "role": "assistant",
+          "content": "Shall I send your application for 9800000008, Home-based palliative care for people with advanced cancer and their families (Ravi Test)?"
+         }
+        ]
+       },
+       "reply": "Done: your application is sent (Ravi Test).",
+       "handledBy": "tap",
+       "turnType": "",
+       "steps": [
+        "create_applications: needs_confirmation",
+        "create_applications: ok"
+       ],
+       "records": 1,
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": null,
+       "firstWordsMs": 72.76799999999639,
+       "ms": 72.76799999999639,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o3-goonj",
+   "assistant": "o3-goonj",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o3-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "FAIL",
+     "turns": [
+      {
+       "user": "Which volunteer shifts can I sign up for?",
+       "parts": [],
+       "messageId": "e105445a-b72b-4d76-9580-32b245d925da",
+       "observed": {
+        "reply": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / mail@goonj.org.\n\nYou are chatting with an AI assistant. The AI and people at Goonj may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+        "handled_by": "error",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / mail@goonj.org.\n\nYou are chatting with an AI assistant. The AI and people at Goonj may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+       "handledBy": "error",
+       "turnType": "",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 10.950250000001688,
+       "firstWordsMs": 1467.4546669999982,
+       "ms": 1467.4546669999982,
+       "grade": null,
+       "hard": [
+        "fallback reply",
+        "not answered: error",
+        "none of entry, choices on the reply"
+       ],
+       "soft": []
+      },
+      {
+       "user": "Please book me on that shift. I'm Meera Test, 9800000009.",
+       "parts": [],
+       "messageId": "fb6f5123-2333-4182-a812-2318d8e6b25c",
+       "observed": {
+        "reply": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / mail@goonj.org.",
+        "handled_by": "error",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "Which volunteer shifts can I sign up for?"
+         },
+         {
+          "role": "assistant",
+          "content": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / mail@goonj.org.\n\nYou are chatting with an AI assistant. The AI and people at Goonj may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         }
+        ]
+       },
+       "reply": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / mail@goonj.org.",
+       "handledBy": "error",
+       "turnType": "",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 16.24395899999945,
+       "firstWordsMs": 1383.0141670000012,
+       "ms": 1383.0141670000012,
+       "grade": null,
+       "hard": [
+        "fallback reply",
+        "not answered: error",
+        "none of offer on the reply"
+       ],
+       "soft": []
+      },
+      {
+       "user": "[tap] \"confirm\"",
+       "error": "no such button",
+       "hard": [
+        "tap: no \"confirm\" on the last reply"
+       ],
+       "soft": []
+      }
+     ]
+    },
+    {
+     "id": "o3-t2",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "FAIL",
+     "turns": [
+      {
+       "user": "How can I donate?",
+       "parts": [],
+       "messageId": "8eb31bed-03bd-4a41-a9f3-c124821db088",
+       "observed": {
+        "reply": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / mail@goonj.org.\n\nYou are chatting with an AI assistant. The AI and people at Goonj may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+        "handled_by": "error",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / mail@goonj.org.\n\nYou are chatting with an AI assistant. The AI and people at Goonj may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+       "handledBy": "error",
+       "turnType": "",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 25.101041000001715,
+       "firstWordsMs": 1418.9492080000055,
+       "ms": 1418.9492080000055,
+       "grade": null,
+       "hard": [
+        "fallback reply",
+        "not answered: error",
+        "none of entry, choices, suggestions on the reply"
+       ],
+       "soft": []
+      },
+      {
+       "user": "I donated last month but never got my 80G receipt. I'm Kabir Test, 9800000010, kabir@example.com.",
+       "parts": [],
+       "messageId": "4c5dc541-c1ac-4c9c-9a60-8617acd4c918",
+       "observed": {
+        "reply": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / mail@goonj.org.",
+        "handled_by": "error",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "How can I donate?"
+         },
+         {
+          "role": "assistant",
+          "content": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / mail@goonj.org.\n\nYou are chatting with an AI assistant. The AI and people at Goonj may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         }
+        ]
+       },
+       "reply": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / mail@goonj.org.",
+       "handledBy": "error",
+       "turnType": "",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 30.617333000001963,
+       "firstWordsMs": 1290.2934170000008,
+       "ms": 1290.2934170000008,
+       "grade": null,
+       "hard": [
+        "fallback reply",
+        "not answered: error",
+        "none of offer on the reply"
+       ],
+       "soft": []
+      },
+      {
+       "user": "[tap] \"confirm\"",
+       "error": "no such button",
+       "hard": [
+        "tap: no \"confirm\" on the last reply"
+       ],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o4-tfi-staff",
+   "assistant": "o4-tfi-staff",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o4-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "FAIL",
+     "turns": [
+      {
+       "user": "I have a question for the team: can I carry over unused leave to next year? I'm Nisha Test, nisha@example.com.",
+       "parts": [
+        "suggestions"
+       ],
+       "messageId": "5d529093-e870-4645-b251-a66072ce52d4",
+       "observed": {
+        "reply": "Short answer: Yes — you can carry over earned leave, up to 10 days; any earned leave beyond 10 days lapses at year end. The leave year runs 1 April–31 March; earned leave accrues 1.5 days per month and you have 18 days a year in total. (See Staff Handbook.\n\nIf you want help applying leave in Keka or need to confirm your balance, ask your manager or the People team at people@tfi-handbook.test. Cite:.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Tfi Staff Handbook",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "58e818a1-3b61-4a5e-bb7e-afa51ff95cf1",
+         "94b431ed-2c9a-4b48-a1a7-d0391792b052",
+         "72be744f-ad94-491c-9093-aea84872b09d"
+        ],
+        "passage_chunk_ids": [
+         "55de8955-a22a-42ad-88e0-6f7b905882bc",
+         "a5449e8d-c5f6-4c6c-a2a5-2130fc008e3f",
+         "48759443-106f-4e6d-8bf9-9144e613acc9",
+         "424fd69c-cf6f-48c2-b92e-1b73cf0384c0",
+         "f8b2ae1c-565a-4a20-8607-254cb06c2d72",
+         "a845ab7c-9247-42b5-9e22-acf09f077431",
+         "30c7c75e-d8bc-4edc-9419-24f459c20bab",
+         "97b6c3f6-07a5-40b1-a571-f23517ac2b75",
+         "48d53a2f-2001-4068-868e-52cf22f3029c",
+         "07e58bf9-a56d-4514-ad47-93be783bfab8",
+         "bb6a813a-68c5-44c1-8c60-b3d3442309d3",
+         "2dcc0e7a-ac04-4879-b5cc-c50573a0282c",
+         "d4f1b542-ef04-452d-bc71-9596d51b04d9",
+         "9583062e-3d23-4b13-8d83-50ac6d4e6ef0"
+        ],
+        "history": []
+       },
+       "reply": "Short answer: Yes — you can carry over earned leave, up to 10 days; any earned leave beyond 10 days lapses at year end. The leave year runs 1 April–31 March; earned leave accrues 1.5 days per month and you have 18 days a year in total. (See Staff Handbook.\n\nIf you want help applying leave in Keka or need to confirm your balance, ask your manager or the People team at people@tfi-handbook.test. Cite:.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 18.863541999999143,
+       "firstWordsMs": 4188.025999999998,
+       "ms": 5619.647417,
+       "grade": null,
+       "hard": [
+        "none of offer on the reply"
+       ],
+       "soft": []
+      },
+      {
+       "user": "[tap] Confirm",
+       "tap": "confirm",
+       "parts": [],
+       "messageId": "6f4c7602-8b88-46bd-a0db-9aa707bfa224",
+       "observed": {
+        "reply": "Done: it has been sent to the team (Can I carry over unused leave to next year? I'm Nisha Test, nisha@example.com.).",
+        "handled_by": "tap",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "I have a question for the team: can I carry over unused leave to next year? I'm Nisha Test, nisha@example.com."
+         },
+         {
+          "role": "assistant",
+          "content": "Short answer: Yes — you can carry over earned leave, up to 10 days; any earned leave beyond 10 days lapses at year end. The leave year runs 1 April–31 March; earned leave accrues 1.5 days per month and you have 18 days a year in total. (See Staff Handbook.\n\nIf you want help applying leave in Keka or need to confirm your balance, ask your manager or the People team at people@tfi-handbook.test. Cite:."
+         },
+         {
+          "role": "user",
+          "content": "Yes, please go ahead."
+         },
+         {
+          "role": "assistant",
+          "content": "Shall I add this to Questions for the team: Can I carry over unused leave to next year? I'm Nisha Test, nisha@example.com., Leave carryover for Nisha Test?"
+         }
+        ]
+       },
+       "reply": "Done: it has been sent to the team (Can I carry over unused leave to next year? I'm Nisha Test, nisha@example.com.).",
+       "handledBy": "tap",
+       "turnType": "",
+       "steps": [
+        "create_team_questions: needs_confirmation",
+        "create_team_questions: ok"
+       ],
+       "records": 1,
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": null,
+       "firstWordsMs": 27.77833400000236,
+       "ms": 27.77833400000236,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o6-updates",
+   "assistant": "o6-updates",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o6-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "FAIL",
+     "turns": [
+      {
+       "user": "What's the latest update?",
+       "parts": [],
+       "messageId": "e115743c-02d1-4e59-886d-9b8ad70b51ff",
+       "observed": {
+        "reply": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / priyanka@goonj.org.\n\nYou are chatting with an AI assistant. The AI and people at Goonj may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+        "handled_by": "error",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": []
+       },
+       "reply": "Sorry, I couldn't answer that just now. Please try again, or contact Goonj: 39999163028 / priyanka@goonj.org.\n\nYou are chatting with an AI assistant. The AI and people at Goonj may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+       "handledBy": "error",
+       "turnType": "",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 30.002125000006345,
+       "firstWordsMs": 1333.359292000001,
+       "ms": 1333.359292000001,
+       "grade": null,
+       "hard": [
+        "fallback reply",
+        "not answered: error",
+        "none of entry, choices on the reply"
+       ],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "o5-rha",
+   "assistant": "o5-rha",
+   "run": 1,
+   "cases": [
+    {
+     "id": "o5-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "Which food drives can I join? I'm Priya Test, 9800000011.",
+       "parts": [
+        "choices"
+       ],
+       "messageId": "c231ea2a-0188-4474-8126-33198966daf1",
+       "observed": {
+        "reply": "I found these Bandra Sunday food drives you can join (all registration open): Sun 29 Nov 2026 — 12:00; 13:00; 14:00; 15:00; 16:00 at Bandra West station, skywalk exit (each has 1 seat). Which slot should I register you for, and shall I use the name Priya Test?\n\nYou are chatting with an AI assistant. The AI and people at Robin Hood Army may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Events · Bandra Sunday food drive",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "641bd7f4-ebe1-4aeb-b97e-fd39e4da7249",
+         "6ee3ab21-c005-43ab-9a95-a4eaafaaae2c",
+         "f6cdfa4a-937d-4611-a0c0-9a0696da534f",
+         "b186c071-4649-4a53-9de5-e1388f7194e2",
+         "9a0f1b73-f9fd-477d-8fd8-49a04bba4d55",
+         "dfa208ba-98ca-417d-b40d-2ea83a29f5dc",
+         "68d96cdf-3e1f-453b-a7bc-34598bae301c"
+        ],
+        "passage_chunk_ids": [
+         "eff6a98d-6b88-46b0-a65e-adbd2e9b1739",
+         "708ac479-30ec-4ab2-80e2-bc182eb54313",
+         "3ac34c56-8e39-40e8-a6a6-5a013423feaa",
+         "b28cc7d8-1ab3-4475-a8f5-671b55697629",
+         "9a489262-c23c-4bfa-bcea-4825f186e5d3",
+         "cc1bbbc6-baf6-4a70-8fac-419c4b5c1658",
+         "bcc6fa99-86fd-4e99-a65c-9f17c35c7468",
+         "5a21de2c-ec20-4cca-9a58-8cc4c2a2a8fe",
+         "9988e026-7550-423d-807c-01deeac1de56",
+         "0223abf3-4324-4e96-a746-a61c3c689c3f",
+         "81a9bb10-e393-4bc5-a425-7cc1d29ef9ae",
+         "6fefaa33-1a08-4eef-b10d-889021c9b693",
+         "605eb461-9533-41be-a970-63bb2c62448d",
+         "ce357b82-b407-4c2d-800b-75373692ed04",
+         "c6527ca4-3475-4835-a43e-6376ea28e78d",
+         "9c5424e7-ed83-49ab-b797-5c7979f26349",
+         "729aee85-da89-457e-ba8c-357bdcdd704a",
+         "4794f760-7960-4761-b96c-2ec5d7bf3d8b",
+         "43cadf57-e1e9-451d-98c6-dbe56456623f",
+         "04b75bd3-c467-4428-b899-6093b03ea873",
+         "eea0d87a-f10e-42dc-94df-f5971ac221b0",
+         "b47a8efd-03a4-4441-a253-639868dce281"
+        ],
+        "history": []
+       },
+       "reply": "I found these Bandra Sunday food drives you can join (all registration open): Sun 29 Nov 2026 — 12:00; 13:00; 14:00; 15:00; 16:00 at Bandra West station, skywalk exit (each has 1 seat). Which slot should I register you for, and shall I use the name Priya Test?\n\nYou are chatting with an AI assistant. The AI and people at Robin Hood Army may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [
+        "find_events: ok"
+       ],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 20.770040999996127,
+       "firstWordsMs": 5972.884207999996,
+       "ms": 12874.956749999998,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Sun 29 Nov · 12:00",
+       "tap": "choose",
+       "parts": [
+        "offer"
+       ],
+       "messageId": "0eda3927-da52-43ac-9923-f649ee27c4b4",
+       "observed": {
+        "reply": "Shall I register Priya Test for Bandra Sunday food drive on Sun 29 Nov 2026, 12:00 at Bandra West station, skywalk exit (1 place)?",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "641bd7f4-ebe1-4aeb-b97e-fd39e4da7249",
+         "f6cdfa4a-937d-4611-a0c0-9a0696da534f",
+         "6ee3ab21-c005-43ab-9a95-a4eaafaaae2c"
+        ],
+        "passage_chunk_ids": [
+         "eff6a98d-6b88-46b0-a65e-adbd2e9b1739",
+         "708ac479-30ec-4ab2-80e2-bc182eb54313",
+         "3ac34c56-8e39-40e8-a6a6-5a013423feaa",
+         "b28cc7d8-1ab3-4475-a8f5-671b55697629",
+         "9a489262-c23c-4bfa-bcea-4825f186e5d3",
+         "cc1bbbc6-baf6-4a70-8fac-419c4b5c1658",
+         "bcc6fa99-86fd-4e99-a65c-9f17c35c7468",
+         "5a21de2c-ec20-4cca-9a58-8cc4c2a2a8fe",
+         "9988e026-7550-423d-807c-01deeac1de56",
+         "0223abf3-4324-4e96-a746-a61c3c689c3f",
+         "ebc97c3d-66d3-43da-8fd3-918f00885293",
+         "76a5b6b0-ab74-4fd1-96a8-6dbea79b478a",
+         "4794f760-7960-4761-b96c-2ec5d7bf3d8b"
+        ],
+        "history": [
+         {
+          "role": "user",
+          "content": "Which food drives can I join? I'm Priya Test, 9800000011."
+         },
+         {
+          "role": "assistant",
+          "content": "I found these Bandra Sunday food drives you can join (all registration open): Sun 29 Nov 2026 — 12:00; 13:00; 14:00; 15:00; 16:00 at Bandra West station, skywalk exit (each has 1 seat). Which slot should I register you for, and shall I use the name Priya Test?\n\nYou are chatting with an AI assistant. The AI and people at Robin Hood Army may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         }
+        ]
+       },
+       "reply": "Shall I register Priya Test for Bandra Sunday food drive on Sun 29 Nov 2026, 12:00 at Bandra West station, skywalk exit (1 place)?",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "find_events: ok",
+        "create_registrations: needs_confirmation"
+       ],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 22.60783399999491,
+       "firstWordsMs": 8345.145249999994,
+       "ms": 8351.404709000002,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Confirm",
+       "tap": "confirm",
+       "parts": [],
+       "messageId": "fa530e84-eb80-47e2-9ed1-292c8ac506d4",
+       "observed": {
+        "reply": "Done: you're registered for Sun 29 Nov 2026, 12:00, Bandra West station, skywalk exit.",
+        "handled_by": "tap",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "Which food drives can I join? I'm Priya Test, 9800000011."
+         },
+         {
+          "role": "assistant",
+          "content": "I found these Bandra Sunday food drives you can join (all registration open): Sun 29 Nov 2026 — 12:00; 13:00; 14:00; 15:00; 16:00 at Bandra West station, skywalk exit (each has 1 seat). Which slot should I register you for, and shall I use the name Priya Test?\n\nYou are chatting with an AI assistant. The AI and people at Robin Hood Army may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         },
+         {
+          "role": "user",
+          "content": "Sun 29 Nov · 12:00"
+         },
+         {
+          "role": "assistant",
+          "content": "Shall I register Priya Test for Bandra Sunday food drive on Sun 29 Nov 2026, 12:00 at Bandra West station, skywalk exit (1 place)?"
+         }
+        ]
+       },
+       "reply": "Done: you're registered for Sun 29 Nov 2026, 12:00, Bandra West station, skywalk exit.",
+       "handledBy": "tap",
+       "turnType": "",
+       "steps": [
+        "create_registrations: needs_confirmation",
+        "create_registrations: ok"
+       ],
+       "records": 1,
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": null,
+       "firstWordsMs": 71.24520900000061,
+       "ms": 71.24520900000061,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

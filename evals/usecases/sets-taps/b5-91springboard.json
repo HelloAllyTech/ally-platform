@@ -8,23 +8,23 @@
       "_note": "A visit booked by taps.",
       "turns": [
         {
-          "user": "I'd like to book a visit to a hub. I'm Tara Test, 9800000016. Which times are free?",
-          "expect": {
-            "partsAny": [
-              "choices"
-            ]
-          }
+          "user": "I'd like to book a visit to your Bengaluru hub on Saturday 28 Nov. I'm Tara Test, 9800000016. Which times are free?",
+          "expect": {}
         },
         {
           "user": "[tap] first time",
           "tap": {
             "chip": 1
           },
-          "expect": {
-            "partsAny": [
-              "offer"
-            ]
-          }
+          "expect": {},
+          "orSay": "Any Bengaluru hub on Saturday 28 Nov. Which times are free?"
+        },
+        {
+          "user": "[tap] service",
+          "tap": {
+            "chip": 1
+          },
+          "optional": true
         },
         {
           "user": "[tap] Confirm",

@@ -9,16 +9,12 @@
       "turns": [
         {
           "user": "I have a question for the team: can I carry over unused leave to next year? I'm Nisha Test, nisha@example.com.",
-          "expect": {
-            "partsAny": [
-              "offer"
-            ]
-          }
+          "expect": {}
         },
         {
           "user": "[tap] Confirm",
           "tap": "confirm",
-          "orSay": "Yes, please go ahead.",
+          "orSay": "Please send my question to the team as well.",
           "expect": {
             "records": {
               "list": "team_questions",

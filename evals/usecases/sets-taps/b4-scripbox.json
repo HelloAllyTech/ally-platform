@@ -21,7 +21,10 @@
           "orSay": "Yes, please go ahead.",
           "expect": {
             "records": {
-              "list": "leads",
+              "list": [
+                "leads",
+                "callback_requests"
+              ],
               "count": 1
             },
             "maxTaps": 3

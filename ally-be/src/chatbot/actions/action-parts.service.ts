@@ -70,6 +70,8 @@ interface ToolRunRow {
     list?: { key: string; name: string };
     passages?: { record_id?: string; record_title?: string; text?: string }[];
     preview?: boolean;
+    /** A booking missing a choice (the service): its options. */
+    choice?: { label: string; options: string[] };
   } | null;
 }
 
@@ -132,6 +134,22 @@ export class ActionPartsService {
       if (wrote && wrote === last) {
         const done = await this.donePart(input, wrote, testOnly);
         return done ? { done } : {};
+      }
+      // A booking missing a choice ("Which service?"): its options as chips.
+      const missing = [...rows]
+        .reverse()
+        .find((r) => r.error_code === 'missing_detail' && r.result?.choice);
+      if (missing?.result?.choice) {
+        const choice = missing.result.choice;
+        const options: TapButton[] = [];
+        for (const option of choice.options.slice(0, MAX_CHOICES)) {
+          const b = await this.button(input, option, {
+            kind: 'choose',
+            text: option,
+          });
+          if (b) options.push(b);
+        }
+        if (options.length) return { choices: { list: choice.label, options } };
       }
       // A lookup, or a write refused with the free entries it found (BT1: "That time was just
       // taken"): chips for them.

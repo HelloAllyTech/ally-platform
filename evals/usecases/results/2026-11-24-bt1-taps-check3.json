@@ -1,0 +1,832 @@
+{
+ "label": "2026-11-24-bt1-taps-check3",
+ "setup": "2026-11-22",
+ "repeat": 1,
+ "classifierFail": false,
+ "results": [
+  {
+   "set": "b4-scripbox",
+   "assistant": "b4-scripbox",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b4-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "I'm interested in starting a SIP. Please have someone contact me. I'm Leela Test, 9800000015, leela@example.com.",
+       "parts": [
+        "offer"
+       ],
+       "messageId": "bd57a2cf-b8e2-42bb-ac74-290f02983f8f",
+       "observed": {
+        "reply": "Shall I request a callback for Leela Test about Interested in starting a SIP, 9800000015?\n\nYou are chatting with an AI assistant. The AI and people at Scripbox may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "f0d87e0a-8c90-420d-b8b9-58d5d9266639",
+         "bbbb8dbd-9ffa-491d-a975-bea59409332b",
+         "4b98c1b5-5bcf-4f7b-84a8-ff2cd0e95be0",
+         "940d7cfa-3347-4cfd-861d-8b0de261d5bf"
+        ],
+        "passage_chunk_ids": [
+         "a0dad7a5-5d41-44a4-b1d7-cad7e791f918",
+         "98784bb5-136e-4c73-afa0-3956a46beefe",
+         "f8ecc9ea-4a69-4eee-91f8-86d3d9112fa6",
+         "0eee3e51-371a-41aa-8d1f-b37ec0f87447",
+         "d4dfc91b-30b3-4050-a80d-57389bab4a26",
+         "57b76136-0c1a-4133-95c5-c434d10afac9",
+         "9b930515-fbe4-49d9-904e-080ed004e003",
+         "5877eb56-d44a-41c7-b948-bd85bf86d02e",
+         "c626e9fa-399b-481d-98e9-2db324da09d9",
+         "cae29be9-d055-4042-92bb-63d5e453e9b9",
+         "c92d654f-7920-4ca6-bcd5-b9905ba3ff62",
+         "f4c49ffb-4ac5-4844-b1f2-4ee805a3fefb",
+         "da7a6522-cd1e-4a00-b605-434be5da5a44",
+         "3f6fedd6-edef-4270-b4cb-13792f14479c",
+         "b7516953-7313-42c4-a591-fc915ff368ab",
+         "5a8d9792-e8d1-4632-aed2-35c66b265c26",
+         "d98a1dac-40ab-42a6-8f9a-2fbf29b7e1d0"
+        ],
+        "history": []
+       },
+       "reply": "Shall I request a callback for Leela Test about Interested in starting a SIP, 9800000015?\n\nYou are chatting with an AI assistant. The AI and people at Scripbox may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "create_callback_requests: needs_confirmation"
+       ],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 64.79412500000001,
+       "firstWordsMs": 5202.888666999999,
+       "ms": 5212.239792,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Confirm",
+       "tap": "confirm",
+       "parts": [],
+       "messageId": "17b579aa-2480-46a7-8638-8b249926efaf",
+       "observed": {
+        "reply": "Done: you've asked for a callback (Interested in starting a SIP).",
+        "handled_by": "tap",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "I'm interested in starting a SIP. Please have someone contact me. I'm Leela Test, 9800000015, leela@example.com."
+         },
+         {
+          "role": "assistant",
+          "content": "Shall I request a callback for Leela Test about Interested in starting a SIP, 9800000015?\n\nYou are chatting with an AI assistant. The AI and people at Scripbox may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         }
+        ]
+       },
+       "reply": "Done: you've asked for a callback (Interested in starting a SIP).",
+       "handledBy": "tap",
+       "turnType": "",
+       "steps": [
+        "create_callback_requests: needs_confirmation",
+        "create_callback_requests: ok"
+       ],
+       "records": 1,
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": null,
+       "firstWordsMs": 66.36837500000001,
+       "ms": 66.36837500000001,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b2-cloudnine",
+   "assistant": "b2-cloudnine",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b2-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "I'd like to book an antenatal check-up on Saturday 28 Nov, any centre is fine. I'm Anita Test, 9800000013. Which times are free?",
+       "parts": [
+        "choices"
+       ],
+       "messageId": "a90bb379-e3b0-4621-be2d-f06601cae4c0",
+       "observed": {
+        "reply": "I can book that. These antenatal check-up slots are free on Saturday 28 Nov: 10:00, 11:00 and 15:00. Which one shall I book for you?\n\nYou are chatting with an AI assistant. The AI and people at Cloudnine Hospitals may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 10:00",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 11:00",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 15:00",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "9b751274-442d-47c0-9890-ec1641d104a9",
+         "03ad7660-6ee9-4f27-a512-37231ee1b591",
+         "a61de900-a9dd-427b-95f3-0c754ca7239a",
+         "44ca8ef4-46ac-4e41-b1ee-179a83d3af81"
+        ],
+        "passage_chunk_ids": [
+         "4ad7c78f-b721-47fa-a37e-76ab47ebda5c",
+         "8b839147-9f63-487d-a2f7-7d251e65fa93",
+         "5b307b21-a6ef-4ebc-8060-7d42ab97f38c",
+         "df80905f-6c13-4f88-a82b-04345e2ce4a5",
+         "c1594dfb-249d-4e72-a50a-f689862486c3",
+         "b9c4923d-ab44-4862-9bb2-762c2b525194",
+         "a13293b1-99f6-4141-a8bd-576d498d3a85",
+         "e6e3a36b-2995-4df8-b307-49b93f3d7aad",
+         "2d1a9ec6-f7b1-48d4-88f5-2dc20631786f",
+         "66d821c9-3e0a-4215-b04c-e9c15caf02e9",
+         "c3e6c36a-ed37-43e2-a4e7-7db9133fd267",
+         "53b1bd8f-1ed8-4a03-b91b-9aa56faea3ff",
+         "71f029bd-7f4f-420a-88b1-d9a50db3fcf7",
+         "d416ee0f-5481-49c9-acfc-162229cc724d",
+         "6aed5924-b285-4d97-9061-fe0691f1e7fa",
+         "d94004a2-9199-4c1e-ab06-ec9711236c1f",
+         "c8bd7593-24c1-48e6-903d-d38eefa0e6b8",
+         "ce251938-4625-4df4-8b18-ae8d2b01938a"
+        ],
+        "history": []
+       },
+       "reply": "I can book that. These antenatal check-up slots are free on Saturday 28 Nov: 10:00, 11:00 and 15:00. Which one shall I book for you?\n\nYou are chatting with an AI assistant. The AI and people at Cloudnine Hospitals may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [
+        "find_slots: ok"
+       ],
+       "sources": 3,
+       "confirmation": null,
+       "statusMs": 65.975416,
+       "firstWordsMs": 9226.012708,
+       "ms": 18235.844791,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Sat 28 Nov · 10:00",
+       "tap": "choose",
+       "parts": [
+        "offer"
+       ],
+       "messageId": "ab744a12-8d9e-4db1-b1e2-e5b119a7b9e4",
+       "observed": {
+        "reply": "Shall I book Sat 28 Nov 2026, 10:00, Antenatal check-up on Sat 28 Nov 2026, 10:00 for Anita Test?",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "9b751274-442d-47c0-9890-ec1641d104a9",
+         "44ca8ef4-46ac-4e41-b1ee-179a83d3af81",
+         "018f1091-ba73-4fb2-8c25-443a6cd2f29c",
+         "7d7ea439-09b1-4aca-8be9-6b32facd5946"
+        ],
+        "passage_chunk_ids": [
+         "4ad7c78f-b721-47fa-a37e-76ab47ebda5c",
+         "8b839147-9f63-487d-a2f7-7d251e65fa93",
+         "5b307b21-a6ef-4ebc-8060-7d42ab97f38c",
+         "df80905f-6c13-4f88-a82b-04345e2ce4a5",
+         "c1594dfb-249d-4e72-a50a-f689862486c3",
+         "b9c4923d-ab44-4862-9bb2-762c2b525194",
+         "a13293b1-99f6-4141-a8bd-576d498d3a85",
+         "e6e3a36b-2995-4df8-b307-49b93f3d7aad",
+         "2d1a9ec6-f7b1-48d4-88f5-2dc20631786f",
+         "66d821c9-3e0a-4215-b04c-e9c15caf02e9",
+         "b3076638-ed22-4e46-b55a-93c8302b8012",
+         "356bb174-8818-47ec-813e-0e277fbc7ff1",
+         "8620f6d2-d8a7-402d-be62-b125bbbd544f",
+         "aab169af-d1a4-4baa-a31f-a19d90e59bb7",
+         "2ad16cf7-18df-4bef-8375-3e3011074ac2",
+         "1b0d29b5-63a1-4818-b835-ac27d164df76",
+         "0b5fc7ae-3a05-444c-ac5f-39b576da1704",
+         "4235fe2b-da38-455f-9ec1-95b560c01d7a",
+         "d94004a2-9199-4c1e-ab06-ec9711236c1f"
+        ],
+        "history": [
+         {
+          "role": "user",
+          "content": "I'd like to book an antenatal check-up on Saturday 28 Nov, any centre is fine. I'm Anita Test, 9800000013. Which times are free?"
+         },
+         {
+          "role": "assistant",
+          "content": "I can book that. These antenatal check-up slots are free on Saturday 28 Nov: 10:00, 11:00 and 15:00. Which one shall I book for you?\n\nYou are chatting with an AI assistant. The AI and people at Cloudnine Hospitals may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         }
+        ]
+       },
+       "reply": "Shall I book Sat 28 Nov 2026, 10:00, Antenatal check-up on Sat 28 Nov 2026, 10:00 for Anita Test?",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "find_slots: ok",
+        "create_appointments: needs_confirmation"
+       ],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 26.587791999998444,
+       "firstWordsMs": 7530.769124999999,
+       "ms": 7536.298458999998,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Confirm",
+       "tap": "confirm",
+       "parts": [
+        "done"
+       ],
+       "messageId": "ea9fc88f-693a-4d82-91de-7ddbdeffc975",
+       "observed": {
+        "reply": "Done: you're booked for Sat 28 Nov 2026, 10:00.",
+        "handled_by": "tap",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "I'd like to book an antenatal check-up on Saturday 28 Nov, any centre is fine. I'm Anita Test, 9800000013. Which times are free?"
+         },
+         {
+          "role": "assistant",
+          "content": "I can book that. These antenatal check-up slots are free on Saturday 28 Nov: 10:00, 11:00 and 15:00. Which one shall I book for you?\n\nYou are chatting with an AI assistant. The AI and people at Cloudnine Hospitals may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out."
+         },
+         {
+          "role": "user",
+          "content": "Sat 28 Nov · 10:00"
+         },
+         {
+          "role": "assistant",
+          "content": "Shall I book Sat 28 Nov 2026, 10:00, Antenatal check-up on Sat 28 Nov 2026, 10:00 for Anita Test?"
+         }
+        ]
+       },
+       "reply": "Done: you're booked for Sat 28 Nov 2026, 10:00.",
+       "handledBy": "tap",
+       "turnType": "",
+       "steps": [
+        "create_appointments: needs_confirmation",
+        "create_appointments: ok"
+       ],
+       "records": 1,
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": null,
+       "firstWordsMs": 38.87574999999924,
+       "ms": 38.87574999999924,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b5-91springboard",
+   "assistant": "b5-91springboard",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b5a-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "FAIL",
+     "turns": [
+      {
+       "user": "I'd like to book a visit to your Bengaluru hub on Saturday 28 Nov. I'm Tara Test, 9800000016. Which times are free?",
+       "parts": [
+        "choices"
+       ],
+       "messageId": "c23d481a-7bf1-4283-b054-5bd34ff2fd7b",
+       "observed": {
+        "reply": "Thanks, Tara — I can book that for you. These times are free for a visit on Sat 28 Nov: 10:00, 11:00 and 15:00 (each 50 min). Which of these would you like me to book for your visit?\n\nYou are chatting with an AI assistant. The AI and people at 91Springboard may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO.",
+        "handled_by": "rag",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 10:00",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 11:00",
+          "source_url": ""
+         },
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 15:00",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "677ce769-bfdd-42eb-96ba-9fb78316a184",
+         "1ff9b960-8ef9-4cd2-ba91-0e88f423405a",
+         "916e7a66-1fa8-471a-8c37-42fa635651d4",
+         "de6c81b1-c03e-4846-8443-34850ebaf513",
+         "2b1e3253-f6cf-4657-a18b-d51594ec13dd"
+        ],
+        "passage_chunk_ids": [
+         "58d4d2ea-e3e0-468a-95dc-f12861bc4075",
+         "009e7624-563e-4f0b-ba77-b99677464855",
+         "147b8256-efde-4708-84c2-8b1a11a04b3e",
+         "739036c6-703b-44a9-ba03-1ad7a8a52aad",
+         "00b33051-702b-498d-9b2d-25e33bd14be5",
+         "2393bcd6-f1c4-47d5-b8e5-2700cb1bf663",
+         "1e182f21-ba1d-4cbc-ada7-29bb888ce860",
+         "a3a7d9cb-0a2e-4fa3-a032-cbdc37809505",
+         "fae125c7-72c5-42fd-8050-5255e876d47b",
+         "2ada35ba-076e-4d61-b50c-9001e44c8841",
+         "6fe79743-8933-4ac8-b352-86c68ee7c713",
+         "6e7e8762-a869-4b40-ae2a-0ea82f40147b",
+         "b612e262-9f9b-4f33-9478-2e6ab6665f11",
+         "509c66f8-291b-4314-9bf1-483d0ffe3bb3",
+         "bfc7cbf7-c3ec-4379-82ed-74ae7f6f8448",
+         "e8ea4826-51ef-45eb-b2bf-a253ed955096",
+         "204b67b7-4091-4c0c-97a6-5d9d535e2586",
+         "2d4953a0-64e0-46bd-9b6d-0273eafad553"
+        ],
+        "history": []
+       },
+       "reply": "Thanks, Tara — I can book that for you. These times are free for a visit on Sat 28 Nov: 10:00, 11:00 and 15:00 (each 50 min). Which of these would you like me to book for your visit?\n\nYou are chatting with an AI assistant. The AI and people at 91Springboard may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO.",
+       "handledBy": "rag",
+       "turnType": "question",
+       "steps": [
+        "find_slots: ok"
+       ],
+       "sources": 3,
+       "confirmation": null,
+       "statusMs": 18.45233300000018,
+       "firstWordsMs": 8515.226208,
+       "ms": 9265.180916000001,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Sat 28 Nov · 10:00",
+       "tap": "choose",
+       "parts": [
+        "choices"
+       ],
+       "messageId": "dd31cc96-b619-4a3d-9248-a4d699529741",
+       "observed": {
+        "reply": "Shall I book your visit on Sat 28 Nov 2026 at 10:00 to the Bengaluru hub to discuss a Virtual Office?",
+        "handled_by": "clarified",
+        "turn_type": "smalltalk",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 10:00",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "677ce769-bfdd-42eb-96ba-9fb78316a184"
+        ],
+        "passage_chunk_ids": [
+         "58d4d2ea-e3e0-468a-95dc-f12861bc4075",
+         "009e7624-563e-4f0b-ba77-b99677464855",
+         "147b8256-efde-4708-84c2-8b1a11a04b3e",
+         "739036c6-703b-44a9-ba03-1ad7a8a52aad",
+         "00b33051-702b-498d-9b2d-25e33bd14be5",
+         "2393bcd6-f1c4-47d5-b8e5-2700cb1bf663",
+         "1e182f21-ba1d-4cbc-ada7-29bb888ce860",
+         "a3a7d9cb-0a2e-4fa3-a032-cbdc37809505",
+         "fae125c7-72c5-42fd-8050-5255e876d47b",
+         "2ada35ba-076e-4d61-b50c-9001e44c8841",
+         "e8ea4826-51ef-45eb-b2bf-a253ed955096"
+        ],
+        "history": [
+         {
+          "role": "user",
+          "content": "I'd like to book a visit to your Bengaluru hub on Saturday 28 Nov. I'm Tara Test, 9800000016. Which times are free?"
+         },
+         {
+          "role": "assistant",
+          "content": "Thanks, Tara — I can book that for you. These times are free for a visit on Sat 28 Nov: 10:00, 11:00 and 15:00 (each 50 min). Which of these would you like me to book for your visit?\n\nYou are chatting with an AI assistant. The AI and people at 91Springboard may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO."
+         }
+        ]
+       },
+       "reply": "Shall I book your visit on Sat 28 Nov 2026 at 10:00 to the Bengaluru hub to discuss a Virtual Office?",
+       "handledBy": "clarified",
+       "turnType": "smalltalk",
+       "steps": [
+        "find_slots: ok",
+        "create_appointments: missing_detail"
+       ],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 20.246415999999954,
+       "firstWordsMs": 16956.251916,
+       "ms": 24209.747583,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Day pass",
+       "tap": "choose",
+       "parts": [],
+       "messageId": "5d7b50ce-eaf9-40ee-b444-d4be438a2512",
+       "observed": {
+        "reply": "Which city or hub would you like a Day Pass for?",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "677ce769-bfdd-42eb-96ba-9fb78316a184",
+         "0e9be021-7707-411d-b55e-6cc26de57852",
+         "cc5d68d4-1514-4125-8e57-06dd4b8f6262",
+         "dcccd7c5-1c1c-4f68-bd38-678a468b9949"
+        ],
+        "passage_chunk_ids": [
+         "58d4d2ea-e3e0-468a-95dc-f12861bc4075",
+         "009e7624-563e-4f0b-ba77-b99677464855",
+         "147b8256-efde-4708-84c2-8b1a11a04b3e",
+         "739036c6-703b-44a9-ba03-1ad7a8a52aad",
+         "00b33051-702b-498d-9b2d-25e33bd14be5",
+         "2393bcd6-f1c4-47d5-b8e5-2700cb1bf663",
+         "1e182f21-ba1d-4cbc-ada7-29bb888ce860",
+         "a3a7d9cb-0a2e-4fa3-a032-cbdc37809505",
+         "fae125c7-72c5-42fd-8050-5255e876d47b",
+         "2ada35ba-076e-4d61-b50c-9001e44c8841",
+         "4277232f-f836-4759-8633-2ee4fc9a23be",
+         "8a83aa71-2944-4b38-8533-9c34f2ace01e",
+         "83c9ebf2-d8c4-40d9-9a54-6a4decb033dd",
+         "4aee7b04-86a9-4f0c-8ba3-a2f037fe5e1c"
+        ],
+        "history": [
+         {
+          "role": "user",
+          "content": "I'd like to book a visit to your Bengaluru hub on Saturday 28 Nov. I'm Tara Test, 9800000016. Which times are free?"
+         },
+         {
+          "role": "assistant",
+          "content": "Thanks, Tara — I can book that for you. These times are free for a visit on Sat 28 Nov: 10:00, 11:00 and 15:00 (each 50 min). Which of these would you like me to book for your visit?\n\nYou are chatting with an AI assistant. The AI and people at 91Springboard may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO."
+         },
+         {
+          "role": "user",
+          "content": "Sat 28 Nov · 10:00"
+         },
+         {
+          "role": "assistant",
+          "content": "Shall I book your visit on Sat 28 Nov 2026 at 10:00 to the Bengaluru hub to discuss a Virtual Office?"
+         }
+        ]
+       },
+       "reply": "Which city or hub would you like a Day Pass for?",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 50.99474999999802,
+       "firstWordsMs": 2875.6567080000023,
+       "ms": 3561.8161249999976,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] \"confirm\"",
+       "error": "no such button",
+       "hard": [
+        "tap: no \"confirm\" on the last reply"
+       ],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "set": "b5-bhive",
+   "assistant": "b5-bhive",
+   "run": 1,
+   "cases": [
+    {
+     "id": "b5b-t1",
+     "kind": "action",
+     "lang": "en",
+     "mustPass": false,
+     "verdict": "PASS",
+     "turns": [
+      {
+       "user": "I'd like to book a tour of the Whitefield campus on Saturday 28 Nov. I'm Rohan Test, 9800000012. Which times are free?",
+       "parts": [
+        "choices"
+       ],
+       "messageId": "b656b2d6-9872-4c96-9796-f89d7e284b40",
+       "observed": {
+        "reply": "I can see a free tour slot on Sat 28 Nov 2026 at 10:00 for the Whitefield campus (50 min) — would you like me to book that for you? I’ll use the name Rohan Test. Once you confirm I'll book it. (Tours run 10:00–19:00 Mon–Sat.\n\nYou are chatting with an AI assistant. The AI and people at BHIVE Workspace may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO.",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 10:00",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "f4978e73-a54f-4309-889e-5cef26bbf103",
+         "d75f2e7e-259d-414b-a988-ff429db5a043",
+         "5cd20c19-807c-4ba6-bf67-b9af3fd80561",
+         "4799c003-6cd7-4063-a001-58b1cb96a47b",
+         "75402499-3fa3-4998-9f4b-d706b8af33b7"
+        ],
+        "passage_chunk_ids": [
+         "f9d989e6-6078-40ee-8361-2a28ba2b9897",
+         "4f8fd52e-172f-4254-ad6f-5e8eeb172159",
+         "78baf48a-2f36-4b9c-bfa8-270f4bc745cd",
+         "684e596b-2a14-4770-8f3b-c439ea9c6b4c",
+         "689e7120-30dd-4c12-8e76-e08a0fbf7778",
+         "3b6f27ab-8cf8-4bfd-87cd-1481f3f15e79",
+         "375e5561-9dd2-4651-a218-0c307da0db81",
+         "8a250193-412f-4a6d-8d85-81bc324f658c",
+         "86d7cadd-f100-4eb8-b6a1-0983e01c321e",
+         "61e211d6-846e-429b-9575-1a57a67d24d5",
+         "d4ea13e7-add5-47e6-a476-1bf0d71b0e5c",
+         "6f3c5711-b4e6-4224-be0b-9c4947dccca0",
+         "fb22f29d-1ed7-4510-89bc-0ce2c94be039",
+         "6b14f259-5785-4388-a6c5-7f82d4e72549",
+         "f3fc89d6-b745-45ff-837a-6ee5fcf525e6",
+         "c56f0b3a-abc3-4ea7-9f73-f1ed036a4293",
+         "c93e615f-8c19-45bf-81cd-2ab78048ce2b",
+         "8fd07b62-d393-4683-b75a-0d13e3756640"
+        ],
+        "history": []
+       },
+       "reply": "I can see a free tour slot on Sat 28 Nov 2026 at 10:00 for the Whitefield campus (50 min) — would you like me to book that for you? I’ll use the name Rohan Test. Once you confirm I'll book it. (Tours run 10:00–19:00 Mon–Sat.\n\nYou are chatting with an AI assistant. The AI and people at BHIVE Workspace may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO.",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "find_slots: ok"
+       ],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 20.932749999999942,
+       "firstWordsMs": 9061.754208999999,
+       "ms": 19183.526375,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Sat 28 Nov · 10:00",
+       "tap": "choose",
+       "parts": [
+        "choices"
+       ],
+       "messageId": "45dd2604-f9c9-46c4-90f1-81c5eead3406",
+       "observed": {
+        "reply": "Would you like me to book that Sat 28 Nov 2026, 10:00 tour as a Day pass, dedicated desk, private cabin, meeting room, or managed office visit?",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [
+         {
+          "chunk_id": "",
+          "document_id": "",
+          "document_title": "Slots · Sat 28 Nov 2026, 10:00",
+          "source_url": ""
+         }
+        ],
+        "passage_document_ids": [
+         "f4978e73-a54f-4309-889e-5cef26bbf103",
+         "21e00c6c-e729-4427-9840-fd4ae9a099b7",
+         "c8a8099d-aec9-4303-bdec-e915760724ae",
+         "150198cf-044a-46fc-b42b-b1d10dbbcde7",
+         "7e319503-c465-421b-b905-0264f754c0a2",
+         "21cd2ddc-e2b9-41e4-8166-24bebc22fafd",
+         "13b72c10-d034-4d62-b0da-77537c78da9e"
+        ],
+        "passage_chunk_ids": [
+         "f9d989e6-6078-40ee-8361-2a28ba2b9897",
+         "4f8fd52e-172f-4254-ad6f-5e8eeb172159",
+         "78baf48a-2f36-4b9c-bfa8-270f4bc745cd",
+         "684e596b-2a14-4770-8f3b-c439ea9c6b4c",
+         "689e7120-30dd-4c12-8e76-e08a0fbf7778",
+         "3b6f27ab-8cf8-4bfd-87cd-1481f3f15e79",
+         "375e5561-9dd2-4651-a218-0c307da0db81",
+         "8a250193-412f-4a6d-8d85-81bc324f658c",
+         "86d7cadd-f100-4eb8-b6a1-0983e01c321e",
+         "61e211d6-846e-429b-9575-1a57a67d24d5",
+         "e5031397-7300-4a3d-9560-984ef2bc9ea9",
+         "e463fe59-f3bb-4658-8b0d-b431ac072387",
+         "cfe2965a-b846-4e15-a8f6-e8e12149e43d",
+         "1c06bdc7-92f4-4d8c-a4df-0c7034b38e2f",
+         "0a20e400-7d86-4610-83b6-51bf3e3930e2",
+         "252f7cbc-3e01-48de-ba42-f0f3c5557aea",
+         "3a0eacf0-5cfb-4ea1-af08-e95bc9478817",
+         "75b3d9e1-224e-4ced-ae11-06e282f6333a",
+         "c56f0b3a-abc3-4ea7-9f73-f1ed036a4293"
+        ],
+        "history": [
+         {
+          "role": "user",
+          "content": "I'd like to book a tour of the Whitefield campus on Saturday 28 Nov. I'm Rohan Test, 9800000012. Which times are free?"
+         },
+         {
+          "role": "assistant",
+          "content": "I can see a free tour slot on Sat 28 Nov 2026 at 10:00 for the Whitefield campus (50 min) — would you like me to book that for you? I’ll use the name Rohan Test. Once you confirm I'll book it. (Tours run 10:00–19:00 Mon–Sat.\n\nYou are chatting with an AI assistant. The AI and people at BHIVE Workspace may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO."
+         }
+        ]
+       },
+       "reply": "Would you like me to book that Sat 28 Nov 2026, 10:00 tour as a Day pass, dedicated desk, private cabin, meeting room, or managed office visit?",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "find_slots: ok",
+        "create_appointments: missing_detail"
+       ],
+       "sources": 1,
+       "confirmation": null,
+       "statusMs": 18.785541999997804,
+       "firstWordsMs": 12077.641624999997,
+       "ms": 12683.673332999999,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Day pass",
+       "tap": "choose",
+       "parts": [
+        "offer"
+       ],
+       "messageId": "b5dfcb80-b57b-420e-9d29-acdd45c01f3f",
+       "observed": {
+        "reply": "Shall I book Sat 28 Nov 2026, 10:00, Day pass on Sat 28 Nov 2026, 10:00 for Rohan Test?",
+        "handled_by": "clarified",
+        "turn_type": "question",
+        "citations": [],
+        "passage_document_ids": [
+         "f4978e73-a54f-4309-889e-5cef26bbf103",
+         "84fbf947-26bf-4dee-8779-02e6bd980291",
+         "4799c003-6cd7-4063-a001-58b1cb96a47b",
+         "d75f2e7e-259d-414b-a988-ff429db5a043"
+        ],
+        "passage_chunk_ids": [
+         "f9d989e6-6078-40ee-8361-2a28ba2b9897",
+         "4f8fd52e-172f-4254-ad6f-5e8eeb172159",
+         "78baf48a-2f36-4b9c-bfa8-270f4bc745cd",
+         "684e596b-2a14-4770-8f3b-c439ea9c6b4c",
+         "689e7120-30dd-4c12-8e76-e08a0fbf7778",
+         "3b6f27ab-8cf8-4bfd-87cd-1481f3f15e79",
+         "375e5561-9dd2-4651-a218-0c307da0db81",
+         "8a250193-412f-4a6d-8d85-81bc324f658c",
+         "86d7cadd-f100-4eb8-b6a1-0983e01c321e",
+         "61e211d6-846e-429b-9575-1a57a67d24d5",
+         "ea9faff6-2c41-4fc4-825c-cc44d958fd78",
+         "c1ec9bc9-5254-4850-a977-2613b929eda9",
+         "b171f045-035d-4332-80ff-01327ac51785",
+         "f719111c-d0c7-491f-bf9a-62200ca9fb08",
+         "3ed1b916-6144-4b91-9ad2-adc400626ed5",
+         "b4ebbf4b-04e3-4d4c-a445-9c3de12ce2fc",
+         "26f2d656-21ee-495e-82ae-63a43c86ab66",
+         "0caf24d9-9b15-4bd2-aff7-ee4042f2e06e",
+         "c56f0b3a-abc3-4ea7-9f73-f1ed036a4293"
+        ],
+        "history": [
+         {
+          "role": "user",
+          "content": "I'd like to book a tour of the Whitefield campus on Saturday 28 Nov. I'm Rohan Test, 9800000012. Which times are free?"
+         },
+         {
+          "role": "assistant",
+          "content": "I can see a free tour slot on Sat 28 Nov 2026 at 10:00 for the Whitefield campus (50 min) — would you like me to book that for you? I’ll use the name Rohan Test. Once you confirm I'll book it. (Tours run 10:00–19:00 Mon–Sat.\n\nYou are chatting with an AI assistant. The AI and people at BHIVE Workspace may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO."
+         },
+         {
+          "role": "user",
+          "content": "Sat 28 Nov · 10:00"
+         },
+         {
+          "role": "assistant",
+          "content": "Would you like me to book that Sat 28 Nov 2026, 10:00 tour as a Day pass, dedicated desk, private cabin, meeting room, or managed office visit?"
+         }
+        ]
+       },
+       "reply": "Shall I book Sat 28 Nov 2026, 10:00, Day pass on Sat 28 Nov 2026, 10:00 for Rohan Test?",
+       "handledBy": "clarified",
+       "turnType": "question",
+       "steps": [
+        "find_slots: ok",
+        "create_appointments: needs_confirmation"
+       ],
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": 30.755582999998296,
+       "firstWordsMs": 4773.0717499999955,
+       "ms": 13011.145291,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      },
+      {
+       "user": "[tap] Confirm",
+       "tap": "confirm",
+       "parts": [
+        "done"
+       ],
+       "messageId": "e5dae3b1-4e53-400b-bee5-a45b4cb6e8b3",
+       "observed": {
+        "reply": "Done: you're booked for Sat 28 Nov 2026, 10:00.",
+        "handled_by": "tap",
+        "turn_type": "",
+        "citations": [],
+        "passage_document_ids": [],
+        "passage_chunk_ids": [],
+        "history": [
+         {
+          "role": "user",
+          "content": "I'd like to book a tour of the Whitefield campus on Saturday 28 Nov. I'm Rohan Test, 9800000012. Which times are free?"
+         },
+         {
+          "role": "assistant",
+          "content": "I can see a free tour slot on Sat 28 Nov 2026 at 10:00 for the Whitefield campus (50 min) — would you like me to book that for you? I’ll use the name Rohan Test. Once you confirm I'll book it. (Tours run 10:00–19:00 Mon–Sat.\n\nYou are chatting with an AI assistant. The AI and people at BHIVE Workspace may read this chat.\nThis is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.\n\nIs it OK if I remember a few things you tell me, so I can help you better next time? You can say no, and you can ask me to forget at any time. Reply YES or NO."
+         },
+         {
+          "role": "user",
+          "content": "Sat 28 Nov · 10:00"
+         },
+         {
+          "role": "assistant",
+          "content": "Would you like me to book that Sat 28 Nov 2026, 10:00 tour as a Day pass, dedicated desk, private cabin, meeting room, or managed office visit?"
+         },
+         {
+          "role": "user",
+          "content": "Day pass"
+         },
+         {
+          "role": "assistant",
+          "content": "Shall I book Sat 28 Nov 2026, 10:00, Day pass on Sat 28 Nov 2026, 10:00 for Rohan Test?"
+         }
+        ]
+       },
+       "reply": "Done: you're booked for Sat 28 Nov 2026, 10:00.",
+       "handledBy": "tap",
+       "turnType": "",
+       "steps": [
+        "create_appointments: needs_confirmation",
+        "create_appointments: ok"
+       ],
+       "records": 1,
+       "sources": 0,
+       "confirmation": null,
+       "statusMs": null,
+       "firstWordsMs": 64.66883399999642,
+       "ms": 64.66883399999642,
+       "grade": null,
+       "hard": [],
+       "soft": []
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

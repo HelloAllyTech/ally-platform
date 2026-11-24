@@ -332,6 +332,8 @@ export class ListToolsService {
             list: about,
             field: missing.key,
             message: LIST_COPY.missing_choice(missing.label, missing.options),
+            // BT1: the options, for chips (the agent reads `message`).
+            choice: { label: missing.label, options: missing.options },
             passages: [],
           },
         };

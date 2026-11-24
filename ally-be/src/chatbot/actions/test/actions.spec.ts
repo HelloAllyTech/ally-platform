@@ -446,6 +446,32 @@ describe('ActionPartsService (BT1: chips and cards from tool results, never from
     });
   });
 
+  it('a booking missing its service: the services as chips, even after another lookup', async () => {
+    const out = await setup([
+      {
+        tool: 'create_appointments',
+        status: 'error',
+        error_code: 'missing_detail',
+        result: {
+          choice: {
+            label: 'Service',
+            options: ['Eye checkup', 'LASIK consultation'],
+          },
+        },
+      },
+      {
+        tool: 'find_services',
+        status: 'ok',
+        error_code: null,
+        result: { passages: [] },
+      },
+    ]).parts.partsFor(input());
+    expect(out.choices).toMatchObject({
+      list: 'Service',
+      options: [{ label: 'Eye checkup' }, { label: 'LASIK consultation' }],
+    });
+  });
+
   it('after an answer: up to 3 starter questions not asked yet', async () => {
     const out = await setup([]).parts.partsFor(
       input({

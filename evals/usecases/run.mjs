@@ -165,8 +165,9 @@ async function turnFacts({ chatbotId, messageId, conversationId, since, list, ca
   if (list) {
     const { rows } = await db.query(
       `SELECT count(*)::int AS n FROM collection_records r JOIN collections c ON c.id = r.collection_id
-        WHERE r.chatbot_id = $1 AND c.key = $2 AND r.deleted_at IS NULL AND r."createdAt" >= $3::timestamptz`,
-      [chatbotId, list, caseStart],
+        WHERE r.chatbot_id = $1 AND c.key = ANY($2::text[]) AND r.deleted_at IS NULL AND r."createdAt" >= $3::timestamptz`,
+      // BT1: one list, or any of several (a lead may go to Leads or Callback requests).
+      [chatbotId, [].concat(list), caseStart],
     );
     records = rows[0].n;
   }
@@ -485,6 +486,7 @@ async function runCase(c, a, s, visitors, corpus, context) {
     if (t.newChat) await v.newChat();
     const since = new Date(Date.now() - 1000);
     let pressed = null;
+    let orSaid;
     if (t.tap) {
       const tap = typeof t.tap === 'object' && !t.tap.chip ? t.tap.kind : t.tap;
       // `earlier`: a button from a reply before the last one (a crisis between taps).
@@ -494,11 +496,14 @@ async function runCase(c, a, s, visitors, corpus, context) {
       // The model asked for a detail first: type it, then look for the button once more.
       if (!pressed && t.orSay) {
         const asked = await v.say(t.orSay);
+        orSaid = asked.final?.reply ?? asked.error ?? '';
         history.push({ role: 'user', content: t.orSay }, { role: 'assistant', content: asked.final?.reply ?? '' });
         lastParts = asked.final?.parts ?? null;
         if (lastParts) allParts.push(lastParts);
         pressed = buttonFor(lastParts, tap);
       }
+      // `optional`: pressed only when the reply offers it (service chips before the card).
+      if (!pressed && t.optional) continue;
       if (!pressed) {
         turns.push({ user: `[tap] ${JSON.stringify(t.tap)}`, error: 'no such button', hard: [`tap: no ${JSON.stringify(t.tap)} on the last reply`], soft: [] });
         break;
@@ -554,6 +559,7 @@ async function runCase(c, a, s, visitors, corpus, context) {
       user: pressed ? `[tap] ${pressed.label}` : t.user,
       as: t.as,
       tap: pressed ? pressed.kind : undefined,
+      ...(orSaid !== undefined ? { orSay: t.orSay, orSaid } : {}),
       parts: lastParts ? Object.keys(lastParts) : [],
       messageId: said.final?.messageId ?? null,
       observed,
