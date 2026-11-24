@@ -1017,7 +1017,12 @@ export class BotDraftService {
     // the checkup, the list card): the not-yet-live chatbot row takes it. Never a placeholder, and
     // never on a live chatbot (its name changes on Apply).
     const typedName = String(next.draftConfig?.name ?? '').trim();
-    if (next.chatbotId && typedName && realName(typedName, '') === typedName) {
+    if (
+      next.chatbotId &&
+      typedName &&
+      realName(typedName, '') === typedName &&
+      !/^your assistant$/i.test(typedName)
+    ) {
       await this.drafts.manager
         ?.query(
           `UPDATE chatbots SET name = $2 WHERE id = $1 AND status = 'draft' AND name IS DISTINCT FROM $2`,
