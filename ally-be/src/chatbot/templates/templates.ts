@@ -90,6 +90,11 @@ export interface UseCaseTemplate {
   pack: SafetyPackId | null;
   hand_over: boolean;
   memory: boolean;
+  /**
+   * TF1 B1: with memory on, the line a person is told the first time, instead of a YES/NO question
+   * (adult audiences; the young-people wording still asks).
+   */
+  memory_notice?: string;
   /** Organisation-only access on a new assistant. */
   organisation_only?: boolean;
   /** "Extra instructions" on a new assistant; `{name}` is its name. */
@@ -238,7 +243,10 @@ export const TEMPLATES: UseCaseTemplate[] = [
     purpose: ANSWER,
     pack: null,
     hand_over: false, // Q4 H5: off by default; the owner turns it on
-    memory: false,
+    memory: true,
+    // COPY: needs approval (TF1 B1)
+    memory_notice:
+      'I can remember your name and your applications so you don’t have to repeat them. Say ‘forget me’ any time.',
     instructions:
       'You answer for {name}. Explain who each service is for, what to bring and where to go, in plain words, from the Services list. Never decide whether someone qualifies: say what the service needs and that the team confirms.',
     lists: [
@@ -413,7 +421,10 @@ export const TEMPLATES: UseCaseTemplate[] = [
     purpose: ENQUIRIES,
     pack: null,
     hand_over: false, // Q4 H5: off by default; the owner turns it on
-    memory: false,
+    memory: true,
+    // COPY: needs approval (TF1 B1)
+    memory_notice:
+      'I can remember your name, your shifts and how you like to help, so you don’t have to repeat them. Say ‘forget me’ any time.',
     instructions:
       'You answer for {name}. Help people give and volunteer. You can’t take payments or send receipts: explain the ways to give, and take receipt questions as a donor enquiry for the team.',
     lists: [
@@ -572,7 +583,10 @@ export const TEMPLATES: UseCaseTemplate[] = [
     purpose: TRAINING,
     pack: null,
     hand_over: false,
-    memory: false,
+    memory: true,
+    // COPY: needs approval (TF1 B1)
+    memory_notice:
+      'I remember your name and the questions you’ve sent the team. Say ‘forget me’ any time.',
     organisation_only: true,
     instructions:
       'You help new staff and volunteers at {name}. Answer only from the team’s policies and guides, and say which one. If the guides don’t cover it, say so and offer to pass the question to the team.',

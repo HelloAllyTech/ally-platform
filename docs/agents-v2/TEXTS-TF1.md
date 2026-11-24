@@ -33,3 +33,8 @@ Every new line a person or an owner can see, from the TF1 fixes. In code each on
 | F19 | holding line after an emergency (was the self-harm help line), India | Someone from the team will reply to you. If anyone is in danger, call 112 now. |
 | F19 | the same outside India, Hindi and Hinglish | in `ally-be/src/chatbot/safety/crisis-copy.ts` (`EMERGENCY_HOLDING_COPY`) |
 | F5 | Chatbots list, a card for an assistant still in setup | Knowledge, lists and settings |
+| B1 | first reply on a Services assistant with memory on (adults), instead of the YES/NO question | I can remember your name and your applications so you don’t have to repeat them. Say ‘forget me’ any time. |
+| B1 | the same, Donors and volunteers | I can remember your name, your shifts and how you like to help, so you don’t have to repeat them. Say ‘forget me’ any time. |
+| B1 | the same, Staff and volunteer onboarding | I remember your name and the questions you’ve sent the team. Say ‘forget me’ any time. |
+| B1 | the same, in Hindi (every template) | मैं आपका नाम और आपकी बताई ज़रूरी बातें याद रख सकता हूँ, ताकि आपको दोबारा न बताना पड़े। कभी भी ‘मुझे भूल जाओ’ लिखें। |
+| B1 | the same, in Hinglish | Main aapka naam aur aapki batayi zaroori baatein yaad rakh sakta hoon, taaki aapko dobara na batana pade. Kabhi bhi ‘mujhe bhool jao’ likhein. |

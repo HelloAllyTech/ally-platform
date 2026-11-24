@@ -78,7 +78,11 @@ export type ChatbotSettingsOverride = Partial<
    * remember (the pack's defaults are added in code and can't be removed). Per bot only, read from
    * this stored override like `abilities`.
    */
-  memory?: { on?: boolean; neverStore?: string[] };
+  /**
+   * TF1 B1: `notice`, set by a template, is the one line a person is told instead of the YES/NO
+   * memory question (adults only); "forget me" erases at any time.
+   */
+  memory?: { on?: boolean; neverStore?: string[]; notice?: string | null };
   /**
    * Where the business is (chunk 6b): an IANA zone, Asia/Kolkata when unset. Used by lists,
    * `{today}`, Repeat weekly and memory's dates (`assistantZone`). Per bot only, like `memory`.

@@ -364,7 +364,12 @@ export class TemplateService {
         };
       }
       if (setup) {
-        settings.memory = { ...(settings.memory ?? {}), on: template.memory };
+        settings.memory = {
+          ...(settings.memory ?? {}),
+          on: template.memory,
+          // TF1 B1: told, not asked (adults); "forget me" erases.
+          notice: template.memory ? (template.memory_notice ?? null) : null,
+        };
       }
       if (plan.helpline && (setup || !settings.helplineNumbers?.trim())) {
         settings.helplineNumbers = plan.helpline;
