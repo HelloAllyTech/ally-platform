@@ -45,5 +45,9 @@ export function usageContextFor(turn: ChatTurn): UsageContext {
     // Who is messaging, as the channel named it (a bot page names seats).
     ...(outer?.audience ? { audience: outer.audience } : {}),
     ...(outer?.seatEmail ? { seatEmail: outer.seatEmail } : {}),
+    // Stage 9: Ally-paid work (the safety-pack release suite) stays Ally-paid through the turn.
+    ...(outer?.allyPaidKind
+      ? { allyPaidKind: outer.allyPaidKind, creatorUserId: null }
+      : {}),
   };
 }

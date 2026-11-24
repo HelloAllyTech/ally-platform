@@ -5,11 +5,13 @@ import { ButtonVariant } from "@components/types";
 import type { HomeQuickReply } from "@types";
 
 import { HOME, fill } from "../copy";
+import { SAFETY_PRIVACY_COPY } from "../copy/safetyPrivacy";
 import { ListError, ListRow, ListRows, ListSkeleton, RemoveButton } from "../ui/List";
 import { addedIn, useHomeList } from "../useHomeList";
 import { LoadFailed } from "./AccessLists";
 
 const t = HOME.lists.replies;
+const L = SAFETY_PRIVACY_COPY.quick; // COPY: needs approval
 
 interface Draft {
   name: string;
@@ -90,6 +92,50 @@ const ReplyForm: React.FC<{
   );
 };
 
+/** A locked reply (crisis, STOP, START, consent): fixed wording, only regional numbers may be added. */
+export const isLocked = (reply: HomeQuickReply): boolean =>
+  reply.locked ?? (reply.required && reply.kind !== "faq");
+
+/** The regional numbers a locked reply sends along with its fixed wording. */
+const NumbersForm: React.FC<{
+  initial: string[];
+  disabled: boolean;
+  onSave: (numbers: string[]) => Promise<boolean>;
+}> = ({ initial, disabled, onSave }) => {
+  const id = useId();
+  const [text, setText] = useState(initial.join("\n"));
+  return (
+    <form
+      className="ally-home__reply-form"
+      onSubmit={event => {
+        event.preventDefault();
+        void onSave(
+          text
+            .split("\n")
+            .map(n => n.trim())
+            .filter(Boolean),
+        );
+      }}
+    >
+      <div className="ally-field">
+        <label htmlFor={`${id}-numbers`}>{L.numbers}</label>
+        <span className="ally-field__hint">{L.numbersHint}</span>
+        <textarea
+          id={`${id}-numbers`}
+          className="ally-input"
+          rows={2}
+          value={text}
+          disabled={disabled}
+          onChange={event => setText(event.target.value)}
+        />
+      </div>
+      <Button variant={ButtonVariant.TERTIARY} type="submit" disabled={disabled}>
+        {L.save}
+      </Button>
+    </form>
+  );
+};
+
 const stateLabel = (reply: HomeQuickReply) =>
   reply.state === "own"
     ? t.yours
@@ -140,15 +186,26 @@ export const QuickReplies: React.FC<{ botId: string; canEdit: boolean }> = ({ bo
               canEdit &&
               editing !== reply.id && (
                 <>
-                  <Button
-                    variant={ButtonVariant.TERTIARY}
-                    size="sm"
-                    type="button"
-                    onClick={() => setEditing(reply.id)}
-                  >
-                    {t.reword}
-                  </Button>
-                  {reply.state !== "own" && !reply.required && (
+                  {isLocked(reply) ? (
+                    <Button
+                      variant={ButtonVariant.TERTIARY}
+                      size="sm"
+                      type="button"
+                      onClick={() => setEditing(reply.id)}
+                    >
+                      {L.numbers}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant={ButtonVariant.TERTIARY}
+                      size="sm"
+                      type="button"
+                      onClick={() => setEditing(reply.id)}
+                    >
+                      {t.reword}
+                    </Button>
+                  )}
+                  {reply.state !== "own" && !reply.required && !isLocked(reply) && (
                     <Button
                       variant={ButtonVariant.TEXT}
                       size="sm"
@@ -176,8 +233,33 @@ export const QuickReplies: React.FC<{ botId: string; canEdit: boolean }> = ({ bo
             }
           >
             <p className="ally-body ally-home__reply-text">{reply.responseText}</p>
-            {reply.required && <p className="ally-small">{t.safety}</p>}
-            {editing === reply.id && (
+            {reply.required && (
+              <p className="ally-small">{isLocked(reply) ? L.locked : t.safety}</p>
+            )}
+            {reply.extraNumbers && reply.extraNumbers.length > 0 && (
+              <p className="ally-small" data-testid="reply-extra-numbers">
+                {reply.extraNumbers.join(", ")}
+              </p>
+            )}
+            {editing === reply.id && isLocked(reply) && (
+              <NumbersForm
+                initial={reply.extraNumbers ?? []}
+                disabled={list.saving}
+                onSave={async numbers => {
+                  const ok = await list.change(
+                    { op: "edit", id: reply.id, item: { extraNumbers: numbers } },
+                    () => ({
+                      op: "edit",
+                      id: reply.id,
+                      item: { extraNumbers: reply.extraNumbers ?? [] },
+                    }),
+                  );
+                  if (ok) setEditing(null);
+                  return ok;
+                }}
+              />
+            )}
+            {editing === reply.id && !isLocked(reply) && (
               <ReplyForm
                 initial={{
                   name: reply.name,

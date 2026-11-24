@@ -9,6 +9,8 @@ summary: A chronological log tracking all wiki updates and modifications.
 This is an append-only log of modifications, updates, and indexing runs performed on the wiki. All logs use the parseable prefix format: `## [YYYY-MM-DD] action | description`.
 
 
+## [2026-11-23] create | `platform/assistants-build.md`, `assistants-credits-and-access.md`, `assistants-safety-and-data.md`: the Assistants build (stages 1 to 10); concepts card updated.
+
 ## [2026-11-21] update | Dead-code tracking now covers ally-be and ally-web (knip), and gates PRs.
 - `contributing/dead-code.md`: coverage table (ally-be and ally-web scanned by knip, both blocking), a new section on how the TypeScript scan is tuned (entry points, the admin dashboard folded into the root workspace, barrels and in-file exports not reported) and the false-positive patterns found while tuning.
 - `ally-be/docs/pm-agent.md` (Dead-code signals): the weekly publish now includes the TypeScript repos; how a module is grouped per repo; the static-analysis limit.

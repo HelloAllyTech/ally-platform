@@ -14,6 +14,18 @@ interface ExecutionContext {
   method?: string;
   originalUrl?: string;
   headers?: { [key: string]: string | string[] | undefined } | undefined;
+  /**
+   * Assistants stage 8: set by the chatbot member guard after a staff read was logged, so the
+   * services' own view checks on that one chatbot pass for this request (view only, never edit).
+   */
+  staffView?: StaffViewContext;
+}
+
+export interface StaffViewContext {
+  chatbotId: string;
+  staffUserId: number;
+  /** The live owner grant this read used, when it read conversations. */
+  grantId: string | null;
 }
 
 export class ExecutionManager {
@@ -40,6 +52,18 @@ export class ExecutionManager {
       context.userId = userId;
       context.tenantId = tenantId;
     }
+  }
+
+  /** Returns false when there is no request context to hold it (the staff read is then refused). */
+  static setStaffView(view: StaffViewContext): boolean {
+    const context = this.storage.getStore();
+    if (!context) return false;
+    context.staffView = view;
+    return true;
+  }
+
+  static getStaffView(): StaffViewContext | undefined {
+    return this.storage.getStore()?.staffView;
   }
 
   static getCurrentContext(): ExecutionContext | undefined {

@@ -7,6 +7,7 @@ import type { BotPageLimits, PrechatField } from "@types";
 
 import { LookAndFeelSection } from "../../WhatsAppBot/LookAndFeel";
 import { fill, HOME } from "../copy";
+import { CHANNELS_COPY } from "../copy/channels";
 import { Group, SectionHead, TextField, useDraftList } from "../fields";
 import { HomeField, useHomeField } from "../useHomeField";
 
@@ -224,7 +225,7 @@ const LimitsEditor: React.FC<{ field: HomeField<BotPageLimits>; disabled: boolea
         min={min}
         max={max}
         disabled={disabled}
-        value={Number.isFinite(limits[key]) ? limits[key] : ""}
+        value={Number.isFinite(limits[key]) ? (limits[key] as number) : ""}
         onChange={event => field.set({ ...limits, [key]: Number(event.target.value) })}
         onBlur={field.flush}
       />
@@ -234,9 +235,11 @@ const LimitsEditor: React.FC<{ field: HomeField<BotPageLimits>; disabled: boolea
     <>
       <div className="ally-home__limits">
         {row("messagesPerVisitorPerHour", t.perHour, 1, 200)}
+        {row("messagesPerVisitorPerDay", CHANNELS_COPY.limits.perVisitorDay, 1, 5000)}
         {row("maxMessageChars", t.maxChars, 50, 2000)}
         {row("dailyCapPerBot", t.perDay, 1, 20000)}
       </div>
+      <p className="ally-field__hint">{CHANNELS_COPY.limits.crisisNote}</p>
       {field.error && (
         <p className="ally-error" role="alert">
           {field.error}

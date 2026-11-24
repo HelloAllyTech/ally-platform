@@ -7,7 +7,6 @@ import { TONES, toneOf } from "../../Onboarding/MakeItYours";
 import { HOME } from "../copy";
 import { Group, LinesField, SectionHead, TextField } from "../fields";
 import { useHomeField } from "../useHomeField";
-import { QuickReplies } from "./QuickReplies";
 
 import type { SectionProps } from "./props";
 
@@ -20,7 +19,7 @@ const LANGUAGES: { id: BotPageLanguage; label: string }[] = [
 
 /**
  * How the assistant introduces itself and talks (chunk 20d): name, introduction, tone, languages,
- * suggested questions, quick replies, what it says when it doesn't know, and — collapsed — the
+ * suggested questions, what it says when it doesn't know, and — collapsed — the
  * owner's extra instructions, which the safety rules always come before.
  */
 export const PersonalitySection: React.FC<SectionProps> = ({ bot, home, canEdit, go }) => {
@@ -109,12 +108,6 @@ export const PersonalitySection: React.FC<SectionProps> = ({ bot, home, canEdit,
         />
       </Group>
 
-      {bot.connectors.length > 0 && (
-        <Group title={t.quickReplies} hint={t.quickRepliesHint} testId="personality-quick-replies">
-          <QuickReplies botId={bot.id} canEdit={canEdit} />
-        </Group>
-      )}
-
       <Group testId="personality-decline">
         <TextField
           label={t.decline}
@@ -126,7 +119,7 @@ export const PersonalitySection: React.FC<SectionProps> = ({ bot, home, canEdit,
         />
         {/* "Your instructions" live in How it works now, with everything else it follows (20d-2). */}
         <div>
-          <button type="button" className="ally-link" onClick={() => go("how")}>
+          <button type="button" className="ally-link" onClick={() => go("settings")}>
             {HOME.seeAll}
           </button>
         </div>

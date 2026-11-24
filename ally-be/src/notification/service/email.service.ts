@@ -167,6 +167,38 @@ ${magicLink ? `Or click the link below to login instantly:\n${magicLink}\n` : ''
     });
   }
 
+  /**
+   * An invite to a chatbot's team (Stage 1b). Plain text; the link holds the invite token, so the
+   * recipient is masked in logs and the body is never logged. In development the link is echoed
+   * to Slack, as sign-in codes are, so it can be followed locally.
+   */
+  async sendChatbotInvite(params: {
+    to: string;
+    subject: string;
+    body: string;
+    link: string;
+  }): Promise<boolean> {
+    if (this.config.isDevelopment) {
+      this.eventEmitter.emit('exception', {
+        statusCode: 200,
+        timestamp: new Date().toISOString(),
+        path: '/api/v1/chatbots/invites',
+        message: `Chatbot invite for ${params.to} - ${params.link}`,
+        type: 'CHATBOT INVITE',
+        channel: 'C0AS8EM1SUT',
+      });
+    }
+    return this.sesService.sendEmail({
+      from: this.config.email.sourceEmail,
+      to: params.to,
+      subject: params.subject,
+      body: params.body,
+      isHtml: false,
+      purpose: 'chatbot invite',
+      maskRecipientsInLog: true,
+    });
+  }
+
   async sendSummaryNotification(params: {
     to: string;
     chatId: number;

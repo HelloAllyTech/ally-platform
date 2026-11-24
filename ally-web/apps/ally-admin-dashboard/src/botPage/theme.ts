@@ -41,8 +41,9 @@ export function surfaceProps(branding: BotPageBranding): {
       ["--brand-on-accent" as string]:
         contrastRatio(colour, "#FFFFFF") >= 4.5 ? "#FFFFFF" : pickOnPrimary(colour),
     },
-    "data-theme": branding.look?.theme ?? "light",
-    "data-heading": branding.look?.headingStyle ?? "classic",
+    // Stage 7: one look for every page (light, classic headings); only the colour and logo vary.
+    "data-theme": "light",
+    "data-heading": "classic",
   };
 }
 

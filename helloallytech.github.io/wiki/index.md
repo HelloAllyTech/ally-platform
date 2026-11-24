@@ -21,6 +21,9 @@ Welcome to the **Ally Developer Wiki** catalog. This catalog is parsed by the LL
 - [Builder Agent — From a Sentence to a Merged Pull Request](platform/builder-agent.md) — Describe a change, get pull requests: the run protocol, the reconcile loop that reviews, approves and releases them, and what bounds it
 - [Auto-improve — Rubric-Judged Testing for System Skills](platform/auto-improve.md) — How a System Skill is tested and improved on live traffic: connected skills, the designer/router/judge loop, what the target means, why a loop pauses, Apply, and the known limits
 - [Storage Archive — Aged S3 Objects to a Hetzner Storage Box](platform/storage-archive.md) — The plan and recorded decisions for moving private S3 objects older than 30 days off AWS: scope, PHI risk acceptance, archive-only read-back, rollout
+- [Assistants — Builder Home, Create and Build, Channels](platform/assistants-build.md) — Two-option home, six sections, working copy vs live and Apply, bot page address, widget, custom domain, cutover runbook pointer
+- [Assistants — Credits, Budgets, Access, Roles](platform/assistants-credits-and-access.md) — Credits ledger, blocked state and kill switch, invite-only sign-in, roles as a set, responder agreement
+- [Assistants — Safety Core, Customer Data, Staff View, Safety Packs](platform/assistants-safety-and-data.md) — Go-live gate, crisis text, alerts, holding message, retention and erase, staff read-only view, pack releases
 - [Platform Stats](platform/stats.md) — **Generated.** Current counts of entities, migrations, modules, providers — so prose never has to state a number
 
 ## Product Management — ⚠️ Deprecated (2026-08-07)

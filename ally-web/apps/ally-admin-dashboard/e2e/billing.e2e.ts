@@ -184,9 +184,11 @@ test("the owner's Plan and usage: counts and bars, and the monthly usage in doll
   await shoot(page, "my-plan");
 });
 
-test("Share → People: the seats, who holds each, and Give them a seat", async ({ page }) => {
+test("Settings → People and seats: the seats, who holds each, and Give them a seat", async ({
+  page,
+}) => {
   await mockAssistantHome(page);
-  await page.goto(`/dev/assistant-home/${BOT_ID}?section=share`);
+  await page.goto(`/dev/assistant-home/${BOT_ID}?section=settings`);
   const seats = page.getByTestId("share-seats");
   await expect(seats).toBeVisible();
   await expect(seats.getByTestId("seat-summary")).toContainText("5 included · 2 extra Premium");

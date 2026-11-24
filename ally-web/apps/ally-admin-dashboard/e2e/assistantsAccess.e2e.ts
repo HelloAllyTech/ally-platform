@@ -82,15 +82,19 @@ test("a Chatbots-only custom login lands on its assistants and sees nothing else
   await mockLogin(page, ["whatsapp_bot"]);
   await page.goto("/login");
   await logIn(page);
-  await expect(page).toHaveURL(/\/assistants$/);
+  // Its one assistant, with no right to create another, opens straight (stage 3).
+  const itsAssistant = new RegExp(`/assistants/${BOT_ID}$`);
+  await expect(page).toHaveURL(itsAssistant);
   // No Sidebar: only its email and Log out (6b, item 31).
+  // One corner menu (stage 2): the email on its button, Plan and Log out inside it.
   await expect(page.getByTestId("assistant-only-header")).toContainText("asha@clinic.example");
+  await page.getByTestId("corner-menu-button").click();
   await expect(page.getByTestId("assistant-only-logout")).toBeVisible();
   await expect(page.getByTestId("admin-sidebar")).toHaveCount(0);
 
   // Ally admin's pages aren't there for it: they lead back to its assistants.
   await page.goto("/user-management");
-  await expect(page).toHaveURL(/\/assistants$/);
+  await expect(page).toHaveURL(itsAssistant);
 });
 
 test("an old /chatbots link opens the same assistant under /assistants", async ({ page }) => {
@@ -116,5 +120,6 @@ test("someone not on an assistant's team is told so, with the way back", async (
     "You don't have access to this assistant. Ask its owner to add you.",
   );
   await page.getByRole("link", { name: "Go to your assistants" }).click();
-  await expect(page).toHaveURL(/\/assistants$/);
+  // With exactly one assistant, the list opens it straight away.
+  await expect(page).toHaveURL(new RegExp(`/assistants(/${BOT_ID})?$`));
 });

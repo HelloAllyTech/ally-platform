@@ -13,7 +13,8 @@ import {
 } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
 import { FeatureToggleGuard } from '../../../auth/guards/feature-toggle.guard';
-import { ChatbotMemberRole, CHATBOT_ROLE_RANK } from '../../enum/chatbot.enum';
+import { ChatbotCapability, ChatbotMemberRole } from '../../enum/chatbot.enum';
+import { can } from '../chatbot-roles';
 import { ChatbotAccessService } from '../../service/chatbot-access.service';
 import { ChatbotMemberGuard } from '../chatbot-member.guard';
 import {
@@ -25,8 +26,9 @@ import {
 /**
  * A1's route walk: every assistant route, found from the controllers on disk (so a new controller
  * or route can't be missed), declares how it keeps to the caller's own bots, and every route that
- * names a bot is walked as a non-member (404), a viewer, an editor, an owner, and a platform admin
- * who isn't a member (404).
+ * names a bot is walked as a non-member (404), a viewer, a responder, an editor, an owner, and a
+ * platform admin who isn't a member (404). Stage 1b: each route needs a capability; a member passes
+ * when their role SET grants it (a responder: view and respond, never build).
  */
 
 const SRC = path.resolve(__dirname, '../../..');
@@ -168,11 +170,26 @@ describe('Assistant routes: owners only (A1 route walk)', () => {
       editor: 3,
       owner: 4,
       platformAdminNonMember: 5,
+      responder: 6,
+      viewerResponder: 7,
     } as const;
-    const MEMBERS: Record<number, ChatbotMemberRole> = {
+    const MEMBERS: Record<number, ChatbotMemberRole[]> = {
+      [PEOPLE.viewer]: [ChatbotMemberRole.VIEWER],
+      [PEOPLE.editor]: [ChatbotMemberRole.EDITOR],
+      [PEOPLE.owner]: [ChatbotMemberRole.OWNER],
+      [PEOPLE.responder]: [ChatbotMemberRole.RESPONDER],
+      [PEOPLE.viewerResponder]: [
+        ChatbotMemberRole.RESPONDER,
+        ChatbotMemberRole.VIEWER,
+      ],
+    };
+    // What the old column holds for each (dual write): a responder is a viewer there.
+    const LEGACY: Record<number, ChatbotMemberRole> = {
       [PEOPLE.viewer]: ChatbotMemberRole.VIEWER,
       [PEOPLE.editor]: ChatbotMemberRole.EDITOR,
       [PEOPLE.owner]: ChatbotMemberRole.OWNER,
+      [PEOPLE.responder]: ChatbotMemberRole.VIEWER,
+      [PEOPLE.viewerResponder]: ChatbotMemberRole.VIEWER,
     };
     const access = new ChatbotAccessService(
       { findOne: async () => ({ id: BOT, archivedAt: null }) } as never,
@@ -183,7 +200,7 @@ describe('Assistant routes: owners only (A1 route walk)', () => {
           where: { chatbotId: string; userId: number };
         }) =>
           where.chatbotId === BOT && MEMBERS[where.userId]
-            ? { role: MEMBERS[where.userId] }
+            ? { role: LEGACY[where.userId], roles: MEMBERS[where.userId] }
             : null,
       } as never,
       {
@@ -210,7 +227,7 @@ describe('Assistant routes: owners only (A1 route walk)', () => {
     it.each(walked.map((r) => [label(r), r] as const))(
       '%s',
       async (_name, r) => {
-        const { role: needed, param } = roleOf(r)!;
+        const { capability: needed, param } = roleOf(r)!;
         for (const userId of [
           PEOPLE.nonMember,
           PEOPLE.platformAdminNonMember,
@@ -219,10 +236,17 @@ describe('Assistant routes: owners only (A1 route walk)', () => {
             guard.canActivate(context(r, userId, param)),
           ).rejects.toBeInstanceOf(NotFoundException);
         }
-        for (const userId of [PEOPLE.viewer, PEOPLE.editor, PEOPLE.owner]) {
+        expect(Object.values(ChatbotCapability)).toContain(needed);
+        for (const userId of [
+          PEOPLE.viewer,
+          PEOPLE.editor,
+          PEOPLE.owner,
+          PEOPLE.responder,
+          PEOPLE.viewerResponder,
+        ]) {
           const has = MEMBERS[userId];
           const call = guard.canActivate(context(r, userId, param));
-          if (CHATBOT_ROLE_RANK[has] >= CHATBOT_ROLE_RANK[needed]) {
+          if (can(has, needed)) {
             await expect(call).resolves.toBe(true);
           } else {
             await expect(call).rejects.toBeInstanceOf(ForbiddenException);
@@ -234,20 +258,69 @@ describe('Assistant routes: owners only (A1 route walk)', () => {
 
   it('keeps the team, deleting, eval suites, the safety pack and seats to owners', () => {
     const owners = ALL.filter(
-      (r) => roleOf(r)?.role === ChatbotMemberRole.OWNER,
+      (r) => roleOf(r)?.capability === ChatbotCapability.MANAGE_PEOPLE,
     )
       .map((r) => `${r.method} ${r.path}`)
       .sort();
     expect(owners).toEqual([
+      'DELETE v1/chatbots/:id/invites/:inviteId',
+      // Stage 1b: removing one person, invites and handing the chatbot over.
+      'DELETE v1/chatbots/:id/members/:userId',
+      // Stage 8: an owner's permission for Ally staff to read conversations, and who looked.
+      'DELETE v1/chatbots/:id/staff-access/:grantId',
+      'GET v1/chatbots/:id/invites',
+      'GET v1/chatbots/:id/staff-access',
+      'GET v1/chatbots/:id/staff-views',
       'POST v1/chatbots/:id/archive',
       'POST v1/chatbots/:id/checkup/suites',
+      'POST v1/chatbots/:id/invites',
+      // Stage 5: only an owner lets a source with personal details be indexed.
+      'POST v1/chatbots/:id/knowledge/:documentId/approve',
+      // Stage 4: accepting the safety terms before go-live.
+      'POST v1/chatbots/:id/safety-terms',
+      'POST v1/chatbots/:id/staff-access',
       // T1: a template can raise the safety pack and turn hand-over on, both owners' switches.
       'POST v1/chatbots/:id/templates/:templateId',
+      'POST v1/chatbots/:id/transfer',
       'PUT v1/chatbots/:id/members',
       // Q3-fast Part 1: the owner corrects the pack, with a reason when it's less strict.
       'PUT v1/chatbots/:id/safety-pack',
+      // Stage 5: an owner stores a safety-text translation (unused until Ally reviews it).
+      'PUT v1/chatbots/:id/safety-translations',
       // CR1: only an owner gives, moves or frees a seat on their assistant.
       'PUT v1/chatbots/:id/seats/:seatId/assignee',
     ]);
+  });
+
+  it('take-over, hand-back and reply are the respond capability, not edit (Stage 1b)', () => {
+    const respond = ALL.filter(
+      (r) => roleOf(r)?.capability === ChatbotCapability.RESPOND,
+    )
+      .map((r) => `${r.method} ${r.path}`)
+      .sort();
+    expect(respond).toEqual(
+      expect.arrayContaining([
+        'POST v1/inbox/chatbots/:chatbotId/conversations/:id/hand-back',
+        'POST v1/inbox/chatbots/:chatbotId/conversations/:id/messages',
+        'POST v1/inbox/chatbots/:chatbotId/conversations/:id/take-over',
+      ]),
+    );
+  });
+
+  it('a responder can change nothing that shapes the chatbot (no build route admits them)', () => {
+    const responderBuilds = ALL.filter((r) => {
+      const cap = roleOf(r)?.capability;
+      return (
+        cap &&
+        can([ChatbotMemberRole.RESPONDER], cap) &&
+        cap !== ChatbotCapability.VIEW &&
+        cap !== ChatbotCapability.RESPOND
+      );
+    }).map(label);
+    expect(responderBuilds).toEqual([]);
+    const build = ALL.filter(
+      (r) => roleOf(r)?.capability === ChatbotCapability.BUILD,
+    );
+    expect(build.length).toBeGreaterThan(20);
   });
 });

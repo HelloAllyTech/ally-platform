@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,7 +10,6 @@ import {
   ParseUUIDPipe,
   Post,
   Put,
-  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -31,6 +31,7 @@ import { ChatbotAccessService } from '../service/chatbot-access.service';
 import { BotPageAccessService } from './bot-page-access.service';
 import { BotPageRateLimitService } from './bot-page-rate-limit.service';
 import { BotPageService } from './bot-page.service';
+import { WidgetSitesService } from './widget-sites.service';
 import { ChatbotRole } from '../access/chatbot-role.decorator';
 
 const VIEW = { permissions: [PERMISSIONS.VIEW_WHATSAPP_BOT] };
@@ -51,6 +52,7 @@ export class BotPageAdminController {
     private readonly pages: BotPageService,
     private readonly pageAccess: BotPageAccessService,
     private readonly limits: BotPageRateLimitService,
+    private readonly sites: WidgetSitesService,
   ) {}
 
   @Get(':id/page')
@@ -77,38 +79,31 @@ export class BotPageAdminController {
   @ApiOperation({
     summary: 'Save the bot page',
     description:
-      'Public access needs the platform to allow it (botPagePublicAllowed). Links are unique.',
+      'Public access needs the platform to allow it (botPagePublicAllowed). Stage 7: the address is assigned by Ally; a `slug` other than the stored one is refused (400 address_not_editable), and so are the retired look fields (subtitle, avatarUrl, disclaimer, footerLink: 400 look_field_retired).',
   })
   async save(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateBotPageDto,
   ) {
     const { chatbot } = await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    const existing = await this.pages.findForChatbot(chatbot.id);
+    rejectRetiredPageFields(dto, existing?.slug ?? null);
     return this.pages.save(chatbot, dto);
   }
 
-  @Get(':id/page/slug-available')
+  // Stage 7: `GET :id/page/slug-available` is gone. The address is Ally's and can't be edited.
+
+  @Get(':id/widget-sites')
   @ChatbotRole(ChatbotMemberRole.VIEWER)
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, VIEW)
-  @ApiOperation({ summary: 'Whether a link is valid and free for this bot' })
-  async slugAvailable(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query('slug') slug: string,
-  ) {
-    await this.access.assert(id);
-    try {
-      const checked = BotPageService.checkSlug(slug);
-      return {
-        slug: checked,
-        available: await this.pages.slugAvailable(checked, id),
-      };
-    } catch (error) {
-      return {
-        slug,
-        available: false,
-        reason: (error as Error).message,
-      };
-    }
+  @ApiOperation({
+    summary: 'Sites the website widget has loaded on (stage 7)',
+    description:
+      'Most recent first, at most 200. Recorded at most once an hour per site, so counts are approximate.',
+  })
+  async widgetSites(@Param('id', ParseUUIDPipe) id: string) {
+    await this.access.assertOrStaffView(id, ChatbotMemberRole.EDITOR);
+    return { sites: await this.sites.list(id) };
   }
 
   @Post(':id/page/logo-url')
@@ -172,4 +167,48 @@ export class BotPageAdminController {
     }
     return page;
   }
+}
+
+const RETIRED_BRANDING = [
+  'subtitle',
+  'avatarUrl',
+  'disclaimer',
+  'footerLink',
+] as const;
+
+/**
+ * Stage 7, at the HTTP edge only (onboarding's publish calls `save` directly and its extra fields
+ * are ignored there): the owner can't set the address, and the retired look words are refused.
+ */
+export function rejectRetiredPageFields(
+  dto: UpdateBotPageDto,
+  storedSlug: string | null,
+): void {
+  if (
+    dto.slug !== undefined &&
+    dto.slug !== null &&
+    dto.slug.trim().toLowerCase() !== (storedSlug ?? '').toLowerCase()
+  ) {
+    throw new BadRequestException({
+      statusCode: 400,
+      error: 'address_not_editable',
+      message: "The page's address is assigned by Ally and can't be changed.",
+    });
+  }
+  const branding = (dto.settings?.branding ?? {}) as unknown as Record<
+    string,
+    unknown
+  >;
+  const sent = RETIRED_BRANDING.filter((key) => key in branding);
+  const brand = (dto.settings as unknown as { brand?: object } | undefined)
+    ?.brand;
+  if (sent.length) {
+    throw new BadRequestException({
+      statusCode: 400,
+      error: 'look_field_retired',
+      message: `These can no longer be changed: ${sent.join(', ')}. The page shows its name, logo, one colour and a welcome line.`,
+      fields: sent,
+    });
+  }
+  if (brand) BotPageService.rejectRetiredLook(brand);
 }

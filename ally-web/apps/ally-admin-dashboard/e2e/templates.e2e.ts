@@ -77,41 +77,8 @@ test.describe("Templates in setup", () => {
     await mockTemplates(page);
   });
 
-  test("start from a template: two groups, organisations first, then the questions", async ({
-    page,
-  }) => {
-    await page.goto("/dev/onboarding?screen=start");
-    await page.getByTestId("start-method-template").click();
-    await expect(page.getByRole("heading", { name: "What is your assistant for?" })).toBeVisible();
-    await page.evaluate(() => document.fonts.ready);
-
-    const groups = page.locator("section.ally-templates__group");
-    await expect(groups).toHaveCount(2);
-    await expect(groups.nth(0)).toHaveAttribute("aria-label", "For organisations");
-    await expect(groups.nth(1)).toHaveAttribute("aria-label", "For businesses");
-    // The sign-in page's six, in its order.
-    await expect(
-      page.getByTestId("template-group-organisations").locator(".ally-templates__name"),
-    ).toHaveText([
-      "Helpline and crisis support",
-      "Services and eligibility",
-      "Donors and volunteers",
-      "Staff and volunteer onboarding",
-      "Reach more communities",
-      "Campaigns and urgent updates",
-    ]);
-    await expect(page.getByTestId("template-group-businesses").locator("li")).toHaveCount(11);
-    await expect(page).toHaveScreenshot("templates-setup-cards.png", { fullPage: true });
-    await check(page);
-
-    await page.getByTestId("template-card-helpline").click();
-    await expect(
-      page.getByRole("heading", { name: "A few questions to make it yours" }),
-    ).toBeVisible();
-    await expect(page.getByText("What’s your helpline number, and when is it open?")).toBeVisible();
-    await expect(page).toHaveScreenshot("templates-setup-questions.png", { fullPage: true });
-    await check(page);
-  });
+  // Stage 3: "Pick a template" on a new chatbot is the Create and Build screen's now
+  // (createBuild.e2e.ts); the old start screen's template cards are gone.
 
   test("after the site is read: a head start from a template", async ({ page }) => {
     await page.goto("/dev/onboarding?screen=learned&hold=1");
@@ -133,7 +100,7 @@ test.describe("Templates in Tools", () => {
     await mockAssistantHome(page);
     await mockLists(page, { start: "empty" });
     await mockTemplates(page);
-    await page.goto(`/dev/assistant-home/${BOT_ID}?section=lists`);
+    await page.goto(`/dev/assistant-home/${BOT_ID}?section=knowledge&part=lists`);
     await expect(page.getByTestId("lists-empty")).toBeVisible();
     await page.getByTestId("lists-start-template").first().click();
 

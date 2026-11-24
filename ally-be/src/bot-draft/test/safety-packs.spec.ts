@@ -67,7 +67,17 @@ describe('safety packs', () => {
     expect(block).toMatch(/^<safety_rules fixed="true">/);
     expect(block).toContain('Never diagnose');
     expect(block).toContain('- Never: discuss fees for other clinics');
-    expect(packRulesBlock(null)).toBeNull();
+    // Stage 4: a bot with no pack still gets the base block.
+    const base = packRulesBlock(null);
+    expect(base).toMatch(/^<safety_rules fixed="true">/);
+    expect(base).toContain('Never say or suggest that you are a human');
+    expect(base).toContain(
+      'Never give medical, legal or emergency instructions',
+    );
+    expect(base).toContain('The person may be under 18');
+    expect(packRulesBlock(null, [], { audienceAge: 'adults' })).not.toContain(
+      'under 18',
+    );
   });
 });
 
@@ -99,28 +109,37 @@ describe('crisis and emergency replies in the person language (Q3-fast Part 1)',
   const packs = require('../safety-pack/safety-packs');
 
   it.each(['en', 'hi', 'hi-latn'])(
-    'the at-risk reply in %s always has a real number',
+    'the at-risk reply in %s always carries the findahelpline.com link, no country numbers (R6)',
     (language) => {
       for (const pack of ['mental_health', 'medical', 'standard', null]) {
         const reply: string = packs.crisisReply({ pack, language });
-        expect(reply).toMatch(/14416/);
-        expect(reply).not.toMatch(/your local crisis line/);
+        expect(reply).toContain('https://findahelpline.com');
+        expect(reply).not.toMatch(/14416|112|your local crisis line/);
       }
+      // The builder's own numbers come first.
+      const own: string = packs.crisisReply({
+        pack: null,
+        language,
+        helplineNumbers: '1800 111 222',
+      });
+      expect(own.indexOf('1800 111 222')).toBeLessThan(
+        own.indexOf('https://findahelpline.com'),
+      );
     },
   );
 
-  it('the emergency reply sends them to emergency care, names the business, and adds Tele-MANAS only with self-harm', () => {
+  it('the emergency reply sends them to emergency care, names the business, and adds the crisis information only with self-harm', () => {
     expect(
       packs.emergencyReply({
         organisation: 'Cloudnine',
         emergencyNumber: '99724 99724',
       }),
     ).toBe(
-      'This sounds like an emergency. Please go to the nearest emergency department now, or call 112 or an ambulance on 108. You can also call Cloudnine on 99724 99724.',
+      'This sounds like an emergency. Please go to the nearest emergency department now, or call your local emergency number. You can also call Cloudnine on 99724 99724.',
     );
-    expect(packs.emergencyReply({})).not.toMatch(/14416/);
+    expect(packs.emergencyReply({})).not.toMatch(/findahelpline|112|108/);
     expect(packs.emergencyReply({ selfHarm: true })).toMatch(
-      /Tele-MANAS on 14416/,
+      /https:\/\/findahelpline\.com/,
     );
     expect(packs.emergencyReply({ animal: true })).toMatch(
       /^This sounds like an emergency\. Please go to the nearest emergency department or your nearest vet now/,
@@ -133,7 +152,7 @@ describe('crisis and emergency replies in the person language (Q3-fast Part 1)',
       /^लगता है कि यह गंभीर स्थिति हो सकती है।/,
     );
     expect(packs.emergencyReply({ language: 'hi-latn' })).toMatch(
-      /^Yeh emergency lagti hai\. .*112 .*108/,
+      /^Yeh emergency lagti hai\. .*local emergency number/,
     );
   });
 });
@@ -147,6 +166,22 @@ describe('newHelplines (chunk H1)', () => {
       newHelplines('Tele-MANAS 14416, Vandrevala 9999 666 555', already),
     ).toBe('Vandrevala 9999 666 555');
     expect(newHelplines('', already)).toBe('');
+  });
+});
+
+describe('safety pack display names', () => {
+  it('are distinct on the staff page, while owners keep the approved name', () => {
+    const shown = Object.values(SAFETY_PACKS).map(
+      (p) => p.curatorName ?? p.name,
+    );
+    expect(new Set(shown).size).toBe(shown.length);
+    expect(SAFETY_PACKS[SafetyPackId.MEDICAL].curatorName).toBe(
+      'Medical safety (clinics and labs)',
+    );
+    expect(SAFETY_PACKS[SafetyPackId.PHARMACY].curatorName).toBe(
+      'Medical safety (pharmacies)',
+    );
+    expect(SAFETY_PACKS[SafetyPackId.PHARMACY].name).toBe('Medical safety');
   });
 });
 

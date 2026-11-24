@@ -132,6 +132,23 @@ export const en = {
       cancelled: "Cancelled",
     },
   },
+  /**
+   * Crisis information shown to every visitor on the sign-in screen, before any code is asked for,
+   * and the fixed notifications for a blocked turn (stage 6, R1/R6). COPY: needs approval
+   */
+  crisis: {
+    title: "If you need support now",
+    link: "Find a helpline near you at findahelpline.com",
+    linkLabel: "findahelpline.com",
+    linkUrl: "https://findahelpline.com",
+    numbers: "You can call {numbers}.",
+    invited: "If you were invited, check your email.",
+  },
+  blocked: {
+    OUT_OF_CREDITS: "This assistant can't reply right now.",
+    REMOVED_FROM_LIST: "This assistant is available by invitation only.",
+    crisisLead: "If you need support now, you can find a helpline near you at",
+  },
   /** The website widget (copy §22, chunk 13). */
   embed: {
     close: "Close",

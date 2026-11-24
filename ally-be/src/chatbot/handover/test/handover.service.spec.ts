@@ -77,6 +77,12 @@ function harness(
     emitAsync: jest.fn(async () => [{ messageId: 'wa-1', sent: true }]),
   };
   const email = { sendHandoverAlert: jest.fn().mockResolvedValue(true) };
+  const crisis = {
+    flag: jest.fn().mockResolvedValue(undefined),
+    markTaken: jest.fn().mockResolvedValue(undefined),
+    recipientEmails: jest.fn().mockResolvedValue(['owner@clinic.example']),
+  };
+  const outbox = { enqueue: jest.fn().mockResolvedValue(true) };
   const service = new HandoverService(
     { query } as never,
     { appendMessage, setMetadata: jest.fn() } as never,
@@ -87,8 +93,12 @@ function harness(
     emitter as never,
     email as never,
     { adminBaseUrl: 'https://admin.example' } as never,
+    crisis as never,
+    outbox as never,
   );
   return {
+    crisis,
+    outbox,
     service,
     query,
     calls,
@@ -335,17 +345,23 @@ describe('HandoverService', () => {
       h.query.mockImplementationOnce(async () => [
         { id: 'bot-1', settings: {} },
       ]);
-      h.query.mockImplementationOnce(async () => [
-        { email: 'owner@clinic.example' },
-      ]);
       await expect(
         h.service.emailUnopened(new Date('2026-11-12T09:20:00Z')),
       ).resolves.toBe(1);
-      expect(h.email.sendHandoverAlert).toHaveBeenCalledWith({
-        to: 'owner@clinic.example',
-        subject: 'A conversation needs you',
-        body: 'Someone talking to Sunrise Mind would like a person. Nobody has opened the conversation yet. Open it: https://admin.example/chatbots?tab=inbox&conversation=conv-1&bot=bot-1',
-      });
+      // Through the outbox, not sent here: a failed send is retried and never marked sent.
+      expect(h.email.sendHandoverAlert).not.toHaveBeenCalled();
+      expect(h.outbox.enqueue).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipient: 'owner@clinic.example',
+          channel: 'email',
+          kind: 'needs_person',
+          dedupeKey: 'needs_person:conv-1:owner@clinic.example',
+          payload: {
+            subject: 'A conversation needs you',
+            body: 'Someone talking to Sunrise Mind would like a person. Nobody has opened the conversation yet. Open it: https://admin.example/chatbots?tab=inbox&conversation=conv-1&bot=bot-1',
+          },
+        }),
+      );
       expect(info.mock.calls.map((c) => String(c[0])).join('\n')).not.toMatch(
         /owner@/,
       );
@@ -368,7 +384,165 @@ describe('HandoverService', () => {
       await expect(
         h.service.emailUnopened(new Date('2026-11-12T09:20:00Z')),
       ).resolves.toBe(0);
-      expect(h.email.sendHandoverAlert).not.toHaveBeenCalled();
+      expect(h.outbox.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('marks the chat emailed only after the rows are queued', async () => {
+      const h = harness();
+      h.query.mockImplementationOnce(async () => [
+        {
+          id: CHAT,
+          chatbot_id: 'bot-1',
+          needs_person_since: new Date('2026-11-12T09:00:00Z'),
+          assistant: 'x',
+        },
+      ]);
+      h.query.mockImplementationOnce(async () => [
+        { id: 'bot-1', settings: {} },
+      ]);
+      h.outbox.enqueue.mockRejectedValueOnce(new Error('db down'));
+      await expect(
+        h.service.emailUnopened(new Date('2026-11-12T09:20:00Z')),
+      ).rejects.toThrow('db down');
+    });
+
+    it('a digest bot gets one hourly email, held to the next hour', async () => {
+      const h = harness();
+      h.query.mockImplementationOnce(async () => [
+        {
+          id: CHAT,
+          chatbot_id: 'bot-1',
+          needs_person_since: new Date('2026-11-12T09:00:00Z'),
+          assistant: 'x',
+        },
+      ]);
+      h.query.mockImplementationOnce(async () => [
+        { id: 'bot-1', settings: { alertPolicy: { mode: 'digest' } } },
+      ]);
+      await h.service.emailUnopened(new Date('2026-11-12T09:20:00Z'));
+      const call = h.outbox.enqueue.mock.calls[0][0];
+      expect(call.kind).toBe('needs_person_digest');
+      expect(call.dedupeKey).toMatch(/^digest:\d+:owner@clinic.example$/);
+      expect(call.notBefore).toEqual(new Date('2026-11-12T10:00:00Z'));
+    });
+  });
+
+  describe('crisis flags', () => {
+    it('a crisis reply flags the conversation through the crisis service', async () => {
+      const h = harness();
+      await h.service.afterDecision(
+        BOT,
+        CHAT,
+        {
+          handledBy: WaHandledBy.CRISIS,
+          body: 'x',
+          templateId: 't',
+          // Stage 4: the engine sets the level and path; nothing is inferred.
+          crisis: { level: 1, path: 'keyword' },
+        },
+        new Date('2026-11-12T09:00:00Z'),
+      );
+      expect(h.crisis.flag).toHaveBeenCalledWith(
+        BOT,
+        CHAT,
+        { level: 1, path: 'keyword' },
+        new Date('2026-11-12T09:00:00Z'),
+      );
+    });
+
+    it('taking over marks the flag taken', async () => {
+      const h = harness();
+      await h.service.takeOver('bot-1', CHAT, 7);
+      expect(h.crisis.markTaken).toHaveBeenCalledWith(CHAT);
+    });
+
+    it('a flagged chat never goes back to the assistant unless the owner allows it', async () => {
+      const h = harness();
+      const stale = new Date('2026-11-10T00:00:00Z');
+      const held = [
+        {
+          id: CHAT,
+          chatbot_id: 'bot-1',
+          channel: 'web',
+          since: stale,
+          safety_first_at: stale,
+        },
+      ];
+      h.query.mockImplementationOnce(async () => held);
+      h.query.mockImplementationOnce(async () => [
+        { id: 'bot-1', settings: {} },
+      ]);
+      await expect(
+        h.service.autoHandBack(new Date('2026-11-12T09:00:00Z')),
+      ).resolves.toBe(0);
+    });
+  });
+
+  describe('stage 4', () => {
+    it('reminds the customer that a person and the AI can read the chat when someone takes over', async () => {
+      const h = harness();
+      h.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('SET handled_by_user_id = $3'))
+          return [[{ id: CHAT }], 1];
+        if (sql.includes('"lastText"'))
+          return [{ channel: 'web', name: 'Sunrise', lastText: 'hello' }];
+        return [];
+      });
+      await h.service.takeOver('bot-1', CHAT, 7);
+      const calls = h.appendMessage.mock.calls;
+      const stored = calls[calls.length - 1]?.[1];
+      expect(stored?.text).toBe(
+        'A person from Sunrise has joined this chat. They and the AI can read this conversation.',
+      );
+      expect(h.events.publishVisitor).toHaveBeenCalledWith(CHAT, {
+        type: 'state',
+        by: 'person',
+      });
+      expect(h.events.publishVisitor).toHaveBeenCalledWith(
+        CHAT,
+        expect.objectContaining({ type: 'message', text: stored?.text }),
+      );
+    });
+
+    it('hands a chat back after the owner’s minutes of idle time, not hours', async () => {
+      const now = new Date('2026-11-12T09:00:00Z');
+      const run = async (
+        minutesIdle: number,
+        handover: Record<string, unknown>,
+      ) => {
+        const h = harness();
+        const since = new Date(now.getTime() - minutesIdle * 60_000);
+        h.query.mockImplementation(async (sql: string) => {
+          if (
+            sql.includes('FROM chatbot_conversations c') &&
+            sql.includes('GREATEST')
+          )
+            return [
+              {
+                id: CHAT,
+                chatbot_id: 'bot-1',
+                channel: 'web',
+                since,
+                safety_first_at: null,
+              },
+            ];
+          if (sql.includes('FROM chatbots WHERE id'))
+            return [{ id: 'bot-1', settings: {} }];
+          if (sql.includes('SET handled_by_user_id = NULL'))
+            return [[{ id: CHAT }], 1];
+          return [];
+        });
+        (
+          h.service as unknown as { settings: { getForChatbot: jest.Mock } }
+        ).settings.getForChatbot.mockResolvedValue({
+          ...DEFAULT_WHATSAPP_SETTINGS,
+          handover,
+        });
+        return h.service.autoHandBack(now);
+      };
+      await expect(run(20, {})).resolves.toBe(0); // default 30 minutes
+      await expect(run(31, {})).resolves.toBe(1);
+      await expect(run(6, { autoHandBackMinutes: 5 })).resolves.toBe(1);
     });
   });
 });

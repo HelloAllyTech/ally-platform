@@ -1,6 +1,7 @@
 import { usageContext } from 'src/billing/context/usage-context';
 import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { LedgerService } from 'src/billing/service/ledger.service';
 import { DataSource, EntityManager } from 'typeorm';
 import { isHealthPack } from '../../bot-draft/safety-pack/safety-packs';
 import { LoggerService } from '../../logger/logger.service';
@@ -23,6 +24,8 @@ import {
 } from '../bot-page/bot-page-intake';
 import { memorySettingsOf } from './memory-settings';
 import { matchesNeverStore, neverStoreList } from './never-store';
+import { MemoryConsentService } from '../privacy/memory-consent.service';
+import { safetySettingsOf } from '../safety/safety-settings';
 
 export { memorySettingsOf } from './memory-settings';
 
@@ -161,6 +164,10 @@ export class MemoryService {
     private readonly dataSource: DataSource,
     private readonly ai: AiService,
     private readonly settings: ChatbotSettingsService,
+    // Stage 6: the health check's model call is skipped once the budget is empty (keeps none).
+    @Optional() private readonly ledger?: LedgerService,
+    // Stage 5 (D7): memory lines are written only once the person said yes. Optional for specs.
+    @Optional() private readonly consent?: MemoryConsentService,
   ) {}
 
   // ──────────────────────────────────────────────────────────── the run
@@ -477,6 +484,13 @@ export class MemoryService {
 
     const refuse = (text: string) =>
       matchesNeverStore(text, chatbot.safetyPack, settings.neverStore);
+    // Stage 5 (D7): no memory line without this person's yes. Their name is contact data, not
+    // memory, and is unaffected; done/forget only ever remove.
+    const consented = this.consent
+      ? await this.consent
+          .isGranted(chatbot.id, run.contactId)
+          .catch(() => false)
+      : true;
     // Code checks first; then, on a health pack, the model check over every line to be written.
     const checked: AgentMemoryWrite[] = [];
     for (const write of run.writes) {
@@ -495,6 +509,7 @@ export class MemoryService {
       }
       if (write.op === 'add' || write.op === 'replace') {
         if (
+          !consented ||
           !text ||
           text.length > MAX_LINE_CHARS ||
           refuse(text) ||
@@ -519,10 +534,14 @@ export class MemoryService {
     const lines = checked.filter((w) => w.op === 'add' || w.op === 'replace');
     let keep = lines.map(() => true);
     if (lines.length && isHealthPack(chatbot.safetyPack)) {
-      keep = await this.healthCheck(
-        lines.map((w) => w.text!),
-        neverStoreList(chatbot.safetyPack, settings.neverStore),
-      );
+      // Stage 6: with the budget empty the check is not run, and (failing closed) nothing is kept.
+      keep =
+        this.ledger && !(await this.ledger.budgetHasRoom(chatbot.id))
+          ? lines.map(() => false)
+          : await this.healthCheck(
+              lines.map((w) => w.text!),
+              neverStoreList(chatbot.safetyPack, settings.neverStore),
+            );
     }
     const allowed = checked.filter((w) => {
       const i = lines.indexOf(w);
@@ -532,7 +551,10 @@ export class MemoryService {
     });
     if (!allowed.length) return out;
 
-    const retentionDays = (await this.settings.get()).retentionDays;
+    // Stage 5 (D11): the chatbot's own retention days, not the platform's.
+    const retentionDays = safetySettingsOf(
+      chatbot.settings as never,
+    ).retentionDays;
     const now = new Date();
     await this.dataSource.transaction(async (m) => {
       // One writer per person at a time, so the limit and renewals can't race.

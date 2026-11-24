@@ -7,44 +7,37 @@ import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
 import { Toast } from "@components/v2";
 import { ROUTES } from "@constants";
-import { Chatbot, ChatbotMemberRole, ChatbotStatus } from "@types";
+import { Chatbot, ChatbotStatus } from "@types";
 
+import { chatbotAccess } from "./access";
 import { ChangePanel } from "./ChangePanel";
 import { fill, HOME } from "./copy";
+import { STRUCTURE } from "./copy/structure";
 import { day } from "./dates";
 import { EnginePanel } from "./EnginePanel";
 import { isNoAccess, NoAccess } from "./NoAccess";
-import { SECTION_IDS, SectionId, sectionFromUrl } from "./sections";
+import { ReadOnlyContext } from "./readOnly";
+import { PartId, SectionId, sectionFromUrl, visibleSections } from "./sections";
 import { SettingsPanel } from "./SettingsPanel";
 import { HomeSaves, HomeSavesContext, SaveState } from "./useHomeField";
 import { COPY } from "../Onboarding/copy";
 import { ChatbotContext } from "../WhatsAppBot/chatbotContext";
 import { LoadError } from "../WhatsAppBot/shared";
 import { UnsavedChangesContext } from "../WhatsAppBot/unsavedChanges";
-import { CheckupSection } from "./sections/Checkup";
+import { BuildSection } from "./sections/Build";
+import { ChannelsSection } from "./sections/Channels";
 import { ConversationsSection } from "./sections/Conversations";
-import { HowItWorksSection } from "./sections/HowItWorks";
-import { KnowsSection } from "./sections/Knows";
+import { KnowledgeSection } from "./sections/Knowledge";
 import { OverviewSection } from "./sections/Overview";
-import { PageSection } from "./sections/Page";
-import { PersonalitySection } from "./sections/Personality";
-import { SafetySection } from "./sections/Safety";
-import { ShareSection } from "./sections/Share";
+import { SettingsSection } from "./sections/Settings";
 import { TryIt } from "./TryIt";
 import { AssistantSwitcher } from "./ui/AssistantSwitcher";
 import { MoreMenu } from "./ui/Menu";
 import { Sheet } from "./ui/Sheet";
 import { useRestoreAssistant } from "./ui/useRestoreAssistant";
-import { ListsSection } from "./userLists/ListsSection";
 
 import "./home.css";
 import "./ui/scale.css";
-
-const RANK: Record<ChatbotMemberRole, number> = {
-  [ChatbotMemberRole.VIEWER]: 1,
-  [ChatbotMemberRole.EDITOR]: 2,
-  [ChatbotMemberRole.OWNER]: 3,
-};
 
 const STATUS_LABEL: Record<ChatbotStatus, string> = {
   [ChatbotStatus.LIVE]: HOME.status.live,
@@ -82,7 +75,7 @@ const useMedia = (query: string): boolean => {
  * field saves on its own with the version it started from; there are no Save buttons and no
  * unsaved-changes prompt.
  */
-export const AssistantHome: React.FC = () => {
+export const AssistantHome: React.FC<{ readOnly?: boolean }> = ({ readOnly = false }) => {
   const { botId = "" } = useParams();
   const [params, setParams] = useSearchParams();
   const {
@@ -97,8 +90,19 @@ export const AssistantHome: React.FC = () => {
   const { restore, restoring } = useRestoreAssistant();
 
   const fromUrl = sectionFromUrl(params);
-  const section = fromUrl.section;
-  const [panel, setPanel] = useState<Panel>(fromUrl.tryIt ? "try" : null);
+  // A Responder-only member sees Conversations and nothing else: any other link lands there.
+  const access = chatbotAccess(bot);
+  // Staff looking in (readOnly) see Conversations too, but only as a read-only inbox, and only
+  // while an owner's grant is live (`ConversationsSection` → `StaffConversations`).
+  const shown = visibleSections(access.responderOnly);
+  const section: SectionId = shown.includes(fromUrl.section) ? fromUrl.section : shown[0];
+  const part: PartId | null =
+    section === "build"
+      ? ((fromUrl.part === "checkup" ? "checkup" : "personality") as PartId)
+      : section === "knowledge"
+        ? ((fromUrl.part === "lists" ? "lists" : "knows") as PartId)
+        : null;
+  const [panel, setPanel] = useState<Panel>(fromUrl.tryIt && !readOnly ? "try" : null);
   const [tryQuestion, setTryQuestion] = useState<string | undefined>();
 
   // The page's one save status and "Changed · Undo" toast, fed by every field.
@@ -114,8 +118,8 @@ export const AssistantHome: React.FC = () => {
 
   const mainRef = useRef<HTMLDivElement>(null);
   const go = useCallback(
-    (id: SectionId) => {
-      setParams(id === "overview" ? {} : { section: id });
+    (id: SectionId, next?: PartId) => {
+      setParams(id === "overview" ? {} : next ? { section: id, part: next } : { section: id });
       // Focus moves to the new section's heading, for keyboard and screen reader users.
       requestAnimationFrame(() =>
         mainRef.current?.querySelector<HTMLElement>("[data-section-heading]")?.focus(),
@@ -137,15 +141,15 @@ export const AssistantHome: React.FC = () => {
   const wide = useMedia(WIDE);
   const phone = useMedia(PHONE);
   // The inbox is two columns of its own: the panel never docks beside it.
-  const docked = wide && section !== "conversations";
+  // Build is full width: the split carries its own test chatbot, so nothing docks beside it either.
+  const docked = wide && section !== "conversations" && section !== "build";
 
-  const editable =
-    !!bot && !!home.data && RANK[bot.myRole] >= RANK[ChatbotMemberRole.EDITOR] && home.data.canEdit;
+  const editable = !readOnly && !!bot && !!home.data && access.build && home.data.canEdit;
   const opened = useRef(false);
   useEffect(() => {
     if (!editable || opened.current) return;
     opened.current = true;
-    if (window.matchMedia?.(WIDE).matches && section !== "conversations") {
+    if (window.matchMedia?.(WIDE).matches && section !== "conversations" && section !== "build") {
       setPanel(p => p ?? "change");
     }
   }, [editable, section]);
@@ -183,14 +187,20 @@ export const AssistantHome: React.FC = () => {
 
   // A removed assistant, opened from the Archived list, is read-only.
   const archived = Boolean(bot.archivedAt);
-  const canEdit =
-    !archived && RANK[bot.myRole] >= RANK[ChatbotMemberRole.EDITOR] && home.data.canEdit;
-  const canManage = !archived && RANK[bot.myRole] >= RANK[ChatbotMemberRole.OWNER];
+  const canEdit = !readOnly && !archived && access.build && home.data.canEdit;
+  const canManage = !readOnly && !archived && access.manage;
   const tryIt = (question?: string) => {
     setTryQuestion(question);
     setPanel("try");
   };
-  const props = { bot, home: home.data, canEdit, canManage, go, tryIt };
+  const props = {
+    bot,
+    home: home.data,
+    canEdit,
+    canManage,
+    go,
+    tryIt: readOnly ? undefined : tryIt,
+  };
 
   const panelLabel =
     panel === "try"
@@ -201,115 +211,108 @@ export const AssistantHome: React.FC = () => {
           ? HOME.more.settings
           : HOME.more.engine;
 
-  const panelContent =
-    panel === "change" ? (
-      <ChangePanel
-        botId={bot.id}
-        canEdit={canEdit}
-        onClose={() => setPanel(null)}
-        onApplied={run => {
-          void refetch();
-          void home.refetch();
-          saves.changed(run);
-        }}
-        onUndone={() => {
-          void refetch();
-          void home.refetch();
-        }}
-      />
-    ) : panel === "try" ? (
-      <TryIt
-        bot={bot}
-        page={page ?? null}
-        question={tryQuestion}
-        onClose={() => {
-          setPanel(null);
-          setTryQuestion(undefined);
-        }}
-      />
-    ) : panel === "engine" ? (
-      <EnginePanel bot={bot} onClose={() => setPanel(null)} onTry={() => setPanel("try")} />
-    ) : panel === "settings" ? (
-      <SettingsPanel bot={bot} onClose={() => setPanel(null)} />
-    ) : null;
+  const panelContent = readOnly ? null : panel === "change" ? (
+    <ChangePanel
+      botId={bot.id}
+      canEdit={canEdit}
+      onClose={() => setPanel(null)}
+      onApplied={run => {
+        void refetch();
+        void home.refetch();
+        saves.changed(run);
+      }}
+      onUndone={() => {
+        void refetch();
+        void home.refetch();
+      }}
+    />
+  ) : panel === "try" ? (
+    <TryIt
+      bot={bot}
+      page={page ?? null}
+      question={tryQuestion}
+      onClose={() => {
+        setPanel(null);
+        setTryQuestion(undefined);
+      }}
+    />
+  ) : panel === "engine" ? (
+    <EnginePanel bot={bot} onClose={() => setPanel(null)} onTry={() => setPanel("try")} />
+  ) : panel === "settings" ? (
+    <SettingsPanel bot={bot} onClose={() => setPanel(null)} />
+  ) : null;
 
   const render = (id: SectionId) => {
     switch (id) {
-      case "knows":
-        return <KnowsSection {...props} />;
-      case "lists":
-        return <ListsSection {...props} />;
-      case "personality":
-        return <PersonalitySection {...props} />;
-      case "safety":
-        return <SafetySection {...props} />;
-      case "how":
-        return <HowItWorksSection {...props} />;
-      case "page":
-        return <PageSection {...props} />;
-      case "checkup":
-        return <CheckupSection {...props} />;
-      case "conversations":
-        return <ConversationsSection {...props} />;
-      case "share":
-        return <ShareSection {...props} />;
-      case "overview":
-      default:
+      case "build":
         return (
-          <OverviewSection
+          <BuildSection
             {...props}
-            page={page ?? null}
-            openAllNumbers={params.get("tab") === "usage"}
+            part={part === "checkup" ? "checkup" : "personality"}
+            onPart={next => go("build", next)}
           />
         );
+      case "knowledge":
+        return (
+          <KnowledgeSection
+            {...props}
+            part={part === "lists" ? "lists" : "knows"}
+            onPart={next => go("knowledge", next)}
+            openKey={fromUrl.tool}
+          />
+        );
+      case "channels":
+        return <ChannelsSection {...props} />;
+      case "settings":
+        return <SettingsSection {...props} />;
+      case "conversations":
+        return <ConversationsSection {...props} />;
+      case "overview":
+      default:
+        return <OverviewSection {...props} openAllNumbers={params.get("tab") === "usage"} />;
     }
   };
 
   return (
-    <HomeSavesContext.Provider value={saves}>
-      <ChatbotContext.Provider value={bot.id} key={bot.id}>
-        {/* The embedded classic pieces report unsaved edits; the home saves as it goes. */}
-        <UnsavedChangesContext.Provider value={noop}>
-          <div className="ally-v2 ally-home" data-testid="assistant-home" data-section={section}>
-            <header className="ally-home__top">
-              <nav className="ally-home__crumb ally-small" aria-label="Breadcrumb">
-                <Link
-                  to={archived ? `${ROUTES.WHATSAPP_BOT}?tab=archived` : ROUTES.WHATSAPP_BOT}
-                  className="ally-link"
-                >
-                  {archived ? HOME.archived.back : HOME.breadcrumb}
-                </Link>
-                <span aria-hidden="true"> / </span>
-                <span aria-current="page">{bot.name}</span>
-              </nav>
-              <div className="ally-home__title-row">
-                <h1 className="ally-home__title">{bot.name}</h1>
-                <AssistantSwitcher bot={bot} section={section} phone={phone} />
-                <StatusPill bot={bot} />
-                <span className="ally-small ally-home__saving" aria-live="polite">
-                  {saveState === "saving"
-                    ? HOME.saving.saving
-                    : saveState === "failed"
-                      ? HOME.saving.failed
-                      : saveState === "saved"
-                        ? HOME.saving.saved
-                        : canEdit
-                          ? HOME.saving.asYouGo
-                          : ""}
-                </span>
-                {!archived && (
-                  <div className="ally-home__actions">
-                    {canEdit && (
-                      <Button
-                        variant={ButtonVariant.TERTIARY}
-                        type="button"
-                        aria-pressed={panel === "change"}
-                        onClick={() => setPanel(p => (p === "change" ? null : "change"))}
-                      >
-                        {COPY.change.title}
-                      </Button>
-                    )}
-                    {page?.saved && (
+    <ReadOnlyContext.Provider value={readOnly}>
+      <HomeSavesContext.Provider value={saves}>
+        <ChatbotContext.Provider value={bot.id} key={bot.id}>
+          {/* The embedded classic pieces report unsaved edits; the home saves as it goes. */}
+          <UnsavedChangesContext.Provider value={noop}>
+            <div
+              className="ally-v2 ally-home"
+              data-testid="assistant-home"
+              data-section={section}
+              data-part={part ?? undefined}
+            >
+              <header className="ally-home__top">
+                <nav className="ally-home__crumb ally-small" aria-label="Breadcrumb">
+                  <Link
+                    to={archived ? `${ROUTES.WHATSAPP_BOT}?archived=1` : ROUTES.WHATSAPP_BOT}
+                    className="ally-link"
+                  >
+                    {archived ? HOME.archived.back : HOME.breadcrumb}
+                  </Link>
+                  <span aria-hidden="true"> / </span>
+                  <span aria-current="page">{bot.name}</span>
+                </nav>
+                <div className="ally-home__title-row">
+                  <h1 className="ally-home__title">{bot.name}</h1>
+                  {!readOnly && <AssistantSwitcher bot={bot} section={section} phone={phone} />}
+                  <StatusPill bot={bot} />
+                  <span className="ally-small ally-home__saving" aria-live="polite">
+                    {saveState === "saving"
+                      ? HOME.saving.saving
+                      : saveState === "failed"
+                        ? HOME.saving.failed
+                        : saveState === "saved"
+                          ? HOME.saving.saved
+                          : canEdit
+                            ? HOME.saving.asYouGo
+                            : ""}
+                  </span>
+                  {!archived && !access.responderOnly && readOnly && page?.saved && (
+                    <div className="ally-home__actions">
                       <a
                         className="ally-btn ally-btn--secondary ally-home__open-page"
                         href={page.link}
@@ -318,120 +321,154 @@ export const AssistantHome: React.FC = () => {
                       >
                         {HOME.openPage}
                       </a>
-                    )}
-                    <Button
-                      variant={ButtonVariant.PRIMARY}
-                      type="button"
-                      aria-pressed={panel === "try"}
-                      onClick={() => setPanel(p => (p === "try" ? null : "try"))}
-                    >
-                      {HOME.tryIt}
-                    </Button>
-                    <MoreMenu
-                      label={HOME.more.more}
-                      items={[
-                        ...(page?.saved
-                          ? [
-                              {
-                                label: HOME.openPage,
-                                href: page.link,
-                                external: true,
-                                phoneOnly: true,
-                              },
-                            ]
-                          : []),
-                        // Owners only (A1; Ally staff before): how it answers, and its own settings.
-                        ...(canManage
-                          ? [
-                              { label: HOME.more.engine, onSelect: () => setPanel("engine") },
-                              { label: HOME.more.settings, onSelect: () => setPanel("settings") },
-                            ]
-                          : []),
-                      ]}
-                    />
-                  </div>
-                )}
-              </div>
-              {archived && (
-                <div className="ally-home__archived" role="status">
-                  <p className="ally-small">
-                    {fill(HOME.archived.banner, { date: day(bot.archivedAt!) })}
-                  </p>
-                  {bot.myRole === ChatbotMemberRole.OWNER && (
-                    <Button
-                      variant={ButtonVariant.TERTIARY}
-                      type="button"
-                      disabled={restoring}
-                      onClick={async () => {
-                        if (await restore(bot)) {
-                          void refetch();
-                          void home.refetch();
-                        }
-                      }}
-                    >
-                      {HOME.archived.restore}
-                    </Button>
+                    </div>
+                  )}
+                  {!archived && !access.responderOnly && !readOnly && (
+                    <div className="ally-home__actions">
+                      {canEdit && (
+                        <Button
+                          variant={ButtonVariant.TERTIARY}
+                          type="button"
+                          aria-pressed={panel === "change"}
+                          onClick={() => setPanel(p => (p === "change" ? null : "change"))}
+                        >
+                          {COPY.change.title}
+                        </Button>
+                      )}
+                      {page?.saved && (
+                        <a
+                          className="ally-btn ally-btn--secondary ally-home__open-page"
+                          href={page.link}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {HOME.openPage}
+                        </a>
+                      )}
+                      <Button
+                        variant={ButtonVariant.PRIMARY}
+                        type="button"
+                        aria-pressed={panel === "try"}
+                        onClick={() => setPanel(p => (p === "try" ? null : "try"))}
+                      >
+                        {HOME.tryIt}
+                      </Button>
+                      <MoreMenu
+                        label={HOME.more.more}
+                        items={[
+                          ...(page?.saved
+                            ? [
+                                {
+                                  label: HOME.openPage,
+                                  href: page.link,
+                                  external: true,
+                                  phoneOnly: true,
+                                },
+                              ]
+                            : []),
+                          // Owners only (A1; Ally staff before): how it answers, and its own settings.
+                          ...(canManage
+                            ? [
+                                { label: HOME.more.engine, onSelect: () => setPanel("engine") },
+                                { label: HOME.more.settings, onSelect: () => setPanel("settings") },
+                              ]
+                            : []),
+                        ]}
+                      />
+                    </div>
                   )}
                 </div>
-              )}
-            </header>
-
-            <div className={`ally-home__body${panel ? " ally-home__body--panel" : ""}`}>
-              <nav className="ally-home__nav" aria-label={bot.name}>
-                <ul>
-                  {SECTION_IDS.map(id => (
-                    <li key={id}>
-                      <button
+                {archived && (
+                  <div className="ally-home__archived" role="status">
+                    <p className="ally-small">
+                      {fill(HOME.archived.banner, { date: day(bot.archivedAt!) })}
+                    </p>
+                    {access.manage && (
+                      <Button
+                        variant={ButtonVariant.TERTIARY}
                         type="button"
-                        className="ally-home__nav-item"
-                        aria-current={id === section ? "page" : undefined}
-                        onClick={() => go(id)}
+                        disabled={restoring}
+                        onClick={async () => {
+                          if (await restore(bot)) {
+                            void refetch();
+                            void home.refetch();
+                          }
+                        }}
                       >
-                        {HOME.sections[id]}
-                        {id === "knows" && bot.stats.openUnanswered > 0 && (
-                          <span className="ally-home__count">{bot.stats.openUnanswered}</span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
+                        {HOME.archived.restore}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </header>
 
-              <main className="ally-home__main" ref={mainRef} data-testid={`section-${section}`}>
-                {render(section)}
-              </main>
+              <div className={`ally-home__body${panel ? " ally-home__body--panel" : ""}`}>
+                <nav
+                  className="ally-home__nav"
+                  aria-label={bot.name}
+                  hidden={shown.length < 2}
+                  data-testid="home-nav"
+                >
+                  <ul>
+                    {shown.map(id => (
+                      <li key={id}>
+                        <button
+                          type="button"
+                          className="ally-home__nav-item"
+                          aria-current={id === section ? "page" : undefined}
+                          onClick={() => go(id)}
+                        >
+                          {STRUCTURE.sections[id]}
+                          {id === "knowledge" && bot.stats.openUnanswered > 0 && (
+                            <span className="ally-home__count">{bot.stats.openUnanswered}</span>
+                          )}
+                          {id === "conversations" && (bot.waitingForPerson ?? 0) > 0 && (
+                            <span className="ally-home__count" data-testid="waiting-count">
+                              {bot.waitingForPerson}
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
 
-              {panel && docked && (
-                <aside className="ally-home__panel" aria-label={panelLabel}>
+                <main className="ally-home__main" ref={mainRef} data-testid={`section-${section}`}>
+                  {render(section)}
+                </main>
+
+                {panel && docked && (
+                  <aside className="ally-home__panel" aria-label={panelLabel}>
+                    {panelContent}
+                  </aside>
+                )}
+              </div>
+
+              {panel && !docked && (
+                <Sheet
+                  label={panelLabel}
+                  onClose={() => setPanel(null)}
+                  side={phone ? "bottom" : "right"}
+                  testId="home-sheet"
+                >
                   {panelContent}
-                </aside>
+                </Sheet>
+              )}
+
+              {undo && (
+                <Toast
+                  key={undo.key}
+                  message={undo.message ?? COPY.look.changed}
+                  actionLabel={COPY.look.undo}
+                  onAction={undo.run}
+                  onDone={() => setUndo(null)}
+                />
               )}
             </div>
-
-            {panel && !docked && (
-              <Sheet
-                label={panelLabel}
-                onClose={() => setPanel(null)}
-                side={phone ? "bottom" : "right"}
-                testId="home-sheet"
-              >
-                {panelContent}
-              </Sheet>
-            )}
-
-            {undo && (
-              <Toast
-                key={undo.key}
-                message={undo.message ?? COPY.look.changed}
-                actionLabel={COPY.look.undo}
-                onAction={undo.run}
-                onDone={() => setUndo(null)}
-              />
-            )}
-          </div>
-        </UnsavedChangesContext.Provider>
-      </ChatbotContext.Provider>
-    </HomeSavesContext.Provider>
+          </UnsavedChangesContext.Provider>
+        </ChatbotContext.Provider>
+      </HomeSavesContext.Provider>
+    </ReadOnlyContext.Provider>
   );
 };
 

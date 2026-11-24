@@ -196,6 +196,14 @@ export class CreateBotDraftDto {
   @IsString()
   @MaxLength(120)
   name?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Stage 3: create a blank chatbot (the same as sending no input). Reuses the caller’s newest untouched blank.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  blank?: boolean;
 }
 
 /** "Describe it instead", after a website gave too little (chunk 20a-2). */

@@ -57,6 +57,19 @@ export class BotDraftEntity extends BaseWithoutTenantEntity {
     pages?: { include: string[]; exclude: string[] };
     /** Pages the owner removed from what it knows (Sources), never read again until restored. */
     removed?: string[];
+    /**
+     * Stage 3, a live chatbot only: documents added since go-live, owned by the chatbot but not yet
+     * on it (`chatbot_documents`). The working-copy test answers from them; Apply attaches them.
+     */
+    pendingDocumentIds?: string[];
+    /** Stage 3: the working copy's own notes document while its notes differ from live. */
+    workingNotesDocumentId?: string | null;
+    /** Stage 3: facts read from a staged source; the live facts document follows only on Apply. */
+    factsStaged?: boolean;
+    /** Stage 3, Copilot: addresses waiting for the crawl that is running to finish. */
+    crawlQueue?: string[];
+    /** Stage 3: the Ally library template this chatbot was set up from. */
+    template?: { id: string; version: number; name: string } | null;
   };
 
   @Column({
@@ -103,4 +116,26 @@ export class BotDraftEntity extends BaseWithoutTenantEntity {
   /** Bumped on every write; an edit made on an older version is refused (409). */
   @Column({ type: 'int', default: 0 })
   version!: number;
+
+  // ── Stage 3: the working copy (assistants build plan, section 3 "Config model") ──
+
+  /** Created at the click with nothing chosen yet (Create and Build). */
+  @Column({ type: 'boolean', default: false })
+  blank!: boolean;
+
+  /** The first meaningful action (template, path, source, edit, test). Null = untouched. */
+  @Column({ name: 'touched_at', type: 'timestamptz', nullable: true })
+  touchedAt?: Date | null;
+
+  /** When the chatbot first went live. After it, edits wait for Apply (R3). */
+  @Column({ name: 'live_at', type: 'timestamptz', nullable: true })
+  liveAt?: Date | null;
+
+  /** Per staged field: the hash of the live value the working copy last agreed with. */
+  @Column({ name: 'live_base', type: 'jsonb', default: () => "'{}'" })
+  liveBase!: Record<string, string>;
+
+  /** The builder's last mode on this chatbot. */
+  @Column({ name: 'build_mode', type: 'varchar', length: 16, nullable: true })
+  buildMode?: 'copilot' | 'form' | null;
 }

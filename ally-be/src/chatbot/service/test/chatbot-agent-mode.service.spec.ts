@@ -39,8 +39,9 @@ describe('ChatbotService and Agent mode', () => {
       const result = await service.test('bot-1', { message: 'hi' });
       expect(result.turnType).toBe('smalltalk');
       // An empty chat stands for a new person: the agent's hello gets the notice too.
+      // Stage 4: the fixed start notice (an AI and people may read this chat) comes first.
       expect(result.reply).toBe(
-        `Hi there!\n\n${DEFAULT_WHATSAPP_SETTINGS.disclaimerText}`,
+        `Hi there!\n\nYou are chatting with an AI assistant. The AI and people at Ally FAQ may read this chat.\n${DEFAULT_WHATSAPP_SETTINGS.disclaimerText}`,
       );
       expect(respond.mock.calls[0][0].isFirstMessage).toBe(true);
     });

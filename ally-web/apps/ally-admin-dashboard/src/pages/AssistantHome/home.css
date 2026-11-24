@@ -791,7 +791,9 @@
 }
 
 @media (max-width: 959px) {
-  .ally-home__open-page {
+  /* Scoped to the header so it outranks `.ally-btn { display: inline-flex }`, whichever stylesheet
+     loads last; otherwise the row runs past a phone's width. */
+  .ally-home__actions .ally-home__open-page {
     display: none;
   }
   .ally-more--phone {
@@ -897,11 +899,17 @@
   max-width: 260px;
 }
 /* The inbox uses the whole width: it's two columns of its own. */
-.ally-home[data-section="conversations"] .ally-home__main {
+.ally-home[data-section="conversations"] .ally-home__main,
+.ally-home[data-section="build"] .ally-home__main {
   max-width: none;
 }
+/* Build: the split fills the width right of the section nav and the height under the header. */
+.ally-home[data-section="build"] .ally-build__home {
+  height: max(560px, calc(100vh - 230px));
+  min-height: 560px;
+}
 /* Lists (chunk 5b): a table needs the room. */
-.ally-home[data-section="lists"] .ally-home__main {
+.ally-home[data-section="knowledge"][data-part="lists"] .ally-home__main {
   max-width: 1120px;
 }
 .ally-home[data-section="conversations"] .ally-inbox__head {
@@ -1503,4 +1511,92 @@ button.ally-switcher__item {
   justify-content: flex-start;
   align-items: flex-start;
   white-space: normal;
+}
+
+/* ── Parts of a section (stage 2): Build and Knowledge hold two each ── */
+.ally-home__parts {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  border-radius: 12px;
+  background: var(--ally-sunken);
+}
+button.ally-home__part {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ally-muted);
+  font: 500 14px/1 var(--ally-font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+button.ally-home__part[aria-selected="true"] {
+  background: var(--ally-surface);
+  color: var(--ally-ink);
+  box-shadow: 0 1px 2px rgba(23, 23, 28, 0.08);
+}
+button.ally-home__part:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ally-accent);
+}
+.ally-home__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── Overview: how it's doing (stage 7). Phone first: one card per row, two from 640px. ── */
+.ally-overview__cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+.ally-overview__card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: var(--ally-radius-sm);
+  background: var(--ally-surface-2);
+  border: 1px solid var(--ally-line);
+  overflow-wrap: anywhere;
+}
+.ally-overview__card dl,
+.ally-overview__pair {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.ally-overview__pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.ally-overview__stat {
+  background: var(--ally-surface);
+}
+.ally-overview__spark svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.ally-overview__series {
+  display: grid;
+  gap: 4px;
+}
+.ally-overview__list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+.ally-overview__skeleton {
+  height: 160px;
+}
+@media (min-width: 640px) {
+  .ally-overview__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

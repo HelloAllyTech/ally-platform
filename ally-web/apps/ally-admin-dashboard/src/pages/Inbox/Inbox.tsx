@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { useSearchParams } from "react-router-dom";
 
@@ -25,6 +25,8 @@ import {
   soundOn,
 } from "./notifications";
 import { useInboxStream } from "./useInboxStream";
+import { chatbotAccess } from "../AssistantHome/access";
+import { useReadOnly } from "../AssistantHome/readOnly";
 
 import "../../components/v2/v2.css";
 import "./inbox.css";
@@ -34,6 +36,10 @@ const VIEWS: InboxView[] = ["needs_person", "live", "all"];
 // Land on the chats that are waiting for a person, not on a wall of every chat. "All" is one
 // click away and is kept in the URL (?view=all) so a shared link still opens where it was sent.
 const DEFAULT_VIEW: InboxView = "needs_person";
+
+/** A 403 from ally-be: for Ally staff, the owner's grant has ended (or was taken back). */
+export const isForbidden = (error: unknown): boolean =>
+  (error as { status?: unknown } | undefined)?.status === 403;
 
 const ago = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
@@ -46,16 +52,29 @@ const ago = (iso: string) =>
  * It lives in AI Chatbots: the Inbox tab (every assistant you can see) and each assistant's own
  * Inbox section (`chatbotId`, that assistant only). A fixed-height panel: the list and the chat
  * scroll inside it; on a phone, the list or the chat.
+ *
+ * Read-only (`useReadOnly`, Ally staff with an owner's live grant): the list and the chats only.
+ * No live stream, notifications, sound, counts, take over, hand back, reply, checkup or memory
+ * edits; a 403 (the grant ended) calls `onForbidden`.
  */
-export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) => {
+export const Inbox: React.FC<{ chatbotId?: string; onForbidden?: () => void }> = ({
+  chatbotId: locked,
+  onForbidden,
+}) => {
+  const readOnly = useReadOnly();
   const [params, setParams] = useSearchParams();
   const view = (params.get("view") as InboxView) || DEFAULT_VIEW;
   const channel = (params.get("channel") as InboxChannelFilter) || undefined;
   const chatbotId = locked ?? (params.get("assistant") || undefined);
   const selected = params.get("conversation");
-  const { data: items = [], isLoading } = useGetInboxQuery({ view, channel, chatbotId });
+  const {
+    data: items = [],
+    isLoading,
+    error: listError,
+  } = useGetInboxQuery({ view, channel, chatbotId });
   const { data: bots } = useGetChatbotsQuery();
-  const { data: counts } = useGetInboxCountsQuery();
+  // Counts are the caller's own assistants; staff are on none, so they'd only mislead.
+  const { data: counts } = useGetInboxCountsQuery(undefined, { skip: readOnly });
   const { user } = useUser();
   const [sound, setSoundState] = useState(soundOn());
   const [askNotify, setAskNotify] = useState(canAskForNotifications());
@@ -68,6 +87,10 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
     else next.delete(key);
     setParams(next, { replace: true });
   };
+
+  useEffect(() => {
+    if (readOnly && isForbidden(listError)) onForbidden?.();
+  }, [readOnly, listError, onForbidden]);
 
   useInboxStream(event => {
     if (!event.conversationId || !event.chatbotId) return;
@@ -82,7 +105,7 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
       notify(fill(INBOX.notifyNeedsPerson, { business }), open);
     }
     if (event.type === "safety") notify(fill(INBOX.notifySafety, { business }), open);
-  });
+  }, !readOnly);
 
   const current = items.find(item => item.id === selected);
   const currentBot = current?.chatbotId ?? locked ?? params.get("bot");
@@ -101,48 +124,50 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
           ) : (
             <h1 className="ally-heading">{INBOX.nav}</h1>
           )}
-          <div className="ally-btn-row">
-            <button
-              type="button"
-              className="ally-icon-btn ally-inbox__sound"
-              aria-pressed={sound}
-              aria-label={sound ? INBOX.soundTipOn : INBOX.soundTipOff}
-              title={sound ? INBOX.soundTipOn : INBOX.soundTipOff}
-              onClick={() => {
-                setSound(!sound);
-                setSoundState(!sound);
-              }}
-            >
-              <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18">
-                <path d="M4 8h3l4-3v10l-4-3H4z" fill="currentColor" />
-                {sound ? (
-                  <path
-                    d="M13.5 7a4 4 0 0 1 0 6M15.5 5a7 7 0 0 1 0 10"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    fill="none"
-                    strokeLinecap="round"
-                  />
-                ) : (
-                  <path
-                    d="M13 8l4 4M17 8l-4 4"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                )}
-              </svg>
-            </button>
-            {askNotify && (
-              <Button
-                variant={ButtonVariant.TEXT}
+          {!readOnly && (
+            <div className="ally-btn-row">
+              <button
                 type="button"
-                onClick={() => void askForNotifications().then(() => setAskNotify(false))}
+                className="ally-icon-btn ally-inbox__sound"
+                aria-pressed={sound}
+                aria-label={sound ? INBOX.soundTipOn : INBOX.soundTipOff}
+                title={sound ? INBOX.soundTipOn : INBOX.soundTipOff}
+                onClick={() => {
+                  setSound(!sound);
+                  setSoundState(!sound);
+                }}
               >
-                {INBOX.turnOnNotifications}
-              </Button>
-            )}
-          </div>
+                <svg aria-hidden="true" viewBox="0 0 20 20" width="18" height="18">
+                  <path d="M4 8h3l4-3v10l-4-3H4z" fill="currentColor" />
+                  {sound ? (
+                    <path
+                      d="M13.5 7a4 4 0 0 1 0 6M15.5 5a7 7 0 0 1 0 10"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                  ) : (
+                    <path
+                      d="M13 8l4 4M17 8l-4 4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  )}
+                </svg>
+              </button>
+              {askNotify && (
+                <Button
+                  variant={ButtonVariant.TEXT}
+                  type="button"
+                  onClick={() => void askForNotifications().then(() => setAskNotify(false))}
+                >
+                  {INBOX.turnOnNotifications}
+                </Button>
+              )}
+            </div>
+          )}
         </header>
         <div className="ally-inbox__controls">
           <div className="ally-inbox__filters" role="group" aria-label={INBOX.nav}>
@@ -168,6 +193,8 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
             <select
               id="inbox-channel"
               className="ally-input"
+              // Only filters what is shown: stays usable in the staff read-only frame.
+              data-read-only-keep=""
               value={channel ?? ""}
               onChange={event => set("channel", event.target.value || null)}
             >
@@ -269,9 +296,10 @@ export const Inbox: React.FC<{ chatbotId?: string }> = ({ chatbotId: locked }) =
               id={selected}
               me={user?.id ?? null}
               canAddToCheckup={
-                (bots?.chatbots ?? []).find(b => b.id === currentBot)?.myRole !== undefined &&
-                (bots?.chatbots ?? []).find(b => b.id === currentBot)?.myRole !== "viewer"
+                !readOnly &&
+                chatbotAccess((bots?.chatbots ?? []).find(b => b.id === currentBot)).build
               }
+              onForbidden={readOnly ? onForbidden : undefined}
               onOpenConversation={conversation => set("conversation", conversation)}
             />
           </>

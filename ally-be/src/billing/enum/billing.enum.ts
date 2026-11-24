@@ -59,7 +59,24 @@ export enum UsageKind {
   INSTRUCTIONS = 'instructions',
   WHATSAPP = 'whatsapp',
   OTHER = 'other',
+  /**
+   * Indexing an Ally template's knowledge copied onto a builder's chatbot (stage 3, R4): Ally pays,
+   * so the event carries no creator and is never charged to the builder.
+   */
+  TEMPLATE_INDEX = 'template_index',
+  /**
+   * Stage 9: the crisis suite run against a draft safety-pack release by an Ally curator. Ally
+   * pays: the event carries no creator and no payer, and is never charged to the test chatbot's
+   * builder.
+   */
+  PACK_SUITE = 'pack_suite',
 }
+
+/** Usage kinds Ally pays for itself: never charged to a builder or a chatbot budget. */
+export const ALLY_PAID_USAGE_KINDS: ReadonlySet<string> = new Set([
+  UsageKind.TEMPLATE_INDEX,
+  UsageKind.PACK_SUITE,
+]);
 
 export enum CostAlertKind {
   DAILY_BUDGET = 'daily_budget',

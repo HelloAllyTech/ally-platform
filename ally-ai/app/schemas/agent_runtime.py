@@ -441,6 +441,21 @@ class OwnerTextCheckResponse(BaseModel):
     warning: Optional[str] = None
 
 
+class OwnerTextJudgeRequest(BaseModel):
+    text: str = Field(..., max_length=8000)
+    rules: List[str] = Field(..., min_length=1, max_length=40)
+    prompts: Optional[Dict[str, Any]] = None
+
+
+class OwnerTextJudgeResponse(BaseModel):
+    conflict: bool
+    rule: Optional[int] = None
+    reason_en: Optional[str] = None
+    reason_hi: Optional[str] = None
+    #: True when the judge could not run; `conflict` is then true too (fail closed).
+    failed: bool = False
+
+
 # --- memory, light (chunk 8a) ---
 
 

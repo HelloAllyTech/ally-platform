@@ -206,3 +206,38 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* The builder's home (stage 2): Create, then Open with its Show archived toggle. */
+.ally-list-page__choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+  padding: 20px 24px;
+  border: 1px solid var(--ally-line);
+}
+.ally-list-page__choice > .ally-note {
+  flex-basis: 100%;
+}
+.ally-list-page__open-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.ally-list-page__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.ally-list-page__waiting {
+  align-self: flex-start;
+  background: var(--ally-info-bg);
+  color: var(--ally-info);
+}

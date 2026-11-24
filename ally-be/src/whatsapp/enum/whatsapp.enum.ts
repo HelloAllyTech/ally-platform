@@ -125,6 +125,8 @@ export enum WaUnansweredReason {
   BELOW_THRESHOLD = 'below_threshold',
   MODEL_DECLINED = 'model_declined',
   ERROR = 'error',
+  /** Assistants stage 5: two sources disagreed at answer time; an owner question. */
+  CONFLICT = 'conflict',
 }
 
 export enum WaUnansweredStatus {

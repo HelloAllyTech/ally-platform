@@ -11,6 +11,8 @@ export interface HomeFieldValues {
   declineText: string;
   disclaimer: string;
   crisisText: string;
+  /** What customers get while it is archived or paused (600 characters; crisis info is always added). */
+  archivedMessage: string;
   suggestedQuestions: string[];
   prechat: PrechatField[];
   pageLimits: BotPageLimits;
@@ -129,6 +131,12 @@ export interface AssistantHomeView {
   fields: { [K in HomeFieldName]: HomeFieldState<HomeFieldValues[K]> };
   safety: HomeSafety;
   facts: HomeFact[];
+  /** Days since the oldest source was read; null with no sources. */
+  knowledgeStaleDays?: number | null;
+  /** True past 30 days: the Overview offers "Read again". */
+  knowledgeStaleNudge?: boolean;
+  /** The assistant's own source read longest ago: what "Read again" reads. */
+  knowledgeStaleDocumentId?: string | null;
 }
 
 export type RuleChange =
@@ -159,7 +167,10 @@ export interface HomeTeamMember {
   userId: number;
   name: string | null;
   email: string | null;
+  /** OLD single role (highest of `roles` on the old ladder). */
   role: string;
+  /** Stage 1b: every role the member holds (owner, editor, responder, viewer). Absent on an old API. */
+  roles?: string[];
 }
 
 export interface HomeDocument {
@@ -184,6 +195,13 @@ export interface HomeQuickReply {
   state: "own" | "default" | "customised" | "off";
   defaultId: string | null;
   defaultResponseText: string | null;
+  /**
+   * Ally's crisis, STOP, START and consent replies: the wording can't change. Absent until ally-be
+   * sends it; then a required reply that isn't a question-and-answer is treated as locked.
+   */
+  locked?: boolean;
+  /** Regional helpline numbers added to a locked reply. */
+  extraNumbers?: string[];
 }
 
 export interface HomeListItems {

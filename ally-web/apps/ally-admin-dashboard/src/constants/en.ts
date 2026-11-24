@@ -72,6 +72,7 @@ export const en = {
       billingCosts: "Costs",
       // Ally admin → Plans (CR1 Part C): plans, seat types and renewals due.
       billingPlans: "Plans",
+      billingCredits: "Credits",
       voices: "Voices",
       aiTasks: "AI Tasks",
       languages: "Languages",
@@ -1806,6 +1807,18 @@ export const en = {
     loadingTracks: "Loading tracks...",
     noTracks: "No tracks available — a superadmin can upload them in Settings.",
   },
+  /** Staff-only chatbot defaults page (stage 2). // COPY: needs approval */
+  assistantDefaults: {
+    navLabel: "Chatbot defaults",
+    title: "Chatbot defaults",
+    subtitle:
+      "What every chatbot starts from: shared settings and quick replies, the knowledge library, and every number. For Ally staff only.",
+    tabs: {
+      defaults: "Defaults",
+      library: "Knowledge library",
+      connectors: "Channels",
+    },
+  },
   assistantsShell: {
     noAccess: "You don't have access to this assistant. Ask its owner to add you.",
     /** Someone who only has their assistant (chunk 6b): the one thing in its frame. */
@@ -1813,6 +1826,12 @@ export const en = {
     toYourAssistants: "Go to your assistants",
     /** Someone with other Ally admin pages, inside the assistants area (no Sidebar there). */
     toAllyAdmin: "Back to Ally admin",
+    /** The corner menu (stage 2). // COPY: needs approval */
+    cornerMenu: {
+      label: "Account menu",
+      planAndCredits: "Plan and credits",
+      signedInAs: "Signed in as",
+    },
     /** The login screen a signed-out visitor sees on any /assistants page (its own wording and layout). */
     login: {
       headline: "A chatbot your community can trust, ",
@@ -2017,7 +2036,7 @@ export const en = {
         loadFailed: "Could not load the archived assistants.",
       },
       status: { draft: "Not live yet", live: "Live", paused: "Paused" },
-      role: { viewer: "Viewer", editor: "Editor", owner: "Owner" },
+      role: { viewer: "Viewer", responder: "Responder", editor: "Editor", owner: "Owner" },
       noConnector: "Not on WhatsApp yet",
       cardMessages: "{count} messages, last 30 days",
       cardPeople: "{count} people",

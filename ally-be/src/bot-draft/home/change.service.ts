@@ -116,7 +116,6 @@ export class ChangeService {
       await this.write(chatbotId, change.field, change.before, change.after);
     }
     const event = await this.record(chatbotId, changes);
-    this.checkup.scheduleAfterChange(chatbotId);
     return { eventId: event.id };
   }
 
@@ -156,7 +155,6 @@ export class ChangeService {
       },
       [undo],
     );
-    this.checkup.scheduleAfterChange(chatbotId);
     return { eventId: undo.id };
   }
 

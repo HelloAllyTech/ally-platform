@@ -24,6 +24,21 @@ export type BrandSlot = keyof typeof BRAND_SLOTS;
 
 type BrandChange = Partial<Omit<BotPageBrand, "accentContrast">>;
 
+/**
+ * Stage 7: the look ally-be still accepts is the logo and one accent colour (the welcome line has
+ * its own field). Anything else a screen changes stays on screen only: ally-be refuses the retired
+ * fields (heading style, theme, cover, share, landing and team images) with 400.
+ */
+export const SAVED_BRAND_KEYS = ["logo", "accent"] as const;
+
+export const savedBrandPatch = (patch: BrandChange): BrandChange => {
+  const out: BrandChange = {};
+  for (const key of SAVED_BRAND_KEYS) {
+    if (key in patch) (out as Record<string, unknown>)[key] = patch[key];
+  }
+  return out;
+};
+
 export interface BrandEditor {
   /** The brand as the owner sees it now (changes show at once; the save follows). */
   brand: BotPageBrand | null;
@@ -89,7 +104,7 @@ export const useBrandEditor = (chatbotId: string | null, failed: string): BrandE
 
   const flush = useCallback(() => {
     clearTimeout(timer.current);
-    const patch = queued.current;
+    const patch = savedBrandPatch(queued.current);
     queued.current = {};
     if (!chatbotId || !Object.keys(patch).length) {
       setPending(false);

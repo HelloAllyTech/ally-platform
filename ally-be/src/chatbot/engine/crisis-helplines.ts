@@ -11,9 +11,11 @@ type HelplineSettings = Pick<
  * A number a template or setup wrote waits for that confirmation; until then crisis replies carry
  * the pack's national numbers only. Values saved before Q4 have no source and count as the owner's.
  */
-export function crisisHelplines(settings: HelplineSettings): string {
-  const numbers = settings.helplineNumbers?.trim() ?? '';
-  if (!numbers) return '';
+export function crisisHelplines(
+  settings: Partial<HelplineSettings> | null | undefined,
+): string {
+  const numbers = settings?.helplineNumbers?.trim() ?? '';
+  if (!settings || !numbers) return '';
   if (!settings.helplineSource) return numbers;
   if (settings.helplineSource === 'owner') return numbers;
   return settings.helplineConfirmedAt ? numbers : '';

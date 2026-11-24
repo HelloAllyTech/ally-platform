@@ -1,10 +1,13 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Get,
   Param,
+  ParseIntPipe,
   ParseUUIDPipe,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -25,7 +28,11 @@ import { CallerScopedRoute } from '../../auth/decorators/caller-scoped-route.dec
 import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
 import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
-import { ScorecardService } from './scorecard.service';
+import {
+  OVERVIEW_RANGES,
+  type OverviewRange,
+  ScorecardService,
+} from './scorecard.service';
 import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotRole } from '../../chatbot/access/chatbot-role.decorator';
 
@@ -66,6 +73,24 @@ export class ScorecardController {
   })
   view(@Param('id', ParseUUIDPipe) id: string) {
     return this.scorecard.view(id);
+  }
+
+  @Get(':id/home/overview')
+  // Floor is VIEW so Ally staff can read it (matrix: setup); the service keeps members at EDITOR.
+  @ChatbotRole(ChatbotMemberRole.VIEWER)
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT)
+  @ApiOperation({
+    summary:
+      'How it is doing: counts only, groups under 5 held back by the server',
+  })
+  overview(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('range', new DefaultValuePipe(7), ParseIntPipe) range: number,
+  ) {
+    const picked = (OVERVIEW_RANGES as readonly number[]).includes(range)
+      ? (range as OverviewRange)
+      : 7;
+    return this.scorecard.overview(id, picked);
   }
 
   @Post(':id/scorecard/unanswered/:questionId/answer')

@@ -45,6 +45,10 @@ export function quickReplyOf(template: {
   state?: string;
   overridesTemplateId?: string | null;
   defaultResponseText?: string;
+  /** Stage 5 (D6): a chatbot's copy of a required reply; its wording is Ally's. */
+  locked?: boolean;
+  /** Regional numbers added to a locked reply. */
+  extraNumbers?: string[] | null;
 }): HomeListItem {
   return {
     id: template.id,
@@ -57,5 +61,9 @@ export function quickReplyOf(template: {
     state: template.state ?? 'own',
     defaultId: template.overridesTemplateId ?? null,
     defaultResponseText: template.defaultResponseText ?? null,
+    // A required reply (crisis, STOP, START, consent) is locked whether or not the bot has its copy
+    // yet: its wording can't be changed here, only regional numbers added.
+    locked: Boolean(template.locked || template.mandatory),
+    extraNumbers: template.extraNumbers ?? [],
   };
 }

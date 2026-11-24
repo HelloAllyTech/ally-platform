@@ -56,6 +56,12 @@ export function draftView(draft: BotDraftEntity) {
       findings: crawl.findings ?? [],
       brand: crawl.brand ?? null,
       problem: crawl.problem ?? null,
+      // Stage 6: reading the facts paused at $0; resumes on a grant.
+      pausedOutOfCredits: crawl.pausedOutOfCredits ?? null,
+      // Why it paused (the builder's text differs: no "contact Ally" for a stopped feed).
+      pausedReason: crawl.pausedOutOfCredits
+        ? (crawl.pausedReason ?? 'out_of_credits')
+        : null,
     },
     learned: draft.learned,
     industry: draft.industry ?? null,

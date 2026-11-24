@@ -42,10 +42,31 @@ describe('safety rules in the knowledge request', () => {
     expect(run.persona?.safety_rules).toBe(rules);
   });
 
-  it('sends nothing for a bot without a pack (unchanged requests)', () => {
+  it('sends the base safety block for a bot without a pack (stage 4)', () => {
     const body = buildKnowledgeRequest(turn(), {}, KNOWLEDGE);
-    expect(body.persona?.safety_rules).toBeUndefined();
+    const rules = body.persona?.safety_rules ?? '';
+    expect(rules).toMatch(/^<safety_rules fixed="true">/);
+    // Crisis locked, no medical/legal/emergency instructions, honest about being AI.
+    expect(rules).toContain('the fixed crisis information is sent for you');
+    expect(rules).toContain(
+      'Never give medical, legal or emergency instructions',
+    );
+    expect(rules).toContain('Never say or suggest that you are a human');
+    // Unstated audience: the strictest wording.
+    expect(rules).toContain('The person may be under 18');
     expect(body.persona?.safety_pack).toBeUndefined();
+  });
+
+  it('drops the minors lines only for a stated adults-only audience', () => {
+    const adults = buildKnowledgeRequest(
+      turn(chatbotFixture({ settings: { audienceAge: 'adults' } } as never)),
+      {},
+      KNOWLEDGE,
+    );
+    expect(adults.persona?.safety_rules).not.toContain('under 18');
+    expect(adults.persona?.safety_rules).toContain(
+      'Never say or suggest that you are a human',
+    );
   });
 
   it('SP1: a medical bot names its helpline, and offers booking only with a create tool on Do it', () => {

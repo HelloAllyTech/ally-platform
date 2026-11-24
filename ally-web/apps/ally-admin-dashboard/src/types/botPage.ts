@@ -48,6 +48,8 @@ export type BotPageStatus = "off" | "on";
 
 export interface BotPageLimits {
   messagesPerVisitorPerHour: number;
+  /** Stage 7: one person's messages per day. Absent on pages saved before it. */
+  messagesPerVisitorPerDay?: number;
   maxMessageChars: number;
   dailyCapPerBot: number;
 }
@@ -65,9 +67,13 @@ export interface BotPageSettings {
 export interface BotPageView {
   saved: boolean;
   status: BotPageStatus;
+  /** The legacy link's key; never shown or editable (stage 7). */
   slug: string;
+  /** The page's address, `/chat/<publicId>`, assigned by Ally; null until the first save. */
+  publicId?: string | null;
   access: BotPageAccess;
   settings: BotPageSettings;
+  /** The page's address (stage 7: `<chat URL>/<publicId>`); empty until the first save. */
   link: string;
   publicAllowed: boolean;
   live: { ok: boolean; reason?: "page_off" | "bot_not_live" | "public_blocked" | "platform_off" };

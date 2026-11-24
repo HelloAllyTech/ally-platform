@@ -305,6 +305,11 @@ export enum UserRole {
    * open is their feature toggles. Not a platform admin.
    */
   ASSISTANT_OWNER = "ASSISTANT_OWNER",
+  /**
+   * Stage 1b: someone invited to a chatbot's team who had no account (made in the inviter's
+   * organisation). Reaches only the chatbots they are a member of; can't create one.
+   */
+  ASSISTANT_MEMBER = "ASSISTANT_MEMBER",
 }
 
 /**
@@ -324,6 +329,8 @@ export const PLATFORM_MANAGED_ROLES: string[] = [
   UserRole.MULTI_TENANT_ADMIN,
   // Granted on Users → Custom logins (CR1 Part B), with the toggles that decide what it opens.
   UserRole.ASSISTANT_OWNER,
+  // Stage 1b: granted only by accepting a chatbot invite.
+  UserRole.ASSISTANT_MEMBER,
 ];
 
 /**
@@ -365,6 +372,8 @@ export const ADMIN_PORTAL_LOGIN_ROLES: UserRole[] = [
   // CR1 Part B: custom logins sign in here for their assistants. Deliberately NOT in
   // ADMIN_ROLE_PRECEDENCE: it is no admin tier, and holds nothing an admin gate should accept.
   UserRole.ASSISTANT_OWNER,
+  // Stage 1b: invited chatbot team members sign in here too; same reasoning, never an admin tier.
+  UserRole.ASSISTANT_MEMBER,
 ];
 
 /**

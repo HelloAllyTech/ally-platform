@@ -465,8 +465,150 @@ export const COPY = {
   continueSetup: "Continue setup",
 } as const;
 
+/**
+ * Split build: the real assistant beside the builder. Kept apart from `COPY` because `copy.test.ts`
+ * holds every string in `COPY` to the product copy deck; these are not in the deck yet.
+ */
+export const SPLIT_COPY = {
+  layout: {
+    group: "Build and test",
+    build: "Build",
+    test: "Test",
+    presets: "Layout",
+    half: "Half and half",
+    more: "More room for the assistant",
+    only: "Assistant only",
+    divider: "Resize the build and test areas",
+  },
+  pane: {
+    title: "Try your assistant",
+    placeholder: "Your assistant will appear here",
+    newChat: "New chat",
+    inputLabel: "Ask your assistant something",
+    inputPlaceholder: "Ask a question",
+    send: "Send",
+    suggested: "Try asking",
+    you: "You",
+    assistant: "Your assistant",
+    thinking: "Thinking…",
+    status: {
+      thinking: "Thinking…",
+      searching: "Looking through your pages…",
+      found: "Found something useful…",
+      checking: "Checking the answer…",
+      rewriting: "Rewording the answer…",
+      writing: "Writing a reply…",
+    },
+    failed: "That didn't work this time. Nothing you set up was lost.",
+    tryAgain: "Try again",
+    stillReading: "Still reading your pages, so answers may be incomplete.",
+    finished: "Setup is finished, so this test chat has closed.",
+    why: {
+      toggle: "Why this answer?",
+      passages: "Pages it used",
+      none: "It didn't use any of your pages for this.",
+      time: "Took {s} seconds.",
+      declined: "It said it didn't know.",
+    },
+    updated: "Updated just now",
+    older: "older settings",
+    askAgain: "Ask the same question again",
+    announce: "Assistant updated",
+    progress: {
+      running: "Learned {n} of up to {max} pages",
+      done: "Learned {n} pages",
+    },
+  },
+  fix: {
+    button: "Fix this",
+    panel: "Fix this answer",
+    close: "Close",
+    choicesLabel: "What would you like to do?",
+    correct: "Correct a fact",
+    avoid: "Add a topic to avoid",
+    tone: "Change the tone",
+    page: "Add a missing page",
+    pageHint: "Choose a file with the missing details. Web addresses can't be added here yet.",
+    pageChoose: "Choose a file",
+    factsLabel: "Which fact is wrong?",
+    addNew: "None of these, add it as new",
+    factEdit: "Fixed fact",
+    avoidLabel: "What should it not talk about?",
+    toneLabel: "Tone",
+    save: "Save",
+    saving: "Saving…",
+    done: "Done. Asking again…",
+    failed: "That didn't save. What you typed is still here, so you can try again.",
+    rulesFull: "You already have {n} rules, which is the most allowed. Remove one first.",
+    tooLong: "That is {n} letters. The most is {max}.",
+  },
+  addFact: {
+    heading: "It didn't know this one",
+    label: "Type the answer",
+    add: "Add a fact",
+    count: "{n} of {max} letters",
+    over: "That is {n} letters, {over} too many. The most is {max}. Shorten the answer.",
+    failed: "That didn't save. What you typed is still here, so you can try again.",
+  },
+  stillLearning: "Still learning your change",
+  saveTest: {
+    button: "Save as a test",
+    choicesLabel: "What should happen when someone asks this?",
+    answer: "It should answer this",
+    dontKnow: "It should say it doesn't know",
+    saved: "Saved to your checkup: {question}",
+    failed: "That didn't save. Try again.",
+  },
+  unanswered: {
+    button: "Couldn't answer ({n})",
+    heading: "Questions it couldn't answer",
+    addFact: "Add a fact",
+    announce: "Couldn't answer {n}",
+  },
+  /** "Try as": a visitor's fixed messages played into a new chat. */
+  tryAs: {
+    button: "Try as",
+    menuLabel: "Try your assistant as someone else",
+    playing: "Playing: {label}",
+    stop: "Stop",
+    visitorNote: "Played as a visitor",
+  },
+  /** "Run 10 likely questions". */
+  likely: {
+    button: "Run 10 likely questions",
+    running: "Checking likely questions…",
+    heading: "Likely questions",
+    summary: "{n} of {total} look right",
+    ok: "Looks right",
+    check: "Worth a look",
+    show: "Show the full reply",
+    hide: "Hide the full reply",
+    reason: "Why it needs a look",
+    openInChat: "Open in chat",
+    opened: "Opened in the chat",
+    close: "Close",
+    empty: "I need to learn a bit more before I can guess likely questions.",
+    failed: "I couldn't check likely questions this time. Try again.",
+  },
+  /** How the same replies are drawn. */
+  channel: {
+    label: "How it looks",
+    page: "Bot page",
+    whatsapp: "WhatsApp",
+    widget: "Widget",
+    whatsappStrip: "WhatsApp chat",
+    widgetStrip: "Chat on your website",
+  },
+} as const;
+
 /** "{n} pages" with its values filled in; an unknown name is left as it is. */
 export const fill = (text: string, values: Record<string, string | number>): string =>
   text.replace(/\{([\w ]+)\}/g, (match, key: string) =>
     key in values ? String(values[key]) : match,
   );
+
+/** "Make it yours" after the cover was retired: the page look is logo, accent colour and welcome line. */
+export const MAKE_LOOK_COPY = {
+  // COPY: needs approval
+  imageHint: "PNG, JPG or WebP, up to 5 MB. Your logo shows at the top of your page.",
+} as const;

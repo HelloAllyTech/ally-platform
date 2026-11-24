@@ -47,4 +47,8 @@ export class Connector extends BaseWithoutTenantEntity {
 
   @DeleteDateColumn()
   deletedAt?: Date;
+
+  /** Assistants stage 5: unbound at the migration, parked and hidden from builder lists. */
+  @Column({ type: 'boolean', default: false })
+  parked!: boolean;
 }

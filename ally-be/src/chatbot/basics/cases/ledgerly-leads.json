@@ -8,24 +8,16 @@
         "user": "How much does Ledgerly cost?",
         "expect": {
           "crisis": false,
-          "noTools": [
-            "create_leads"
-          ],
-          "must": [
-            "(name|number|phone|contact details|your details)"
-          ]
+          "noTools": ["create_leads"],
+          "must": ["(name|number|phone|contact details|your details)"]
         }
       },
       {
         "user": "Sure. I'm Rahul Mehta, 9876543201",
         "expect": {
           "crisis": false,
-          "tools": [
-            "create_leads: ok"
-          ],
-          "mustNot": [
-            "shall i save|should i save|do you want me to save"
-          ]
+          "tools": ["create_leads: ok"],
+          "mustNot": ["shall i save|should i save|do you want me to save"]
         }
       }
     ]
@@ -39,24 +31,16 @@
         "user": "Ledgerly ka price kya hai?",
         "expect": {
           "crisis": false,
-          "noTools": [
-            "create_leads"
-          ],
-          "must": [
-            "(name|number|phone|contact details|your details)"
-          ]
+          "noTools": ["create_leads"],
+          "must": ["(name|number|phone|contact details|your details)"]
         }
       },
       {
         "user": "Sure. I'm Rahul Mehta, 9876543202",
         "expect": {
           "crisis": false,
-          "tools": [
-            "create_leads: ok"
-          ],
-          "mustNot": [
-            "shall i save|should i save|do you want me to save"
-          ]
+          "tools": ["create_leads: ok"],
+          "mustNot": ["shall i save|should i save|do you want me to save"]
         }
       }
     ]
@@ -70,24 +54,16 @@
         "user": "i want to buy it, how much is it?",
         "expect": {
           "crisis": false,
-          "noTools": [
-            "create_leads"
-          ],
-          "must": [
-            "(name|number|phone|contact details|your details)"
-          ]
+          "noTools": ["create_leads"],
+          "must": ["(name|number|phone|contact details|your details)"]
         }
       },
       {
         "user": "Sure. I'm Rahul Mehta, 9876543203",
         "expect": {
           "crisis": false,
-          "tools": [
-            "create_leads: ok"
-          ],
-          "mustNot": [
-            "shall i save|should i save|do you want me to save"
-          ]
+          "tools": ["create_leads: ok"],
+          "mustNot": ["shall i save|should i save|do you want me to save"]
         }
       }
     ]
@@ -101,24 +77,16 @@
         "user": "What's the price for a team of 10?",
         "expect": {
           "crisis": false,
-          "noTools": [
-            "create_leads"
-          ],
-          "must": [
-            "(name|number|phone|contact details|your details)"
-          ]
+          "noTools": ["create_leads"],
+          "must": ["(name|number|phone|contact details|your details)"]
         }
       },
       {
         "user": "Sure. I'm Rahul Mehta, 9876543204",
         "expect": {
           "crisis": false,
-          "tools": [
-            "create_leads: ok"
-          ],
-          "mustNot": [
-            "shall i save|should i save|do you want me to save"
-          ]
+          "tools": ["create_leads: ok"],
+          "mustNot": ["shall i save|should i save|do you want me to save"]
         }
       }
     ]
@@ -132,24 +100,16 @@
         "user": "Do you have a monthly plan? How much is it?",
         "expect": {
           "crisis": false,
-          "noTools": [
-            "create_leads"
-          ],
-          "must": [
-            "(name|number|phone|contact details|your details)"
-          ]
+          "noTools": ["create_leads"],
+          "must": ["(name|number|phone|contact details|your details)"]
         }
       },
       {
         "user": "Sure. I'm Rahul Mehta, 9876543205",
         "expect": {
           "crisis": false,
-          "tools": [
-            "create_leads: ok"
-          ],
-          "mustNot": [
-            "shall i save|should i save|do you want me to save"
-          ]
+          "tools": ["create_leads: ok"],
+          "mustNot": ["shall i save|should i save|do you want me to save"]
         }
       }
     ]
@@ -163,24 +123,16 @@
         "user": "Can I get a quote for my firm?",
         "expect": {
           "crisis": false,
-          "noTools": [
-            "create_leads"
-          ],
-          "must": [
-            "(name|number|phone|contact details|your details)"
-          ]
+          "noTools": ["create_leads"],
+          "must": ["(name|number|phone|contact details|your details)"]
         }
       },
       {
         "user": "Sure. I'm Rahul Mehta, 9876543206",
         "expect": {
           "crisis": false,
-          "tools": [
-            "create_leads: ok"
-          ],
-          "mustNot": [
-            "shall i save|should i save|do you want me to save"
-          ]
+          "tools": ["create_leads: ok"],
+          "mustNot": ["shall i save|should i save|do you want me to save"]
         }
       }
     ]

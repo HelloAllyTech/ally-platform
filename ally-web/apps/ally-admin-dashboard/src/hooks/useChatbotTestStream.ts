@@ -49,8 +49,13 @@ type StreamEvent =
  *
  * The request is aborted on unmount and by `cancel` (New thread), which stops the run.
  */
-export const useChatbotTestStream = () => {
+export const useChatbotTestStream = (
+  /** The stream's path for an id; the assistant's own route unless a caller streams elsewhere. */
+  pathFor: (id: string) => string = ApiEndpoints.CHATBOTS.TEST_STREAM,
+) => {
   const abortRef = useRef<AbortController | null>(null);
+  const pathRef = useRef(pathFor);
+  pathRef.current = pathFor;
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -68,7 +73,7 @@ export const useChatbotTestStream = () => {
       let response: Response;
       try {
         response = await fetchWithReauth(
-          `${API_BASE_URL}/api${ApiEndpoints.CHATBOTS.TEST_STREAM(id)}`,
+          `${API_BASE_URL}/api${pathRef.current(id)}`,
           body,
           controller.signal,
         );

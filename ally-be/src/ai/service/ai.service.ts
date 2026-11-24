@@ -841,6 +841,33 @@ export class AiService {
     );
   }
 
+  /** The model judge on owner text at Apply (after the regex first pass). `failed` means it could not run. */
+  async judgeOwnerText(
+    text: string,
+    rules: string[],
+  ): Promise<{
+    conflict: boolean;
+    rule: number | null;
+    reason_en: string | null;
+    reason_hi: string | null;
+    failed: boolean;
+  }> {
+    return this.postKnowledge<
+      {
+        conflict: boolean;
+        rule: number | null;
+        reason_en: string | null;
+        reason_hi: string | null;
+        failed: boolean;
+      },
+      { text: string; rules: string[] }
+    >(
+      ENDPOINTS.AGENT_INSTRUCTIONS_JUDGE,
+      { text, rules },
+      { timeoutMs: 15_000, alertOnFailure: false },
+    );
+  }
+
   /**
    * `signal` (Q3-fast Part 1): the crisis check decided first, so the reply no longer waits for
    * this run; aborting stops waiting for it.

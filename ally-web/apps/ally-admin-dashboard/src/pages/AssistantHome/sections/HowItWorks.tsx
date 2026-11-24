@@ -15,7 +15,7 @@ import { ListSkeleton } from "../ui/List";
 import { useHomeField } from "../useHomeField";
 import { joinAnd, offsetAt, purposeLimit } from "../userLists/format";
 
-import type { SectionId } from "../sections";
+import type { PartId, SectionId } from "../sections";
 import type { SectionProps } from "./props";
 
 const t = HOME.how;
@@ -33,9 +33,9 @@ const ORDER: HowLayer[] = [
 ];
 
 /** Where a layer that isn't edited here is edited. */
-const EDITED_IN: Partial<Record<HowLayer, SectionId>> = {
-  safety: "safety",
-  search: "knows",
+const EDITED_IN: Partial<Record<HowLayer, { section: SectionId; part?: PartId; name: string }>> = {
+  safety: { section: "settings", name: HOME.sections.safety },
+  search: { section: "knowledge", part: "knows", name: HOME.sections.knows },
 };
 
 /** The owner's instructions' limit (ally-be `MAX_SYSTEM_PROMPT_CHARS`). */
@@ -60,7 +60,7 @@ const Layer: React.FC<{
 }> = ({ layer, n, view, summary, owner, control, go }) => {
   const [open, setOpen] = useState(false);
   const exact = textOf(view, layer);
-  const sectionName = EDITED_IN[layer] ? HOME.sections[EDITED_IN[layer]!] : null;
+  const sectionName = EDITED_IN[layer]?.name ?? null;
   return (
     <li className="ally-card ally-how__layer" id={`how-${layer}`} data-testid={`how-${layer}`}>
       <header className="ally-how__head">
@@ -306,7 +306,11 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
             summary={summaries[layer]}
             owner={["business", "tone", "instructions", "avoid"].includes(layer)}
             control={controls[layer]}
-            go={EDITED_IN[layer] ? () => go(EDITED_IN[layer]!) : undefined}
+            go={
+              EDITED_IN[layer]
+                ? () => go(EDITED_IN[layer]!.section, EDITED_IN[layer]!.part)
+                : undefined
+            }
           />
         ))}
       </ol>
@@ -315,7 +319,7 @@ export const HowItWorksSection: React.FC<SectionProps> = ({ bot, home, canEdit, 
       {home.fields.memory && (
         <p className="ally-small ally-how__moved" data-testid="how-memory-moved">
           {HOME.memory.movedToTools}{" "}
-          <Link to={{ search: "?section=lists&tool=memory" }}>{HOME.memory.openTools}</Link>
+          <Link to={{ search: "?section=settings" }}>{HOME.memory.openTools}</Link>
         </p>
       )}
     </>

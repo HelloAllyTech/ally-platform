@@ -68,6 +68,8 @@ export enum Permissions {
   // owner holds the debrief settings. Read through pages/Debriefs/debriefAccess.ts only.
   SYSTEM_ACCESS = "system:access",
   MANAGE_DEBRIEF_SETTINGS = "manage:admin:debrief-settings",
+  // Assistants stage 9: the safety-pack curator (Ally admin -> Safety packs).
+  MANAGE_SAFETY_PACKS = "manage:safety-packs",
   // Per-user preferences (e.g. the saved admin sidebar order). Held by every
   // platform-tier group — PLATFORM_ADMIN inherited both from SUPER_DUPER_ADMIN
   // in the role-collapse migration — but NOT by a plain tenant ADMIN or a
@@ -111,6 +113,8 @@ export const SIDEBAR_ITEMS = {
   BILLING_MODELS: "billing-models",
   BILLING_COSTS: "billing-costs",
   BILLING_PLANS: "billing-plans",
+  BILLING_CREDITS: "billing-credits",
+  SAFETY_PACKS: "safety-packs",
   AI_TASKS: "ai-tasks",
   SCENARIO_LANGUAGES: "scenario-languages",
   PROMPTS: "prompts",
@@ -136,6 +140,8 @@ export const SIDEBAR_ITEMS = {
   LOGS: "logs",
   MOBILE_RELEASES: "mobile-releases",
   WHATSAPP_BOT: "whatsapp-bot",
+  /** Staff only (system:access): what every chatbot inherits. */
+  ASSISTANT_DEFAULTS: "assistant-defaults",
   BUG_HUNTER: "bug-hunter",
   PM_AGENT: "pm-agent",
   BUG_HUNTER_V2: "bug-hunter-v2",

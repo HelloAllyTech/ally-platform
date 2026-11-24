@@ -23,7 +23,8 @@ const REASONS: LimitReason[] = [
 
 /**
  * CR1 enforcement in the engine: at any limit, no run starts — the person gets a fixed, honest
- * reply with no agent call — and a crisis message still gets the crisis reply, at every limit.
+ * reply with no agent call — and a crisis KEYWORD still gets the crisis reply, at every limit.
+ * Stage 6 (R1): the model classifier no longer runs at a limit; blocked means no model call.
  */
 describe('ChatbotEngineService: limits (CR1)', () => {
   const setup = (
@@ -81,7 +82,7 @@ describe('ChatbotEngineService: limits (CR1)', () => {
       conversationId: '6f9c1a52-1111-4a8e-9a0c-1b2c3d4e5f60',
       providerMessageId: 'wamid.1',
     });
-    return { engine, aiService, limits, turn };
+    return { engine, aiService, limits, turn, replyService };
   };
 
   it('answers as before when nothing is limited', async () => {
@@ -92,7 +93,7 @@ describe('ChatbotEngineService: limits (CR1)', () => {
   });
 
   it.each(REASONS)(
-    'at %s: a fixed reply, no agent call, and the crisis check still ran',
+    'at %s: a fixed reply, no agent call and no model call (R1: keyword check only)',
     async (reason) => {
       const h = setup(reason);
       const decision = await h.engine.respond(h.turn());
@@ -102,19 +103,20 @@ describe('ChatbotEngineService: limits (CR1)', () => {
       });
       expect(decision.body).not.toMatch(/\$/);
       expect(h.aiService.runAgent).not.toHaveBeenCalled();
-      expect(h.aiService.checkWhatsAppCrisis).toHaveBeenCalledTimes(1);
+      expect(h.aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
+      expect(h.replyService.match).toHaveBeenCalledTimes(1);
     },
   );
 
   it.each(REASONS)(
-    'at %s: a crisis message still gets the crisis reply (classifier)',
+    'at %s: the crisis classifier no longer runs at a limit (R1)',
     async (reason) => {
       const h = setup(reason, { crisis: true });
       const decision = await h.engine.respond(
         h.turn('I don’t want to live anymore'),
       );
-      expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-      expect(decision.limited).toBeUndefined();
+      expect(decision.handledBy).toBe(WaHandledBy.RATE_LIMITED);
+      expect(h.aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
       expect(h.aiService.runAgent).not.toHaveBeenCalled();
     },
   );

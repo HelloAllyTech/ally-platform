@@ -168,6 +168,7 @@ const buildTable = (): RouteMetaEntry[] => {
     { path: ROUTES.BILLING_MODELS, title: i.billingModels, section: "ai-languages" },
     { path: ROUTES.BILLING_COSTS, title: i.billingCosts, section: "ai-languages" },
     { path: ROUTES.BILLING_PLANS, title: i.billingPlans, section: "ai-languages" },
+    { path: ROUTES.BILLING_CREDITS, title: i.billingCredits, section: "ai-languages" },
     { path: ROUTES.MANAGE_SCENARIO_VOICES, title: i.voices, section: "ai-languages" },
     { path: ROUTES.AI_TASKS, title: i.aiTasks, section: "ai-languages" },
     { path: ROUTES.MANAGE_SCENARIO_LANGUAGES, title: i.languages, section: "ai-languages" },
@@ -253,6 +254,13 @@ const buildTable = (): RouteMetaEntry[] => {
       section: "product",
       fullBleed: true,
     },
+    // Staff only (stage 2): the defaults, shared quick replies, library and numbers.
+    {
+      path: ROUTES.ASSISTANT_DEFAULTS,
+      title: en.assistantDefaults.title,
+      section: "product",
+      parent: ROUTES.WHATSAPP_BOT,
+    },
     { path: ROUTES.DIRECTORY, title: "Resources directory", section: "product", fullBleed: true },
     {
       path: ROUTES.DIRECTORY_COLLECTION,
@@ -284,6 +292,8 @@ const buildTable = (): RouteMetaEntry[] => {
     },
     // The owner's Plan and usage (CR1), from the account menu.
     { path: ROUTES.MY_PLAN, title: "Plan and usage", section: "product", fullBleed: true },
+    // The builder's Credits (stage 6), from the corner menu's "Plan and credits".
+    { path: ROUTES.MY_CREDITS, title: "Plan and credits", section: "product", fullBleed: true },
     { path: ROUTES.ALLY_CONSOLE, title: i.allyConsole, section: "product" },
     // Settings & Logs
     { path: ROUTES.SETTINGS, title: i.settings, section: "settings-logs" },

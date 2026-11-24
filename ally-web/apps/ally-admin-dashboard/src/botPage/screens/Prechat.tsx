@@ -7,10 +7,12 @@ import {
   ErrorText,
   PageHeader,
   PrimaryButton,
+  SafetyNotice,
   ScreenHeading,
   TextButton,
 } from "../components/parts";
 import { fill, type BotPageCopy } from "../copy";
+import { safetyCopy } from "../copy/safety";
 
 import type { BotPageBranding, PrechatField } from "../types";
 
@@ -27,11 +29,24 @@ export function Prechat({
   busy = false,
   error,
   errorField,
+  notice,
+  disclaimer,
+  draft: initialDraft = "",
+  maxChars = 1000,
+  onSendMessage,
 }: {
   branding: BotPageBranding;
   copy: BotPageCopy;
   fields: PrechatField[];
-  onDone(answers: { id: string; value: string }[]): void;
+  onDone(answers: { id: string; value: string }[], draft: string): void;
+  /** The fixed notice and the pack's disclaimer, shown above the questions. */
+  notice?: string;
+  disclaimer?: string | null;
+  /** A message the visitor already typed (kept when the server asked for the questions). */
+  draft?: string;
+  maxChars?: number;
+  /** Send a first message without answering: the questions never block it. */
+  onSendMessage?(text: string): void;
   busy?: boolean;
   error?: string | null;
   /** The question the server refused, to go back to it. */
@@ -43,6 +58,8 @@ export function Prechat({
   });
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [missing, setMissing] = useState(false);
+  const [message, setMessage] = useState(initialDraft);
+  const words = safetyCopy(copy);
   const field = fields[index];
   const value = answers[field.id] ?? "";
   const last = index === fields.length - 1;
@@ -86,19 +103,28 @@ export function Prechat({
       setIndex(index + 1);
       return;
     }
-    onDone(fields.map(f => ({ id: f.id, value: answers[f.id] ?? "" })));
+    onDone(
+      fields.map(f => ({ id: f.id, value: answers[f.id] ?? "" })),
+      message,
+    );
   };
 
   const inputId = `bp-q-${field.id}`;
   return (
     <div className="bp-screen">
       <PageHeader branding={branding} />
+      <div className="bp-pad">
+        <SafetyNotice notice={notice} disclaimer={disclaimer} label={words.noticeLabel} />
+      </div>
       <form
         key={field.id}
         onSubmit={next}
         className="bp-pad bp-stack bp-grow ally-slide"
         noValidate
       >
+        <p className="bp-small" data-testid="bp-prechat-intro">
+          {words.questionsIntro}
+        </p>
         <div className="bp-progress-row">
           <div
             className="ally-progress"
@@ -222,6 +248,28 @@ export function Prechat({
           </PrimaryButton>
         </div>
       </form>
+      {onSendMessage && (
+        <div className="bp-pad bp-prechat-compose">
+          <label htmlFor="bp-prechat-message" className="bp-small">
+            {words.messageLabel}
+          </label>
+          <textarea
+            id="bp-prechat-message"
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            placeholder={words.messagePlaceholder}
+            maxLength={maxChars}
+            rows={2}
+          />
+          <PrimaryButton
+            type="button"
+            disabled={busy || !message.trim()}
+            onClick={() => onSendMessage(message.trim())}
+          >
+            {words.send}
+          </PrimaryButton>
+        </div>
+      )}
     </div>
   );
 }

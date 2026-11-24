@@ -155,17 +155,59 @@ describe('Per-bot keyword replies', () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
 
-    it('lets a bot reword a required reply, keeping its kind and place', async () => {
+    // Stage 5 (D6) reverses the old rule: a bot's copy of a required reply is locked.
+    it('refuses rewording a required reply on a bot (its copy is locked)', async () => {
+      repo.findOne.mockResolvedValueOnce(crisis).mockResolvedValueOnce(null);
+      await expect(
+        service.customiseTemplate('crisis', BOT, {
+          responseText: 'Call Northwind 2200',
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses a wording edit on an existing locked copy, and allows regional numbers', async () => {
+      const locked = row({
+        id: 'copy',
+        chatbotId: BOT,
+        overridesTemplateId: 'crisis',
+        locked: true,
+      } as never);
+      repo.findOne.mockResolvedValueOnce(crisis).mockResolvedValueOnce(locked);
+      await expect(
+        service.customiseTemplate('crisis', BOT, { patterns: ['help'] }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(repo.update).not.toHaveBeenCalled();
+
+      repo.findOne
+        .mockResolvedValueOnce(crisis)
+        .mockResolvedValueOnce(locked)
+        .mockResolvedValueOnce({
+          ...locked,
+          extraNumbers: ['+91 22 1234 5678'],
+        });
+      const saved = await service.customiseTemplate('crisis', BOT, {
+        extraNumbers: ['+91 22 1234 5678'],
+      });
+      expect(repo.update).toHaveBeenCalledWith(
+        { id: 'copy' },
+        expect.objectContaining({ extraNumbers: ['+91 22 1234 5678'] }),
+      );
+      expect(saved).toMatchObject({ extraNumbers: ['+91 22 1234 5678'] });
+    });
+
+    it('makes a locked copy of a required reply when a bot first adds numbers to it', async () => {
       repo.findOne.mockResolvedValueOnce(crisis).mockResolvedValueOnce(null);
       const saved = await service.customiseTemplate('crisis', BOT, {
-        responseText: 'Call Northwind 2200',
+        extraNumbers: ['+44 116 123'],
       });
       expect(saved).toMatchObject({
         chatbotId: BOT,
         overridesTemplateId: 'crisis',
         kind: WaTemplateKind.CRISIS,
         priority: 10,
-        responseText: 'Call Northwind 2200',
+        locked: true,
+        extraNumbers: ['+44 116 123'],
       });
     });
 

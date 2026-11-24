@@ -16,7 +16,7 @@ import { COPY } from "../../Onboarding/copy";
 import { fill, HOME } from "../copy";
 import { Group } from "../fields";
 
-import type { SectionId } from "../sections";
+import type { PartId, SectionId } from "../sections";
 
 const t = HOME.scorecard;
 
@@ -168,7 +168,7 @@ export const UnansweredList: React.FC<{ botId: string; canEdit: boolean; testId?
 export const Scorecard: React.FC<{
   botId: string;
   canEdit: boolean;
-  go: (id: SectionId) => void;
+  go: (id: SectionId, part?: PartId) => void;
 }> = ({ botId, canEdit, go }) => {
   const { data } = useGetScorecardQuery(botId);
   const [correct, correcting] = useCorrectFeedbackMutation();
@@ -343,7 +343,11 @@ export const Scorecard: React.FC<{
                 </>
               )}
             </p>
-            <Button variant={ButtonVariant.TERTIARY} type="button" onClick={() => go("checkup")}>
+            <Button
+              variant={ButtonVariant.TERTIARY}
+              type="button"
+              onClick={() => go("build", "checkup")}
+            >
               {t.viewCheckup}
             </Button>
           </div>

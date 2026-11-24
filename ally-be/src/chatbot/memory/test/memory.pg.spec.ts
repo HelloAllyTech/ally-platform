@@ -422,7 +422,8 @@ describePg('Memory, light (Postgres)', () => {
       expect(
         new Date(first.expires_at!).getTime() -
           new Date(first.said_at).getTime(),
-      ).toBe(180 * DAY);
+        // Stage 5 (D11): the chatbot's own retention days, 90 by default.
+      ).toBe(90 * DAY);
       await dataSource.query(
         `UPDATE memory_entries SET said_at = said_at - interval '10 days',
                 expires_at = expires_at - interval '10 days'`,
@@ -437,18 +438,29 @@ describePg('Memory, light (Postgres)', () => {
       );
     });
 
-    it('with retention off a preference has no expiry; an open item and context take the earlier date', async () => {
+    // Stage 5 (D11): retention is the chatbot's own (7 to 365 days, default 90), never off.
+    it("a line never outlives the chatbot's retention; an open item and context take the earlier date", async () => {
       const { contactId, conversationId } = await person();
       await turn(conversationId, 'x');
-      retentionDays = 0;
-      await after(conversationId, [add('prefers evenings')]);
-      retentionDays = 10;
-      await after(conversationId, [
-        add('waiting for a call back', 'open_items'),
-        add('comes with his mother', 'context'),
-      ]);
-      retentionDays = 365;
-      await after(conversationId, [add('asked about fees', 'open_items')]);
+      const days = (n: number) => ({
+        settings: { memory: { on: true }, retentionDays: n },
+      });
+      await after(conversationId, [add('prefers evenings')], {}, days(200));
+      await after(
+        conversationId,
+        [
+          add('waiting for a call back', 'open_items'),
+          add('comes with his mother', 'context'),
+        ],
+        {},
+        days(10),
+      );
+      await after(
+        conversationId,
+        [add('asked about fees', 'open_items')],
+        {},
+        days(365),
+      );
       const byText = Object.fromEntries(
         (await lines(contactId)).map((l) => [
           l.text,
@@ -462,7 +474,7 @@ describePg('Memory, light (Postgres)', () => {
         ]),
       );
       expect(byText).toEqual({
-        'prefers evenings': null,
+        'prefers evenings': 200,
         'waiting for a call back': 10,
         'comes with his mother': 10,
         'asked about fees': 30,

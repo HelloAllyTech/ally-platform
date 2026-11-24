@@ -1,3 +1,9 @@
+import type {
+  AlertPolicy,
+  AudienceAge,
+  CrisisResumeRule,
+  NoAnswerMode,
+} from '../safety/safety-settings';
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
 
 /** How a bot presents itself. Sent to the answering model on every question. */
@@ -78,6 +84,31 @@ export type ChatbotSettingsOverride = Partial<
    * `{today}`, Repeat weekly and memory's dates (`assistantZone`). Per bot only, like `memory`.
    */
   timeZone?: string;
+  /**
+   * Per-user dollar limits (stage 6, D1), in micros; null or absent = no limit. Counted per end
+   * person in the chatbot's time zone. Per bot only, written by the budget panel
+   * (`PUT v1/chatbots/:id/user-limits`), read by the credits gate.
+   */
+  userLimits?: {
+    dailyMicros?: number | null;
+    weeklyMicros?: number | null;
+    monthlyMicros?: number | null;
+  };
+  /**
+   * Safety settings (assistants build, stage 1b), per bot only, read through
+   * `safetySettingsOf` (safety/safety-settings.ts), which holds the defaults and bounds. Never part
+   * of the platform defaults.
+   */
+  audienceAge?: AudienceAge;
+  retentionDays?: number;
+  noAnswerMode?: NoAnswerMode;
+  enabledLanguages?: string[];
+  alertPolicy?: AlertPolicy;
+  waitBeforeNoOneAvailableMinutes?: number;
+  crisisResumeRule?: CrisisResumeRule;
+  archivedMessage?: string;
+  /** Stage 4: how a customer reaches a person (go-live requires one); `safety/safety-terms.ts`. */
+  humanContact?: { phone?: string; email?: string; url?: string };
   /**
    * Sent by the owner's Safety screen, never stored (Q4 G7): "Use this number in crisis replies".
    * Saving a changed number confirms it too.

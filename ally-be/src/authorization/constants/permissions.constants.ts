@@ -372,6 +372,10 @@ const PERMISSIONS = {
   EDIT_LANDING_PAGE: 'edit:landing-page',
   DELETE_LANDING_PAGE: 'delete:landing-page',
 
+  // === SAFETY PACK RELEASES (assistants stage 9) ===
+  // The curator: draft, test, release and roll back the safety packs every chatbot uses.
+  MANAGE_SAFETY_PACKS: 'manage:safety-packs',
+
   // === AI LAB ===
   VIEW_AI_LAB: 'view:admin:ai-lab',
   EDIT_AI_LAB: 'edit:admin:ai-lab',
@@ -641,6 +645,8 @@ const SUPER_DUPER_ADMIN_PERMISSIONS = [
   PERMISSIONS.VIEW_WHATSAPP_BOT_UNANSWERED,
   PERMISSIONS.EDIT_WHATSAPP_BOT_UNANSWERED,
   PERMISSIONS.VIEW_WHATSAPP_BOT_ANALYTICS,
+  // Stage 9: safety pack releases reach every chatbot, so SDA only (granted in 1987500000000).
+  PERMISSIONS.MANAGE_SAFETY_PACKS,
 ];
 
 const COUNSELOR_PERMISSIONS = [

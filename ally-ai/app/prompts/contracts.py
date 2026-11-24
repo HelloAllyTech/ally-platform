@@ -1011,6 +1011,26 @@ class MemoryCheckInputs(PromptInputs):
     never_store: str = ""
 
 
+class InstructionsJudgeInputs(PromptInputs):
+    """`agent/instructions_judge.txt`."""
+
+    prompt = PromptInfo(
+        code="ally_ai_agent_instructions_judge",
+        name="Chatbot Builder: Apply Safety Judge",
+        description=(
+            "Reads owner-written text (instructions, tone, persona, decline text, "
+            "never-rules) against the fixed safety rules when the owner clicks Apply, "
+            "and says whether it conflicts, with a reason in English and Hindi. "
+            "ally-be refuses the Apply when this fails."
+        ),
+    )
+
+    output_format: ClassVar[Optional[str]] = "structured"
+
+    text: str
+    rules: str
+
+
 class ConversationSummaryInputs(PromptInputs):
     """`conversation/summary.txt`."""
 

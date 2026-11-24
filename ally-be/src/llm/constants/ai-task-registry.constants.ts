@@ -1422,6 +1422,24 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     promptOverride: 'ally_ai_memory_check',
   },
   {
+    id: 'apply-safety-judge',
+    task: LlmTask.APPLY_SAFETY_JUDGE,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'A builder applies changed instructions, tone, persona or rules on a live assistant (Apply, stage 4)',
+    detail:
+      'One call per changed owner text after the regex first pass, against the fixed safety rule ' +
+      'list; says whether the text conflicts, with a reason in English and Hindi. Any failure ' +
+      'refuses the Apply (fails closed). Paid from the builder’s free balance. ally-ai endpoint ' +
+      '/agent/instructions/judge.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
+    promptOverride: 'ally_ai_agent_instructions_judge',
+  },
+  {
     id: 'chatbot-conversation-summary',
     task: LlmTask.CHATBOT_CONVERSATION_SUMMARY,
     runtime: LlmRuntime.ALLY_AI,
@@ -1536,6 +1554,47 @@ const ALLY_AI_TASKS: AiTaskEntry[] = [
     configuredBy:
       'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER; per prompt: the Skills Store',
     promptOverride: 'ally_ai_builder_change',
+  },
+  {
+    id: 'owner-instructions-check',
+    task: null,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'An owner saves "Your instructions" on the assistant home, or applies staged changes to a live assistant (Create and Build, stage 3)',
+    detail:
+      "One call per owner-written text that changed: does it try to weaken or override a safety rule? Refused text is never saved or published; if the check can't run, nothing is saved (fails closed). On Apply it runs only when a safety-relevant field changed (instructions, own rules, tone, the assistant's name, decline text, notes); name, greeting and suggested questions apply with no call. Metered to the builder as `instructions`. ally-ai endpoint /agent/instructions/check.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      'KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER',
+  },
+  {
+    id: 'template-knowledge-indexing',
+    task: null,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      "A builder starts a blank assistant from an Ally template (stage 3): each of the template's knowledge documents is copied onto it and indexed",
+    detail:
+      "Embeddings for the copied documents' chunks, through the ordinary knowledge ingest. Ally pays (R4): usage is recorded as `template_index` with no payer, never charged to the builder. A later edit by the builder re-indexes at their cost like any document.",
+    kind: AiTaskKind.EMBEDDING,
+    provider: 'openai',
+    defaultModel: 'text-embedding-3-small',
+    configuredBy: 'OpenAIEmbeddingConstants.MODEL',
+  },
+  {
+    id: 'safety-pack-release-suite',
+    task: null,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger:
+      'An Ally curator runs the crisis check on a draft safety-pack release (Ally admin → Safety packs, stage 9)',
+    detail:
+      "The multilingual crisis suite (`crisis-cases.json`) asked in every supported language on a test chatbot the curator picks, with the draft pack injected: per case one agent run (plus the crisis classifier) and one checkup-judge grade, the same calls as a checkup. Ally pays: every call is recorded as `pack_suite` with no creator and no payer, never charged to the test chatbot's builder. A release needs every language to pass.",
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy:
+      "KNOWLEDGE_AGENT__DEFAULT_MODEL / KNOWLEDGE_AGENT__DEFAULT_PROVIDER (the test chatbot's own model for the run)",
   },
   {
     id: 'checkup-judge',
@@ -2569,6 +2628,42 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     provider: 'openai',
     defaultModel: 'gpt-5.6-luna (OPENAI_CHAT_MODEL overrides it)',
     configuredBy: 'OPENAI_CHAT_MODEL',
+  },
+  {
+    id: 'knowledge-personal-data-scan',
+    task: null,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      "An assistant's uploaded file or crawled page is read for indexing (assistants stage 5)",
+    detail:
+      'One call per read of a document whose text is new or changed: lists names of private individuals in the first ' +
+      '12,000 characters, after a free regex pass for phones, emails and ID numbers. Any finding holds the document at ' +
+      "`needs_review` until the owner approves or excludes it; nothing is indexed meanwhile. Not run for the builder's own " +
+      'typed text (Owner notes, learned facts, pasted text with no source address), Ally template knowledge, approved ' +
+      'unchanged text, or with ASSISTANT_KNOWLEDGE_PII_REVIEW_ENABLED=false. A failed call is logged ' +
+      'and the regex result alone decides. KnowledgeReviewService.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'resolved',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL (tier default)',
+  },
+  {
+    id: 'knowledge-conflict-judge',
+    task: null,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'At answer time, the top passages for a question come from different documents and the code check is unsure (assistants stage 5, optional)',
+    detail:
+      'Says whether two passages from different documents contradict each other on the asked point. Runs only when the ' +
+      'free numeric/phone/email mismatch heuristic found nothing and the caller asks for the judge; a contradiction is ' +
+      'stored as an owner question in the unanswered queue (reason `conflict`). Not wired into the engine yet. ' +
+      'AnswerConflictService.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'resolved',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL (tier default)',
   },
 ];
 

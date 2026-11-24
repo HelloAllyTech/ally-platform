@@ -152,7 +152,7 @@ describe("Tools", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Your pages/ }));
     expect(screen.getByText("12 pages")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: t.tools.pagesManage }));
-    expect(go).toHaveBeenCalledWith("knows");
+    expect(go).toHaveBeenCalledWith("knowledge", "knows");
 
     fireEvent.click(screen.getByRole("tab", { name: /Memory/ }));
     expect(screen.getByRole("switch", { name: /Remember people between chats/ })).toBeTruthy();
@@ -162,7 +162,7 @@ describe("Tools", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Hand over/ }));
     expect(screen.getByText(t.tools.handoverBody)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: t.tools.handoverChange }));
-    expect(go).toHaveBeenCalledWith("share");
+    expect(go).toHaveBeenCalledWith("settings");
   });
 
   it("lets an owner switch hand over on, keeping the bot's other settings (A1)", () => {

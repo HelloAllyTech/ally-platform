@@ -1,13 +1,6 @@
 import React, { lazy, Suspense } from "react";
 
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useLocation,
-  useSearchParams,
-} from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 
 import { Permissions, ROUTES, FeatureToggleKey, OrgToggle } from "@constants";
 import {
@@ -85,7 +78,8 @@ import {
   EvaluateLogin,
   EvaluateRecords,
   EvaluateRecordDetail,
-  WhatsAppBot,
+  BuilderHome,
+  AssistantDefaults,
 } from "@pages";
 
 // By path, not through `@pages`: onboarding (chunk 20a) needs nothing the barrel provides.
@@ -97,6 +91,9 @@ import { NotFound } from "./NotFound";
 import { PrivateLayout } from "./PrivateLayout";
 import { PublicRoute } from "./PublicRoute";
 import { AssistantHome } from "../pages/AssistantHome";
+import { AssistantInvite } from "../pages/AssistantInvite";
+import { CreateGate } from "../pages/BuilderHome/CreateGate";
+import { CHATBOT_SUPPORT_ROUTE, ChatbotSupport } from "../pages/ChatbotSupport/ChatbotSupport";
 import { OnboardingSession, OnboardingStart } from "../pages/Onboarding";
 
 /**
@@ -108,13 +105,11 @@ const DEBRIEF_CONSOLE_FEATURES = [
   FeatureToggleKey.DEBRIEF_CLINICAL_SIGN_OFF,
 ];
 
-/** `/inbox` (an owner's email from before the inbox moved): AI Chatbots → Inbox, same chat. */
-const InboxRedirect: React.FC = () => {
-  const [params] = useSearchParams();
-  const next = new URLSearchParams(params);
-  next.set("tab", "inbox");
-  return <Navigate to={`${ROUTES.WHATSAPP_BOT}?${next.toString()}`} replace />;
-};
+/**
+ * `/inbox` (an owner's email from before the inbox moved): the assistants home. The Inbox tab is
+ * gone (stage 2): each chatbot's Conversations section holds its chats.
+ */
+const InboxRedirect: React.FC = () => <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
 
 /**
  * Links from before A1 (`/chatbots`, `/chatbots/:id?section=tools`, `/chatbots/new/…`, emails and
@@ -164,6 +159,15 @@ const BillingPlans = lazy(() =>
   import("../pages/Billing/Plans").then(module => ({ default: module.BillingPlans })),
 );
 // The owner's Plan and usage (CR1 Part C): any signed-in user, for themselves. Never dollars.
+const MyCredits = lazy(() =>
+  import("../pages/Credits/MyCredits").then(module => ({ default: module.MyCredits })),
+);
+const StaffCredits = lazy(() =>
+  import("../pages/Credits/StaffCredits").then(module => ({ default: module.StaffCredits })),
+);
+const SafetyPacks = lazy(() =>
+  import("../pages/SafetyPacks/SafetyPacks").then(module => ({ default: module.SafetyPacks })),
+);
 const MyPlan = lazy(() =>
   import("../pages/Plan/MyPlan").then(module => ({ default: module.MyPlan })),
 );
@@ -226,6 +230,9 @@ export const RouteLayout: React.FC = () => {
             </PublicRoute>
           }
         />
+
+        {/* The emailed team invite: public, whether or not they are signed in (not a PublicRoute). */}
+        <Route path={ROUTES.ASSISTANT_INVITE} element={<AssistantInvite />} />
 
         {/* A directory collection's public page: no sign-in, outside the admin shell. */}
         <Route
@@ -476,6 +483,31 @@ export const RouteLayout: React.FC = () => {
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_COSTS}>
                 <BillingPlans />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.BILLING_CREDITS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_COSTS}>
+                <StaffCredits />
+              </PrivateLayout>
+            }
+          />
+          {/* Assistants stage 9: safety pack releases (the curator grant). */}
+          <Route
+            path={ROUTES.SAFETY_PACKS}
+            element={
+              <PrivateLayout requiredPermissions={[Permissions.MANAGE_SAFETY_PACKS]}>
+                <SafetyPacks />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.MY_CREDITS}
+            element={
+              <PrivateLayout fullBleed>
+                <MyCredits />
               </PrivateLayout>
             }
           />
@@ -1081,10 +1113,32 @@ export const RouteLayout: React.FC = () => {
               // Full bleed, as the assistant home: the page draws its own background to the edges.
               // Open to anyone signed in (chunk 6b): it lists only the assistants they're on.
               <PrivateLayout fullBleed>
-                <WhatsAppBot />
+                <BuilderHome />
               </PrivateLayout>
             }
           />
+          {/* Staff only (stage 2): defaults, shared quick replies, library and numbers. The grant
+              is `system:access`, held by Ally staff and never by a tenant's own admins. */}
+          <Route
+            path={ROUTES.ASSISTANT_DEFAULTS}
+            element={
+              <PrivateLayout requiredPermissions={[Permissions.SYSTEM_ACCESS]}>
+                <AssistantDefaults />
+              </PrivateLayout>
+            }
+          />
+          {/* Staff only (stage 8): find any chatbot and open it read-only; every read is logged. */}
+          {[CHATBOT_SUPPORT_ROUTE, `${CHATBOT_SUPPORT_ROUTE}/:botId`].map(path => (
+            <Route
+              key={path}
+              path={path}
+              element={
+                <PrivateLayout fullBleed requiredPermissions={[Permissions.SYSTEM_ACCESS]}>
+                  <ChatbotSupport />
+                </PrivateLayout>
+              }
+            />
+          ))}
           {/* Onboarding (chunk 20a), before `:botId` so `new` is never read as a bot id. */}
           <Route
             path={ROUTES.CHATBOT_NEW}
@@ -1094,7 +1148,9 @@ export const RouteLayout: React.FC = () => {
                 requiredPermissions={[Permissions.EDIT_WHATSAPP_BOT]}
                 fullBleed
               >
-                <OnboardingStart />
+                <CreateGate>
+                  <OnboardingStart />
+                </CreateGate>
               </PrivateLayout>
             }
           />

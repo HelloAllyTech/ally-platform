@@ -24,6 +24,12 @@ import { resolveRouteMeta } from "./routeMeta";
 import { ShellContext } from "./ShellContext";
 import { useDocumentTitle } from "./useDocumentTitle";
 
+/**
+ * The account pages someone in the assistants-only shell may open besides the assistants area:
+ * Plan and usage, and Credits (the corner menu's "Plan and credits").
+ */
+export const ASSISTANT_ONLY_ACCOUNT_PAGES: string[] = [ROUTES.MY_PLAN, ROUTES.MY_CREDITS];
+
 /** What a lazy page shows while its chunk loads, inside the shell (the sidebar never blinks). */
 export const PageFallback: React.FC = () => (
   <div
@@ -94,8 +100,13 @@ const SignedInShell: React.FC = () => {
   if (assistantOnly) {
     // Every assistants page stays open, New assistant included: that page checks the Assistants
     // switch itself, so someone with it can create one and someone without it is told so.
-    // Plan and usage is theirs too: with no Sidebar, the slim header is its only way in.
-    if (!pathname.startsWith(ROUTES.WHATSAPP_BOT) && pathname !== ROUTES.MY_PLAN && !inDirectory) {
+    // Plan and usage and Credits are theirs too: with no Sidebar, the slim header's corner menu
+    // is their only way in.
+    if (
+      !pathname.startsWith(ROUTES.WHATSAPP_BOT) &&
+      !ASSISTANT_ONLY_ACCOUNT_PAGES.includes(pathname) &&
+      !inDirectory
+    ) {
       return <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
     }
     return (

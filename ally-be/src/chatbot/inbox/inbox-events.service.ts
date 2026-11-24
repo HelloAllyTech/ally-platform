@@ -10,7 +10,8 @@ import { RedisService } from '../../redis/service/redis.service';
  * visitor wrote passes through Redis. Listeners re-read what they need through the API.
  */
 export interface InboxEvent {
-  type: 'message' | 'state' | 'safety' | 'read';
+  /** `members`: the team changed; `removedUserIds` re-read their bots at once (Stage 1b). */
+  type: 'message' | 'state' | 'safety' | 'read' | 'members';
   chatbotId: string;
   conversationId: string;
   [key: string]: unknown;

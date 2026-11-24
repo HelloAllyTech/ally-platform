@@ -222,6 +222,8 @@ export enum LlmTask {
   // the memory check on health assistants, and the rolling summary of a long chat. Chatbot spend.
   CHATBOT_MEMORY_CHECK = 'chatbot_memory_check',
   CHATBOT_CONVERSATION_SUMMARY = 'chatbot_conversation_summary',
+  // Customer setup spend: the model judge on owner-written text at Apply. Absent from TASK_AREA.
+  APPLY_SAFETY_JUDGE = 'apply_safety_judge',
   // Onboarding builder (chunk 20a), made by ally-ai's /builder/*: one label per
   // sub-task, so the cost of setting up an assistant shows step by step.
   // Extraction runs once per batch of crawled pages and dominates. Customer

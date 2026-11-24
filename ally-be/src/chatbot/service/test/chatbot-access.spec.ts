@@ -4,7 +4,12 @@ import { ChatbotMemberRole } from '../../enum/chatbot.enum';
 import { ChatbotAccessService } from '../chatbot-access.service';
 
 jest.mock('src/common/execution/execution-manager', () => ({
-  ExecutionManager: { getUserId: () => 7, getExecutionId: () => undefined },
+  ExecutionManager: {
+    getUserId: () => 7,
+    getExecutionId: () => undefined,
+    // Stage 8: no staff read-only view in these specs.
+    getStaffView: () => undefined,
+  },
 }));
 
 /**

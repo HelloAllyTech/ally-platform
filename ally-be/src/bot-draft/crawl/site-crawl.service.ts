@@ -1,4 +1,5 @@
 import { Inject, Injectable, OnModuleInit, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BotImageService } from '../../chatbot/bot-image/bot-image.service';
@@ -59,6 +60,11 @@ export const CRAWL_LIMITS = {
   minPageChars: 60,
   /** Pages read before their summaries are sent to the builder, so findings appear while reading. */
   learnBatch: 8,
+  /**
+   * SB1: the first batch is small, so the first facts (and the starter assistant) appear within a
+   * few seconds instead of after eight pages. Later batches are `learnBatch`.
+   */
+  firstLearnBatch: 2,
   /** A crawl left "running" this long (an instance restarted) is picked up by the sweep. */
   stalledSeconds: 60,
   queueCap: 400,
@@ -81,8 +87,29 @@ function turnedAway(error: GuardedFetchError | null): boolean {
   );
 }
 
+/**
+ * A learner's answer for one batch: read (void), or paused by the credits gate. `'paused'` alone is
+ * out of credits; `paused:<kind>` names the builder-facing reason (`CreditPauseKind`).
+ */
+export type LearnOutcome =
+  | void
+  | 'paused'
+  | `paused:${NonNullable<CrawlState['pausedReason']>}`;
+
+/** Whether a learner's outcome is a pause, and why (out of credits when it doesn't say). */
+export function pausedReasonOf(
+  outcome: LearnOutcome,
+): NonNullable<CrawlState['pausedReason']> | null {
+  if (!outcome) return null;
+  if (outcome === 'paused') return 'out_of_credits';
+  return outcome.slice('paused:'.length) as NonNullable<
+    CrawlState['pausedReason']
+  >;
+}
+
 export interface CrawlLearner {
-  learnFrom(draftId: string, pages: LearnablePage[]): Promise<void>;
+  /** Paused: the batch is kept and read once the reason no longer holds (stage 6). */
+  learnFrom(draftId: string, pages: LearnablePage[]): Promise<LearnOutcome>;
   /** The crawl ended (read, partly read or failed): the builder says so in the chat. */
   crawlFinished?(
     draftId: string,
@@ -90,6 +117,22 @@ export interface CrawlLearner {
   ): Promise<void>;
 }
 export const CRAWL_LEARNER = 'BOT_DRAFT_CRAWL_LEARNER';
+
+/** Stage 3: emitted when a crawl ends, however it ended (Copilot's queue and narration). */
+export const CRAWL_FINISHED = 'bot-draft.crawl-finished';
+export interface CrawlFinishedEvent {
+  draftId: string;
+  read: number;
+  domain?: string;
+  problem?: CrawlProblem;
+}
+
+/** Stage 3: a chatbot that has gone live stages new sources until Apply. */
+export function stagesSources(
+  draft: Pick<BotDraftEntity, 'liveAt' | 'status'>,
+): boolean {
+  return Boolean(draft.liveAt) || draft.status === BotDraftStatus.PUBLISHED;
+}
 
 /**
  * Reads the owner's website into the draft (chunk 20a).
@@ -121,6 +164,8 @@ export class SiteCrawlService implements OnModuleInit {
     private readonly chatbots?: Repository<Chatbot>,
     @Optional() private readonly images?: BotImageService,
     @Optional() private readonly pages?: BotPageService,
+    // Stage 3 (optional and last, as above).
+    @Optional() private readonly emitter?: EventEmitter2,
   ) {}
 
   /**
@@ -242,10 +287,11 @@ export class SiteCrawlService implements OnModuleInit {
     if (!(await this.redis.acquireLock(lockKey, 180).catch(() => true))) return;
     try {
       const draft = await this.drafts.findById(draftId);
-      // A setup closed since (its bot was removed) is never read again.
+      // A setup closed since (its bot was removed) is never read again. A published one is the
+      // live chatbot's working copy (stage 3): a source added to it is read, and waits for Apply.
       if (
         !draft ||
-        draft.status !== BotDraftStatus.ACTIVE ||
+        draft.status === BotDraftStatus.ABANDONED ||
         draft.crawl.status !== 'running' ||
         !draft.crawl.website
       )
@@ -290,14 +336,24 @@ export class SiteCrawlService implements OnModuleInit {
     }
 
     let pending: LearnablePage[] = [];
-    const learning: Promise<void>[] = [];
+    let flushedOnce = false;
+    const learning: Promise<unknown>[] = [];
     const flushLearning = () => {
       if (!pending.length || !this.learner) return;
       const batch = pending;
       pending = [];
+      flushedOnce = true;
       learning.push(
         this.learner
           .learnFrom(draft.id, batch)
+          .then((outcome) => {
+            // Stage 6: shown as paused, with its reason, until the ledger resumes the batch.
+            const reason = pausedReasonOf(outcome);
+            if (reason && !crawl.pausedOutOfCredits) {
+              crawl.pausedOutOfCredits = new Date().toISOString();
+            }
+            if (reason) crawl.pausedReason = reason;
+          })
           .catch((error) =>
             this.logger.warn(
               `Learning from ${batch.length} pages failed for draft ${draft.id}: ${error instanceof Error ? error.message : 'unknown'}`,
@@ -384,7 +440,11 @@ export class SiteCrawlService implements OnModuleInit {
           url: page.url,
           title: page.title,
         });
-        if (pending.length >= CRAWL_LIMITS.learnBatch) flushLearning();
+        if (
+          pending.length >=
+          (flushedOnce ? CRAWL_LIMITS.learnBatch : CRAWL_LIMITS.firstLearnBatch)
+        )
+          flushLearning();
       }
       await this.drafts.saveCrawl(draft.id, crawl);
       return true;
@@ -533,17 +593,23 @@ export class SiteCrawlService implements OnModuleInit {
       sourceUrl: pageUrl,
       tags: ['onboarding'],
     });
-    await this.chatbotDocuments
-      .createQueryBuilder()
-      .insert()
-      .into(ChatbotDocument)
-      .values({
-        chatbotId: draft.chatbotId!,
-        documentId: document.id,
-        createdBy: draft.ownerUserId,
-      })
-      .orIgnore()
-      .execute();
+    if (stagesSources(draft)) {
+      // Stage 3: on a chatbot that has gone live a new page waits for Apply (R3). It is owned by
+      // the chatbot but not on it, so only the working-copy test answers from it.
+      await this.drafts.addPendingDocument(draft.id, document.id);
+    } else {
+      await this.chatbotDocuments
+        .createQueryBuilder()
+        .insert()
+        .into(ChatbotDocument)
+        .values({
+          chatbotId: draft.chatbotId!,
+          documentId: document.id,
+          createdBy: draft.ownerUserId,
+        })
+        .orIgnore()
+        .execute();
+    }
     await this.drafts.addKnowledgeDocument(draft.id, document.id);
     return {
       url: pageUrl,
@@ -756,6 +822,11 @@ export class SiteCrawlService implements OnModuleInit {
           `Could not post the crawl's outcome for draft ${draftId}: ${error instanceof Error ? error.message : 'unknown'}`,
         ),
       );
+    // Stage 3: Copilot narrates the outcome and starts the next queued address.
+    this.emitter?.emit(CRAWL_FINISHED, {
+      draftId,
+      ...outcome,
+    } satisfies CrawlFinishedEvent);
   }
 
   private async fail(

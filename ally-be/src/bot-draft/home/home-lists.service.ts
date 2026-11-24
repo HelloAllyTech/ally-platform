@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { BotPageAccessService } from '../../chatbot/bot-page/bot-page-access.service';
 import { BotPageService } from '../../chatbot/bot-page/bot-page.service';
@@ -16,6 +16,7 @@ import {
   ChatbotMemberRole,
 } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
+import { rolesFromInput, rolesOfRow } from '../../chatbot/access/chatbot-roles';
 import { ChatbotAudienceService } from '../../chatbot/service/chatbot-audience.service';
 import { ChatbotService } from '../../chatbot/service/chatbot.service';
 import {
@@ -108,7 +109,7 @@ export class HomeListsService {
           details: { list, items: before, version: listVersion(before) },
         });
       }
-      await this.apply(chatbot, list, change, before);
+      await this.apply(chatbot, list, change, before, manager);
       const items = await this.items(chatbotId, list);
       return { list, items, version: listVersion(items) };
     });
@@ -146,6 +147,7 @@ export class HomeListsService {
           name: m.name,
           email: m.email,
           role: m.role,
+          roles: m.roles,
         }));
       case 'documents':
         return (await this.chatbots.listDocuments(chatbotId)).map((d) => ({
@@ -172,6 +174,9 @@ export class HomeListsService {
     list: HomeListName,
     change: ListChange,
     before: HomeListItem[],
+    // The transaction holding the bot's row lock: the team is changed inside it (Stage 1b), since
+    // a second connection's member writes would wait on that lock.
+    manager?: EntityManager,
   ): Promise<void> {
     const id = chatbot.id;
     const known = (itemId?: string) => {
@@ -215,36 +220,51 @@ export class HomeListsService {
         }
         break;
       case 'team': {
+        // Stage 1b: each member's whole set is carried, so editing one person never drops
+        // another's roles. An item may give `roles` (a set) or the old single `role`.
         const members = before.map((m) => ({
           userId: Number(m.userId),
-          role: m.role as ChatbotMemberRole,
+          roles: rolesOfRow({
+            role: m.role as string,
+            roles: m.roles as string[] | undefined,
+          }),
         }));
         if (change.op === 'add') {
           const userId = await this.userByEmail(change.item?.email);
-          const role = roleOf(change.item?.role);
-          await this.chatbots.setMembers(id, {
-            members: [
-              ...members.filter((m) => m.userId !== userId),
-              { userId, role },
-            ],
-          });
+          const roles = rolesOf(change.item);
+          await this.chatbots.setMembers(
+            id,
+            {
+              members: [
+                ...members.filter((m) => m.userId !== userId),
+                { userId, roles },
+              ],
+            },
+            manager,
+          );
           return;
         }
         if (change.op === 'edit') {
           const target = Number(known(change.id).userId);
-          const role = roleOf(change.item?.role);
-          await this.chatbots.setMembers(id, {
-            members: members.map((m) =>
-              m.userId === target ? { ...m, role } : m,
-            ),
-          });
+          const roles = rolesOf(change.item);
+          await this.chatbots.setMembers(
+            id,
+            {
+              members: members.map((m) =>
+                m.userId === target ? { ...m, roles } : m,
+              ),
+            },
+            manager,
+          );
           return;
         }
         if (change.op === 'remove') {
           const target = Number(known(change.id).userId);
-          await this.chatbots.setMembers(id, {
-            members: members.filter((m) => m.userId !== target),
-          });
+          await this.chatbots.setMembers(
+            id,
+            { members: members.filter((m) => m.userId !== target) },
+            manager,
+          );
           return;
         }
         break;
@@ -305,14 +325,40 @@ export class HomeListsService {
     const reply = known(change.id);
     const own = reply.state === 'own';
     if (change.op === 'edit') {
+      const responseText =
+        item.responseText !== undefined
+          ? replyText(item.responseText, 1000, 'The reply')
+          : undefined;
+      const patterns =
+        item.patterns !== undefined ? patternsOf(item.patterns) : undefined;
+      if (reply.locked) {
+        // Stage 5 (D6): a locked reply's wording is Ally's. The dashboard may send the wording back
+        // unchanged with the numbers; only an actual change to it is refused.
+        const sameText =
+          responseText === undefined || responseText === reply.responseText;
+        const samePatterns =
+          patterns === undefined ||
+          JSON.stringify(patterns) ===
+            JSON.stringify(reply.patterns as string[]);
+        if (!sameText || !samePatterns) {
+          // COPY: needs approval
+          throw new BadRequestException({
+            errorCode: 'locked_reply',
+            message:
+              'This is a fixed safety reply. Its wording is set by Ally; you can add regional numbers.',
+          });
+        }
+      }
       const dto = {
-        ...(item.responseText !== undefined
-          ? { responseText: replyText(item.responseText, 1000, 'The reply') }
+        ...(responseText !== undefined && !reply.locked
+          ? { responseText }
           : {}),
-        ...(item.patterns !== undefined
-          ? { patterns: patternsOf(item.patterns) }
-          : {}),
+        ...(patterns !== undefined && !reply.locked ? { patterns } : {}),
         ...(item.active !== undefined ? { active: Boolean(item.active) } : {}),
+        // Numbers belong to locked replies only; on any other reply the owner writes them in.
+        ...(item.extraNumbers !== undefined && reply.locked
+          ? { extraNumbers: extraNumbersOf(item.extraNumbers) }
+          : {}),
       };
       if (own) {
         await this.replies.updateTemplate(reply.id, dto as never, chatbotId);
@@ -410,15 +456,16 @@ function entriesOf(change: ListChange, list: 'page' | 'audience') {
   return entries as never[];
 }
 
-function roleOf(raw: unknown): ChatbotMemberRole {
-  const role = Object.values(ChatbotMemberRole).find((r) => r === raw);
-  if (!role) {
+function rolesOf(item: unknown): ChatbotMemberRole[] {
+  const raw = (item ?? {}) as { role?: unknown; roles?: unknown };
+  const roles = rolesFromInput(raw);
+  if (!roles.length) {
     throw new BadRequestException({
       errorCode: 'invalid_value',
       message: 'Choose what they can do.',
     });
   }
-  return role;
+  return roles;
 }
 
 function replyText(raw: unknown, max: number, label: string): string {
@@ -436,6 +483,31 @@ function replyText(raw: unknown, max: number, label: string): string {
     });
   }
   return value;
+}
+
+/** Most regional numbers one locked reply carries, and the longest one. */
+export const MAX_EXTRA_NUMBERS = 10;
+export const MAX_EXTRA_NUMBER_CHARS = 60;
+
+/** Regional numbers for a locked reply: a list or one comma/line-separated string. Empty clears. */
+export function extraNumbersOf(raw: unknown): string[] {
+  const values = Array.isArray(raw) ? raw : String(raw ?? '').split(/[,\n]/);
+  const numbers = [
+    ...new Set(values.map((v) => String(v ?? '').trim()).filter(Boolean)),
+  ];
+  if (numbers.length > MAX_EXTRA_NUMBERS) {
+    throw new BadRequestException({
+      errorCode: 'invalid_value',
+      message: `Add at most ${MAX_EXTRA_NUMBERS} numbers.`,
+    });
+  }
+  if (numbers.some((n) => n.length > MAX_EXTRA_NUMBER_CHARS)) {
+    throw new BadRequestException({
+      errorCode: 'invalid_value',
+      message: `Each number can be at most ${MAX_EXTRA_NUMBER_CHARS} characters.`,
+    });
+  }
+  return numbers;
 }
 
 function patternsOf(raw: unknown): string[] {

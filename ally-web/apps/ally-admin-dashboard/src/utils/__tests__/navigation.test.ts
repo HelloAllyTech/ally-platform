@@ -231,6 +231,7 @@ describe("deriveNavigationItems", () => {
       SIDEBAR_ITEMS.BILLING_MODELS,
       SIDEBAR_ITEMS.BILLING_COSTS,
       SIDEBAR_ITEMS.BILLING_PLANS,
+      SIDEBAR_ITEMS.BILLING_CREDITS,
     ]);
     expect(withCosts[1].path).toBe(ROUTES.BILLING_MODELS);
     expect(withCosts[2].path).toBe(ROUTES.BILLING_COSTS);
@@ -244,6 +245,7 @@ describe("deriveNavigationItems", () => {
     expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_MODELS);
     expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_COSTS);
     expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_PLANS);
+    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_CREDITS);
   });
 
   describe("org-toggle tier (a tenant's own admins)", () => {
@@ -407,6 +409,45 @@ describe("deriveNavigationItems", () => {
     }).map(i => i.id);
     expect(ids).toContain(SIDEBAR_ITEMS.WHATSAPP_BOT);
     expect(ids).toContain(SIDEBAR_ITEMS.ANALYTICS);
+  });
+
+  // Stage 2: the Defaults, Library and Connectors screens moved off the builder's home to a staff
+  // page; the sidebar entry needs system:access AND Chatbots, so a tenant's own admin never sees it.
+  describe("Chatbot defaults (staff only)", () => {
+    const ids = (permissions: Permissions[], features: string[]) =>
+      deriveNavigationItems({ permissions, features, savedOrder: undefined }).map(i => i.id);
+
+    it("shows for staff with the system grant and Chatbots on, linking the staff route", () => {
+      const result = deriveNavigationItems({
+        permissions: [Permissions.SYSTEM_ACCESS],
+        features: [FeatureToggleKey.WHATSAPP_BOT, FeatureToggleKey.ANALYTICS],
+        savedOrder: undefined,
+      });
+      const item = result.find(i => i.id === SIDEBAR_ITEMS.ASSISTANT_DEFAULTS);
+      expect(item?.path).toBe(ROUTES.ASSISTANT_DEFAULTS);
+    });
+
+    it("is hidden without the system grant, and shown with it even when Chatbots is off", () => {
+      expect(ids([Permissions.EDIT_WHATSAPP_BOT], [FeatureToggleKey.WHATSAPP_BOT])).not.toContain(
+        SIDEBAR_ITEMS.ASSISTANT_DEFAULTS,
+      );
+      expect(ids([Permissions.SYSTEM_ACCESS], [FeatureToggleKey.ANALYTICS])).toContain(
+        SIDEBAR_ITEMS.ASSISTANT_DEFAULTS,
+      );
+    });
+
+    it("shows Safety packs on the curator grant alone, without the Chatbots toggle", () => {
+      expect(ids([Permissions.MANAGE_SAFETY_PACKS], [FeatureToggleKey.ANALYTICS])).toContain(
+        SIDEBAR_ITEMS.SAFETY_PACKS,
+      );
+      expect(ids([], [FeatureToggleKey.WHATSAPP_BOT])).not.toContain(SIDEBAR_ITEMS.SAFETY_PACKS);
+    });
+
+    it("never shows to a Chatbots-only login, even one holding every permission", () => {
+      expect(ids(Object.values(Permissions), [FeatureToggleKey.WHATSAPP_BOT])).not.toContain(
+        SIDEBAR_ITEMS.ASSISTANT_DEFAULTS,
+      );
+    });
   });
 
   // Both halves are required, like Simulation Studio: Course Copilot is deliberately not in

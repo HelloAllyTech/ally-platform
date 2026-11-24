@@ -2,6 +2,30 @@ import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { LoggerService } from '../../logger/logger.service';
 import { RedisService } from '../../redis/service/redis.service';
+import {
+  DEFAULT_CHATBOT_TIME_ZONE,
+  localDay,
+} from '../../billing/util/credit-periods';
+
+/** Seconds from `now` to the next midnight in `zone`. */
+export function secondsToLocalMidnight(
+  now: Date,
+  zone: string = DEFAULT_CHATBOT_TIME_ZONE,
+): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: zone,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const n = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return Math.max(
+    1,
+    86_400 - (n('hour') * 3600 + n('minute') * 60 + n('second')),
+  );
+}
 
 /** Per-IP ceilings on the public routes, whatever the page's own limits say. */
 export const BOT_PAGE_IP_LIMITS = {
@@ -17,7 +41,9 @@ export const BOT_PAGE_IP_LIMITS = {
 } as const;
 
 /**
- * The bot page's limits: messages per visitor per hour, a per-IP ceiling, and a daily cap per bot.
+ * The bot page's limits: messages per visitor per hour and per day (stage 7), a per-IP ceiling,
+ * and a daily cap per bot. A crisis keyword message is never counted against the visitor's or the
+ * bot's limits (the caller checks it first, R1).
  *
  * Fixed windows in Redis keyed by the window itself, as `WhatsAppRateLimitService` does. Not the
  * `@RateLimit` decorator: its guard is off when running locally and knows only ip and user, while
@@ -61,6 +87,34 @@ export class BotPageRateLimitService {
       return { allowed: true };
     } catch (error) {
       this.failedOpen('hourly', error);
+      return { allowed: true };
+    }
+  }
+
+  /**
+   * Stage 7: counts one hit against a daily window (the chatbot's day, Asia/Kolkata by default,
+   * as the credit periods use); false once it is over `limit`. Fails open, like `hourly`.
+   */
+  async daily(
+    scope: string,
+    limit: number,
+    now = new Date(),
+  ): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
+    const day = localDay(now);
+    try {
+      const { count } = await this.redis.incrWithExpiry(
+        `bp:rl:${scope}:d:${day}`,
+        90_000,
+      );
+      if (count > limit) {
+        return {
+          allowed: false,
+          retryAfterSeconds: secondsToLocalMidnight(now),
+        };
+      }
+      return { allowed: true };
+    } catch (error) {
+      this.failedOpen('daily', error);
       return { allowed: true };
     }
   }

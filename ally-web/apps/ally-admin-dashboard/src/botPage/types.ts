@@ -16,25 +16,42 @@ export interface PublicImage {
 export type HeadingStyle = "classic" | "modern" | "friendly";
 export type BrandTheme = "light" | "dark" | "auto";
 
-/** How the page looks (chunk 20d): ally-be sends it inside `branding` as `look`. */
+/**
+ * How the page looks: ally-be sends it inside `branding` as `look`. Since stage 7 only the accent
+ * and the logo; the page is always light with classic headings.
+ */
 export interface BrandLook {
-  headingStyle: HeadingStyle;
-  theme: BrandTheme;
   /** The owner's colour, corrected so white text on it reads at 4.5:1. */
   accent: string;
   logo: PublicImage | null;
-  cover: PublicImage | null;
+  /** Retired in stage 7: no longer sent or used. */
+  headingStyle?: HeadingStyle;
+  /** Retired in stage 7: no longer sent or used. */
+  theme?: BrandTheme;
+  /** Retired in stage 7: no longer sent or used. */
+  cover?: PublicImage | null;
 }
 
+/** Stage 7: the look is the name, the logo, one accent colour and a short welcome line. */
 export interface BotPageBranding {
   logoUrl: string | null;
   accentColour: string;
   title: string;
-  subtitle: string;
   assistantName: string;
-  avatarUrl: string | null;
-  disclaimer: string;
-  footerLink: { label: string; url: string } | null;
+  /** The owner's accent as chosen (stage 7). */
+  accent?: string;
+  /** The accent corrected for white text; the same as `accentColour` (stage 7). */
+  accentContrast?: string;
+  /** One short welcome line; empty or absent when none (stage 7). */
+  welcome?: string;
+  /** Retired in stage 7: ally-be no longer sends it and the page ignores it. */
+  subtitle?: string;
+  /** Retired in stage 7: ally-be no longer sends it and the page ignores it. */
+  avatarUrl?: string | null;
+  /** Retired in stage 7 (the fixed crisis information owns it): never shown. */
+  disclaimer?: string;
+  /** Retired in stage 7: never shown. */
+  footerLink?: { label: string; url: string } | null;
   /** Absent from pages served before chunk 20d. */
   look?: BrandLook;
 }
@@ -49,7 +66,10 @@ export interface PrechatField {
 }
 
 export interface PublicBotPage {
+  /** The legacy link's key. */
   slug: string;
+  /** The page's address, `/chat/<publicId>` (stage 7). Absent from older servers. */
+  publicId?: string;
   access: BotPageAccess;
   branding: BotPageBranding;
   suggestedQuestions: string[];
@@ -57,7 +77,18 @@ export interface PublicBotPage {
   maxMessageChars: number;
   language: BotPageLanguage;
   turnstileSiteKey: string | null;
+  /**
+   * The chatbot's own crisis numbers, when the public view returns them (stage 6). The sign-in
+   * screen always shows the findahelpline.com link; these come first when set.
+   */
+  crisis?: { numbers?: string | null; helplineUrl?: string | null };
+  /** The fixed notice that an AI and people may read this chat; shown at the start of every conversation. */
+  notice?: string;
+  /** The safety pack's required disclaimer, or null. The free-text `branding.disclaimer` stays retired. */
+  disclaimer?: string | null;
 }
+
+export type BlockedState = "OUT_OF_CREDITS" | "REMOVED_FROM_LIST";
 
 export interface PublicSession {
   state: "ready" | "needs_email" | "needs_code";
@@ -93,6 +124,12 @@ export interface PublicFinal {
   rateable?: boolean;
   /** A team member has this chat (chunk 11a): no reply now; theirs arrives on the visitor stream. */
   held?: boolean;
+  /**
+   * The turn got the fixed notification and no model run (stage 6): out of credits, or the person
+   * is not on the chatbot's list. `reply` is the server's fixed text; the page words its own when
+   * that is empty.
+   */
+  blocked?: BlockedState;
   /** What the assistant did for this reply (chunk 6b); absent for a crisis or Safety reply. */
   steps?: PublicStep[];
   /** A booking or change made in this reply, from the stored record (chunk 6b). */
@@ -169,5 +206,7 @@ export type BotPageErrorCode =
   | "BOT_PAGE_INTAKE_REQUIRED"
   | "BOT_PAGE_INTAKE_INVALID"
   | "BOT_PAGE_HOST_NOT_ALLOWED"
+  | "BOT_PAGE_OUT_OF_CREDITS"
+  | "BOT_PAGE_NOT_ON_LIST"
   | "NETWORK"
   | "INTERNAL";

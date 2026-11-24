@@ -35,7 +35,14 @@ export enum ChatbotKnowledgeSource {
   ORGANISATION = 'organisation',
 }
 
-/** Dashboard access to one bot. Each role includes the ones before it. */
+/**
+ * Dashboard access to one bot (Stage 1b: roles are a SET, `chatbot_members.roles`). What each role
+ * allows is its capabilities (`ROLE_CAPABILITIES` in access/chatbot-roles.ts), not a ladder.
+ *
+ * The old single `chatbot_members.role` column is still written (dual write) with the highest
+ * role of the set on the old ladder (owner > editor > viewer); a responder-only member is written
+ * as `viewer` there, so an instance still running the old code never gives them more than viewing.
+ */
 export enum ChatbotMemberRole {
   /** See it, its conversations and usage, and test it. */
   VIEWER = 'viewer',
@@ -43,13 +50,35 @@ export enum ChatbotMemberRole {
   EDITOR = 'editor',
   /** Also manage its members and connectors. */
   OWNER = 'owner',
+  /**
+   * Take over its conversations, reply and hand back (after accepting the responder agreement).
+   * Never edit rights. Not on the old ladder: stored as `viewer` in the old `role` column.
+   */
+  RESPONDER = 'responder',
 }
 
+/**
+ * The OLD ladder, kept for the `role` column and for `assert(min)` callers. A responder ranks with
+ * a viewer here; what a responder may do beyond viewing is the `respond` capability.
+ */
 export const CHATBOT_ROLE_RANK: Record<ChatbotMemberRole, number> = {
   [ChatbotMemberRole.VIEWER]: 1,
+  [ChatbotMemberRole.RESPONDER]: 1,
   [ChatbotMemberRole.EDITOR]: 2,
   [ChatbotMemberRole.OWNER]: 3,
 };
+
+/** What a member may do on one bot. Routes and services check these, never a role name. */
+export enum ChatbotCapability {
+  /** Read it: settings, conversations, usage; test it. */
+  VIEW = 'view',
+  /** Take over conversations, reply and hand back. */
+  RESPOND = 'respond',
+  /** Change what it says and knows: persona, knowledge, replies, settings, who can chat. */
+  BUILD = 'build',
+  /** Members, invites, ownership, connectors, archive. */
+  MANAGE_PEOPLE = 'manage_people',
+}
 
 /** One "who can chat" entry. */
 export enum ChatbotAudienceKind {

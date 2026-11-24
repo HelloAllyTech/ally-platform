@@ -44,6 +44,8 @@ export const BrandPreview: React.FC<{
         accentColour: accent,
         title: name,
         subtitle: introduction,
+        // Stage 7: the page shows the welcome line where the subtitle was.
+        welcome: introduction,
         assistantName: name,
         avatarUrl: null,
         disclaimer,

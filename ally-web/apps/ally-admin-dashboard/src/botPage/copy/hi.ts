@@ -83,6 +83,20 @@ export const hi: BotPageCopy = {
       writing: "उत्तर लिख रहा है…",
     },
   },
+  /** COPY: needs approval; to be reviewed by a native speaker. */
+  crisis: {
+    title: "अगर आपको अभी सहायता चाहिए",
+    link: "findahelpline.com पर अपने पास की हेल्पलाइन खोजें",
+    linkLabel: "findahelpline.com",
+    linkUrl: "https://findahelpline.com",
+    numbers: "आप {numbers} पर कॉल कर सकते हैं।",
+    invited: "अगर आपको आमंत्रित किया गया था, तो अपना ईमेल देखें।",
+  },
+  blocked: {
+    OUT_OF_CREDITS: "यह सहायक अभी जवाब नहीं दे सकता।",
+    REMOVED_FROM_LIST: "यह सहायक केवल आमंत्रण से उपलब्ध है।",
+    crisisLead: "अगर आपको अभी सहायता चाहिए, तो अपने पास की हेल्पलाइन यहाँ खोजें:",
+  },
   /** The website widget (copy §22, chunk 13). */
   // needs review: drafted in chunk 6b, not yet checked by a Hindi speaker (all of `steps`).
   steps: {

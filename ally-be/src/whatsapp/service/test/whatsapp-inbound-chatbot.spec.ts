@@ -29,6 +29,7 @@ import { ChatbotEngineService } from 'src/chatbot/engine/chatbot-engine.service'
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
 import { ChatbotAudience } from 'src/chatbot/entity/chatbot-audience.entity';
 import { ChatbotDocument } from 'src/chatbot/entity/chatbot-document.entity';
+import { ChatPrivacyService } from 'src/chatbot/privacy/chat-privacy.service';
 import {
   ChatbotAccessMode,
   ChatbotAnswerMode,
@@ -112,8 +113,12 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
   let documentRows: Partial<ChatbotDocument>[];
   let promptShared: { getPromptsByOptions: jest.Mock };
   let templateService: { match: jest.Mock; findByKind: jest.Mock };
+  /** Stage 5: erase in chat and memory consent (`ChatPrivacyService`), mocked. */
+  let privacy: { beforeTurn: jest.Mock; consentQuestion: jest.Mock };
   let contact: Partial<WaContact>;
   let savedMessages: Record<string, unknown>[];
+  /** Keys the rate limiter has already notified (the blocked notice's once per 24 hours). */
+  let notified: Set<string>;
 
   const inbound = (text = 'how do I ask about intent?') => ({
     providerMessageId: 'wamid.1',
@@ -132,6 +137,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
     savedMessages.find((m) => m.direction === 'outbound')?.handledBy;
 
   beforeEach(async () => {
+    notified = new Set();
     savedMessages = [];
     contact = {
       id: 'contact-1',
@@ -190,6 +196,16 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
       match: jest.fn().mockResolvedValue(null),
       // Consulted by the opt-out/consent step for its wording.
       findByKind: jest.fn().mockResolvedValue([]),
+    };
+    // The free crisis keyword check, as ChatbotReplyService answers it (from `match`).
+    (templateService as Record<string, unknown>).isCrisisKeyword = jest.fn(
+      async (...args: unknown[]) =>
+        (await templateService.match(...args))?.template?.kind ===
+        WaTemplateKind.CRISIS,
+    );
+    privacy = {
+      beforeTurn: jest.fn().mockResolvedValue(null),
+      consentQuestion: jest.fn().mockResolvedValue(null),
     };
 
     const messageRepository = {
@@ -268,7 +284,15 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
           provide: WhatsAppRateLimitService,
           useValue: {
             check: async () => ({ allowed: true }),
-            shouldNotify: async () => false,
+            // Rate-limit windows stay silent as before; the blocked notice (stage 6) is once
+            // per key, like Redis with a 24-hour expiry.
+            shouldNotify: async (key: string, window: string) => {
+              if (!window.startsWith('blocked:')) return false;
+              const k = `${key}:${window}`;
+              if (notified.has(k)) return false;
+              notified.add(k);
+              return true;
+            },
           },
         },
         { provide: WhatsAppIdentityService, useValue: identityService },
@@ -292,10 +316,50 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
           useValue: promptShared,
         },
         { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+        { provide: ChatPrivacyService, useValue: privacy },
       ],
     }).compile();
 
     service = module.get(WhatsAppInboundService);
+  });
+
+  describe('stage 5: erase in chat and memory consent', () => {
+    it('an erase step answers with its fixed reply, authenticated by the number; the engine never runs', async () => {
+      privacy.beforeTurn.mockResolvedValue({
+        kind: 'erase_confirm',
+        body: 'Do you want me to erase…',
+        handledBy: WaHandledBy.TEMPLATE,
+      });
+      await service.handle(inbound('please delete my data'));
+      expect(privacy.beforeTurn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          conversationId: 'conv-1',
+          phone: '919876543210',
+          crisisKeyword: false,
+        }),
+      );
+      expect(sentBody()).toBe('Do you want me to erase…');
+      expect(handledBy()).toBe(WaHandledBy.TEMPLATE);
+      expect(aiService.runAgent).not.toHaveBeenCalled();
+      expect(aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
+    });
+
+    it('a crisis keyword is never read as an erase request', async () => {
+      templateService.match.mockResolvedValue({
+        bypassRag: true,
+        terminal: true,
+        template: {
+          id: 'tpl-crisis',
+          kind: WaTemplateKind.CRISIS,
+          responseText: 'crisis',
+          patterns: ['want to die'],
+        },
+      });
+      await service.handle(inbound('delete my data I want to die'));
+      expect(privacy.beforeTurn).toHaveBeenCalledWith(
+        expect.objectContaining({ crisisKeyword: true }),
+      );
+    });
   });
 
   it('refuses to answer a contact whose organisation cannot be resolved', async () => {
@@ -313,9 +377,9 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
     expect(handledBy()).toBe(WaHandledBy.UNIDENTIFIED);
   });
 
-  it('runs the crisis classifier BEFORE refusing an unrecognised number', async () => {
-    // Someone in danger is not less in danger for being unrecognised. Skipping the second
-    // safety layer here would remove it for precisely the population we know least about.
+  it('does not run the crisis classifier before refusing an unrecognised number (R1)', async () => {
+    // Stage 6, R1: a refused sender gets the FREE keyword crisis check only. The model classifier
+    // no longer runs for people the bot is not for: blocked means no model call.
     aiService.checkWhatsAppCrisis.mockResolvedValue({
       is_crisis: true,
       confidence: 0.9,
@@ -324,8 +388,10 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
     await service.handle(inbound('I want to end my life'));
 
-    expect(sentBody()).toBe(GENERAL_CRISIS_TEXT);
-    expect(handledBy()).toBe(WaHandledBy.CRISIS);
+    expect(aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
+    expect(aiService.runAgent).not.toHaveBeenCalled();
+    expect(sentBody()).toBe(DEFAULT_WHATSAPP_SETTINGS.unrecognisedNumberText);
+    expect(handledBy()).toBe(WaHandledBy.UNIDENTIFIED);
   });
 
   it('still refuses when the crisis classifier is down', async () => {
@@ -448,6 +514,13 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
       signal: 'I want to end my life',
     });
 
+    // The classifier runs for a sender the bot is for (R1: never for a refused one).
+    identityService.identify.mockResolvedValue({
+      ...contact,
+      tenantId: TENANT_A,
+    });
+    aiService.runAgent.mockResolvedValue(ANSWER);
+
     await service.handle(inbound('I want to end my life'));
 
     const outbound = savedMessages.find((m) => m.direction === 'outbound');
@@ -546,7 +619,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
       ]);
     });
 
-    it('refuses someone who is not on the bot’s list, in the bot’s own words', async () => {
+    it('refuses someone who is not on the bot’s list with the fixed notification (D4)', async () => {
       identityService.identify.mockResolvedValue({
         ...contact,
         tenantId: TENANT_B,
@@ -555,7 +628,67 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
       await onNumber();
 
       expect(aiService.runAgent).not.toHaveBeenCalled();
-      expect(sentBody()).toBe('Not one of Acme’s workers.');
+      expect(aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
+      expect(sentBody()).toContain('available by invitation only');
+      expect(sentBody()).toContain('https://findahelpline.com');
+      expect(handledBy()).toBe(WaHandledBy.UNIDENTIFIED);
+    });
+
+    it('sends the fixed notification once per 24 hours per number, then stores in silence', async () => {
+      identityService.identify.mockResolvedValue({
+        ...contact,
+        tenantId: TENANT_B,
+      });
+
+      await onNumber();
+      await service.handle({
+        ...inbound('hello again'),
+        phoneNumberId: 'org-number',
+        providerMessageId: 'wamid.2',
+      });
+
+      // The second message is stored (recorded inbound, then discarded with its reason): no reply.
+      expect(provider.sendText).toHaveBeenCalledTimes(1);
+      expect(aiService.runAgent).not.toHaveBeenCalled();
+    });
+
+    it('gives a refused sender the crisis reply on a crisis keyword, every time', async () => {
+      identityService.identify.mockResolvedValue({
+        ...contact,
+        tenantId: TENANT_B,
+      });
+      templateService.match.mockResolvedValue({
+        bypassRag: false,
+        template: {
+          id: 'tpl-crisis',
+          kind: WaTemplateKind.CRISIS,
+          responseText: 'Please contact a crisis line now.',
+        },
+      });
+
+      await onNumber();
+      await service.handle({
+        ...inbound('I want to hurt myself'),
+        phoneNumberId: 'org-number',
+        providerMessageId: 'wamid.3',
+      });
+
+      expect(provider.sendText).toHaveBeenCalledTimes(2);
+      expect(handledBy()).toBe(WaHandledBy.CRISIS);
+      expect(aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
+      expect(aiService.runAgent).not.toHaveBeenCalled();
+    });
+
+    it('STOP wins over the fixed notification for a refused sender', async () => {
+      identityService.identify.mockResolvedValue({
+        ...contact,
+        tenantId: TENANT_B,
+      });
+
+      await service.handle({ ...inbound('STOP'), phoneNumberId: 'org-number' });
+
+      expect(sentBody()).toContain('You will not receive any more messages');
+      expect(sentBody()).not.toContain('findahelpline');
     });
 
     it('sends the persona and the bot’s model with the answer, and only on the answer prompt', async () => {
@@ -573,11 +706,15 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
       await onNumber();
 
       const request = aiService.runAgent.mock.calls[0][0];
-      expect(request.persona).toEqual({
+      expect(request.persona).toMatchObject({
         display_name: 'Ava',
         system_prompt: 'Be brief.',
         tone: undefined,
       });
+      // Stage 4: the base safety block rides along on every bot.
+      expect(request.persona.safety_rules).toContain(
+        'Never say or suggest that you are a human',
+      );
       expect(request.prompts.ally_ai_knowledge_whatsapp_answer).toMatchObject({
         provider: 'gemini',
         model: 'gemini-2.5-flash',
@@ -590,7 +727,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
       expect(request.prompts.ally_ai_knowledge_crisis_classify).toBeUndefined();
     });
 
-    it('answers a first-time question directly, without an introduction', async () => {
+    it('answers a first-time question first, then the fixed start notice (stage 4)', async () => {
       connectorService.chatbotFor.mockResolvedValue({
         ...ACME_BOT,
         accessMode: ChatbotAccessMode.ANYONE,
@@ -600,8 +737,11 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
       await onNumber();
 
-      // A real question is answered straight away — no welcome or notice in front of it.
-      expect(sentBody()).toBe('Ask directly about intent.');
+      // A real question is answered straight away, with nothing in front of it; the notice that an
+      // AI and people may read the chat follows (stage 4).
+      expect(sentBody()).toBe(
+        `Ask directly about intent.\n\nYou are chatting with an AI assistant. The AI and people at ${ACME_BOT.name} may read this chat.\n${DEFAULT_WHATSAPP_SETTINGS.disclaimerText}`,
+      );
     });
 
     it('answers a hello with the bot’s own welcome, not the shared greeting as well', async () => {
@@ -628,7 +768,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
       });
 
       expect(sentBody()).toBe(
-        `Hi, I am Ava.\n\n${DEFAULT_WHATSAPP_SETTINGS.disclaimerText}`,
+        `Hi, I am Ava.\n\nYou are chatting with an AI assistant. The AI and people at ${ACME_BOT.name} may read this chat.\n${DEFAULT_WHATSAPP_SETTINGS.disclaimerText}`,
       );
     });
 

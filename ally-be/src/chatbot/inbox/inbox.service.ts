@@ -57,8 +57,12 @@ export class InboxService {
     return this.access.accessibleChatbotIds(userId());
   }
 
-  async list(filters: InboxFilters = {}): Promise<InboxItem[]> {
-    const ids = await this.scope();
+  /** `scope`: stage 8, the one chatbot an Ally staff read was authorised for (else the caller's). */
+  async list(
+    filters: InboxFilters = {},
+    scope?: string[],
+  ): Promise<InboxItem[]> {
+    const ids = scope ?? (await this.scope());
     if (!ids.length) return [];
     const params: unknown[] = [userId()];
     const where: string[] = [];
@@ -117,12 +121,12 @@ export class InboxService {
   }
 
   /** Unread chats and the two lists the nav and the notifications need: the reconnect snapshot. */
-  async counts(): Promise<{
+  async counts(scope?: string[]): Promise<{
     unread: number;
     needsPerson: number;
     safety: number;
   }> {
-    const ids = await this.scope();
+    const ids = scope ?? (await this.scope());
     if (!ids.length) return { unread: 0, needsPerson: 0, safety: 0 };
     const [row] = (await this.dataSource.query(
       `SELECT

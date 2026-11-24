@@ -28,7 +28,8 @@ export interface BotPageEligibility {
  * pages.
  *
  * Never consulted by the engine or by WhatsApp: `chatbot_audience` stays the only list that decides
- * who may chat on a channel, so nothing done on a page can widen that.
+ * who may chat on a channel, so nothing done on a page can widen that. An invite-only page also
+ * admits the email entries on `chatbot_audience` (D4: the access list is the one invite list).
  */
 @Injectable()
 export class BotPageAccessService {
@@ -111,7 +112,18 @@ export class BotPageAccessService {
           value: normalised,
         },
       });
-      return { eligible: found > 0 };
+      if (found > 0) return { eligible: true };
+      // D4: invite only is the chatbot's own access list ("Who may chat"). An email entry there
+      // opens the page too; this reads that list, it never adds to it.
+      const listed: unknown[] = await this.dataSource.query(
+        `SELECT 1
+           FROM chatbot_audience au
+           JOIN chatbot_pages p ON p.chatbot_id = au.chatbot_id
+          WHERE p.id = $1 AND au.kind = $2 AND au.value = $3
+          LIMIT 1`,
+        [page.id, ChatbotAudienceKind.EMAIL, normalised],
+      );
+      return { eligible: listed.length > 0 };
     }
 
     if (page.access === BotPageAccess.ORGANISATION) {

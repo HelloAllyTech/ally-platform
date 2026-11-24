@@ -5,6 +5,8 @@ import type { Page, Route } from "@playwright/test";
 
 /** The assistant the home tests open (fictional Sunrise Mind, as the other fixtures). */
 export const BOT_ID = "6f9c1a52-1111-4a8e-9a0c-1b2c3d4e5f60";
+/** This chatbot's working copy (stage 3), which an editor's Build edits. */
+const DRAFT_ID = "6f9c1a52-2222-4a8e-9a0c-1b2c3d4e5f60";
 
 const v = (n: number) => n.toString(16).padStart(16, "0");
 
@@ -287,6 +289,44 @@ const SCORECARD = {
   checkup: { passed: 18, total: 20, at: "2026-11-10T10:00:00.000Z" },
 };
 
+/** How it's doing (stage 7, `GET :id/home/overview`): counts only, small groups held back. */
+const OVERVIEW = {
+  range: 30,
+  timeZone: "Asia/Kolkata",
+  from: "2026-10-12",
+  to: "2026-11-10",
+  conversations: 412,
+  people: 268,
+  days: [
+    ["2026-11-04", 22, 15],
+    ["2026-11-05", 31, 19],
+    ["2026-11-06", 18, 12],
+    ["2026-11-07", 3, 3],
+    ["2026-11-08", 27, 21],
+    ["2026-11-09", 35, 24],
+    ["2026-11-10", 29, 20],
+  ].map(([day, conversations, people]) => ({
+    day,
+    conversations: (conversations as number) < 5 ? { lessThan: 5 } : conversations,
+    people: (people as number) < 5 ? { lessThan: 5 } : people,
+  })),
+  answered: { share: 0.88, fewerThan5: false },
+  handedToPerson: { count: 14, medianWaitMinutes: 42 },
+  ratings: { up: 96, down: 11 },
+  byChannel: [
+    { key: "page", count: 301 },
+    { key: "whatsapp", count: 111 },
+  ],
+  byLanguage: [
+    { key: "en", count: 344 },
+    { key: "hi", count: 68 },
+  ],
+  topUnanswered: [
+    { kind: "question", text: "Do you take insurance?", count: 6 },
+    { kind: "theme", theme: "no_hits", count: { lessThan: 5 } },
+  ],
+};
+
 /**
  * Answers every API call the home makes, from the fixtures above. Field saves check the version
  * they were based on, as ally-be does, so a stale save gets a 409 with the current value.
@@ -351,12 +391,112 @@ export async function mockAssistantHome(
     },
   };
 
+  // Stage 3: an editor's Build is the Create and Build screen on this chatbot's working copy.
+  const f = home.fields;
+  const workingCopy = {
+    draftId: DRAFT_ID,
+    chatbotId: BOT_ID,
+    live: true,
+    blank: false,
+    touched: true,
+    buildMode: "form" as string | null,
+    template: null,
+    settingsHash: v(4000),
+    updatedAt: "2026-11-10T09:30:00.000Z",
+    fields: {
+      name: f.name,
+      assistantName: f.assistantName,
+      introduction: f.introduction,
+      tone: f.tone,
+      instructions: f.instructions,
+      languages: { value: ["en", "hi"], version: v(4001) },
+      suggestedQuestions: f.suggestedQuestions,
+      declineText: f.declineText,
+      extraNever: { value: [], version: v(4002) },
+      ownerNotes: { value: "", version: v(4003) },
+    } as Record<string, { value: unknown; version: string }>,
+  };
+  const drafts = `/bot-drafts/${DRAFT_ID}`;
+
   await page.route("**/api/v1/**", async route => {
     const request = route.request();
-    const path = new URL(request.url()).pathname.replace(/^.*\/api\/v1/, "");
+    const url = new URL(request.url());
+    const path = url.pathname.replace(/^.*\/api\/v1/, "");
     const method = request.method();
     const base = `/chatbots/${BOT_ID}`;
 
+    if (path === `${base}/working-copy` || path === `${drafts}/working-copy`) {
+      return json(route, workingCopy);
+    }
+    if (path === drafts) {
+      return json(route, {
+        id: DRAFT_ID,
+        status: "active",
+        version: 1,
+        chatbotId: BOT_ID,
+        crawl: {
+          status: "idle",
+          domain: null,
+          pagesRead: 0,
+          pages: [],
+          findings: [],
+          problem: null,
+        },
+        learned: { facts: [], dropped: 0 },
+        draft: { suggestedQuestions: [] },
+      });
+    }
+    if (path === `${drafts}/pending`) {
+      return json(route, {
+        live: true,
+        changes: [],
+        settingsHash: workingCopy.settingsHash,
+        liveVersion: v(4100),
+      });
+    }
+    if (path === `${drafts}/events`) {
+      return route.fulfill({ status: 200, contentType: "text/event-stream", body: ": ping\n\n" });
+    }
+    if (path === `${drafts}/sources`) {
+      return json(route, {
+        crawl: { status: "idle", domain: null, pagesRead: 0, failure: null },
+        queue: [],
+        pendingDocumentIds: [],
+        live: true,
+      });
+    }
+    if (path === `${drafts}/mode` && method !== "GET") {
+      const body = request.postDataJSON() as { mode: string };
+      workingCopy.buildMode = body.mode;
+      return json(route, { mode: body.mode, touched: true });
+    }
+    // A form field: the working copy checks the version it was based on, as ally-be does.
+    const draftField = new RegExp(`^${drafts}/fields/(\\w+)$`).exec(path);
+    if (draftField && method === "PATCH") {
+      const name = draftField[1];
+      const body = request.postDataJSON() as { value: unknown; version: string };
+      const current = workingCopy.fields[name];
+      if (current && current.version !== body.version) {
+        return json(
+          route,
+          {
+            errorCode: "stale_field",
+            message: "This changed while you were editing.",
+            details: { field: name, ...current },
+          },
+          409,
+        );
+      }
+      const next = { value: body.value, version: v(5000 + saves.length) };
+      saves.push({ field: name, ...body });
+      workingCopy.fields[name] = next;
+      return json(route, {
+        field: name,
+        ...next,
+        settingsHash: v(4200 + saves.length),
+        staged: true,
+      });
+    }
     if (path === "/chatbots")
       return json(route, { chatbots: [bot], canCreate: Boolean(options.admin) });
     if (path === base) return json(route, bot);
@@ -384,6 +524,11 @@ export async function mockAssistantHome(
     }
     // Chunk Q2a: the live scorecard on the Overview.
     if (path === `${base}/scorecard`) return json(route, SCORECARD);
+    // Stage 7: How it's doing on the Overview (counts only; groups under 5 held back).
+    if (path === `${base}/home/overview`) {
+      const range = Number(url.searchParams.get("range") ?? 30);
+      return json(route, { ...OVERVIEW, range });
+    }
     // CR1 Part C: Share → People's seats, and "This uses 2 of your 3 assistants".
     if (path === `${base}/seats` || path.startsWith(`${base}/seats/`)) {
       return json(route, { ...ASSISTANT_SEATS, chatbotId: BOT_ID });
@@ -589,6 +734,68 @@ export async function mockAssistantHome(
         },
       ]);
     }
+    // Stage 6: this assistant's credit budget and per-person limits (Settings).
+    if (path === `/me/credits/chatbots/${BOT_ID}/budget`) {
+      return json(route, {
+        chatbotId: BOT_ID,
+        hasBudget: true,
+        setAsideUsd: 10,
+        spentUsd: 2.37,
+        reservedUsd: 0.1,
+        remainingUsd: 7.53,
+        freeBalanceUsd: 4.5,
+        reserveUsd: 1,
+        userLimits: { dailyUsd: 0.5, weeklyUsd: null, monthlyUsd: 5 },
+      });
+    }
+    // Stage 8: the owner's grant for Ally staff to read conversations, and who looked (Settings).
+    if (path === `${base}/staff-access`) {
+      return json(route, {
+        grants: [
+          {
+            id: "00000000-0000-4000-8000-0000000000c1",
+            grantedBy: 7,
+            grantedByName: "Shehbaz",
+            reason: "Checking a wrong answer",
+            createdAt: "2026-11-01T09:00:00.000Z",
+            expiresAt: "2026-11-02T09:00:00.000Z",
+            revokedAt: null,
+            status: "expired",
+          },
+        ],
+      });
+    }
+    if (path === `${base}/staff-views`) {
+      return json(route, {
+        views: [
+          {
+            id: "00000000-0000-4000-8000-0000000000d1",
+            at: "2026-11-01T10:15:00.000Z",
+            staffUserId: 2,
+            staffName: "Ally support",
+            what: "setup",
+            conversations: false,
+            conversationId: null,
+            route: "home",
+          },
+        ],
+      });
+    }
+    // Stage 7: where the widget has loaded, and the page's own web address (Channels).
+    if (path === `${base}/widget-sites`) {
+      return json(route, {
+        sites: [
+          {
+            host: "sunrisemind.example",
+            firstSeen: "2026-11-02T09:00:00.000Z",
+            lastSeen: "2026-11-10T09:00:00.000Z",
+            loadCount: 182,
+          },
+        ],
+      });
+    }
+    if (path === `${base}/page/domains`) return json(route, { domains: [] });
+    if (path === "/whatsapp/numbers") return json(route, []);
     if (path === `${base}/audience`) return json(route, []);
     // All numbers on the Overview (CL1): the four analytics routes the classic usage tab read.
     if (path === "/whatsapp/analytics/overview") {
@@ -661,5 +868,5 @@ export async function mockAssistantHome(
       return json(route, { documents: [], count: 0 });
     return json(route, []);
   });
-  return { saves, home };
+  return { saves, home, workingCopy };
 }

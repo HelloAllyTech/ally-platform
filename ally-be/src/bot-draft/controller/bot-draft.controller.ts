@@ -37,6 +37,8 @@ import {
   PageChoiceDto,
 } from '../dto/bot-draft.dto';
 import { BotDraftActor, BotDraftStatus } from '../enum/bot-draft.enum';
+import { TestChatbotDto } from '../../chatbot/dto/chatbot.dto';
+import { BotDraftPreviewService } from '../service/bot-draft-preview.service';
 import { BotDraftPublishService } from '../service/bot-draft-publish.service';
 import { BotDraftSessionService } from '../service/bot-draft-session.service';
 import { draftView } from '../service/bot-draft-view';
@@ -50,6 +52,9 @@ import { templateById } from '../../chatbot/templates/templates';
 import { answersOf, templateDescription } from '../templates/template-answers';
 import { TemplateService } from '../templates/template.service';
 import { AssistantScope } from '../../chatbot/access/chatbot-role.decorator';
+import { BlankChatbotService } from '../blank/blank-chatbot.service';
+import { WorkingCopyService } from '../working-copy/working-copy.service';
+import { GoLiveGateService } from '../../chatbot/safety/go-live-gate.service';
 
 const EDIT = { permissions: [PERMISSIONS.EDIT_WHATSAPP_BOT] };
 
@@ -77,6 +82,13 @@ export class BotDraftController {
     private readonly checkupCases?: CheckupCasesService,
     // Use-case templates (T1); optional for the same reason.
     @Optional() private readonly templates?: TemplateService,
+    // SB1: chat with the assistant while building it.
+    @Optional() private readonly preview?: BotDraftPreviewService,
+    // Stage 3: blank chatbots and the working copy.
+    @Optional() private readonly blanks?: BlankChatbotService,
+    @Optional() private readonly workingCopy?: WorkingCopyService,
+    // Stage 4: while the go-live gate is on it is the readiness check, not the old Check-up run.
+    @Optional() private readonly goLive?: GoLiveGateService,
   ) {}
 
   @Post()
@@ -89,6 +101,12 @@ export class BotDraftController {
       'Creates the draft and its draft chatbot. With a website, reading starts in the background (progress on /events); with a description, its details are read into "What we learned"; with `interview`, the builder opens by asking its first question and learns from the owner\'s answers in chat.',
   })
   async create(@Body() dto: CreateBotDraftDto) {
+    // Stage 3: no input at all (or `blank: true`) creates a blank chatbot at the click, reusing the
+    // caller's newest untouched one, so a double click makes one.
+    if (this.blanks && isBlankRequest(dto)) {
+      const { draft, reused } = await this.blanks.createOrReuse();
+      return { ...draftView(draft), blank: true, reused };
+    }
     const website = dto.website?.trim();
     // T1: a template start reads a description written from the owner's answers.
     const template = dto.template ? templateById(dto.template) : undefined;
@@ -376,9 +394,12 @@ export class BotDraftController {
     @Body() dto: PublishBotDraftDto,
   ) {
     const draft = await this.drafts.get(id);
-    // The checkup gates the first publish (chunk 20a-2); changing who can use a published
-    // assistant doesn't run it again.
-    if (draft.status !== BotDraftStatus.PUBLISHED) {
+    // Stage 4 (D10): with the go-live gate on, its per-language crisis check (asserted inside
+    // `publisher.publish`) is the hard gate and the owner decides the rest; the Check-up stays
+    // available but no longer blocks going live. With the gate switched off
+    // (ASSISTANT_GO_LIVE_GATE_ENABLED=false) the old rule holds: the checkup gates the first
+    // publish (chunk 20a-2), and changing who can use a published assistant doesn't run it again.
+    if (!this.goLive?.enforced() && draft.status !== BotDraftStatus.PUBLISHED) {
       // An owner's own Must pass question that failed asks first (chunk 20d-2); the gate itself
       // (unsourced answers, safety questions) is unchanged and runs after.
       await this.checkupCases?.assertMustPassConfirmed(
@@ -391,7 +412,18 @@ export class BotDraftController {
         Boolean(dto.recheckSafety),
       );
     }
-    return this.publisher.publish(draft, dto);
+    const published = await this.publisher.publish(draft, dto);
+    // Stage 3: from now on the working copy waits for Apply. Publishing again changes nothing here.
+    if (draft.status !== BotDraftStatus.PUBLISHED) {
+      await this.workingCopy
+        ?.markLive(draft.id)
+        .catch((error) =>
+          this.logger.warn(
+            `Working copy not marked live for draft ${id}: ${error instanceof Error ? error.message : 'unknown'}`,
+          ),
+        );
+    }
+    return published;
   }
 
   @Get(':id/pages/found')
@@ -456,6 +488,89 @@ export class BotDraftController {
       await this.drafts.update(draft, { status: BotDraftStatus.ABANDONED }),
     );
   }
+
+  // ── SB1: chat with the assistant while building it ───────────────────────
+
+  @Post(':id/test')
+  @AssistantScope('service')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary:
+      'Ask the assistant being built a question, using the draft as it is now',
+    description:
+      "Projects the latest draft onto its draft assistant, then runs the ordinary Preview test (same decision path and crisis check as /v1/chatbots/:id/test). Any `draft` override in the body is ignored: the server's draft is the truth. 409 `setup_finished` once the setup is published or abandoned. The reply carries `preview.pendingDocuments`.",
+  })
+  test(@Param('id', ParseUUIDPipe) id: string, @Body() dto: TestChatbotDto) {
+    return this.previewService().test(id, dto);
+  }
+
+  @Post(':id/test/stream')
+  @AssistantScope('service')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiOperation({
+    summary: 'The same test as :id/test, streamed (SSE)',
+    description:
+      'Events as /v1/chatbots/:id/test/stream: run_started, status, step, token, then final (what :id/test returns) or error. Closing the connection stops the run.',
+  })
+  async testStream(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: TestChatbotDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const preview = this.previewService();
+    const stop = new AbortController();
+    let heartbeat: NodeJS.Timeout | undefined;
+    res.on('close', () => {
+      if (!res.writableEnded) stop.abort();
+    });
+    // Headers go out with the first event, so a refusal before the run (no access, a finished
+    // setup) is still a plain HTTP error the dashboard can read.
+    const send = (event: string, data: unknown): void => {
+      if (stop.signal.aborted || res.writableEnded) return;
+      if (!res.headersSent) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders();
+        heartbeat = setInterval(() => res.write(': ping\n\n'), 10_000);
+      }
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+    try {
+      const result = await preview.test(id, dto, {
+        onEvent: ({ event, data }) => send(event, data),
+        signal: stop.signal,
+      });
+      send('final', result);
+    } catch (error) {
+      if (!res.headersSent) throw error;
+      send('error', { code: 'internal' });
+    } finally {
+      clearInterval(heartbeat);
+      if (res.headersSent && !res.writableEnded) res.end();
+    }
+  }
+
+  /** Optional in the constructor so specs that build this controller by hand needn't change. */
+  private previewService(): BotDraftPreviewService {
+    if (!this.preview)
+      throw new Error('BotDraftPreviewService is not provided');
+    return this.preview;
+  }
+}
+
+/** Stage 3: a create with nothing to start from, or an explicit blank. */
+function isBlankRequest(dto: CreateBotDraftDto | undefined): boolean {
+  if (!dto) return true;
+  if (dto.blank === true) return true;
+  return (
+    !dto.website?.trim() &&
+    !dto.description?.trim() &&
+    !dto.upload &&
+    !dto.interview &&
+    !dto.template
+  );
 }
 
 /** "sunrise-mind.example" → "Sunrise Mind": a starting name the owner can change. */

@@ -74,7 +74,7 @@ describe('ChatbotEngineService: the crisis check reads earlier messages', () => 
     expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
   });
 
-  it('refuse: a sender the bot is not for is checked with history too', async () => {
+  it('refuse: a sender the bot is not for gets no classifier call (R1: keyword check only)', async () => {
     const h = setup();
     await h.engine.respond(
       stored({
@@ -85,7 +85,7 @@ describe('ChatbotEngineService: the crisis check reads earlier messages', () => 
       }),
     );
     expect(h.aiService.answerKnowledgeQuestion).not.toHaveBeenCalled();
-    expect(sent(h.aiService).history).toEqual([DISCLOSURE]);
+    expect(h.aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
   });
 
   it('a held chat: the latest message alone, and a crisis still gets the crisis reply at once', async () => {

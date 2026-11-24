@@ -1,26 +1,17 @@
-import React, { useId, useState } from "react";
+import React, { useState } from "react";
 
 import { useBindConnectorMutation, useCheckWaNumberMutation } from "@api";
 import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
-import { ChatbotMemberRole, WaBusinessNumberStatus } from "@types";
-import type { Chatbot, HomeTeamMember, WaBusinessNumber } from "@types";
+import { WaBusinessNumberStatus } from "@types";
+import type { Chatbot, WaBusinessNumber } from "@types";
 
 import { ConnectWhatsAppFlow, useWaNumbers } from "../../WhatsAppBot/NumberTab";
 import { HOME, fill } from "../copy";
 import { when } from "../dates";
-import {
-  AddRow,
-  InlineConfirm,
-  ListError,
-  ListRow,
-  ListRows,
-  ListSkeleton,
-  RemoveButton,
-} from "../ui/List";
-import { Sheet } from "../ui/Sheet";
-import { useHomeList } from "../useHomeList";
 import { LoadFailed } from "./AccessLists";
+import { InlineConfirm, ListError, ListRow, ListRows, ListSkeleton } from "../ui/List";
+import { Sheet } from "../ui/Sheet";
 
 const t = HOME.lists;
 
@@ -181,129 +172,6 @@ export const WhatsAppNumbers: React.FC<{ bot: Chatbot; canManage: boolean }> = (
           </div>
         </Sheet>
       )}
-    </div>
-  );
-};
-
-const ROLES: { id: ChatbotMemberRole; label: string }[] = [
-  { id: ChatbotMemberRole.VIEWER, label: t.team.viewer },
-  { id: ChatbotMemberRole.EDITOR, label: t.team.editor },
-  { id: ChatbotMemberRole.OWNER, label: t.team.owner },
-];
-
-const RoleSelect: React.FC<{
-  value: string;
-  label: string;
-  disabled?: boolean;
-  onChange: (role: ChatbotMemberRole) => void;
-}> = ({ value, label, disabled, onChange }) => (
-  <select
-    className="ally-input ally-input--compact"
-    aria-label={label}
-    value={value}
-    disabled={disabled}
-    onChange={event => onChange(event.target.value as ChatbotMemberRole)}
-  >
-    {ROLES.map(role => (
-      <option key={role.id} value={role.id}>
-        {role.label}
-      </option>
-    ))}
-  </select>
-);
-
-/**
- * Who can change the assistant (chunk 20d-2, Share → Team): the same three roles as before, now
- * added by email. Owners change it; everyone else sees it.
- */
-export const TeamList: React.FC<{ botId: string; canManage: boolean; myUserId?: number }> = ({
-  botId,
-  canManage,
-  myUserId,
-}) => {
-  const list = useHomeList(botId, "team");
-  const [role, setRole] = useState<ChatbotMemberRole>(ChatbotMemberRole.EDITOR);
-  const roleId = useId();
-  const label = (member: HomeTeamMember) => member.name ?? member.email ?? String(member.userId);
-
-  if (list.loading) return <ListSkeleton />;
-  if (list.failed) return <LoadFailed onRetry={list.refetch} />;
-  return (
-    <div className="ally-home__list-block" data-testid="team-list">
-      <ListRows label={HOME.share.team}>
-        {list.items.map(member => (
-          <ListRow
-            key={member.id}
-            title={label(member)}
-            badge={
-              member.userId === myUserId ? (
-                <span className="ally-badge ally-badge--muted">{t.team.you}</span>
-              ) : undefined
-            }
-            meta={member.name ? (member.email ?? undefined) : undefined}
-            actions={
-              <>
-                <RoleSelect
-                  label={`${t.team.roleLabel}: ${label(member)}`}
-                  value={member.role}
-                  disabled={!canManage || list.saving}
-                  onChange={next =>
-                    void list.change({ op: "edit", id: member.id, item: { role: next } }, () => ({
-                      op: "edit",
-                      id: member.id,
-                      item: { role: member.role },
-                    }))
-                  }
-                />
-                {canManage && (
-                  <RemoveButton
-                    label={fill(t.remove, { item: label(member) })}
-                    disabled={list.saving}
-                    onClick={() =>
-                      void list.change({ op: "remove", id: member.id }, () =>
-                        member.email
-                          ? { op: "add", item: { email: member.email, role: member.role } }
-                          : null,
-                      )
-                    }
-                  />
-                )}
-              </>
-            }
-          />
-        ))}
-      </ListRows>
-      {canManage ? (
-        <AddRow
-          label={t.team.emailLabel}
-          type="email"
-          addLabel={t.add}
-          disabled={list.saving}
-          extra={
-            <>
-              <label htmlFor={roleId} className="ally-sr-only">
-                {t.team.roleLabel}
-              </label>
-              <select
-                id={roleId}
-                className="ally-input ally-input--compact"
-                value={role}
-                onChange={event => setRole(event.target.value as ChatbotMemberRole)}
-              >
-                {ROLES.map(option => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </>
-          }
-          onAdd={email => list.change({ op: "add", item: { email, role } })}
-        />
-      ) : (
-        <p className="ally-small">{t.team.ownerOnly}</p>
-      )}
-      <ListError error={list.error} />
     </div>
   );
 };

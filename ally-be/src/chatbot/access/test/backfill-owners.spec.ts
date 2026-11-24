@@ -63,7 +63,7 @@ describe('backfillOwners (A1)', () => {
     const fake = db();
     await backfillOwners(fake as never, { dryRun: true });
     expect(fake.query.mock.calls[0][0]).toMatch(
-      /NOT EXISTS[\s\S]*m\.role = 'owner'/,
+      /NOT EXISTS[\s\S]*'owner' = ANY\(m\.roles\)/,
     );
   });
 });

@@ -108,6 +108,10 @@ export interface BotDraftView {
     findings: string[];
     brand: { logoUrl: string | null; accentColour: string | null } | null;
     problem: string | null;
+    /** Reading paused at $0 credits (ISO time); resumes after a grant. */
+    pausedOutOfCredits?: string | null;
+    /** Why it paused (ally-be `CreditPauseKind`); null or absent reads as out of credits. */
+    pausedReason?: "out_of_credits" | "feed_off" | "no_payer" | "ledger_unavailable" | null;
   };
   learned: { facts: LearnedFact[]; dropped: number };
   industry: string | null;

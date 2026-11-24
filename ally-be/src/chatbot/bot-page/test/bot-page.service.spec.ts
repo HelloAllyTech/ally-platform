@@ -79,18 +79,23 @@ describe('BotPageService', () => {
       { getForChatbot: jest.fn(async () => globalSettings) } as never,
       { getPresignedUrlForImageUpload: jest.fn() } as never,
       {
-        botPage: { baseUrl: 'http://localhost:8081' },
+        botPage: {
+          baseUrl: 'http://localhost:8081',
+          chatUrl: 'http://localhost:8081/chat',
+        },
         s3: { assetsBucket: 'assets' },
       } as never,
     );
   });
 
   describe('before the first save', () => {
-    it('suggests a link from the bot’s name and prefills the crisis disclaimer', async () => {
+    it('has no address before the first save, and prefills the crisis disclaimer', async () => {
       const view = await service.view(bot);
       expect(view.saved).toBe(false);
       expect(view.slug).toBe('sunrise-mind');
-      expect(view.link).toBe('http://localhost:8081/b/sunrise-mind');
+      // Stage 7: the address is assigned on the first save, never suggested from the name.
+      expect(view.publicId).toBeNull();
+      expect(view.link).toBe('');
       expect(view.status).toBe(BotPageStatus.OFF);
       expect(view.access).toBe(BotPageAccess.INVITE);
       expect(view.settings.branding.assistantName).toBe('Sunny');
@@ -139,6 +144,7 @@ describe('BotPageService', () => {
       pages.findOne.mockResolvedValue({
         chatbotId: 'bot-1',
         slug: 'sunrise-mind',
+        publicId: 'k7m2p9qa',
         settings: { widget },
       });
       await service.save(
@@ -166,12 +172,18 @@ describe('BotPageService', () => {
       expect(pages.save).toHaveBeenCalled();
     });
 
-    it('refuses a link another bot already has', async () => {
+    it('never changes the stored link or address, whatever slug is sent (stage 7)', async () => {
       pages.findOne.mockResolvedValue({
-        chatbotId: 'other-bot',
+        chatbotId: 'bot-1',
         slug: 'sunrise-mind',
+        publicId: 'k7m2p9qa',
+        settings: {},
       });
-      await expect(service.save(bot, dto())).rejects.toThrow(ConflictException);
+      await service.save(bot, dto({ slug: 'someone-elses-name' }));
+      expect(pages.save.mock.calls[0][0]).toMatchObject({
+        slug: 'sunrise-mind',
+        publicId: 'k7m2p9qa',
+      });
     });
 
     it('turns a lost race on the unique index into the same conflict', async () => {

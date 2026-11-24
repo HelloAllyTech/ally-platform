@@ -91,6 +91,17 @@ describe('BotPageAccessService', () => {
       });
     });
 
+    it("invite: an email on the chatbot's access list (Who may chat) opens it too", async () => {
+      const page = { id: 'page-1', access: BotPageAccess.INVITE };
+      query.mockResolvedValueOnce([{ '?column?': 1 }]);
+      expect(await service.eligibility(page, 'Meera@Example.com')).toEqual({
+        eligible: true,
+      });
+      const [sql, params] = query.mock.calls[0];
+      expect(sql).toMatch(/FROM chatbot_audience/);
+      expect(params).toEqual(['page-1', 'email', 'meera@example.com']);
+    });
+
     it('organisation: an active user of an organisation on the list', async () => {
       const page = { id: 'page-1', access: BotPageAccess.ORGANISATION };
       expect(await service.eligibility(page, 'ravi@sunrise.org')).toEqual({

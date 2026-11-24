@@ -1,4 +1,8 @@
 import { usageContext } from 'src/billing/context/usage-context';
+import { withFirstMessageParts } from '../engine/first-reply';
+import { startNotice } from '../safety/chat-notice';
+import { offMessage } from '../safety/off-message';
+import { replyLanguageOf } from '../engine/reply-language';
 import { UsageChannel, UsageKind } from 'src/billing/enum/billing.enum';
 import {
   HttpException,
@@ -28,6 +32,7 @@ import {
   BotPageVerifyDto,
 } from '../dto/bot-page.dto';
 import { isFailedRun } from '../engine/agent-runtime';
+import { crisisHelplines } from '../engine/crisis-helplines';
 import { ChatbotEngineService } from '../engine/chatbot-engine.service';
 import type {
   ChatbotDecision,
@@ -47,7 +52,11 @@ import {
   AGENT_FALLBACK_EVENT,
   AgentFallbackEvent,
 } from '../type/agent-runtime.event';
-import { BOT_PAGE_BOUNDS, PrechatField } from '../type/bot-page.type';
+import {
+  BOT_PAGE_BOUNDS,
+  DEFAULT_BOT_PAGE_LIMITS,
+  PrechatField,
+} from '../type/bot-page.type';
 import {
   BotPageAccessService,
   BotPageEligibility,
@@ -70,7 +79,8 @@ import {
   BotPageVisitorService,
   IssuedVisitor,
 } from './bot-page-visitor.service';
-import { cleanPageUrl, frameAncestors, hostAllowed } from './widget-host';
+import { cleanPageUrl } from './widget-host';
+import { WidgetSitesService, widgetSiteHost } from './widget-sites.service';
 import { SseWriter } from '../../common/sse/sse-writer';
 import { handoverMessage, handoverOf } from '../handover/handover';
 import { HandoverService } from '../handover/handover.service';
@@ -87,30 +97,81 @@ import {
   type PublicStep,
 } from './live-steps';
 import { FEEDBACK_UPSERT } from './answer-feedback.sql';
+import { ChatPrivacyService } from '../privacy/chat-privacy.service';
+import { AnswerConflictService } from '../knowledge/answer-conflict.service';
+import { CRISIS_LINK } from '../safety/crisis-copy';
+import { packFor } from '../../bot-draft/safety-pack/safety-packs';
 
 /** What a visitor's browser learns about a page. Nothing internal: no prompts, ids or settings. */
 export interface PublicBotPage {
+  /** The legacy link's key, for older clients. */
   slug: string;
+  /** The page's address (`/chat/<publicId>`, stage 7): a page opened by its old link goes here. */
+  publicId: string;
   access: BotPageAccess;
-  /** The words, plus `look` (chunk 20d): heading style, theme, the corrected accent and images. */
-  branding: AvailableBotPage['settings']['branding'] & {
-    look: PublicBrandLook;
-  };
+  /** Stage 7: the look is the name, the logo, one accent colour and a short welcome line. */
+  branding: PublicBranding;
   suggestedQuestions: string[];
   prechat: PrechatField[];
   maxMessageChars: number;
   language: AvailableBotPage['settings']['language'];
   /** Set when the page needs a Turnstile token to start a session. */
   turnstileSiteKey: string | null;
+  /**
+   * The chatbot's crisis information (R6), shown on the sign-in screen to every visitor before
+   * any code is asked for, and under a blocked reply: the builder's own numbers first when set,
+   * then the helpline link.
+   */
+  crisis: { numbers: string | null; helplineUrl: string };
+  /**
+   * The fixed notice that an AI and people at the organisation may read the chat (stage 4), shown
+   * on the page's first screen on every channel. Never empty: the owner's wording only when it
+   * keeps that meaning.
+   */
+  notice: string;
+  /**
+   * The safety pack's required disclaimer (a health pack's "not a crisis service or medical
+   * advice"), or the owner's longer wording that still contains it. Null when the bot's pack needs
+   * none, or when `notice` already carries it. The free-text disclaimer is otherwise retired
+   * (stage 7), but a pack's can't be removed.
+   */
+  disclaimer: string | null;
 }
 
-/** How the page looks to a visitor. Image URLs are on the public image route; no ids. */
-interface PublicBrandLook {
-  headingStyle: AvailableBotPage['settings']['brand']['headingStyle'];
-  theme: AvailableBotPage['settings']['brand']['theme'];
+/**
+ * The disclaimer a page must show: the pack's own text, or the owner's stored wording when it still
+ * contains it (the draft lock only lets an owner lengthen it). Null without a pack that needs one.
+ */
+export function requiredDisclaimer(
+  safetyPack: string | null | undefined,
+  stored: string | null | undefined,
+): string | null {
+  const required = packFor(safetyPack)?.disclaimer?.trim();
+  if (!required) return null;
+  const own = (stored ?? '').trim();
+  return own && own.includes(required) ? own : required;
+}
+
+/**
+ * How the page looks to a visitor (stage 7). No subtitle, avatar, disclaimer (the fixed crisis
+ * notice owns that), footer link, cover, theme or heading style: stored values of those are inert.
+ */
+export interface PublicBranding {
+  /** The business's name. */
+  title: string;
+  /** The name on the bot's replies (the assistant's name). */
+  assistantName: string;
+  logoUrl: string | null;
+  /** The colour to paint with: the owner's accent, darkened until white text reads on it. */
+  accentColour: string;
+  /** The owner's accent as chosen. */
   accent: string;
-  logo: AvailableBotPage['brandImages']['logo'];
-  cover: AvailableBotPage['brandImages']['cover'];
+  /** Same as `accentColour`, named for what it is. */
+  accentContrast: string;
+  /** One short welcome line; empty when the owner set none. */
+  welcome: string;
+  /** Image URLs on the public image route; no ids. */
+  look: { accent: string; logo: AvailableBotPage['brandImages']['logo'] };
 }
 
 type SessionState = 'ready' | 'needs_email' | 'needs_code';
@@ -181,6 +242,11 @@ export interface PublicFinal {
   steps?: PublicStep[];
   /** A booking or change made in this reply, from the stored record (chunk 6b). */
   confirmation?: PublicConfirmation;
+  /**
+   * Stage 6: the turn was blocked and `reply` is the fixed notification (no model call), or on a
+   * crisis keyword the crisis reply. The page shows it with the crisis information.
+   */
+  blocked?: 'OUT_OF_CREDITS' | 'REMOVED_FROM_LIST';
 }
 
 /** The bot page's refusals, mapped onto the repo's `ErrorCode` contract (see error-code.enum.ts). */
@@ -189,6 +255,9 @@ const PUBLIC_ERRORS = {
   bot_check_failed: ErrorCode.BOT_PAGE_BOT_CHECK_FAILED,
   start_again: ErrorCode.BOT_PAGE_START_AGAIN,
   not_allowed: ErrorCode.BOT_PAGE_NOT_ALLOWED,
+  // Stage 6: a verified visitor taken off the list sends a message: the fixed notification.
+  not_on_list: ErrorCode.BOT_PAGE_NOT_ON_LIST,
+  out_of_credits: ErrorCode.BOT_PAGE_OUT_OF_CREDITS,
   code_wrong: ErrorCode.BOT_PAGE_CODE_WRONG,
   code_expired: ErrorCode.BOT_PAGE_CODE_EXPIRED,
   code_too_many: ErrorCode.BOT_PAGE_CODE_TOO_MANY,
@@ -292,28 +361,50 @@ export class BotPagePublicService {
     @Optional() private readonly summaries?: SummaryService,
     // The confirmation card (chunk 6b). Optional, like memory, for older test wiring.
     @Optional() private readonly listTools?: ListToolsService,
+    // Stage 5: erase in chat, memory consent, conflicts. Optional for older test wiring.
+    @Optional() private readonly privacy?: ChatPrivacyService,
+    @Optional() private readonly answerConflict?: AnswerConflictService,
+    // Stage 7: "Sites it has loaded on". Optional for older test wiring.
+    @Optional() private readonly widgetSites?: WidgetSitesService,
   ) {}
 
   async page(slug: string): Promise<AvailableBotPage> {
     const available = await this.pages.findAvailable(slug);
-    if (!available) throw publicError(HttpStatus.NOT_FOUND, 'not_found');
+    if (!available) {
+      // Stage 4: an archived or paused assistant shows its off message with the crisis
+      // information, which can't be removed, rather than a bare "not found".
+      const off = await this.pages.findOff?.(slug).catch(() => null);
+      if (off) {
+        throw publicError(HttpStatus.NOT_FOUND, 'not_found', {
+          details: {
+            assistantOff: off.reason,
+            offMessage: offMessage(off.chatbot as never, 'en'),
+          },
+        });
+      }
+      throw publicError(HttpStatus.NOT_FOUND, 'not_found');
+    }
     return available;
   }
 
   view(available: AvailableBotPage): PublicBotPage {
     const { page, settings } = available;
+    // `findAvailable` has already put the contrast-corrected accent and the stored logo's URL
+    // into `branding`.
+    const paint = settings.branding.accentColour;
     return {
       slug: page.slug,
+      publicId: page.publicId,
       access: page.access,
       branding: {
-        ...settings.branding,
-        look: {
-          headingStyle: settings.brand.headingStyle,
-          theme: settings.brand.theme,
-          accent: settings.branding.accentColour,
-          logo: available.brandImages?.logo ?? null,
-          cover: available.brandImages?.cover ?? null,
-        },
+        title: settings.branding.title,
+        assistantName: settings.branding.assistantName,
+        logoUrl: settings.branding.logoUrl,
+        accentColour: paint,
+        accent: settings.brand?.accent ?? paint,
+        accentContrast: paint,
+        welcome: settings.branding.welcome ?? '',
+        look: { accent: paint, logo: available.brandImages?.logo ?? null },
       },
       suggestedQuestions: settings.suggestedQuestions,
       prechat: settings.prechat,
@@ -324,7 +415,39 @@ export class BotPagePublicService {
       language: settings.language,
       turnstileSiteKey:
         page.access === BotPageAccess.PUBLIC ? this.turnstile.siteKey : null,
+      // The builder's own numbers only (R6): never the platform's defaults. Q4 G7: confirmed ones.
+      crisis: {
+        numbers: crisisHelplines(available.chatbot.settings) || null,
+        helplineUrl: CRISIS_LINK,
+      },
+      ...this.notices(available),
     };
+  }
+
+  /**
+   * The page's fixed notice and its pack's required disclaimer. When the notice already carries
+   * the disclaimer (the owner's wording includes it), `disclaimer` is null so it isn't shown twice:
+   * the pack's text is on the page either way.
+   */
+  private notices(
+    available: AvailableBotPage,
+  ): Pick<PublicBotPage, 'notice' | 'disclaimer'> {
+    const { settings, chatbot } = available;
+    const notice = startNotice({
+      disclaimer:
+        available.botSettings?.disclaimerText ??
+        chatbot.settings?.disclaimerText ??
+        '',
+      language: replyLanguageOf('', settings.language),
+      organisation: settings.branding.title || chatbot.name,
+    });
+    const disclaimer = requiredDisclaimer(
+      chatbot.safetyPack,
+      settings.branding.disclaimer,
+    );
+    const required = packFor(chatbot.safetyPack)?.disclaimer?.trim() ?? '';
+    const inNotice = Boolean(required) && notice.includes(required);
+    return { notice, disclaimer: inNotice ? null : disclaimer };
   }
 
   // ── session and codes ─────────────────────────────────────────────────
@@ -385,17 +508,29 @@ export class BotPagePublicService {
 
     const eligibility = await this.pageAccess.eligibility(page, email);
     if (eligibility.eligible) {
-      const sent = await this.otp.send(chatbot.id, email, {
-        title: available.settings.branding.title,
-        logoUrl: available.settings.branding.logoUrl,
-        accentColour: available.settings.branding.accentColour,
-      });
-      if (sent === 'too_many') {
-        throw publicError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limited');
-      }
-      if (sent === 'failed') {
-        throw publicError(HttpStatus.SERVICE_UNAVAILABLE, 'email_failed');
-      }
+      // Not awaited, and its outcome never changes the answer (D4): a per-address cap or a failed
+      // email on a listed address would otherwise answer differently from an unlisted one, and
+      // the time an email takes would too. Logged for the team instead.
+      void this.otp
+        .send(chatbot.id, email, {
+          title: available.settings.branding.title,
+          logoUrl: available.settings.branding.logoUrl,
+          accentColour: available.settings.branding.accentColour,
+        })
+        .then((sent) => {
+          if (sent === 'too_many' || sent === 'failed') {
+            this.logger.warn(
+              `Bot page ${page.slug}: sign-in code not sent (${sent})`,
+            );
+          }
+        })
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `Bot page ${page.slug}: sign-in code not sent (${
+              error instanceof Error ? error.message : 'error'
+            })`,
+          ),
+        );
     }
     // The same answer whether or not the address may use the page, so the page can't be used to
     // find out who is invited.
@@ -571,7 +706,8 @@ export class BotPagePublicService {
   /**
    * Everything that can refuse a message, before any of it is stored or streamed: the page, the
    * visitor, the length, the limits, and the pre-chat questions. Refusals are plain HTTP errors
-   * with a `code`, so the page can explain them.
+   * with a `code`, so the page can explain them. A crisis keyword message (R1) skips the limits and
+   * the pre-chat questions.
    */
   async admit(
     slug: string,
@@ -584,7 +720,9 @@ export class BotPagePublicService {
     text: string;
   }> {
     const available = await this.page(slug);
-    const ready = await this.requireReady(available, req);
+    const ready = await this.requireReady(available, req, {
+      removedCode: 'not_on_list',
+    });
     const trimmed = (text ?? '').trim();
     const max = Math.min(
       available.settings.limits.maxMessageChars,
@@ -597,17 +735,35 @@ export class BotPagePublicService {
     }
 
     await this.ipLimit(req, 'messages', BOT_PAGE_IP_LIMITS.messages.perHour);
-    const perVisitor = await this.limits.hourly(
-      `v:${available.chatbot.id}:${ready.visitor.id}`,
-      available.settings.limits.messagesPerVisitorPerHour,
-    );
-    if (!perVisitor.allowed) {
-      throw publicError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limited', {
-        retryAfterSeconds: perVisitor.retryAfterSeconds,
-      });
+    // R1 / stage 7: the free keyword crisis check runs first, and a crisis message is never held
+    // back by the person's hourly or daily limit or the bot's daily cap (its reply is model-free).
+    const crisis = await this.crisisKeyword(trimmed, available.chatbot.id);
+    if (!crisis) {
+      const perVisitor = await this.limits.hourly(
+        `v:${available.chatbot.id}:${ready.visitor.id}`,
+        available.settings.limits.messagesPerVisitorPerHour,
+      );
+      if (!perVisitor.allowed) {
+        throw publicError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limited', {
+          retryAfterSeconds: perVisitor.retryAfterSeconds,
+        });
+      }
+      const perDay = await this.limits.daily(
+        `v:${available.chatbot.id}:${ready.visitor.id}`,
+        available.settings.limits.messagesPerVisitorPerDay ??
+          DEFAULT_BOT_PAGE_LIMITS.messagesPerVisitorPerDay,
+      );
+      if (!perDay.allowed) {
+        throw publicError(HttpStatus.TOO_MANY_REQUESTS, 'rate_limited', {
+          retryAfterSeconds: perDay.retryAfterSeconds,
+          details: { window: 'day' },
+        });
+      }
     }
 
-    if (intakeRequired(available.settings.prechat)) {
+    // A crisis message is never held back by unanswered pre-chat questions either: it is accepted
+    // and the engine answers it with the crisis reply. The questions still apply to the next one.
+    if (!crisis && intakeRequired(available.settings.prechat)) {
       const contact = await this.contactOf(available, ready, false);
       const current = contact
         ? await this.conversations.currentConversation(
@@ -623,11 +779,15 @@ export class BotPagePublicService {
       if (!done) throw publicError(HttpStatus.CONFLICT, 'intake_required');
     }
 
-    const cap = await this.limits.dailyCap(
-      available.chatbot.id,
-      available.settings.limits.dailyCapPerBot,
-    );
-    if (!cap.allowed) throw publicError(HttpStatus.SERVICE_UNAVAILABLE, 'busy');
+    if (!crisis) {
+      const cap = await this.limits.dailyCap(
+        available.chatbot.id,
+        available.settings.limits.dailyCapPerBot,
+      );
+      if (!cap.allowed) {
+        throw publicError(HttpStatus.SERVICE_UNAVAILABLE, 'busy');
+      }
+    }
 
     await this.visitors.rotateIfDue(res, ready.visitor);
     return { available, ready, text: trimmed };
@@ -661,47 +821,67 @@ export class BotPagePublicService {
 
     const startedAt = Date.now();
     let decision: ChatbotDecision;
+    let isFirstMessage = false;
+    // Stage 5: erase in chat (the signed-in visitor's contact) and the consent answer, after the
+    // free crisis keyword check. Model-free fixed replies; the engine does not run for them.
+    const fixed = this.privacy
+      ? await this.privacy.beforeTurn({
+          chatbot,
+          conversationId: conversation.id,
+          contactId: contact.id,
+          email: ready.email,
+          text,
+          crisisKeyword: await this.engine.isCrisisKeyword(
+            text,
+            null,
+            chatbot.id,
+          ),
+        })
+      : null;
     try {
       const history = await this.conversations.recentHistory(conversation.id);
+      isFirstMessage = history.length <= 1;
       // CR1: the bubble is its own channel on the Costs screen; the turn stays the page's.
-      decision = await usageContext.with(
-        {
-          channel: ready.visitor.embed
-            ? UsageChannel.BUBBLE
-            : UsageChannel.BOT_PAGE,
-          runKind: UsageKind.CUSTOMER_REPLY,
-          // CR1: on an invite-only or organisation page the signed-in person holds a seat.
-          audience:
-            available.page.access === BotPageAccess.PUBLIC
-              ? 'customer'
-              : 'seat',
-          seatEmail: ready.email ?? null,
-        },
-        () =>
-          this.engine.respond(
+      decision = fixed
+        ? { handledBy: fixed.handledBy, body: fixed.body }
+        : await usageContext.with(
             {
-              // The page's own gate has already decided who may chat here; the bot's accessMode is
-              // WhatsApp's (and every other channel's) list, and the page must neither use nor widen it.
-              chatbot: { ...chatbot, accessMode: ChatbotAccessMode.ANYONE },
-              settings: botSettings,
-              text,
-              history,
-              isFirstMessage: history.length <= 1,
-              sender: {
-                externalId: ready.visitor.id,
-                label: `bot page visitor ${BotPageVisitorService.logTag(ready.visitor.id)}`,
-                email: ready.email,
-                userId: ready.eligibility.userId ?? null,
-                tenantId: ready.eligibility.tenantId ?? null,
-              },
-              channel: WEB_CHANNEL,
-              conversationId: conversation.id,
-              providerMessageId: inbound.id,
-              contactId: contact.id,
+              channel: ready.visitor.embed
+                ? UsageChannel.BUBBLE
+                : UsageChannel.BOT_PAGE,
+              runKind: UsageKind.CUSTOMER_REPLY,
+              // CR1: on an invite-only or organisation page the signed-in person holds a seat.
+              audience:
+                available.page.access === BotPageAccess.PUBLIC
+                  ? 'customer'
+                  : 'seat',
+              seatEmail: ready.email ?? null,
             },
-            live,
-          ),
-      );
+            () =>
+              this.engine.respond(
+                {
+                  // The page's own gate has already decided who may chat here; the bot's accessMode is
+                  // WhatsApp's (and every other channel's) list, and the page must neither use nor widen it.
+                  chatbot: { ...chatbot, accessMode: ChatbotAccessMode.ANYONE },
+                  settings: botSettings,
+                  text,
+                  history,
+                  isFirstMessage: history.length <= 1,
+                  sender: {
+                    externalId: ready.visitor.id,
+                    label: `bot page visitor ${BotPageVisitorService.logTag(ready.visitor.id)}`,
+                    email: ready.email,
+                    userId: ready.eligibility.userId ?? null,
+                    tenantId: ready.eligibility.tenantId ?? null,
+                  },
+                  channel: WEB_CHANNEL,
+                  conversationId: conversation.id,
+                  providerMessageId: inbound.id,
+                  contactId: contact.id,
+                },
+                live,
+              ),
+          );
     } catch (error) {
       await this.conversations.updateMessage(inbound.id, {
         status: WaMessageStatus.FAILED,
@@ -729,11 +909,44 @@ export class BotPagePublicService {
       };
     }
     // Safety, Needs a person, and a second "I don't know" becoming the hand-over message.
-    decision = await this.handover.afterDecision(
+    if (!fixed) {
+      decision = await this.handover.afterDecision(
+        chatbot,
+        conversation.id,
+        decision,
+      );
+    }
+
+    // Stage 4: the conversation's first reply carries the fixed start notice (bot page and widget).
+    if (isFirstMessage) {
+      decision = {
+        ...decision,
+        body: withFirstMessageParts({
+          body: decision.body,
+          handledBy: decision.handledBy,
+          bodyIsWelcome: decision.isWelcome,
+          notice: startNotice({
+            disclaimer: botSettings.disclaimerText ?? '',
+            language: replyLanguageOf(text),
+            organisation: chatbot.name,
+          }),
+        }),
+      };
+    }
+
+    // Stage 5 (D7): with memory on, the one consent question follows the agent's own reply (after the start notice).
+    const consentQuestion = await this.privacy?.consentQuestion({
       chatbot,
-      conversation.id,
+      contactId: contact.id,
       decision,
-    );
+      text,
+    });
+    if (consentQuestion) {
+      decision = {
+        ...decision,
+        body: `${decision.body}\n\n${consentQuestion}`,
+      };
+    }
 
     const outbound = await this.conversations.appendMessage(conversation.id, {
       channel: ConversationChannel.WEB,
@@ -756,6 +969,19 @@ export class BotPagePublicService {
       handledBy: decision.handledBy,
     });
 
+    // Stage 5: two sources disagreed; the owner gets a question naming them (one row per message,
+    // so the generic gap row below is then ignored).
+    if (decision.conflict && this.answerConflict) {
+      await this.answerConflict
+        .recordConflict({
+          conversationId: conversation.id,
+          messageId: inbound.id,
+          question: text,
+          language: decision.language ?? null,
+          result: decision.conflict,
+        })
+        .catch(() => undefined);
+    }
     if (decision.unanswered) {
       await this.fileUnanswered(inbound.id, conversation.id, text, decision);
     }
@@ -774,6 +1000,9 @@ export class BotPagePublicService {
         runKind: UsageKind.CUSTOMER_REPLY,
         chatbotId: chatbot.id,
         creatorUserId: chatbot.createdBy ?? null,
+        // Stage 6: the payer stamped on the turn (the chatbot's budget) pays for these too.
+        payerAccountId: decision.payer?.accountId ?? null,
+        endPersonId: decision.payer?.endPersonId ?? null,
       },
       () => {
         void this.memory?.afterTurn({
@@ -810,6 +1039,10 @@ export class BotPagePublicService {
       rateable: RATEABLE.has(decision.handledBy),
       ...(steps.length ? { steps } : {}),
       ...(confirmation ? { confirmation } : {}),
+      ...(decision.blocked === 'OUT_OF_CREDITS' ||
+      decision.blocked === 'REMOVED_FROM_LIST'
+        ? { blocked: decision.blocked }
+        : {}),
     };
   }
 
@@ -971,18 +1204,22 @@ export class BotPagePublicService {
   // ── the website widget (chunk 13) ─────────────────────────────────────
 
   /**
-   * What the widget's loader needs to draw the bubble, read from the owner's own site. Only for an
-   * allowed website: anywhere else it is 404 (as for a page that is off), so nothing is drawn.
+   * What the widget's loader needs to draw the bubble. Stage 7: the widget may load on any site
+   * (chatting still needs sign-in), and every site it loads on is noted for the owner's "Sites it
+   * has loaded on" list. `key` is the page's address or its legacy slug, so old embeds keep working.
    */
   async widgetConfig(
-    slug: string,
+    key: string,
     origin: string | undefined,
     req: Request,
   ): Promise<WidgetConfig> {
-    const available = await this.page(slug);
+    const available = await this.page(key);
     await this.ipLimit(req, 'widget', BOT_PAGE_IP_LIMITS.widget.perHour);
     if (!origin || !this.hostOk(available, origin)) {
       throw publicError(HttpStatus.FORBIDDEN, 'host_not_allowed');
+    }
+    if (new URL(origin).origin !== this.config.botPage.origin) {
+      void this.widgetSites?.record(available.chatbot.id, origin);
     }
     const { settings } = available;
     return {
@@ -993,23 +1230,18 @@ export class BotPagePublicService {
       accent: settings.branding.accentColour,
       logo: available.brandImages?.logo?.src ?? settings.branding.logoUrl,
       title: settings.branding.title,
-      pageUrl: this.pages.link(available.page.slug),
+      pageUrl: this.pages.link(available.page.publicId),
     };
   }
 
   /**
    * The `frame-ancestors` the embedded page should be served with, for CloudFront and Caddy to set
-   * (LAUNCH-CHECKLIST): the allowed websites and their subdomains, and Ally's own page.
+   * (LAUNCH-CHECKLIST). Stage 7: any site may frame it (the widget loads anywhere; chatting still
+   * needs sign-in). The page must still exist, so an unknown key stays a 404.
    */
-  async framePolicy(slug: string): Promise<{ frameAncestors: string }> {
-    const available = await this.page(slug);
-    return {
-      frameAncestors: frameAncestors(
-        available.settings.widget.allowedDomains,
-        this.config.botPage.origin,
-        { production: this.config.nodeEnv === 'production' },
-      ),
-    };
+  async framePolicy(key: string): Promise<{ frameAncestors: string }> {
+    await this.page(key);
+    return { frameAncestors: 'frame-ancestors *' };
   }
 
   // ── plumbing ──────────────────────────────────────────────────────────
@@ -1032,22 +1264,34 @@ export class BotPagePublicService {
     return { host, page: cleanPageUrl(dto.page, host) };
   }
 
-  /** Whether the widget may open on this host now (allowed websites, or Ally's own page). */
-  private hostOk(available: AvailableBotPage, host: string): boolean {
+  /**
+   * Whether the widget may open on this host. Stage 7: any http(s) page. The stored
+   * `allowedDomains` are kept but no longer consulted.
+   */
+  private hostOk(_available: AvailableBotPage, host: string): boolean {
+    return widgetSiteHost(host) !== null;
+  }
+
+  /** The free keyword crisis check (R1), for the limiter's exemption. Never throws. */
+  private async crisisKeyword(
+    text: string,
+    chatbotId: string,
+  ): Promise<boolean> {
     try {
-      if (new URL(host).origin === this.config.botPage.origin) return true;
+      return Boolean(await this.engine.isCrisisKeyword(text, null, chatbotId));
     } catch {
       return false;
     }
-    return hostAllowed(available.settings.widget.allowedDomains, host, {
-      production: this.config.nodeEnv === 'production',
-    });
   }
 
   /** The visitor behind the cookie, if they may use the page now; otherwise 401 or 403. */
   private async requireReady(
     available: AvailableBotPage,
     req: Request,
+    // Stage 6: on a message, a verified visitor taken off the list gets the fixed notification
+    // (with the crisis information) rather than an error screen. They proved the address
+    // already, so this tells them nothing they did not know.
+    { removedCode = 'not_allowed' }: { removedCode?: PublicErrorCode } = {},
   ): Promise<ReadyVisitor> {
     const visitor = await this.visitors.read(req, available.chatbot.id);
     if (!visitor) throw publicError(HttpStatus.UNAUTHORIZED, 'start_again');
@@ -1063,7 +1307,7 @@ export class BotPagePublicService {
       throw publicError(HttpStatus.UNAUTHORIZED, 'start_again');
     }
     const ready = await this.recheck(available, visitor);
-    if (!ready) throw publicError(HttpStatus.FORBIDDEN, 'not_allowed');
+    if (!ready) throw publicError(HttpStatus.FORBIDDEN, removedCode);
     return ready;
   }
 

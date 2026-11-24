@@ -55,20 +55,8 @@ export function LogoMark({ branding }: { branding: BotPageBranding }) {
   );
 }
 
-/** The chat's avatar: the owner's picture, else the orb in the brand colour. */
-export function Avatar({ branding, size = 40 }: { branding: BotPageBranding; size?: number }) {
-  if (branding.avatarUrl) {
-    return (
-      <img
-        src={branding.avatarUrl}
-        alt=""
-        width={size}
-        height={size}
-        className="bp-header__logo"
-        style={{ borderRadius: 999 }}
-      />
-    );
-  }
+/** The chat's avatar: the orb in the brand colour (stage 7: no owner picture). */
+export function Avatar({ size = 40 }: { branding?: BotPageBranding; size?: number }) {
   return <Orb size={size} />;
 }
 
@@ -286,14 +274,10 @@ export function ErrorText({ children }: { children?: string | null }) {
   );
 }
 
-export function Footer({ branding, copy }: { branding: BotPageBranding; copy: BotPageCopy }) {
+/** Stage 7: only "Powered by"; the footer link is retired. */
+export function Footer({ copy }: { branding?: BotPageBranding; copy: BotPageCopy }) {
   return (
     <footer className="bp-footer">
-      {branding.footerLink && (
-        <a href={branding.footerLink.url} target="_blank" rel="noopener noreferrer">
-          {branding.footerLink.label}
-        </a>
-      )}
       <span>{copy.poweredBy}</span>
     </footer>
   );
@@ -385,6 +369,25 @@ export function ConfirmationCard({
           ))}
         </dl>
       )}
+    </section>
+  );
+}
+
+/** The fixed "an AI and people may read this chat" notice and the pack's disclaimer (always shown, never dismissed). */
+export function SafetyNotice({
+  notice,
+  disclaimer,
+  label,
+}: {
+  notice?: string | null;
+  disclaimer?: string | null;
+  label: string;
+}) {
+  if (!notice?.trim() && !disclaimer?.trim()) return null;
+  return (
+    <section className="bp-safety" aria-label={label} data-testid="bp-safety-notice">
+      {notice?.trim() && <p className="bp-safety__notice">{notice}</p>}
+      {disclaimer?.trim() && <p className="bp-safety__disclaimer">{disclaimer}</p>}
     </section>
   );
 }

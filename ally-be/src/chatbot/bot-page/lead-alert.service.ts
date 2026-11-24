@@ -7,6 +7,8 @@ import { LoggerService } from '../../logger/logger.service';
 import { EmailService } from '../../notification/service/email.service';
 import { RedisService } from '../../redis/service/redis.service';
 import { PrechatFieldType } from '../enum/bot-page.enum';
+import { ChatbotMemberRole } from '../enum/chatbot.enum';
+import { sqlHasRole } from '../access/chatbot-roles';
 import type { Chatbot } from '../entity/chatbot.entity';
 import type { StoredIntake } from './bot-page-intake';
 
@@ -104,11 +106,14 @@ export class LeadAlertService {
     }
   }
 
+  /** Stage 4: owners AND responders, the people who answer customers (roles set, old column as fallback). */
   private async ownerEmails(chatbotId: string): Promise<string[]> {
     const rows = (await this.dataSource.query(
       `SELECT DISTINCT u.email FROM chatbot_members m
          JOIN users u ON u.id = m.user_id
-        WHERE m.chatbot_id = $1 AND m.role = 'owner' AND u.email IS NOT NULL`,
+        WHERE m.chatbot_id = $1
+          AND (${sqlHasRole('m', ChatbotMemberRole.OWNER)} OR ${sqlHasRole('m', ChatbotMemberRole.RESPONDER)})
+          AND u.email IS NOT NULL`,
       [chatbotId],
     )) as { email: string }[];
     return rows.map((r) => r.email).filter(Boolean);

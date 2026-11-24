@@ -78,6 +78,22 @@ export class ChatbotConversation extends BaseWithoutTenantEntity {
   @Column({ name: 'safety_at', type: 'timestamp', nullable: true })
   safetyAt?: Date | null;
 
+  /** The FIRST crisis flag on this chat, set once and never overwritten (D14). */
+  @Column({ name: 'safety_first_at', type: 'timestamp', nullable: true })
+  safetyFirstAt?: Date | null;
+
+  /** Highest crisis level seen: 1 at risk, 2 medical emergency. */
+  @Column({ name: 'safety_level', type: 'smallint', nullable: true })
+  safetyLevel?: number | null;
+
+  /** When a person first took over a flagged chat; null while the flag is untaken. */
+  @Column({ name: 'safety_taken_at', type: 'timestamp', nullable: true })
+  safetyTakenAt?: Date | null;
+
+  /** The retention sweep keeps a flagged chat until this: first flag + 12 months. */
+  @Column({ name: 'retain_until', type: 'timestamp', nullable: true })
+  retainUntil?: Date | null;
+
   @Column({ name: 'last_human_reply_at', type: 'timestamp', nullable: true })
   lastHumanReplyAt?: Date | null;
 

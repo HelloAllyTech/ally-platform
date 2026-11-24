@@ -14,6 +14,7 @@ import { Input } from "@components/input";
 import { ButtonVariant } from "@components/types";
 
 import { INBOX, fill } from "./copy";
+import { useReadOnly } from "../AssistantHome/readOnly";
 import { Sheet } from "../AssistantHome/ui/Sheet";
 
 const t = INBOX.memory;
@@ -223,7 +224,10 @@ export const MemoryPanel: React.FC<{
   conversationId: string;
   canEdit: boolean;
   onOpenSource: (conversationId: string, messageId: string) => void;
-}> = ({ chatbotId, contactId, conversationId, canEdit, onOpenSource }) => {
+}> = ({ chatbotId, contactId, conversationId, canEdit: canEditProp, onOpenSource }) => {
+  // Ally staff's read-only view: the memory is shown, never forgotten or edited.
+  const readOnly = useReadOnly();
+  const canEdit = canEditProp && !readOnly;
   const { data, isLoading, isError, refetch } = useGetPersonMemoryQuery({
     chatbotId,
     contactId,
@@ -259,7 +263,8 @@ export const MemoryPanel: React.FC<{
     const notes =
       !data.on && !data.lines.length ? (
         <p className="ally-small" data-testid="memory-off">
-          {t.off} <Link to={`/assistants/${chatbotId}?section=lists&tool=memory`}>{t.turnOn}</Link>
+          {t.off}{" "}
+          {!readOnly && <Link to={`/assistants/${chatbotId}?section=settings`}>{t.turnOn}</Link>}
         </p>
       ) : !data.lines.length ? (
         <p className="ally-small">{t.empty}</p>
@@ -339,9 +344,11 @@ export const MemoryPanel: React.FC<{
                 </li>
               ))}
             </ul>
-            <Link className="ally-small" to={`/assistants/${chatbotId}?section=lists&tool=memory`}>
-              {t.changeNever}
-            </Link>
+            {!readOnly && (
+              <Link className="ally-small" to={`/assistants/${chatbotId}?section=settings`}>
+                {t.changeNever}
+              </Link>
+            )}
           </section>
         )}
       </>

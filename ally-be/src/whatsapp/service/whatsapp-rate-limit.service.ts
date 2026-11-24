@@ -87,13 +87,20 @@ export class WhatsAppRateLimitService {
    *
    * Without this a number that keeps sending gets a throttle reply to every single message, which is
    * both a spam loop we are paying Meta for and a worse experience than silence.
+   *
+   * Stage 6 reuses it for the blocked states' fixed notification: once per 24 hours per number per
+   * chatbot (`ttlSeconds` 86 400), then silence with the message stored.
    */
-  async shouldNotify(phone: string, window: string): Promise<boolean> {
+  async shouldNotify(
+    phone: string,
+    window: string,
+    ttlSeconds = 300,
+  ): Promise<boolean> {
     const key = `wa:rl:notified:${phone}:${window}`;
     try {
       const existing = await this.redisService.get(key);
       if (existing) return false;
-      await this.redisService.set(key, '1', 300);
+      await this.redisService.set(key, '1', ttlSeconds);
       return true;
     } catch {
       // If we cannot tell, stay quiet: a missed notice is better than a loop of them.

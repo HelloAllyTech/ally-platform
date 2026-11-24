@@ -25,6 +25,8 @@ const ERROR_TEXT = [
   /\bchecking (?:if the site connection is secure|your browser)\b/i,
   /\benable (?:javascript and cookies|cookies) to continue\b/i,
   /\bray id\b/i,
+  // A page that is only a "turn on JavaScript" notice has no content for us to read (SB1).
+  /\b(?:this (?:page|site|website) requires javascript|(?:you )?(?:need|have) to enable javascript|(?:please )?enable javascript (?:in your browser(?: settings)? )?(?:to|and reload)|javascript is (?:required|disabled|turned off))\b/i,
   /\bthe request (?:was|has been) (?:blocked|rejected)\b/i,
   /\b(?:50[0234])\b[\s\S]{0,40}\b(?:internal server error|bad gateway|service unavailable|gateway time-?out)\b/i,
 ];

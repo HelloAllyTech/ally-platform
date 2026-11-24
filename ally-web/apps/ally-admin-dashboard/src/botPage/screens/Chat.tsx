@@ -5,12 +5,14 @@ import {
   ErrorText,
   Feedback,
   PageHeader,
+  SafetyNotice,
   Sources,
   StepLine,
   StepsDone,
   TypingDots,
 } from "../components/parts";
 import { fill, type BotPageCopy } from "../copy";
+import { safetyCopy } from "../copy/safety";
 import { doingLine, doneLines, shortWhen } from "../liveSteps";
 
 import type {
@@ -149,10 +151,15 @@ export function Chat({
       )}
 
       <main className="bp-thread" aria-live="polite" aria-relevant="additions">
+        <SafetyNotice
+          notice={page.notice}
+          disclaimer={page.disclaimer}
+          label={safetyCopy(copy).noticeLabel}
+        />
         <ol className="bp-messages">
-          {page.branding.subtitle && !messages.length && !pending && (
+          {page.branding.welcome && !messages.length && !pending && (
             <li className="bp-msg ally-rise">
-              <p className="bp-bubble bp-bubble--assistant">{page.branding.subtitle}</p>
+              <p className="bp-bubble bp-bubble--assistant">{page.branding.welcome}</p>
             </li>
           )}
           {messages.map(m =>

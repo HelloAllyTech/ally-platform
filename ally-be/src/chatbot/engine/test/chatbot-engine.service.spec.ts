@@ -172,7 +172,11 @@ describe('ChatbotEngineService', () => {
         include_global: true,
       });
       expect(body).not.toHaveProperty('document_ids');
-      expect(body.persona).toBeUndefined();
+      // Stage 4: only the base safety block, which every chatbot gets.
+      expect(body.persona?.display_name).toBeUndefined();
+      expect(body.persona?.safety_rules).toMatch(
+        /^<safety_rules fixed="true">/,
+      );
     });
 
     it('runs the crisis check alongside with the same prompts', async () => {
@@ -404,7 +408,9 @@ describe('ChatbotEngineService', () => {
       );
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
       expect(decision.body).toMatch(/emergency/i);
-      expect(decision.body).toMatch(/112|108/);
+      // R6: no country numbers in the default.
+      expect(decision.body).toMatch(/local emergency number/);
+      expect(decision.body).not.toMatch(/112|108/);
     });
 
     it('a failed classifier with no emergency keyword sends the answer as usual (H1)', async () => {
@@ -452,7 +458,7 @@ describe('ChatbotEngineService', () => {
         turn({ text: 'Mujhe ab jeene ka mann nahi karta, kya karun' }),
       );
       expect(hinglish.body).toMatch(/^Lagta hai yeh urgent ho sakta hai/);
-      expect(hinglish.body).toContain('14416');
+      expect(hinglish.body).toContain('https://findahelpline.com');
 
       aiService.checkWhatsAppCrisis.mockResolvedValue({
         is_crisis: true,
@@ -470,7 +476,7 @@ describe('ChatbotEngineService', () => {
       );
       expect(emergency.body).toBe(
         'This sounds like an emergency. Please go to the nearest emergency department now, ' +
-          'or call 112 or an ambulance on 108. You can also call Cloudnine on 99724 99724.',
+          'or call your local emergency number. You can also call Cloudnine on 99724 99724.',
       );
       expect(emergency.alert?.message).toContain('a medical emergency');
     });

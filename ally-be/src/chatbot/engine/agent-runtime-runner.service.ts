@@ -388,7 +388,7 @@ export class AgentRuntimeRunner {
         ? keyFactsFor(this.documentRepository.manager, turn.chatbot.id)
         : Promise.resolve(null),
     ]);
-    const contact = contactFromSources(facts, turn.settings.helplineNumbers);
+    const contact = contactFromSources(facts, crisisHelplines(turn.settings));
     if (shown) shown.refs = memory.refs;
     const body: AgentRunRequest = {
       ...buildAgentRunRequest(request, {

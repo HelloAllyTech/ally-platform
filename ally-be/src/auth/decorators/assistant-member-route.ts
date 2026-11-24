@@ -25,7 +25,8 @@ export function isAssistantMemberRoute(
   if (
     role &&
     typeof role === 'object' &&
-    typeof (role as { role?: unknown }).role === 'string' &&
+    (typeof (role as { role?: unknown }).role === 'string' ||
+      typeof (role as { capability?: unknown }).capability === 'string') &&
     typeof (role as { param?: unknown }).param === 'string'
   ) {
     return true;

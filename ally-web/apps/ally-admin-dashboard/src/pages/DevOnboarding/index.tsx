@@ -154,7 +154,13 @@ const DevOnboardingFlow: React.FC = () => {
     const at = STAGES.indexOf(stage);
     const following = STAGES[Math.min(at + 1, STAGES.length - 1)];
     setStage(following);
-    setParams({ screen: following }, { replace: true });
+    setParams(
+      {
+        screen: following,
+        ...(params.get("split") ? { split: params.get("split") as string } : {}),
+      },
+      { replace: true },
+    );
   };
 
   // The read and the build finish on their own, as they do for real.

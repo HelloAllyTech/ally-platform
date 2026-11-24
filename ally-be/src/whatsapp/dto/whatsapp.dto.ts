@@ -115,6 +115,17 @@ export class UpdateWaTemplateDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      "Assistants stage 5: regional helpline numbers added to a locked crisis/STOP/START reply on a chatbot. The locked reply's wording itself cannot be changed.",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  extraNumbers?: string[];
 }
 
 export class ReorderWaTemplatesDto {

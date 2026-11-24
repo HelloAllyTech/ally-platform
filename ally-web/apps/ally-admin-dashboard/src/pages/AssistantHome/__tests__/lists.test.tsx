@@ -40,7 +40,6 @@ vi.mock("../../WhatsAppBot/NumberTab", () => ({
 }));
 
 const { PageAccessList } = await import("../sections/AccessLists");
-const { TeamList } = await import("../sections/PeopleLists");
 const { QuickReplies } = await import("../sections/QuickReplies");
 const { DocumentsList } = await import("../sections/DocumentsList");
 
@@ -165,63 +164,25 @@ describe("who can open the page", () => {
   });
 });
 
-describe("the team", () => {
-  it("adds by email with today's roles, and changes a role with Undo back", async () => {
-    send.mockReturnValue(resolves({ items: lists.team.items, version: "000000000000001b" }));
-    withSaves(<TeamList botId="bot-1" canManage myUserId={7} />);
-    expect(screen.getByText("You")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Their email address"), {
-      target: { value: "ravi@clinic.test" },
-    });
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Add" })));
-    expect(send).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        version: "000000000000000b",
-        change: { op: "add", item: { email: "ravi@clinic.test", role: "editor" } },
-      }),
-    );
-    await act(async () =>
-      fireEvent.change(screen.getByLabelText("What they can do: Meera"), {
-        target: { value: "viewer" },
-      }),
-    );
-    expect(send).toHaveBeenLastCalledWith(
-      expect.objectContaining({ change: { op: "edit", id: "8", item: { role: "viewer" } } }),
-    );
-    act(() => saves.changed.mock.calls.at(-1)![0]());
-    expect(send).toHaveBeenLastCalledWith(
-      expect.objectContaining({ change: { op: "edit", id: "8", item: { role: "editor" } } }),
-    );
-  });
-
-  it("is read-only for an editor", () => {
-    withSaves(<TeamList botId="bot-1" canManage={false} />);
-    expect(screen.getByText("Only an owner can change the team.")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Their email address")).toBeNull();
-    expect(screen.getByLabelText("What they can do: Meera")).toBeDisabled();
-  });
-});
-
 describe("quick replies", () => {
-  it("lets Ally's safety reply be reworded but never turned off or removed", async () => {
+  it("locks Ally's safety reply: no rewording, never turned off or removed, regional numbers only", async () => {
     withSaves(<QuickReplies botId="bot-1" canEdit />);
-    expect(
-      screen.getByText("Safety reply: it can be reworded, never turned off."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Fixed by Ally. The wording can't be changed.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Turn off" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Remove Crisis" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reword" })).toBeNull();
     send.mockReturnValue(
       resolves({ items: lists.quickReplies.items, version: "000000000000001c" }),
     );
-    fireEvent.click(screen.getByRole("button", { name: "Reword" }));
-    expect(screen.queryByLabelText("When someone writes")).toBeNull();
-    fireEvent.change(screen.getByLabelText("It replies"), {
-      target: { value: "Please call 14416 now." },
+    fireEvent.click(screen.getByRole("button", { name: "Regional numbers to add" }));
+    expect(screen.queryByLabelText("It replies")).toBeNull();
+    fireEvent.change(screen.getByLabelText("Regional numbers to add"), {
+      target: { value: "14416" },
     });
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save reply" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Save numbers" })));
     expect(send).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        change: { op: "edit", id: "crisis-1", item: { responseText: "Please call 14416 now." } },
+        change: { op: "edit", id: "crisis-1", item: { extraNumbers: ["14416"] } },
       }),
     );
   });

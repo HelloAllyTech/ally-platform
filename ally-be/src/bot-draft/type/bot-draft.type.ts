@@ -138,6 +138,21 @@ export interface CrawlState {
   findings: string[];
   brand?: CrawlBrand;
   problem?: CrawlProblem;
+  /**
+   * Stage 6: when reading the pages' facts paused at a zero free balance (ISO). The facts are read
+   * once the builder has credits again (the ledger resumes the batch), and this is cleared then.
+   */
+  pausedOutOfCredits?: string;
+  /**
+   * Why the reading paused, as the builder is told it (`CreditPauseKind`): out of credits, the
+   * usage feed being off, no billing account, or credits that could not be checked. Absent on
+   * crawls paused before the reason was kept: read as out of credits.
+   */
+  pausedReason?:
+    | 'out_of_credits'
+    | 'feed_off'
+    | 'no_payer'
+    | 'ledger_unavailable';
 }
 
 /** A JSON Patch operation (the subset onboarding uses). */
@@ -188,4 +203,6 @@ export interface TranscriptEntry {
   text: string;
   chips?: string[];
   at: string;
+  /** Stage 3: a line from Copilot (change by chat) on a live assistant's working copy. */
+  kind?: 'copilot';
 }

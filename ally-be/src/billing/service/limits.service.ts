@@ -1,4 +1,10 @@
-import { ForbiddenException, Injectable, Optional } from '@nestjs/common';
+import {
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import { SESService } from 'src/aws/service/ses.service';
 import { LoggerService } from 'src/logger/logger.service';
@@ -13,6 +19,16 @@ import {
 } from '../enum/billing.enum';
 import { PlanService, dayString, periodFor } from './plan.service';
 import { SpendCapService } from './spend-cap.service';
+import { randomUUID } from 'crypto';
+import { CREDITS, runEstimateMicros } from '../constants/credits.constants';
+import { EndPersonService } from './end-person.service';
+import { OWNER_CREDITS_MESSAGES, creditPauseKind } from '../util/credit-pause';
+import {
+  CreditBlockReason,
+  LedgerService,
+  PausedJob,
+  UserLimits,
+} from './ledger.service';
 
 /** Why a run must not start (matches the engine's LimitReason). */
 export type LimitVerdict =
@@ -20,7 +36,11 @@ export type LimitVerdict =
   | 'no_seat'
   | 'seat_messages'
   | 'owner_cap'
-  | 'owner_runs';
+  | 'owner_runs'
+  /** Stage 6: a customer's turn the ledger refused (OUT_OF_CREDITS: no payer, budget or limits). */
+  | 'out_of_credits'
+  /** Stage 6: the owner's own testing with no free balance left. */
+  | 'owner_credits';
 
 /** Who is messaging: a public/WhatsApp customer, an invited person (a seat), or the owner's team. */
 export type Audience = 'customer' | 'seat' | 'owner';
@@ -31,7 +51,30 @@ export interface TurnLimitInput {
   /** The conversation (or, without one, the sender) for "a new conversation after 24 hours". */
   conversationKey: string | null | undefined;
   context: UsageContext | undefined;
+  /** Stage 6: who is messaging, for the end person's per-user limits. */
+  sender?: {
+    phone?: string | null;
+    email?: string | null;
+    label?: string | null;
+  };
+  /** Stage 6: the chatbot's per-user dollar limits (`settings.userLimits`). */
+  userLimits?: UserLimits | null;
+  /** Stage 6: the chatbot's time zone, for the limits' day, week and month. */
+  timeZone?: string | null;
 }
+
+/** The outcome of a background job's credits gate (site reading, re-indexing). */
+export type BackgroundGate =
+  | { ok: true; accountId: string | null }
+  | { ok: false; paused: boolean; reason: CreditBlockReason | 'plan_limit' };
+
+const hasLimit = (limits: UserLimits | null | undefined) =>
+  Boolean(
+    limits &&
+    [limits.dailyMicros, limits.weeklyMicros, limits.monthlyMicros].some(
+      (v) => v !== null && v !== undefined,
+    ),
+  );
 
 const GAP_MS = 24 * 3_600_000;
 
@@ -61,16 +104,200 @@ export type OwnerRunKind =
 @Injectable()
 export class LimitsService {
   private readonly logger = LoggerService.getInstance(LimitsService.name);
+  /** When each chatbot (or builder) last passed the credits gate: the DB-down grace. */
+  private readonly lastPassed = new Map<string, number>();
 
   constructor(
     private readonly dataSource: DataSource,
     private readonly plans: PlanService,
     private readonly spend: SpendCapService,
     @Optional() private readonly ses?: SESService,
+    @Optional() private readonly ledger?: LedgerService,
+    @Optional() private readonly persons?: EndPersonService,
   ) {}
 
-  /** The engine's check for one message. Null: answer it. */
+  /** Credit enforcement is on (the kill switch), and the ledger is wired. */
+  private async creditsOn(): Promise<boolean> {
+    return Boolean(this.ledger && (await this.ledger.switches()).enforcement);
+  }
+
+  /**
+   * The engine's check for one message, before any model call. Null: answer it.
+   *
+   * Stage 6, with credit enforcement on: the turn's money is RESERVED here, atomically, from the
+   * chatbot's budget (a customer, including the end person's daily/weekly/monthly limits) or the
+   * builder's free balance (the owner testing, R2), and the payer is stamped on the run's usage
+   * context. No payer, an empty budget, a person over a limit, or a stopped usage feed: blocked
+   * (OUT_OF_CREDITS). A database failure fails CLOSED after a short grace.
+   *
+   * With enforcement switched off, the CR1 limits below run exactly as before.
+   */
   async checkTurn(input: TurnLimitInput): Promise<LimitVerdict | null> {
+    // Stage 9: Ally pays for its own safety-pack release suite; nothing is reserved or counted.
+    if (input.context?.allyPaidKind) return null;
+    if (await this.creditsOn().catch(() => true)) {
+      return this.checkCredits(input);
+    }
+    return this.legacyCheckTurn(input);
+  }
+
+  private async checkCredits(
+    input: TurnLimitInput,
+  ): Promise<LimitVerdict | null> {
+    const context = input.context;
+    if (!context) return null; // no run: nothing will be called
+    const owner = audienceOf(context) === 'owner';
+    const blocked: LimitVerdict = owner ? 'owner_credits' : 'out_of_credits';
+    const graceKey = input.chatbotId || String(input.creatorUserId ?? '');
+    try {
+      const ledger = this.ledger!;
+      if (await ledger.feedBlocksSpend()) {
+        this.logger.warn(
+          `Credits: usage feed stopped; refusing a run on ${input.chatbotId} (feed_off)`,
+        );
+        // The builder's own test pane names the real reason; a customer still gets the fixed
+        // notification, whatever the reason.
+        context.creditBlockReason = 'feed_off';
+        return blocked;
+      }
+      let endPersonId: string | null = null;
+      if (!owner && this.persons && input.sender) {
+        endPersonId = await this.persons.find(input.chatbotId, input.sender);
+        // A person is only created when the chatbot has per-user limits to count against.
+        if (!endPersonId && hasLimit(input.userLimits)) {
+          endPersonId = await this.persons.resolve(input.chatbotId, {
+            ...input.sender,
+            display: input.sender.label ?? null,
+          });
+        }
+      }
+      const runId = context.runId ?? randomUUID();
+      const result = await ledger.reserve({
+        runId,
+        funding: owner ? 'free' : 'budget',
+        estimateMicros: runEstimateMicros(context.runKind),
+        chatbotId: input.chatbotId,
+        draftId: context.draftId ?? null,
+        creatorUserId: input.creatorUserId ?? null,
+        endPersonId,
+        userLimits: input.userLimits ?? null,
+        timeZone: input.timeZone ?? null,
+      });
+      if (!result.ok) {
+        this.logger.info(
+          `Credits: run on chatbot ${input.chatbotId} refused (${result.reason})`,
+        );
+        context.creditBlockReason = result.reason;
+        return blocked;
+      }
+      // The payer is stamped on the run when it starts (the context object is the run's own).
+      context.runId = runId;
+      context.payerAccountId = result.accountId;
+      context.endPersonId = endPersonId;
+      // Let through with the feed stopped (not blocking here): its cost goes unrecorded.
+      if (!(await ledger.feedHealthy().catch(() => true))) {
+        context.costUnrecorded = true;
+      }
+      this.lastPassed.set(graceKey, Date.now());
+      return null;
+    } catch (error) {
+      const passed = this.lastPassed.get(graceKey);
+      const inGrace =
+        passed !== undefined && Date.now() - passed < CREDITS.DB_DOWN_GRACE_MS;
+      this.logger.warn(
+        `Credits check failed for chatbot ${input.chatbotId} (${inGrace ? 'within grace, answering' : 'failing closed'}): ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+      if (!inGrace) context.creditBlockReason = 'ledger_unavailable';
+      return inGrace ? null : blocked;
+    }
+  }
+
+  /**
+   * Background AI work for a builder (site reading, re-indexing): may it start? With credits on,
+   * only while the paying account has a free balance and the feed records; otherwise the job is
+   * PAUSED (kept in `credit_paused_jobs`, resumed by the ledger once credits exist), never failed.
+   * With credits off, the CR1 owner-run count as before (a refusal is not paused).
+   */
+  async backgroundGate(input: {
+    kind: string;
+    subjectId: string;
+    creatorUserId: number | null | undefined;
+    chatbotId?: string | null;
+    draftId?: string | null;
+    runKey: string;
+    ownerRunKind: OwnerRunKind;
+    payload: Record<string, unknown>;
+  }): Promise<BackgroundGate> {
+    if (!(await this.creditsOn().catch(() => true))) {
+      try {
+        await this.assertOwnerRun(
+          input.creatorUserId,
+          input.runKey,
+          input.ownerRunKind,
+        );
+        return { ok: true, accountId: null };
+      } catch {
+        return { ok: false, paused: false, reason: 'plan_limit' };
+      }
+    }
+    const ledger = this.ledger!;
+    let accountId: string | null = null;
+    let reason: CreditBlockReason | null = null;
+    try {
+      accountId = await ledger.builderPayer({
+        chatbotId: input.chatbotId,
+        draftId: input.draftId,
+        creatorUserId: input.creatorUserId,
+      });
+      if (!accountId) reason = 'no_payer';
+      else if (await ledger.feedBlocksSpend()) reason = 'feed_off';
+      else if (!((await ledger.freeBalanceOf(accountId)) > 0))
+        reason = 'free_balance_empty';
+    } catch {
+      reason = 'ledger_unavailable';
+    }
+    if (!reason) return { ok: true, accountId };
+    await ledger
+      .pauseJob({
+        kind: input.kind,
+        subjectId: input.subjectId,
+        accountId,
+        ownerUserId: input.creatorUserId ?? null,
+        reason,
+        payload: input.payload,
+      })
+      .catch((error) =>
+        this.logger.warn(
+          `Could not pause ${input.kind} for ${input.subjectId}: ${error instanceof Error ? error.message : ''}`,
+        ),
+      );
+    this.logger.info(
+      `Credits: ${input.kind} for ${input.subjectId} paused (${reason})`,
+    );
+    return { ok: false, paused: true, reason };
+  }
+
+  /** Resume a paused background job kind once its builder has credits again (the ledger's sweep). */
+  onResume(kind: string, handler: (job: PausedJob) => Promise<void>): void {
+    this.ledger?.registerResumer(kind, handler);
+  }
+
+  /** A resume step for paused work kept outside the ledger's jobs (see `resumeAllPaused`). */
+  onSweep(name: string, sweep: () => Promise<number>): void {
+    this.ledger?.registerSweeper(name, sweep);
+  }
+
+  /**
+   * Give a turn's reservation back at once: its reply needed no model (a keyword reply or a
+   * refusal). Only a run this gate stamped a payer on holds anything.
+   */
+  async releaseTurn(context: UsageContext | undefined): Promise<void> {
+    if (!this.ledger || !context?.runId || !context.payerAccountId) return;
+    await this.ledger.release(context.runId);
+  }
+
+  /** The CR1 check (plans, seats, the spend cap): what runs with credit enforcement off. */
+  async legacyCheckTurn(input: TurnLimitInput): Promise<LimitVerdict | null> {
     const context = input.context;
     const creator = input.creatorUserId ?? null;
     if (!context || !creator) return null;
@@ -147,6 +374,9 @@ export class LimitsService {
     runKey: string,
     kind: OwnerRunKind,
   ): Promise<void> {
+    if (await this.creditsOn().catch(() => true)) {
+      return this.assertOwnerCredits(creatorUserId, kind);
+    }
     if (!creatorUserId) return;
     let verdict: LimitVerdict | null = null;
     try {
@@ -173,6 +403,50 @@ export class LimitsService {
         errorCode: 'PLAN_OWNER_RUNS_USED_UP',
       });
     }
+  }
+
+  /**
+   * Stage 6: owner-side work is paid from the builder's free balance (R2). Refused with
+   * `CREDITS_REQUIRED` before any AI call when there is none, no payer, or the feed is stopped.
+   */
+  private async assertOwnerCredits(
+    creatorUserId: number | null | undefined,
+    kind: OwnerRunKind,
+  ): Promise<void> {
+    let reason: CreditBlockReason | null = null;
+    const graceKey = `owner:${creatorUserId ?? ''}`;
+    try {
+      const ledger = this.ledger!;
+      const accountId = creatorUserId
+        ? await ledger.accountFor(creatorUserId)
+        : null;
+      if (!accountId) reason = 'no_payer';
+      else if (await ledger.feedBlocksSpend()) reason = 'feed_off';
+      else if (!((await ledger.freeBalanceOf(accountId)) > 0))
+        reason = 'free_balance_empty';
+      if (!reason) this.lastPassed.set(graceKey, Date.now());
+    } catch {
+      const passed = this.lastPassed.get(graceKey);
+      if (
+        passed !== undefined &&
+        Date.now() - passed < CREDITS.DB_DOWN_GRACE_MS
+      )
+        return;
+      reason = 'ledger_unavailable';
+    }
+    if (!reason) return;
+    this.logger.info(
+      `Credits: owner ${kind} refused for user ${creatorUserId} (${reason})`,
+    );
+    throw new HttpException(
+      {
+        errorCode: 'credits_required',
+        reason,
+        // Never "out of credits" for a reason that isn't (a stopped feed, no billing account).
+        message: OWNER_CREDITS_MESSAGES[creditPauseKind(reason)],
+      },
+      HttpStatus.PAYMENT_REQUIRED,
+    );
   }
 
   /** Counts one owner-side run; false when the month's runs are used up. */

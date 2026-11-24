@@ -92,7 +92,7 @@ All paths are under `ally-web/apps/ally-admin-dashboard/src`.
 - **Preview:** `pages/WhatsAppBot/ChatbotTestTab.tsx`. It uses `useTestChatbotMutation`, keeps the thread in local state, and shows handledBy, model, latency and sources. It has a Reset button. <!-- docs-path-lint: ignore -->
 - **Platform-admin signal:** `useGetChatbotsQuery().data.canCreate`. There's no role hook for this.
 - **Types:** `types/chatbots.ts` and `types/whatsappBot.ts`. The RTK slice is `api/chatbots.ts`.
-- **Tests:** none for the Settings, Defaults or Preview tabs before this chunk. The test style (Vitest, with `@api` mocked) is in `pages/WhatsAppBot/__tests__/WhatsAppBot.test.tsx`.
+- **Tests:** none for the Settings, Defaults or Preview tabs before this chunk. The test style (Vitest, with `@api` mocked) is in `pages/WhatsAppBot/__tests__/WhatsAppBot.test.tsx`. <!-- docs-path-lint: ignore -->
 
 ### Latest migration
 `1980920000000-AddChatbotLastTestedAt`. This chunk adds `1980960000000`.

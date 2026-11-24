@@ -128,6 +128,8 @@ export const makeEngine = ({
   tools = [],
   listTools,
   limits,
+  blockedCrisis,
+  canChat = true,
 }: {
   aiService: EngineAiService;
   promptShared: { getPromptsByOptions: jest.Mock };
@@ -143,13 +145,17 @@ export const makeEngine = ({
   /** The bot's list tools (chunk 6); none by default. */
   listTools?: { offeredFor: jest.Mock };
   /** CR1's limits; without them nothing is ever limited. */
-  limits?: { checkTurn: jest.Mock };
+  limits?: { checkTurn: jest.Mock; releaseTurn?: jest.Mock };
+  /** Stage 6 (R1): records a crisis keyword on a blocked turn. */
+  blockedCrisis?: { markBlockedCrisis: jest.Mock };
+  /** Whether the sender is on the bot's list (the access gate). */
+  canChat?: boolean;
 }): ChatbotEngineService =>
   new ChatbotEngineService(
     documents as never,
     replyService as never,
     { renderPlaceholders: (text: string) => text } as never,
-    { canChat: jest.fn().mockResolvedValue(true) } as never,
+    { canChat: jest.fn().mockResolvedValue(canChat) } as never,
     aiService as never,
     promptShared as never,
     new AgentRuntimeRunner(
@@ -172,4 +178,5 @@ export const makeEngine = ({
     ),
     conversations as never,
     limits as never,
+    blockedCrisis as never,
   );

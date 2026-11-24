@@ -102,7 +102,11 @@ describe('ChatbotSettingsService: abilities', () => {
       ['declineText', 'Ask the front desk.'],
       ['crisisText', 'Call 14416.'],
       ['busyText', 'One moment.'],
-      ['disclaimer', 'Not medical advice.'],
+      // Stage 4: the notice must keep "an AI and people may read this chat".
+      [
+        'disclaimer',
+        'Not medical advice. An AI and our team may read this chat.',
+      ],
     ] as const)('%s', (field, value) => {
       const written = (HOME_FIELDS[field] as any).write(value, state);
       expect(written.chatbot.settings.abilities).toEqual(abilities);

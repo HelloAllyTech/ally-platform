@@ -1,13 +1,13 @@
 import React from "react";
 
 import { useNavigate, useParams } from "react-router-dom";
-import { toast } from "sonner";
 
 import { AssistantLine, Orb, StepFrame, TellMeSomethingElse } from "@components/v2";
 import { ROUTES } from "@constants";
 
 import { CheckupScreen } from "./CheckupScreen";
 import { COPY } from "./copy";
+import { BuildScreen } from "./create/BuildScreen";
 import { MakeItYoursScreen } from "./MakeItYours";
 import { defaultsConfirmation } from "./purposes";
 import {
@@ -23,13 +23,11 @@ import {
 import { DraftTemplate } from "./screens/DraftTemplate";
 import { ShareWithPlan } from "./screens/ShareWithPlan";
 import { reached } from "./steps";
-import {
-  OnboardingSession as OnboardingSessionState,
-  useOnboardingSession,
-} from "./useOnboardingSession";
-import { BrandEditor, useBrandEditor } from "../../hooks/brand/useBrandEditor";
+import { CreateGate } from "../BuilderHome/CreateGate";
 
 import type { OnboardingScreen } from "./flow";
+import type { OnboardingSession as OnboardingSessionState } from "./useOnboardingSession";
+import type { BrandEditor } from "../../hooks/brand/useBrandEditor";
 
 /** Screens with cards side by side get the wider column (DESIGN.md §2 max widths). */
 const WIDTH: Partial<Record<OnboardingScreen, "result" | "wide">> = {
@@ -42,31 +40,30 @@ const WIDTH: Partial<Record<OnboardingScreen, "result" | "wide">> = {
 };
 
 /**
- * Onboarding, one screen at a time (chunk 20d). Presentation only: every decision and action is
- * `useOnboardingSession`; this picks the screen it names and puts it in the StepFrame, with
- * "Tell me something else" under it.
+ * `/assistants/new/:draftId` (stage 3): the Create and Build screen for this chatbot. A setup that
+ * was in progress before stage 3 lands here too, with its old step ignored. Below 1280px the
+ * "open on a laptop" message shows instead, as on `/assistants/new`. A blank deleted while this
+ * tab was open starts a new one.
  */
 export const OnboardingSession: React.FC = () => {
   const { draftId = "" } = useParams<{ draftId: string }>();
   const navigate = useNavigate();
-  const s = useOnboardingSession(draftId, message => toast.error(message));
-  const editor = useBrandEditor(s.view?.chatbotId ?? null, COPY.look.errors.failed);
   return (
-    <OnboardingView
-      s={s}
-      editor={editor}
-      onLeave={() => navigate(ROUTES.WHATSAPP_BOT)}
-      onStartOver={() => navigate(ROUTES.CHATBOT_NEW)}
-      onConnectWhatsApp={chatbotId =>
-        navigate(`${ROUTES.CHATBOT_DETAIL.replace(":botId", chatbotId)}?tab=connectors`)
-      }
-    />
+    <CreateGate>
+      <BuildScreen
+        key={draftId}
+        draftId={draftId}
+        surface="create"
+        onGone={() => navigate(ROUTES.CHATBOT_NEW, { replace: true })}
+      />
+    </CreateGate>
   );
 };
 
 /**
- * The session drawn from its state: no hooks of its own beyond what screens keep locally, so the
- * dev harness (`/dev/onboarding`) renders exactly this from fixtures for the browser tests.
+ * The old one-screen-at-a-time flow drawn from its state. Superseded by the Create and Build
+ * screen (stage 3); kept only for the dev harness (`/dev/onboarding`), which renders it from
+ * fixtures.
  */
 export const OnboardingView: React.FC<{
   s: OnboardingSessionState;
@@ -234,7 +231,7 @@ export const OnboardingView: React.FC<{
     }
   })();
 
-  return (
+  const frame = (
     <StepFrame
       screenKey={screen === "question" ? `question-${view.transcript.length}` : screen}
       labels={{
@@ -279,4 +276,6 @@ export const OnboardingView: React.FC<{
       {body}
     </StepFrame>
   );
+
+  return frame;
 };

@@ -1051,6 +1051,13 @@ export const ApiEndpoints = {
     TEAM_NAMES: (id: string) => `/v1/chatbots/${id}/team-names`,
     HOME: (id: string) => `/v1/chatbots/${id}/home`,
     HOME_LIST: (id: string, list: string) => `/v1/chatbots/${id}/home/lists/${list}`,
+    /** Stage 1b: the team (members with their role sets), leaving, handing over and invites. */
+    MEMBERS: (id: string) => `/v1/chatbots/${id}/members`,
+    MEMBER: (id: string, userId: number) => `/v1/chatbots/${id}/members/${userId}`,
+    LEAVE: (id: string) => `/v1/chatbots/${id}/leave`,
+    TRANSFER: (id: string) => `/v1/chatbots/${id}/transfer`,
+    INVITES: (id: string) => `/v1/chatbots/${id}/invites`,
+    INVITE: (id: string, inviteId: string) => `/v1/chatbots/${id}/invites/${inviteId}`,
     RULES: (id: string) => `/v1/chatbots/${id}/rules`,
     SAFETY_PACK: (id: string) => `/v1/chatbots/${id}/safety-pack`,
     LISTS: (id: string) => `/v1/chatbots/${id}/lists`,
@@ -1095,6 +1102,10 @@ export const ApiEndpoints = {
     CHANGE_UNDO: (id: string, eventId: string) => `/v1/chatbots/${id}/changes/${eventId}/undo`,
     SOURCES: (id: string) => `/v1/chatbots/${id}/sources`,
     SCORECARD: (id: string) => `/v1/chatbots/${id}/scorecard`,
+    HOME_OVERVIEW: (id: string, range: 7 | 30 | 90) =>
+      `/v1/chatbots/${id}/home/overview?range=${range}`,
+    SOURCE_READ_AGAIN: (id: string, documentId: string) =>
+      `/v1/chatbots/${id}/knowledge/sources/${documentId}/read-again`,
     SCORECARD_ANSWER: (id: string, questionId: string) =>
       `/v1/chatbots/${id}/scorecard/unanswered/${questionId}/answer`,
     SCORECARD_CORRECT: (id: string, feedbackId: string) =>
@@ -1154,6 +1165,24 @@ export const ApiEndpoints = {
       `/v1/chatbots/${chatbotId}/seats/${seatId}/assignee`,
     PUBLISH_USE: (chatbotId: string) => `/v1/chatbots/${chatbotId}/publish-use`,
   },
+  /** Credits (stage 6): the builder's own, each chatbot's budget, and Ally admin → Credits. */
+  CREDITS: {
+    ME: "/v1/me/credits",
+    BUDGET: (chatbotId: string) => `/v1/me/credits/chatbots/${chatbotId}/budget`,
+    TOP_UP: (chatbotId: string) => `/v1/me/credits/chatbots/${chatbotId}/budget/top-up`,
+    USER_LIMITS: (chatbotId: string) => `/v1/me/credits/chatbots/${chatbotId}/user-limits`,
+    ADMIN_ACCOUNTS: "/v1/admin/billing/credits/accounts",
+    ADMIN_ACCOUNT: (accountId: string) => `/v1/admin/billing/credits/accounts/${accountId}`,
+    ADMIN_GRANTS: "/v1/admin/billing/credits/grants",
+    ADMIN_TRANSFER: (chatbotId: string) =>
+      `/v1/admin/billing/credits/budgets/${chatbotId}/transfer`,
+    ADMIN_CUTOVER: "/v1/admin/billing/credits/cutover",
+  },
+  /** A chatbot's "who may chat" list (stage 6): phone, email, user and organisation entries. */
+  ACCESS_LIST: {
+    ENTRIES: (chatbotId: string) => `/v1/chatbots/${chatbotId}/audience`,
+    ENTRY: (chatbotId: string, entryId: string) => `/v1/chatbots/${chatbotId}/audience/${entryId}`,
+  },
   /** Ally admin → Custom logins (CR1 Part B): the Assistant owner role. */
   CUSTOM_LOGINS: {
     LIST: "/v1/custom-logins",
@@ -1198,6 +1227,16 @@ export const ApiEndpoints = {
   },
   /** The use-case templates before a setup starts (T1). */
   ASSISTANT_TEMPLATES: "/v1/assistant-templates",
+  /** Signed-in person's own membership: accept an invite, the responder agreement (Stage 1b). */
+  ASSISTANT_MEMBERS: {
+    ACCEPT_INVITE: "/v1/assistant-members/invites/accept",
+    RESPONDER_AGREEMENT: "/v1/assistant-members/responder-agreement",
+  },
+  /** The invite link's page, before sign-in. */
+  PUBLIC_ASSISTANT_INVITES: {
+    PREVIEW: "/v1/public/assistant-invites/preview",
+    ACCEPT: "/v1/public/assistant-invites/accept",
+  },
   BOT_DRAFTS: {
     LIST: "/v1/bot-drafts",
     TEMPLATE: (id: string) => `/v1/bot-drafts/${id}/template`,
@@ -1217,6 +1256,15 @@ export const ApiEndpoints = {
     PUBLISH: (id: string) => `/v1/bot-drafts/${id}/publish`,
     ABANDON: (id: string) => `/v1/bot-drafts/${id}/abandon`,
     CHECKUP: (id: string) => `/v1/bot-drafts/${id}/checkup`,
+    /** Chat with the draft's real assistant while it is built (split build). */
+    TEST: (id: string) => `/v1/bot-drafts/${id}/test`,
+    TEST_STREAM: (id: string) => `/v1/bot-drafts/${id}/test/stream`,
+    /** Ten likely questions asked of the draft's assistant, each judged (split build). */
+    RUN_LIKELY: (id: string) => `/v1/bot-drafts/${id}/run-likely`,
+    /** Change the draft by talking: propose, apply, undo (split build). */
+    CHANGES_PROPOSE: (id: string) => `/v1/bot-drafts/${id}/changes/propose`,
+    CHANGES_APPLY: (id: string) => `/v1/bot-drafts/${id}/changes/apply`,
+    CHANGE_UNDO: (id: string, eventId: string) => `/v1/bot-drafts/${id}/changes/${eventId}/undo`,
   },
   WHATSAPP_BOT: {
     // Corpus (ally-be src/knowledge-base)
@@ -1378,6 +1426,8 @@ export const ApiEndpoints = {
 
 export const ROUTES = {
   LOGIN: "/login",
+  /** The emailed team-invite link (`?token=`): public, works signed in or out. */
+  ASSISTANT_INVITE: "/assistant-invite",
   MAGIC_VERIFY: "/auth/verify",
   SIMULATION_STUDIO: "/simulation-studio",
   USER_MANAGEMENT: "/user-management",
@@ -1397,6 +1447,11 @@ export const ROUTES = {
   BILLING_PLANS: "/billing/plans",
   /** The owner's Plan and usage (CR1): any signed-in user, for themselves. Never dollars. */
   MY_PLAN: "/account/plan",
+  /** The builder's Credits page (stage 6): "Plan and credits" in the corner menu opens it. */
+  MY_CREDITS: "/account/credits",
+  /** Ally admin → Credits (stage 6, `manage_costs`). */
+  BILLING_CREDITS: "/billing/credits",
+  SAFETY_PACKS: "/safety-packs",
   AI_TASKS: "/ai-tasks",
   DEBRIEFS: "/debriefs",
   DEBRIEF_SESSION: (runId: string) => `/debriefs/sessions/${runId}`,
@@ -1448,7 +1503,10 @@ export const ROUTES = {
   CHATBOT_DETAIL: "/assistants/:botId",
   /** Onboarding (chunk 20a). Static, so it outranks `:botId`. */
   CHATBOT_NEW: "/assistants/new",
+  /** Old inbox links (emails): redirected to the assistants home. */
   INBOX: "/inbox",
+  /** Staff only: the defaults every chatbot inherits, shared quick replies, library, numbers. */
+  ASSISTANT_DEFAULTS: "/admin/assistants-defaults",
   CHATBOT_NEW_SESSION: (draftId: string) => `/assistants/new/${draftId}`,
   /** There is no sign-up (A1): these redirect to the login screen. */
   SIGN_UP: "/signup",
@@ -1596,6 +1654,7 @@ export const TAG_TYPES = {
   BILLING_USER_SPEND: "billingUserSpend",
   BILLING_USER_PLAN: "billingUserPlan",
   MY_PLAN: "myPlan",
+  CREDITS: "credits",
   DIRECTORY_ENTRIES: "directoryEntries",
   DIRECTORY_COLLECTIONS: "directoryCollections",
   ASSISTANT_SEATS: "assistantSeats",

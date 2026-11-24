@@ -1,5 +1,4 @@
 import { ErrorText, Footer, LogoMark, PrimaryButton, ScreenHeading } from "../components/parts";
-import { fill } from "../copy";
 
 import type { BotPageCopy } from "../copy";
 import type { PublicBotPage } from "../types";
@@ -39,7 +38,6 @@ export function Cover({
   turnstile?: React.ReactNode;
 }) {
   const { branding } = page;
-  const cover = branding.look?.cover;
   const note =
     page.access === "invite"
       ? copy.cover.privateNote
@@ -49,32 +47,21 @@ export function Cover({
   return (
     <div className="bp-screen bp-pad">
       <div className="bp-cover-image ally-rise">
-        {cover ? (
-          <img
-            className="bp-cover-photo"
-            src={cover.src}
-            srcSet={cover.srcset || undefined}
-            sizes="(max-width: 640px) 100vw, 640px"
-            width={cover.width}
-            height={cover.height}
-            alt={cover.alt || fill(copy.cover.coverAlt, { business: branding.title })}
-          />
-        ) : (
-          <span
-            className="ally-orb ally-breathe"
-            aria-hidden="true"
-            style={{ width: 96, height: 96 }}
-          />
-        )}
+        {/* Stage 7: no cover image; the orb in the brand colour. */}
+        <span
+          className="ally-orb ally-breathe"
+          aria-hidden="true"
+          style={{ width: 96, height: 96 }}
+        />
         <span className="bp-logo-tile">
           <LogoMark branding={branding} />
         </span>
       </div>
       <div className="bp-stack bp-cover-title bp-grow">
         <ScreenHeading>{branding.title}</ScreenHeading>
-        {branding.subtitle && (
+        {branding.welcome && (
           <p className="ally-body bp-muted" style={{ margin: 0 }}>
-            {branding.subtitle}
+            {branding.welcome}
           </p>
         )}
         {note && (
@@ -92,11 +79,6 @@ export function Cover({
           </PrimaryButton>
         </div>
         <ErrorText>{error}</ErrorText>
-        {branding.disclaimer && (
-          <p className="bp-small bp-center" style={{ margin: 0 }}>
-            {branding.disclaimer}
-          </p>
-        )}
       </div>
       <Footer branding={branding} copy={copy} />
     </div>

@@ -1,6 +1,6 @@
 import type { AssistantHomeView, Chatbot } from "@types";
 
-import type { SectionId } from "../sections";
+import type { PartId, SectionId } from "../sections";
 
 /** What every section is given by the home. */
 export interface SectionProps {
@@ -10,7 +10,7 @@ export interface SectionProps {
   canEdit: boolean;
   /** Owners also manage the team and channels, and can remove the assistant. */
   canManage: boolean;
-  go: (section: SectionId) => void;
+  go: (section: SectionId, part?: PartId) => void;
   /** Opens Try it, with a question in the box when one is given (chunk 5b). */
   tryIt?: (question?: string) => void;
 }

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <!-- `/b/<slug>` is the bot page (b.html). Deployed, the CDN answers unknown paths with this
+    <!-- `/chat/<id>` (stage 7) and old `/b/<slug>` links are the bot page (b.html). Deployed, the CDN answers unknown paths with this
          file, so hand over here before the dashboard loads: write b.html into the same document.
          Unlike a redirect, that keeps the URL, the referrer and ancestorOrigins, which the
          embedded widget's host check reads (src/botPage/embed.ts). The <plaintext> turns the rest
@@ -14,7 +14,7 @@
         var base = "%BASE_URL%".replace(/\/$/, "");
         var path = location.pathname;
         if (path.indexOf(base) === 0) path = path.slice(base.length);
-        if (!/^\/b\/[^/]+\/?$/.test(path)) return;
+        if (!/^\/(b|chat)\/[^/]+\/?$/.test(path)) return;
         document.write("<plaintext hidden>");
         var write = function (html) {
           document.open();
