@@ -237,6 +237,14 @@ describe('schemas', () => {
   const findListings = listToolDefinitions(listings, names)[0];
 
   // TF1 F9: "what did I book?" in a new chat asked for a name instead of looking it up.
+  // TF1 F16: a Hindi question searched English entries with Hindi words and found nothing.
+  it('a text filter says to search with the words the entries are written in', () => {
+    const title = findListings.input_schema.properties.title_contains as {
+      description: string;
+    };
+    expect(title.description).toMatch(/words the entries are written in/);
+  });
+
   it("a person's list tells the model to look up their own entries first", () => {
     expect(find.description).toMatch(
       /only the entries of the person in this chat/,

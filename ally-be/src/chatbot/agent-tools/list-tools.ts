@@ -274,7 +274,11 @@ function findSchema(list: ListView): ListToolInputSchema {
     } else if (CONTAINS_TYPES.has(f.type)) {
       put(
         `${f.key}_contains`,
-        text(`${f.label} contains this text; empty for any`),
+        // TF1 F16: a Hindi question searched English entries with Hindi words and found nothing.
+        text(
+          `${f.label} contains this text, in the words the entries are written in (search in ` +
+            `English when they are, whatever language the person writes in); empty for any`,
+        ),
       );
     } else if (RANGE_TYPES.has(f.type)) {
       if (f.type === ListFieldType.DATETIME) {
