@@ -791,7 +791,9 @@
 }
 
 @media (max-width: 959px) {
-  .ally-home__open-page {
+  /* Scoped to the header so it outranks `.ally-btn { display: inline-flex }`, whichever stylesheet
+     loads last; otherwise the row runs past a phone's width. */
+  .ally-home__actions .ally-home__open-page {
     display: none;
   }
   .ally-more--phone {

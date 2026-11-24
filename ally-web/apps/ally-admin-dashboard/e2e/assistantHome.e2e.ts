@@ -52,14 +52,16 @@ test.describe("assistant home sections", () => {
   }
 });
 
-test("All numbers opens in place on the Overview", async ({ page }) => {
+// Stage 7: the Overview is How it's doing (counts only); reply time, languages and document use
+// ("See all numbers") are Ally staff's alone, so an owner never sees the button. The staff path is
+// unit tested (Overview.test.tsx); this harness has no signed-in user.
+test("the Overview shows how it's doing, and All numbers stays with Ally staff", async ({
+  page,
+}) => {
   await mockAssistantHome(page);
   await open(page, "overview");
-  await page.getByRole("button", { name: "See all numbers" }).click();
-  await expect(page.getByTestId("all-numbers")).toBeVisible();
-  await expect(page.getByRole("img", { name: /8 Nov: \d+ replies/ })).toBeVisible();
-  await expect(page).toHaveScreenshot("home-overview-all-numbers.png", { fullPage: true });
-  await expectNoSeriousA11yIssues(page);
+  await expect(page.getByTestId("overview-doing")).toContainText("412");
+  await expect(page.getByRole("button", { name: "See all numbers" })).toHaveCount(0);
 });
 
 test("change your assistant: a proposal as before and after", async ({ page }) => {
@@ -86,23 +88,26 @@ test("Try it draws the bot page chat in the page's brand", async ({ page }) => {
   await expectNoSeriousA11yIssues(page);
 });
 
-test("a field changed in another tab shows that tab's value", async ({ page }) => {
-  const { home } = await mockAssistantHome(page);
-  await open(page, "personality");
+// Stage 3: an editor's Build is the Create and Build form on the chatbot's working copy. A field
+// another tab saved first is not applied; the typed text stays, and "Use theirs" shows what it says now.
+test("a field changed in another tab keeps your text and offers theirs", async ({ page }) => {
+  const { workingCopy } = await mockAssistantHome(page);
+  await open(page, "build");
   // Another tab saves first: the field's version moves on.
-  home.fields.assistantName = { value: "Ravi", version: "ffffffffffffffff" };
-  const name = page.getByLabel("Name", { exact: true });
+  workingCopy.fields.assistantName = { value: "Ravi", version: "ffffffffffffffff" };
+  const name = page.getByLabel("Name it uses in chat", { exact: true });
   await name.fill("Meera");
   await name.blur();
-  await expect(page.getByRole("alert")).toHaveText(
-    "This changed while you were editing. Here is what it says now.",
-  );
+  const stale = page.getByTestId("field-stale-assistantName");
+  await expect(stale).toContainText("This changed somewhere else while you were typing.");
+  await expect(name).toHaveValue("Meera");
+  await stale.getByRole("button", { name: "Use theirs" }).click();
   await expect(name).toHaveValue("Ravi");
 });
 
 test("a viewer sees everything and can change nothing", async ({ page }) => {
   await mockAssistantHome(page, { role: "viewer" });
-  await open(page, "personality");
+  await open(page, "build");
   await expect(page.getByLabel("Name", { exact: true })).toBeDisabled();
   await expect(page.getByText("Changes save as you go")).toHaveCount(0);
 });
@@ -124,31 +129,35 @@ test("only owners see How it answers and Settings", async ({ page }) => {
   await expect(page.getByTestId("settings-panel")).toBeVisible();
 });
 
-test("a question just added stays until it has words, then saves", async ({ page }) => {
+// Suggested questions are one per line in the Build form: a blank line is never a question.
+test("a blank suggested question is never saved, and the rest saves on leaving", async ({
+  page,
+}) => {
   const { saves } = await mockAssistantHome(page);
-  await open(page, "personality");
-  await page.getByRole("button", { name: "Add a question" }).first().click();
-  const added = page.getByRole("textbox", { name: "Suggested questions 4", exact: true });
-  await expect(added).toBeFocused();
+  await open(page, "build");
+  const box = page.getByTestId("field-suggestedQuestions");
+  await expect(box).toHaveValue("What are your fees?\nWho speaks Marathi?\nHow do I book?");
+  await box.focus();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
   await page.waitForTimeout(1500);
-  await expect(added).toHaveValue("");
-  expect(saves).toEqual([]);
-  await added.fill("Do you see children?");
-  await added.blur();
+  expect(saves.filter(s => s.field === "suggestedQuestions")).toEqual([]);
+  await page.keyboard.type("Do you see children?");
+  await box.blur();
   await expect
-    .poll(() => saves.at(-1)?.value)
+    .poll(() => saves.filter(s => s.field === "suggestedQuestions").at(-1)?.value)
     .toEqual([
       "What are your fees?",
       "Who speaks Marathi?",
       "How do I book?",
       "Do you see children?",
     ]);
-  await expect(added).toHaveValue("Do you see children?");
 });
 
 test("a question before the chat stays until it has words", async ({ page }) => {
   const { saves } = await mockAssistantHome(page);
-  await open(page, "page");
+  await open(page, "channels");
   await page.getByRole("button", { name: "Add a question" }).click();
   await page.waitForTimeout(1500);
   await expect(page.getByRole("textbox", { name: "Question 3", exact: true })).toHaveValue("");

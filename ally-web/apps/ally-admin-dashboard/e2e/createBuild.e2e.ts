@@ -53,8 +53,10 @@ async function mockBuild(page: Page, state: { creates: number; edits: unknown[] 
     const path = url.pathname.replace(/^.*\/api\/v1/, "");
     const method = request.method();
     if (path === "/authorization/permissions") {
-      return json(route, ["system:access", "edit:whatsapp_bot", "view:whatsapp_bot"]);
+      return json(route, ["system:access", "edit:whatsapp-bot", "view:whatsapp-bot"]);
     }
+    // The create routes need the Chatbots feature as well as the edit grant.
+    if (path === "/users/me/feature-toggles") return json(route, ["whatsapp_bot"]);
     if (path === "/bot-drafts" && method === "POST") {
       state.creates += 1;
       return json(route, {
