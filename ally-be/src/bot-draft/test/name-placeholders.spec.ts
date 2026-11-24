@@ -28,3 +28,17 @@ describe('a placeholder is never a name (Q4 N1)', () => {
     expect(realName('Goonj', 'x')).toBe('Goonj');
   });
 });
+
+// TF1: the page said "people at Your assistant" and its header "Your assistant" after the owner
+// had named it.
+describe('the default name never beats a real one (TF1)', () => {
+  it('falls back to the real name', () => {
+    expect(realName('Your assistant', 'Saathi Youth Helpline')).toBe(
+      'Saathi Youth Helpline',
+    );
+  });
+  it('is kept when nothing better exists', () => {
+    expect(realName('Your assistant', 'Your assistant')).toBe('Your assistant');
+    expect(realName('Your assistant', '')).toBe('Your assistant');
+  });
+});
