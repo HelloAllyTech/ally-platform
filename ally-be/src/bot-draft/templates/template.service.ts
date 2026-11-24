@@ -1,3 +1,4 @@
+import { realName } from '../name-placeholders';
 import { syncDraftPack } from '../safety-pack/sync-draft-pack';
 import {
   BadRequestException,
@@ -226,7 +227,7 @@ export class TemplateService {
     const config = fresh.draftConfig;
     const instructions = template.instructions.replace(
       /\{name\}/g,
-      config.name || 'the organisation',
+      realName(config.name, 'the organisation'),
     );
     const event: DraftEvent = {
       id: randomUUID(),
