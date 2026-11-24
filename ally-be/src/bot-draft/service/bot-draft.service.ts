@@ -1,3 +1,4 @@
+import { realName } from '../name-placeholders';
 import {
   BadRequestException,
   ConflictException,
@@ -1011,6 +1012,18 @@ export class BotDraftService {
         message:
           'Something changed while you were editing. Your view has been refreshed.',
       });
+    }
+    // TF1 F12: before go-live the name typed in setup is the assistant's name everywhere (Try it,
+    // the checkup, the list card): the not-yet-live chatbot row takes it. Never a placeholder, and
+    // never on a live chatbot (its name changes on Apply).
+    const typedName = String(next.draftConfig?.name ?? '').trim();
+    if (next.chatbotId && typedName && realName(typedName, '') === typedName) {
+      await this.drafts.manager
+        ?.query(
+          `UPDATE chatbots SET name = $2 WHERE id = $1 AND status = 'draft' AND name IS DISTINCT FROM $2`,
+          [next.chatbotId, typedName.slice(0, 120)],
+        )
+        .catch(() => undefined);
     }
     // Q3-fast Part 2: once the facts are a document, it follows every save (an unchanged text is
     // a no-op there), so a removed page, a correction or a re-read reaches what the assistant knows.
