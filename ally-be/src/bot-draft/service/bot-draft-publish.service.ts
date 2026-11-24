@@ -302,7 +302,7 @@ export class BotDraftPublishService {
       slug: view.slug,
       link: view.link,
       access: pageAccess,
-      budget: budget ?? null,
+      ...(budget ? { budget } : {}),
     };
   }
 
