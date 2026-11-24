@@ -64,10 +64,32 @@ export interface StatisticsChartEntry {
   reason: string | null;
 }
 
+/** The tabs of the page that show charts. */
+export type StatisticsViewId = "organisation" | "course" | "learner";
+
+export interface StatisticsViewSection {
+  /** Translation key under `statisticsLibrary.sections`. */
+  key: string;
+  /** Drawn for the course or learner chosen on the view rather than the whole organisation. */
+  subject: boolean;
+  charts: string[];
+}
+
+export interface StatisticsViewConfig {
+  id: StatisticsViewId;
+  /** What the view asks you to choose, or null when it is about the whole organisation. */
+  subject: StatisticsFilterKey | null;
+  sections: StatisticsViewSection[];
+  /** The layout before a person customises, in section order. */
+  defaultLayout: string[];
+}
+
 export interface StatisticsChartLibrary {
   /** Whether the new page is switched on for this tenant. */
   enabled: boolean;
   charts: StatisticsChartEntry[];
+  /** The tabs that show charts. Absent from a backend older than the tabs. */
+  views?: StatisticsViewConfig[];
 }
 
 export interface StatisticsChartResponse<T = unknown> {
@@ -275,6 +297,8 @@ export interface CoursePerformanceData {
 export interface GetStatisticsScopeOptionsRequest {
   kind: StatisticsFilterKey;
   search?: string;
+  /** Describe this one option instead of listing. */
+  id?: string;
 }
 
 /** TSQ-043 */

@@ -676,7 +676,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['course'],
     needs: [{ signal: 'courseEnrolments', min: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-042',
@@ -879,7 +879,7 @@ export const TENANT_CHART_LIBRARY: readonly TenantChartEntry[] = [
     sources: ['doc'],
     scopes: ['learner'],
     needs: [{ signal: 'courseEnrolments', min: 1 }],
-    live: false,
+    live: true,
   }),
   entry({
     id: 'TSQ-065',

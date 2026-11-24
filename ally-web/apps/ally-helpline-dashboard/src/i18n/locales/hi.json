@@ -4248,6 +4248,89 @@
         "simulation": "यह चार्ट देखने के लिए ऊपर से कोई सिमुलेशन चुनें।",
         "learner": "यह चार्ट देखने के लिए ऊपर से कोई लर्नर चुनें।"
       }
+    },
+    "tabs": {
+      "foryou": "आपके लिए",
+      "organisation": "संगठन",
+      "course": "कोर्स",
+      "learner": "लर्नर"
+    },
+    "sections": {
+      "learners": "लर्नर्स",
+      "practice": "अभ्यास",
+      "courses": "कोर्स",
+      "results": "नतीजे",
+      "reviews": "समीक्षाएँ",
+      "skills": "कौशल",
+      "feedback": "लर्नर फ़ीडबैक",
+      "allCourses": "सभी कोर्स",
+      "courseFacts": "इस कोर्स के बारे में",
+      "useOverTime": "समय के साथ उपयोग",
+      "roleplays": "रोलप्ले",
+      "learning": "सीखना",
+      "progress": "प्रगति"
+    },
+    "subject": {
+      "label": {
+        "course": "कोर्स",
+        "learner": "लर्नर"
+      },
+      "choose": {
+        "course": "कोर्स चुनें",
+        "learner": "लर्नर चुनें"
+      },
+      "pick": {
+        "course": "कोर्स कैसा चल रहा है यह देखने के लिए कोई कोर्स चुनें।",
+        "learner": "किसी लर्नर का रिकॉर्ड देखने के लिए उसे चुनें।"
+      },
+      "heading": {
+        "course": "एक कोर्स विस्तार से"
+      }
+    },
+    "forYou": {
+      "greeting": {
+        "morning": "सुप्रभात, {{name}}।",
+        "afternoon": "नमस्कार, {{name}}।",
+        "evening": "शुभ संध्या, {{name}}।"
+      },
+      "greetingNoName": {
+        "morning": "सुप्रभात।",
+        "afternoon": "नमस्कार।",
+        "evening": "शुभ संध्या।"
+      }
+    },
+    "pins": {
+      "heading": "आपके पिन किए हुए",
+      "empty": "अभी कुछ पिन नहीं किया है। किसी भी टैब से चार्ट पिन करें।",
+      "noData": "अभी डेटा नहीं है",
+      "title": "चार्ट पिन करें",
+      "add": "पिन करें",
+      "added": "पिन किया",
+      "addAria": "{{title}} को आपके लिए में पिन करें",
+      "pinAria": "{{title}} को आपके लिए में पिन करें",
+      "unpinAria": "{{title}} को अनपिन करें",
+      "limit": "आप अधिकतम {{count}} चार्ट पिन कर सकते हैं।",
+      "labels": {
+        "activeLearners": "सक्रिय लर्नर्स",
+        "activeNow": "अभी सक्रिय",
+        "needAttention": "ध्यान चाहने वाले लर्नर्स",
+        "sessionsReviewed": "समीक्षा किए गए सेशन",
+        "averageRating": "औसत रेटिंग",
+        "typicalScore": "सामान्य सेशन स्कोर",
+        "liveCourses": "लाइव कोर्स",
+        "learnersOnCourses": "कोर्स पर लर्नर्स",
+        "coursesInUse": "उपयोग में कोर्स"
+      },
+      "captions": {
+        "ofLearners": "{{total}} लर्नर्स में से",
+        "thisWeek": "इस हफ़्ते",
+        "learners": "लर्नर्स",
+        "reviewed": "{{completed}} में से {{reviewed}} सेशन की समीक्षा हुई",
+        "ratings": "{{count}} रेटिंग से",
+        "sessions": "{{count}} सेशन में",
+        "ofCourses": "{{courses}} कोर्स में से",
+        "inProgress": "{{count}} जारी हैं"
+      }
     }
   }
 }

@@ -54,12 +54,18 @@ export interface PmLaneRunResult {
   passes: number;
   toolCalls: number;
   repaired: boolean;
+  /** Why the first submission failed validation (the repair round's errors), for the trace. */
+  repairErrors: string[];
 }
 
 const REPAIR_NOTE =
   'Some candidates failed validation (errors below). Call submit_candidates once more with ' +
   'the corrected candidates — fix the listed fields, cite only evidence ids returned by tools ' +
   'in this run, or drop the candidate. Candidates that fail again are discarded.';
+
+const SUBMIT_ONLY_NOTE =
+  'Not run: research is over and only submit_candidates is available now. Call ' +
+  'submit_candidates with your candidates (an empty list is a valid answer).';
 
 /**
  * One lane: a bounded tool loop that ends in exactly one structured submission.
@@ -97,6 +103,7 @@ export class PmLaneRunner {
       passes: 0,
       toolCalls: 0,
       repaired: false,
+      repairErrors: [],
     };
 
     let forceSubmit = false;
@@ -121,6 +128,9 @@ export class PmLaneRunner {
         messages,
         tools: finalPass ? [submitTool] : [...research, submitTool],
         maxTokens: PM_PIPELINE.LANE_MAX_TOKENS,
+        // Only the submit tool is offered here: where the provider allows it, make the call
+        // mandatory. Without this gpt-5-mini kept calling research tools from the history.
+        ...(finalPass ? { toolChoice: 'required' as const } : {}),
         timeoutMs: Math.max(
           5_000,
           Math.min(PM_PIPELINE.CALL_TIMEOUT_MS, input.deadline - now()),
@@ -180,6 +190,7 @@ export class PmLaneRunner {
         }
         // One repair round: the valid ones are kept, the model resubmits only the rest.
         result.repaired = true;
+        result.repairErrors = errors.slice(0, 10).map((e) => e.slice(0, 200));
         kept = valid;
         result.discarded = [];
         messages.push({ role: 'assistant', content: turn.content });
@@ -212,6 +223,23 @@ export class PmLaneRunner {
         });
         forceSubmit = true;
         nudged = true;
+        continue;
+      }
+
+      // A submit-only pass that called something else: refuse it without running it, and say
+      // so. Running it (as before) let the model spend every remaining pass researching after a
+      // repair note and end the lane with nothing submitted.
+      if (finalPass) {
+        messages.push({ role: 'assistant', content: turn.content });
+        messages.push({
+          role: 'user',
+          content: uses.map((use) => ({
+            type: 'tool_result' as const,
+            tool_use_id: use.id,
+            is_error: true,
+            content: SUBMIT_ONLY_NOTE,
+          })),
+        });
         continue;
       }
 

@@ -1,0 +1,72 @@
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { UpdateUserPreferencesDto } from '../update-user-prefernces.dto';
+
+const errorsFor = async (body: Record<string, unknown>) =>
+  validate(plainToInstance(UpdateUserPreferencesDto, body));
+
+describe('statistics preferences', () => {
+  describe('statistics_layouts', () => {
+    it('accepts a list of card keys for each view and the pins', async () => {
+      expect(
+        await errorsFor({
+          statistics_layouts: {
+            organisation: ['TSQ-001', 'TSQ-003?course=8b3f2f0e-1c0a-4d6e'],
+            course: [],
+            learner: ['TSQ-063'],
+            pins: ['TSQ-001'],
+          },
+        }),
+      ).toEqual([]);
+    });
+
+    it.each([
+      ['a view that does not exist', { team: ['TSQ-001'] }],
+      ['a value that is not a list', { organisation: 'TSQ-001' }],
+      ['a repeated card', { organisation: ['TSQ-001', 'TSQ-001'] }],
+      ['an empty card key', { organisation: [''] }],
+      ['a card key that is too long', { organisation: ['x'.repeat(81)] }],
+      [
+        'too many cards',
+        { organisation: Array.from({ length: 61 }, (_, i) => `TSQ-${i}`) },
+      ],
+      ['a non-string card', { organisation: [5] }],
+    ])('refuses %s', async (_label, layouts) => {
+      expect(await errorsFor({ statistics_layouts: layouts })).not.toEqual([]);
+    });
+
+    it('refuses a list in place of the object', async () => {
+      expect(await errorsFor({ statistics_layouts: ['TSQ-001'] })).not.toEqual(
+        [],
+      );
+    });
+
+    it('may be left out', async () => {
+      expect(await errorsFor({})).toEqual([]);
+    });
+  });
+
+  describe('statistics_subjects', () => {
+    it('accepts a course id and a learner id', async () => {
+      expect(
+        await errorsFor({
+          statistics_subjects: {
+            course: '8b3f2f0e-1c0a-4d6e-9a53-3d1c0d2f4a11',
+            learner: '42',
+          },
+        }),
+      ).toEqual([]);
+    });
+
+    it.each([
+      ['another key', { team: '1' }],
+      ['an id with other characters', { course: "1'; DROP TABLE users" }],
+      ['an id that is too long', { learner: '1'.repeat(65) }],
+      ['a number', { learner: 42 }],
+    ])('refuses %s', async (_label, subjects) => {
+      expect(await errorsFor({ statistics_subjects: subjects })).not.toEqual(
+        [],
+      );
+    });
+  });
+});

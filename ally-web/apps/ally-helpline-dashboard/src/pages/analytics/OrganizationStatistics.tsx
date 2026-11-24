@@ -7,13 +7,13 @@ import OrganizationMetrics from "./OrganizationMetrics";
 
 // The new dashboard pulls in the chart library and its renderers. Lazy, so a
 // tenant the page is off for never loads any of it.
-const StatisticsDashboard = lazy(() =>
-  import("./statistics/StatisticsDashboard").then(m => ({ default: m.StatisticsDashboard })),
+const StatisticsPage = lazy(() =>
+  import("./statistics/StatisticsPage").then(m => ({ default: m.StatisticsPage })),
 );
 
 /**
- * The Org tab's native content: the new chart-library dashboard for tenants it
- * is switched on for, otherwise the existing Organization Metrics view.
+ * The Org tab's native content: the Statistics page (For you, Organisation, Course,
+ * Learner) for tenants it is switched on for, otherwise the existing Organization Metrics view.
  *
  * Falls back to the existing view when the library cannot be read (an older
  * backend without the endpoint, or a failed request), so the Statistics page
@@ -30,10 +30,11 @@ export const OrganizationStatistics: FunctionComponent = () => {
     );
   }
 
-  if (library?.enabled) {
+  // A backend older than the tabs sends no views: keep the existing view then.
+  if (library?.enabled && library.views?.length) {
     return (
       <Suspense fallback={null}>
-        <StatisticsDashboard charts={library.charts} />
+        <StatisticsPage library={library} />
       </Suspense>
     );
   }

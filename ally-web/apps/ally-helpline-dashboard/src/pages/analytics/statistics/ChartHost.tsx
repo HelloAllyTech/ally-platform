@@ -22,10 +22,15 @@ interface ChartHostProps {
   filters?: StatisticsFilterValues;
   /** Called when a filter is changed. Without it the card shows its filters but cannot change them. */
   onFiltersChange?: (filters: StatisticsFilterValues) => void;
+  /** Filters the view supplies (its chosen course or learner): in `filters`, but not offered on the card. */
+  lockedFilters?: readonly StatisticsFilterKey[];
+  /** Pins the card to For you. Absent when the page is being customised. */
+  onTogglePin?: () => void;
+  pinned?: boolean;
 }
 
 /** The request fields for a card's filters. A simulation or learner id is a number. */
-const filterParams = (filters: StatisticsFilterValues) => {
+export const filterParams = (filters: StatisticsFilterValues) => {
   const params: { courseId?: string; scenarioId?: number; learnerId?: number } = {};
   if (filters.course) params.courseId = filters.course;
   const scenarioId = Number(filters.simulation);
@@ -49,6 +54,9 @@ export const ChartHost: FunctionComponent<ChartHostProps> = ({
   range,
   filters = {},
   onFiltersChange,
+  lockedFilters,
+  onTogglePin,
+  pinned = false,
 }) => {
   const { t } = useTranslation();
   const renderer = CHART_RENDERERS[entry.id];
@@ -135,6 +143,7 @@ export const ChartHost: FunctionComponent<ChartHostProps> = ({
       <CardFilters
         filters={entry.filters}
         values={filters}
+        hidden={lockedFilters}
         labels={labels}
         onChange={next => onFiltersChange?.(next)}
       />
@@ -157,6 +166,18 @@ export const ChartHost: FunctionComponent<ChartHostProps> = ({
         title={entry.question}
         takeaway={takeaway}
         controls={controls}
+        pin={
+          onTogglePin && renderer.pin
+            ? {
+                pinned,
+                label: t(
+                  pinned ? "statisticsLibrary.pins.unpinAria" : "statisticsLibrary.pins.pinAria",
+                  { title: entry.question },
+                ),
+                onToggle: onTogglePin,
+              }
+            : undefined
+        }
         loading={loading}
         error={isError}
         onRetry={refetch}

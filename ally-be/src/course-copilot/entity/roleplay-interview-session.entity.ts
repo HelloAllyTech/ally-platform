@@ -23,7 +23,7 @@ export class RoleplayInterviewSession extends BaseWithoutTenantEntity {
   @Column({ type: 'int' })
   createdBy!: number;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   tenantId?: string | null;
 
   @Column({ type: 'int', nullable: true })

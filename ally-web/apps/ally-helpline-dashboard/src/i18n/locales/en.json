@@ -4248,6 +4248,89 @@
         "simulation": "Choose a simulation above to see this chart.",
         "learner": "Choose a learner above to see this chart."
       }
+    },
+    "tabs": {
+      "foryou": "For you",
+      "organisation": "Organisation",
+      "course": "Course",
+      "learner": "Learner"
+    },
+    "sections": {
+      "learners": "Learners",
+      "practice": "Practice",
+      "courses": "Courses",
+      "results": "Results",
+      "reviews": "Reviews",
+      "skills": "Skills",
+      "feedback": "Learner feedback",
+      "allCourses": "All courses",
+      "courseFacts": "About this course",
+      "useOverTime": "Use over time",
+      "roleplays": "Roleplays",
+      "learning": "Learning",
+      "progress": "Progress"
+    },
+    "subject": {
+      "label": {
+        "course": "Course",
+        "learner": "Learner"
+      },
+      "choose": {
+        "course": "Choose a course",
+        "learner": "Choose a learner"
+      },
+      "pick": {
+        "course": "Choose a course to see how it is doing.",
+        "learner": "Choose a learner to see their record."
+      },
+      "heading": {
+        "course": "One course in depth"
+      }
+    },
+    "forYou": {
+      "greeting": {
+        "morning": "Good morning, {{name}}.",
+        "afternoon": "Good afternoon, {{name}}.",
+        "evening": "Good evening, {{name}}."
+      },
+      "greetingNoName": {
+        "morning": "Good morning.",
+        "afternoon": "Good afternoon.",
+        "evening": "Good evening."
+      }
+    },
+    "pins": {
+      "heading": "Pinned by you",
+      "empty": "Nothing pinned yet. Pin a chart from any tab.",
+      "noData": "No data yet",
+      "title": "Pin charts",
+      "add": "Pin",
+      "added": "Pinned",
+      "addAria": "Pin {{title}} to For you",
+      "pinAria": "Pin {{title}} to For you",
+      "unpinAria": "Unpin {{title}}",
+      "limit": "You can pin up to {{count}} charts.",
+      "labels": {
+        "activeLearners": "Active learners",
+        "activeNow": "Active right now",
+        "needAttention": "Learners who need attention",
+        "sessionsReviewed": "Sessions reviewed",
+        "averageRating": "Average rating",
+        "typicalScore": "Typical session score",
+        "liveCourses": "Live courses",
+        "learnersOnCourses": "Learners on a course",
+        "coursesInUse": "Courses in use"
+      },
+      "captions": {
+        "ofLearners": "of {{total}} learners",
+        "thisWeek": "this week",
+        "learners": "learners",
+        "reviewed": "{{reviewed}} of {{completed}} sessions reviewed",
+        "ratings": "from {{count}} ratings",
+        "sessions": "across {{count}} sessions",
+        "ofCourses": "of {{courses}} courses",
+        "inProgress": "{{count}} in progress"
+      }
     }
   }
 }

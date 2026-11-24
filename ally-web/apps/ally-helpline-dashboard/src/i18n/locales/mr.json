@@ -4248,6 +4248,89 @@
         "simulation": "हा चार्ट पाहण्यासाठी वरून एखादे सिम्युलेशन निवडा.",
         "learner": "हा चार्ट पाहण्यासाठी वरून एखादा लर्नर निवडा."
       }
+    },
+    "tabs": {
+      "foryou": "तुमच्यासाठी",
+      "organisation": "संस्था",
+      "course": "कोर्स",
+      "learner": "लर्नर"
+    },
+    "sections": {
+      "learners": "लर्नर्स",
+      "practice": "सराव",
+      "courses": "कोर्स",
+      "results": "निकाल",
+      "reviews": "समीक्षा",
+      "skills": "कौशल्ये",
+      "feedback": "लर्नर अभिप्राय",
+      "allCourses": "सर्व कोर्स",
+      "courseFacts": "या कोर्सबद्दल",
+      "useOverTime": "कालांतराने वापर",
+      "roleplays": "रोलप्ले",
+      "learning": "शिकणे",
+      "progress": "प्रगती"
+    },
+    "subject": {
+      "label": {
+        "course": "कोर्स",
+        "learner": "लर्नर"
+      },
+      "choose": {
+        "course": "कोर्स निवडा",
+        "learner": "लर्नर निवडा"
+      },
+      "pick": {
+        "course": "कोर्स कसा चालला आहे हे पाहण्यासाठी एखादा कोर्स निवडा.",
+        "learner": "एखाद्या लर्नरची नोंद पाहण्यासाठी तो निवडा."
+      },
+      "heading": {
+        "course": "एक कोर्स सविस्तर"
+      }
+    },
+    "forYou": {
+      "greeting": {
+        "morning": "शुभ प्रभात, {{name}}.",
+        "afternoon": "नमस्कार, {{name}}.",
+        "evening": "शुभ संध्याकाळ, {{name}}."
+      },
+      "greetingNoName": {
+        "morning": "शुभ प्रभात.",
+        "afternoon": "नमस्कार.",
+        "evening": "शुभ संध्याकाळ."
+      }
+    },
+    "pins": {
+      "heading": "तुम्ही पिन केलेले",
+      "empty": "अजून काही पिन केलेले नाही. कोणत्याही टॅबवरून चार्ट पिन करा.",
+      "noData": "अजून डेटा नाही",
+      "title": "चार्ट पिन करा",
+      "add": "पिन करा",
+      "added": "पिन केले",
+      "addAria": "{{title}} तुमच्यासाठी मध्ये पिन करा",
+      "pinAria": "{{title}} तुमच्यासाठी मध्ये पिन करा",
+      "unpinAria": "{{title}} अनपिन करा",
+      "limit": "तुम्ही जास्तीत जास्त {{count}} चार्ट पिन करू शकता.",
+      "labels": {
+        "activeLearners": "सक्रिय लर्नर्स",
+        "activeNow": "सध्या सक्रिय",
+        "needAttention": "लक्ष हवे असलेले लर्नर्स",
+        "sessionsReviewed": "समीक्षा झालेली सत्रे",
+        "averageRating": "सरासरी रेटिंग",
+        "typicalScore": "सामान्य सत्र स्कोअर",
+        "liveCourses": "लाइव्ह कोर्स",
+        "learnersOnCourses": "कोर्सवरील लर्नर्स",
+        "coursesInUse": "वापरात असलेले कोर्स"
+      },
+      "captions": {
+        "ofLearners": "{{total}} लर्नर्सपैकी",
+        "thisWeek": "या आठवड्यात",
+        "learners": "लर्नर्स",
+        "reviewed": "{{completed}} पैकी {{reviewed}} सत्रांची समीक्षा झाली",
+        "ratings": "{{count}} रेटिंगमधून",
+        "sessions": "{{count}} सत्रांमध्ये",
+        "ofCourses": "{{courses}} कोर्सपैकी",
+        "inProgress": "{{count}} सुरू आहेत"
+      }
     }
   }
 }

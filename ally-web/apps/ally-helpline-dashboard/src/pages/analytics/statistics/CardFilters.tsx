@@ -15,6 +15,8 @@ interface CardFiltersProps {
   /** The filters this card offers, from the library. */
   filters: readonly StatisticsChartFilter[];
   values: StatisticsFilterValues;
+  /** Filters the page supplies for the whole view (its course or learner); not offered on the card. */
+  hidden?: readonly StatisticsFilterKey[];
   /** Names of the chosen course, simulation or learner, as the chart reported them. */
   labels: Partial<Record<StatisticsFilterKey, string>>;
   onChange: (values: StatisticsFilterValues, picked?: StatisticsScopeOption) => void;
@@ -27,8 +29,9 @@ interface CardFiltersProps {
  * filter on a chart needs no change here.
  */
 export const CardFilters: FunctionComponent<CardFiltersProps> = ({
-  filters,
+  filters: declared,
   values,
+  hidden = [],
   labels,
   onChange,
 }) => {
@@ -36,6 +39,7 @@ export const CardFilters: FunctionComponent<CardFiltersProps> = ({
   const [open, setOpen] = useState<StatisticsFilterKey | null>(null);
   const [known, setKnown] = useState<Partial<Record<StatisticsFilterKey, string>>>({});
 
+  const filters = declared.filter(f => !hidden.includes(f.key));
   if (filters.length === 0) return null;
 
   const nameOf = (key: StatisticsFilterKey) => known[key] ?? labels[key] ?? "…";

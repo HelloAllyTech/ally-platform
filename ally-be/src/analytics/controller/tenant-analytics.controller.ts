@@ -223,6 +223,8 @@ export class TenantAnalyticsController {
       this.requireTenantId(),
       query.kind,
       query.search,
+      undefined,
+      query.id,
     );
   }
 

@@ -2,76 +2,68 @@ import { FunctionComponent, useMemo, useState } from "react";
 
 import { useTranslation } from "react-i18next";
 
-import type { StatisticsChartEntry, StatisticsChartGroup } from "@types";
+import type { StatisticsChartEntry } from "@types";
 
-import { CHART_RENDERERS } from "./renderers";
+/** A chart in the library and the group it is listed under (a section of the tab, or a tab). */
+export interface LibraryEntry {
+  chart: StatisticsChartEntry;
+  group: string;
+}
+
+export interface LibraryGroup {
+  key: string;
+  label: string;
+}
 
 interface LibraryDrawerProps {
-  /** Every chart the backend offers this tenant. */
-  charts: readonly StatisticsChartEntry[];
-  /** Ids already on the dashboard for the whole organisation. */
+  /** `add`: charts for a tab. `pin`: charts to pin to For you. */
+  mode: "add" | "pin";
+  /** The charts to list, in the order to show them. */
+  entries: readonly LibraryEntry[];
+  /** The chips that filter the list, in order. Only groups with a chart are shown. */
+  groups: readonly LibraryGroup[];
+  /** Ids already on the tab (or pinned). */
   addedIds: readonly string[];
-  /** Adds a chart to the dashboard. */
   onAdd: (id: string) => void;
 }
 
-const GROUP_ORDER: StatisticsChartGroup[] = [
-  "activity",
-  "learners",
-  "courses",
-  "outcomes",
-  "learner_voice",
-  "reviews",
-];
-
-const GROUP_LABEL_KEY: Record<StatisticsChartGroup, string> = {
-  activity: "activity",
-  learners: "learners",
-  courses: "courses",
-  outcomes: "outcomes",
-  learner_voice: "learnerVoice",
-  reviews: "reviews",
-};
-
 /**
- * The chart library: every chart this organisation may add, with whether it can
- * fill it. Charts it has no data for stay listed but greyed, with the reason,
- * so the admin sees what exists and why it is not available yet.
+ * The chart library for the tab being customised: its charts, with whether the
+ * organisation can fill each. A chart it has no data for stays listed but
+ * greyed, with the reason. On For you the same drawer lists what can be pinned.
  */
 export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
-  charts,
+  mode,
+  entries,
+  groups,
   addedIds,
   onAdd,
 }) => {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
-  const [group, setGroup] = useState<StatisticsChartGroup | "all">("all");
-  // Only charts this build can draw are offered. A chart that needs a filter is
-  // offered too: it asks for the choice on its card.
-  const offered = useMemo(() => charts.filter(c => CHART_RENDERERS[c.id]), [charts]);
+  const [group, setGroup] = useState<string>("all");
+  const prefix = mode === "pin" ? "statisticsLibrary.pins" : "statisticsLibrary.library";
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return offered.filter(
-      c =>
-        (group === "all" || c.group === group) &&
-        (q === "" || `${c.title} ${c.question}`.toLowerCase().includes(q)),
+    return entries.filter(
+      ({ chart, group: g }) =>
+        (group === "all" || g === group) &&
+        (q === "" || `${chart.title} ${chart.question}`.toLowerCase().includes(q)),
     );
-  }, [offered, group, query]);
+  }, [entries, group, query]);
 
-  const groups = GROUP_ORDER.filter(g => offered.some(c => c.group === g));
+  const present = groups.filter(g => entries.some(e => e.group === g.key));
   const added = new Set(addedIds);
 
   return (
     <aside
       className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[420px] flex-col overflow-hidden rounded-none border-l border-border-light bg-white shadow-2xl xl:sticky xl:top-4 xl:z-auto xl:max-h-[calc(100vh-2rem)] xl:w-[420px] xl:flex-none xl:rounded xl:border xl:shadow-none"
-      aria-label={t("statisticsLibrary.library.title")}
+      aria-label={t(`${prefix}.title`)}
       data-testid="statistics-library-drawer"
     >
       <div className="flex flex-none flex-col gap-3 border-b border-border-light p-4">
-        <h2 className="text-xl font-medium text-typography-900">
-          {t("statisticsLibrary.library.title")}
-        </h2>
+        <h2 className="text-xl font-medium text-typography-900">{t(`${prefix}.title`)}</h2>
         <input
           type="search"
           value={query}
@@ -81,30 +73,32 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
           className="min-h-11 rounded border border-border-light px-3 text-sm text-typography-900"
           data-testid="statistics-library-search"
         />
-        <div
-          className="flex flex-wrap gap-2"
-          role="group"
-          aria-label={t("statisticsLibrary.library.filterByGroup")}
-        >
-          {(["all", ...groups] as const).map(g => (
-            <button
-              key={g}
-              type="button"
-              aria-pressed={group === g}
-              onClick={() => setGroup(g)}
-              className={`min-h-9 rounded-full border px-3 text-sm ${
-                group === g
-                  ? "border-[#264d8e] bg-[#264d8e] text-white"
-                  : "border-border-light bg-white text-typography-900"
-              }`}
-              data-testid={`statistics-library-group-${g}`}
-            >
-              {g === "all"
-                ? t("statisticsLibrary.library.groups.all")
-                : t(`statisticsLibrary.library.groups.${GROUP_LABEL_KEY[g]}`)}
-            </button>
-          ))}
-        </div>
+        {present.length > 1 && (
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label={t("statisticsLibrary.library.filterByGroup")}
+          >
+            {[{ key: "all", label: t("statisticsLibrary.library.groups.all") }, ...present].map(
+              g => (
+                <button
+                  key={g.key}
+                  type="button"
+                  aria-pressed={group === g.key}
+                  onClick={() => setGroup(g.key)}
+                  className={`min-h-9 rounded-full border px-3 text-sm ${
+                    group === g.key
+                      ? "border-[#264d8e] bg-[#264d8e] text-white"
+                      : "border-border-light bg-white text-typography-900"
+                  }`}
+                  data-testid={`statistics-library-group-${g.key}`}
+                >
+                  {g.label}
+                </button>
+              ),
+            )}
+          </div>
+        )}
       </div>
 
       <ul
@@ -116,7 +110,7 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
             {t("statisticsLibrary.library.noResults")}
           </li>
         )}
-        {visible.map(chart => {
+        {visible.map(({ chart }) => {
           const isAdded = added.has(chart.id);
           const unavailable = chart.state === "unavailable";
           return (
@@ -136,7 +130,7 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
                 type="button"
                 disabled={unavailable || isAdded}
                 onClick={() => onAdd(chart.id)}
-                aria-label={t("statisticsLibrary.library.addAria", { title: chart.title })}
+                aria-label={t(`${prefix}.addAria`, { title: chart.title })}
                 className={`min-h-11 min-w-[76px] self-center rounded border px-3 text-sm font-medium ${
                   isAdded
                     ? "border-[#b7d9c4] bg-white text-[#1e6b3a]"
@@ -147,10 +141,10 @@ export const LibraryDrawer: FunctionComponent<LibraryDrawerProps> = ({
                 data-testid={`statistics-library-add-${chart.id}`}
               >
                 {isAdded
-                  ? t("statisticsLibrary.library.added")
+                  ? t(`${prefix}.added`)
                   : unavailable
                     ? t("statisticsLibrary.library.unavailable")
-                    : t("statisticsLibrary.library.add")}
+                    : t(`${prefix}.add`)}
               </button>
             </li>
           );

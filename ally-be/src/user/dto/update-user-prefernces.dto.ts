@@ -8,7 +8,12 @@ import {
   IsOptional,
   IsString,
   MaxLength,
+  Validate,
 } from 'class-validator';
+import {
+  StatisticsLayoutsConstraint,
+  StatisticsSubjectsConstraint,
+} from './statistics-preferences.validators';
 
 export class UpdateUserPreferencesDto {
   @IsOptional()
@@ -62,6 +67,21 @@ export class UpdateUserPreferencesDto {
   @MaxLength(80, { each: true })
   @ArrayUnique()
   statistics_dashboard?: string[];
+
+  // Per-user layouts of the Statistics tabs (ally-helpline-dashboard Statistics
+  // page): { organisation, course, learner, pins }, each an ordered list of
+  // card keys (`TSQ-003`, or `TSQ-003?course=<id>` with a filter set). Absent
+  // means "never customised" for that tab, so its default layout applies; an
+  // empty list means the person removed everything. `statistics_dashboard`
+  // above is the older, single list: the page reads it as `organisation`.
+  @IsOptional()
+  @Validate(StatisticsLayoutsConstraint)
+  statistics_layouts?: Record<string, string[]>;
+
+  // The course and learner a person last chose on the Course and Learner tabs.
+  @IsOptional()
+  @Validate(StatisticsSubjectsConstraint)
+  statistics_subjects?: Record<string, string>;
   // Per-user order of the Roadmap Queue's built-in tabs (admin-dashboard Roadmap → Queue), as view
   // ids: 'to-triage' | 'all' | 'leading' | 'for-you'. Loose like the other keys: the frontend drops
   // an id the person's role no longer offers and appends any it doesn't find, in the default order.
