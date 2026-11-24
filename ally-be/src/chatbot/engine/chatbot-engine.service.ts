@@ -16,6 +16,7 @@ import { usageContext } from 'src/billing/context/usage-context';
 import { Injectable, Optional } from '@nestjs/common';
 import {
   crisisReply,
+  emergencyKindOf,
   emergencyReply,
 } from '../../bot-draft/safety-pack/safety-packs';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -1363,6 +1364,7 @@ export class ChatbotEngineService {
             ),
             selfHarm: Boolean(crisis.self_harm),
             animal: aboutAnAnimal(turn.text),
+            kind: emergencyKindOf(turn.text),
             helplineNumbers: crisisHelplines(turn.settings) || null,
             india: isIndiaAssistant(chatbot.settings),
           })

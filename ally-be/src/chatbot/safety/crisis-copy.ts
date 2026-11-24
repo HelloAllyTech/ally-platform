@@ -74,6 +74,40 @@ export function holdingMessage(
   );
 }
 
+// COPY: needs approval (TF1 F19). After an emergency reply (a collapse, a flood), not the self-harm
+// help line, which was wrong for them.
+export const EMERGENCY_HOLDING_COPY: Record<
+  ReplyLanguage,
+  { india: string; elsewhere: string }
+> = {
+  en: {
+    india:
+      'Someone from the team will reply to you. If anyone is in danger, call 112 now.',
+    elsewhere:
+      'Someone from the team will reply to you. If anyone is in danger, call your local emergency number now.',
+  },
+  hi: {
+    india:
+      'टीम का कोई व्यक्ति आपको जवाब देगा। अगर किसी की जान खतरे में है, तो अभी 112 पर कॉल करें।',
+    elsewhere:
+      'टीम का कोई व्यक्ति आपको जवाब देगा। अगर किसी की जान खतरे में है, तो अभी अपने स्थानीय आपातकालीन नंबर पर कॉल करें।',
+  },
+  'hi-latn': {
+    india:
+      'Team ka koi vyakti aapko jawab dega. Agar kisi ki jaan khatre mein hai, to abhi 112 par call karein.',
+    elsewhere:
+      'Team ka koi vyakti aapko jawab dega. Agar kisi ki jaan khatre mein hai, to abhi apne local emergency number par call karein.',
+  },
+};
+
+export function emergencyHoldingMessage(
+  language: ReplyLanguage,
+  _helplineNumbers?: string | null,
+  india = false,
+): string {
+  return EMERGENCY_HOLDING_COPY[language][india ? 'india' : 'elsewhere'];
+}
+
 export function noOneAvailableMessage(
   language: ReplyLanguage,
   helplineNumbers?: string | null,
