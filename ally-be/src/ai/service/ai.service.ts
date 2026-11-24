@@ -742,8 +742,9 @@ export class AiService {
   async checkWhatsAppCrisis(
     request: CrisisCheckRequest,
   ): Promise<CrisisCheckResponse> {
-    // Chunk H1: 4 s, then one quick retry inside what is left of 6 s, so a finished reply never
-    // waits more than 6 s for the verdict. A verdict ally-ai marks failed is retried too.
+    // Chunk H1: one attempt of up to 6 s (24 Nov; it was 4 s, which cut slow verdicts off under
+    // load), and a quick retry only inside what is left of 6 s, so a finished reply never waits
+    // more than 6 s for the verdict. A verdict ally-ai marks failed is retried too.
     const { attemptMs, retryDelayMs, budgetMs, minRetryMs } =
       CRISIS_CHECK_LIMITS;
     const startedAt = Date.now();

@@ -1,4 +1,4 @@
-import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
+import { INDIA_GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import * as jwt from 'jsonwebtoken';
 import { AiUpstreamError } from '../../../ai/exception/ai-upstream.exception';
 import { ErrorCode } from '../../../exception/error-code.enum';
@@ -221,7 +221,7 @@ describe('ChatbotEngineService: the tool gateway', () => {
       });
       const decision = await h.engine.respond(h.turn());
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-      expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
+      expect(decision.body).toBe(INDIA_GENERAL_CRISIS_TEXT);
       expect(decision.handover).toBeUndefined();
     });
 

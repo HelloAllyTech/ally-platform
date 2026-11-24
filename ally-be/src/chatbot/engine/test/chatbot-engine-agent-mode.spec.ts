@@ -1,4 +1,4 @@
-import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
+import { INDIA_GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import type { AgentRunResponse } from '../../../ai/dto/knowledge.dto';
 import { WaKeywordTemplate } from '../../../whatsapp/entity/wa-keyword-template.entity';
 import {
@@ -404,7 +404,7 @@ describe('ChatbotEngineService in Agent mode', () => {
         turn({ text: "hi, I can't go on" }),
       );
       expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
-      expect(decision.body).toBe(GENERAL_CRISIS_TEXT);
+      expect(decision.body).toBe(INDIA_GENERAL_CRISIS_TEXT);
       expect(decision.isWelcome).toBeUndefined();
       // Q3-fast Part 1: the verdict came first, so the reply went out with no run at all.
       expect(aiService.runAgent).not.toHaveBeenCalled();

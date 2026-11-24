@@ -1,4 +1,4 @@
-import { GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
+import { INDIA_GENERAL_CRISIS_TEXT } from '../../../bot-draft/safety-pack/safety-packs';
 import { WaHandledBy } from '../../enum/whatsapp.enum';
 import { WhatsAppInboundService } from '../whatsapp-inbound.service';
 import { Chatbot } from 'src/chatbot/entity/chatbot.entity';
@@ -85,7 +85,7 @@ describe('WhatsAppInboundService: the first message to an agent bot', () => {
       signal: "can't go on",
     });
     await service.handle(inbound());
-    expect(sent()).toBe(GENERAL_CRISIS_TEXT);
+    expect(sent()).toBe(INDIA_GENERAL_CRISIS_TEXT);
     expect(sent()).not.toContain(NOTICE);
   });
 

@@ -1,3 +1,4 @@
+import { fixedCrisisInformation } from '../engine/blocked-notice';
 import type { ReplyLanguage } from '../engine/reply-language';
 
 /**
@@ -45,11 +46,16 @@ const HELP_COPY: Record<ReplyLanguage, { link: string; numbers: string }> = {
   },
 };
 
-/** The help line: the builder's numbers first when set, always the link. */
+/**
+ * The help line: the builder's numbers first when set, always the link. In India (`india`), the
+ * crisis information with 112 and Tele-MANAS 14416 first (`fixedCrisisInformation`).
+ */
 export function helpLine(
   language: ReplyLanguage,
   helplineNumbers?: string | null,
+  india = false,
 ): string {
+  if (india) return fixedCrisisInformation(helplineNumbers, language, true);
   const numbers = helplineNumbers?.trim();
   const text = numbers ? HELP_COPY[language].numbers : HELP_COPY[language].link;
   return text
@@ -60,20 +66,22 @@ export function helpLine(
 export function holdingMessage(
   language: ReplyLanguage,
   helplineNumbers?: string | null,
+  india = false,
 ): string {
   return HOLDING_COPY[language].replace(
     '{help}',
-    helpLine(language, helplineNumbers),
+    helpLine(language, helplineNumbers, india),
   );
 }
 
 export function noOneAvailableMessage(
   language: ReplyLanguage,
   helplineNumbers?: string | null,
+  india = false,
 ): string {
   return NO_ONE_AVAILABLE_COPY[language].replace(
     '{help}',
-    helpLine(language, helplineNumbers),
+    helpLine(language, helplineNumbers, india),
   );
 }
 

@@ -853,6 +853,19 @@ export function assistantZone(
   return isTimeZone(hours) ? hours : DEFAULT_TIME_ZONE;
 }
 
+const INDIA_TIME_ZONES = new Set(['Asia/Kolkata', 'Asia/Calcutta']);
+
+/**
+ * Whether an assistant is in India, by its time zone (`assistantZone`): its crisis replies then
+ * carry 112 and Tele-MANAS 14416 (`fixedCrisisInformation`). One with no zone set is in India,
+ * like every other default here. Takes the chatbot's own settings (the `chatbots.settings` row).
+ */
+export function isIndiaAssistant(settings: unknown): boolean {
+  return INDIA_TIME_ZONES.has(
+    assistantZone((settings ?? null) as Parameters<typeof assistantZone>[0]),
+  );
+}
+
 /**
  * Today where the business is, for the lists section (chunk 6): "Saturday 14 Nov 2026, 11:58
  * (Asia/Kolkata, UTC+05:30)". The agent works out "Thursday" or "tomorrow" from it, and writes

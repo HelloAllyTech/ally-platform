@@ -5,9 +5,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * platform's own tenant id is "ally", not a uuid, so a uuid column refused every
  * interview a platform admin started ("invalid input syntax for type uuid").
  */
-export class RoleplayInterviewTenantIdText1987800000000
-  implements MigrationInterface
-{
+export class RoleplayInterviewTenantIdText1987800000000 implements MigrationInterface {
   name = 'RoleplayInterviewTenantIdText1987800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

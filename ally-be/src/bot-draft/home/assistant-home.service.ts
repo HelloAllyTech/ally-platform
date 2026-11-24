@@ -32,7 +32,11 @@ import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
 import { BotPageSettings } from '../../chatbot/type/bot-page.type';
 import type { ChatbotSettingsOverride } from '../../chatbot/type/chatbot.type';
-import { abilityFor, listToolName } from '../../chatbot/agent-tools/list-tools';
+import {
+  abilityFor,
+  isIndiaAssistant,
+  listToolName,
+} from '../../chatbot/agent-tools/list-tools';
 import { ExecutionManager } from '../../common/execution/execution-manager';
 import { KnowledgeBaseService } from '../../knowledge-base/service/knowledge-base.service';
 import { BotDraftEntity } from '../entity/bot-draft.entity';
@@ -228,6 +232,7 @@ export class AssistantHomeService {
       pack: chatbot.safetyPack,
       // Q4 G7: exactly what's sent, so only a number the owner confirmed.
       helplineNumbers: crisisHelplines(effective),
+      india: isIndiaAssistant(chatbot.settings),
     });
   }
 

@@ -2,6 +2,7 @@ import {
   FIND_A_HELPLINE_URL,
   fixedCrisisInformation,
 } from '../engine/blocked-notice';
+import { isIndiaAssistant } from '../agent-tools/list-tools';
 import { crisisHelplines } from '../engine/crisis-helplines';
 import type { ReplyLanguage } from '../engine/reply-language';
 import { ChatbotStatus } from '../enum/chatbot.enum';
@@ -41,7 +42,11 @@ export function offMessage(
   const lead = own || DEFAULT_OFF_MESSAGE[language] || DEFAULT_OFF_MESSAGE.en;
   // Q4 G7: only numbers the owner confirmed.
   const numbers = crisisHelplines(settings as never) || null;
-  const help = fixedCrisisInformation(numbers, language);
+  const help = fixedCrisisInformation(
+    numbers,
+    language,
+    isIndiaAssistant(settings),
+  );
   // Locked: the crisis information always follows, unless the owner's words already carry it whole.
   return lead.includes(FIND_A_HELPLINE_URL) && lead.includes(help)
     ? lead
