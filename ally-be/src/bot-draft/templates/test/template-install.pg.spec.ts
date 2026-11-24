@@ -164,6 +164,21 @@ describePg('Use-case templates: install (Postgres)', () => {
     });
   });
 
+  // TF1 F6: the template's example shift was live and bookable.
+  it('the assistant never sees an example entry; the owner does', async () => {
+    await service.installOnAssistant(bot, 'salon', {});
+    const agent = await records.query(bot, 'price_list', {
+      kind: 'agent',
+      runId: 'run-1',
+    });
+    expect(agent.total).toBe(0);
+    const owner = await records.query(bot, 'price_list', {
+      kind: 'user',
+      userId: 1,
+    });
+    expect(owner.total).toBe(2);
+  });
+
   it('an example the owner changes is theirs, and stops counting', async () => {
     await service.installOnAssistant(bot, 'salon', {});
     const [first] = await ds.query(

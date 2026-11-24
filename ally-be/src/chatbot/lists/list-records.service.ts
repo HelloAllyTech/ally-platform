@@ -385,6 +385,13 @@ export class ListRecordsService {
     if (!(q.includeDeleted && !isAgent(actor)))
       where.push('r.deleted_at IS NULL');
     if (scope !== undefined) where.push(`r.contact_id = ${sql.p(scope)}`);
+    // TF1 F6: a template's example entry (an example shift) is the owner's to replace, never
+    // something the assistant offers or books. It stops being one once the owner changes it.
+    if (isAgent(actor)) {
+      where.push(
+        `NOT (COALESCE(r.created_by, '{}'::jsonb) @> '{"example": true}'::jsonb AND r.version <= 1)`,
+      );
+    }
 
     for (const filter of q.filters ?? []) {
       const field = usable(filter.field);
