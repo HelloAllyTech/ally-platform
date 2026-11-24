@@ -15,7 +15,6 @@ import { config as loadEnv } from 'dotenv';
 loadEnv();
 
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from '../../app.module';
 import { BotDraftPublishService } from '../../bot-draft/service/bot-draft-publish.service';
 import { DataSource } from 'typeorm';
 import { BotDraftEntity } from '../../bot-draft/entity/bot-draft.entity';
@@ -57,6 +56,9 @@ async function main(): Promise<void> {
     .map((e) => e.trim())
     .filter(Boolean);
 
+  // Loaded here, not at the top: importing AppModule validates the environment, which a unit
+  // test of `localPublishAllowed` (no .env in CI) must not do.
+  const { AppModule } = await import('../../app.module');
   const app = await NestFactory.createApplicationContext(AppModule, {
     logger: ['error', 'warn'],
   });
