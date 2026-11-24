@@ -1,6 +1,6 @@
 import React from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
@@ -20,19 +20,38 @@ vi.mock("../ConnectorsTab", () => ({
 vi.mock("../CorpusTab", () => ({ CorpusTab: () => <div data-testid="library" /> }));
 vi.mock("../TemplatesTab", () => ({ TemplatesTab: () => <div data-testid="replies" /> }));
 
-const { AssistantDefaults } = await import("../AssistantDefaults");
+const panels = await import("../AssistantDefaults");
 
-describe("AssistantDefaults (staff only)", () => {
-  it("holds the Defaults, Library and Connectors screens that left the builder's home", () => {
-    render(
+describe("Defaults panels (staff only)", () => {
+  it("each holds one of the screens that left the builder's home", () => {
+    const { rerender } = render(
       <MemoryRouter>
-        <AssistantDefaults />
+        <panels.StartingSettingsPanel />
       </MemoryRouter>,
     );
     expect(screen.getByTestId("defaults-settings")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("staff-tab-library"));
+    expect(screen.getByText(DEFAULTS_COPY.intro)).toBeTruthy();
+
+    rerender(
+      <MemoryRouter>
+        <panels.QuickRepliesPanel />
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId("replies")).toBeTruthy();
+    expect(screen.getByText(DEFAULTS_COPY.repliesIntro)).toBeTruthy();
+
+    rerender(
+      <MemoryRouter>
+        <panels.KnowledgeLibraryPanel />
+      </MemoryRouter>,
+    );
     expect(screen.getByTestId("library")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("staff-tab-connectors"));
+
+    rerender(
+      <MemoryRouter>
+        <panels.ChannelsPanel />
+      </MemoryRouter>,
+    );
     expect(screen.getByTestId("all-connectors")).toBeTruthy();
   });
 });

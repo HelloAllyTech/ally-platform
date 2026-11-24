@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
+import { ROUTES } from "@constants";
 
 import { AssistantHome } from "../AssistantHome";
 import { STAFF_SUPPORT_COPY } from "./copy";
@@ -29,7 +30,7 @@ export const ChatbotSupport: React.FC = () => {
     return (
       <div data-testid="chatbot-support-view">
         <p style={{ margin: "12px 16px 0" }}>
-          <Link to={CHATBOT_SUPPORT_ROUTE}>{c.back}</Link>
+          <Link to={`${ROUTES.ASSISTANTS_ADMIN}/support`}>{c.back}</Link>
         </p>
         <ReadOnlyFrame>
           <AssistantHome readOnly />
@@ -40,7 +41,7 @@ export const ChatbotSupport: React.FC = () => {
   return <ChatbotSupportSearch />;
 };
 
-export const ChatbotSupportSearch: React.FC = () => {
+export const ChatbotSupportSearch: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const inputId = useId();
   const [text, setText] = useState("");
   const [query, setQuery] = useState<string | null>(null);
@@ -48,13 +49,15 @@ export const ChatbotSupportSearch: React.FC = () => {
     skip: query === null,
   });
   return (
-    <div className="ally-v2 ally-list-page" data-testid="chatbot-support">
-      <header className="ally-list-page__head">
-        <div className="ally-list-page__title">
-          <h1 className="ally-display">{c.title}</h1>
-          <p className="ally-small">{c.subtitle}</p>
-        </div>
-      </header>
+    <div className={embedded ? "ally-v2" : "ally-v2 ally-list-page"} data-testid="chatbot-support">
+      {!embedded && (
+        <header className="ally-list-page__head">
+          <div className="ally-list-page__title">
+            <h1 className="ally-display">{c.title}</h1>
+            <p className="ally-small">{c.subtitle}</p>
+          </div>
+        </header>
+      )}
       <form
         className="ally-add-row"
         role="search"

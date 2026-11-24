@@ -88,7 +88,6 @@ vi.mock("@pages", () => ({
   Logs: () => <div>LogsPage</div>,
   MobileReleases: () => <div>MobileReleasesPage</div>,
   BuilderHome: () => <div>BuilderHomePage</div>,
-  AssistantDefaults: () => <div>AssistantDefaultsPage</div>,
   Terms: () => <div>TermsPage</div>,
   Privacy: () => <div>PrivacyPage</div>,
   AILab: () => <div>AILabPage</div>,
@@ -127,6 +126,9 @@ vi.mock("@pages", () => ({
 }));
 
 // Onboarding pulls in the QR-code library; the router only needs the two entry components.
+vi.mock("../../pages/AssistantsAdmin", () => ({
+  AssistantsAdmin: () => <div>AssistantsAdminPage</div>,
+}));
 vi.mock("../../pages/ChatbotSupport/ChatbotSupport", () => ({
   CHATBOT_SUPPORT_ROUTE: "/admin/chatbot-support",
   ChatbotSupport: () => <div>ChatbotSupportPage</div>,
@@ -414,38 +416,47 @@ describe("RouteLayout", () => {
       expect(screen.getByText("BuilderHomePage")).toBeInTheDocument();
     });
 
-    it("puts Defaults, Library and Connectors on a staff route gated on system:access", () => {
-      privateLayoutCalls.props.length = 0;
-      window.history.pushState({}, "", ROUTES.ASSISTANT_DEFAULTS);
+    it("opens Assistants admin on its Overview when no section is given", async () => {
+      window.history.pushState({}, "", ROUTES.ASSISTANTS_ADMIN);
       render(<RouteLayout />);
-      expect(screen.getByText("AssistantDefaultsPage")).toBeInTheDocument();
+      expect(window.location.pathname).toBe(`${ROUTES.ASSISTANTS_ADMIN}/overview`);
+      expect(await screen.findByText("AssistantsAdminPage")).toBeInTheDocument();
+    });
+
+    // The page checks each section's own grant, so the route itself asks for none: a staff member
+    // with only the safety-pack grant must still get in.
+    it("lets any signed-in admin reach Assistants admin; the page filters its sections", async () => {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", `${ROUTES.ASSISTANTS_ADMIN}/safety`);
+      render(<RouteLayout />);
+      expect(await screen.findByText("AssistantsAdminPage")).toBeInTheDocument();
       const gate = privateLayoutCalls.props.at(-1);
-      expect(gate?.requiredPermissions).toEqual([Permissions.SYSTEM_ACCESS]);
-      // Staff pages never depend on the Chatbots toggle.
+      expect(gate?.requiredPermissions ?? []).toEqual([]);
       expect(gate?.requiredFeature).toBeUndefined();
     });
 
     it.each([
-      [ROUTES.SAFETY_PACKS, [Permissions.MANAGE_SAFETY_PACKS]],
-      ["/admin/chatbot-support", [Permissions.SYSTEM_ACCESS]],
-      ["/admin/chatbot-support/b1", [Permissions.SYSTEM_ACCESS]],
-    ])(
-      "gates the staff page %s on its staff permission, never the Chatbots toggle",
-      (path, perms) => {
-        privateLayoutCalls.props.length = 0;
-        window.history.pushState({}, "", path);
-        render(<RouteLayout />);
-        const gate = privateLayoutCalls.props.at(-1);
-        expect(gate?.requiredPermissions).toEqual(perms);
-        expect(gate?.requiredFeature).toBeUndefined();
-      },
-    );
-
-    it("gates Credits on manage_costs", () => {
-      privateLayoutCalls.props.length = 0;
-      window.history.pushState({}, "", ROUTES.BILLING_CREDITS);
+      [ROUTES.BILLING_MODELS, "/assistants-admin/pricing", "?view=models"],
+      [ROUTES.BILLING_COSTS, "/assistants-admin/pricing", "?view=costs"],
+      [ROUTES.BILLING_PLANS, "/assistants-admin/pricing", "?view=plans"],
+      [ROUTES.BILLING_CREDITS, "/assistants-admin/credits", ""],
+      [ROUTES.SAFETY_PACKS, "/assistants-admin/safety", ""],
+      [ROUTES.ASSISTANT_DEFAULTS, "/assistants-admin/content", ""],
+      ["/admin/chatbot-support", "/assistants-admin/support", ""],
+    ])("sends the old staff path %s to its section in Assistants admin", (from, path, search) => {
+      window.history.pushState({}, "", from);
       render(<RouteLayout />);
-      expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toBe(FeatureToggleKey.MANAGE_COSTS);
+      expect(window.location.pathname).toBe(path);
+      expect(window.location.search).toBe(search);
+    });
+
+    it("keeps the read-only chatbot view on its own path, gated on system:access", () => {
+      privateLayoutCalls.props.length = 0;
+      window.history.pushState({}, "", "/admin/chatbot-support/b1");
+      render(<RouteLayout />);
+      const gate = privateLayoutCalls.props.at(-1);
+      expect(gate?.requiredPermissions).toEqual([Permissions.SYSTEM_ACCESS]);
+      expect(gate?.requiredFeature).toBeUndefined();
     });
   });
 

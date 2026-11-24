@@ -29,10 +29,10 @@ describe("resolveRouteMeta", () => {
     expect(resolveRouteMeta("/assistants/bot-1").title).toBe("Assistant");
   });
 
-  it("titles Ally admin's Models and Costs", () => {
-    expect(resolveRouteMeta(ROUTES.BILLING_MODELS).title).toBe("Models");
-    expect(resolveRouteMeta(ROUTES.BILLING_COSTS).title).toBe("Costs");
-    expect(resolveRouteMeta(ROUTES.BILLING_COSTS).known).toBe(true);
+  it("titles Assistants admin and each of its sections", () => {
+    expect(resolveRouteMeta(ROUTES.ASSISTANTS_ADMIN).title).toBe("Assistants admin");
+    expect(resolveRouteMeta(`${ROUTES.ASSISTANTS_ADMIN}/pricing`).title).toBe("Assistants admin");
+    expect(resolveRouteMeta(`${ROUTES.ASSISTANTS_ADMIN}/pricing`).known).toBe(true);
   });
 
   it("tolerates a trailing slash", () => {

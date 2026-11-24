@@ -20,7 +20,7 @@ chatbot and no create right opens straight into it. The corner menu holds Plan (
 Create is blocked on a narrow screen with an "open on a laptop" message, so no blank is created that cannot be
 built. A person whose only role is Responder sees Conversations and nothing else.
 
-Defaults, Library and Connectors moved to a staff route (`/admin/chatbot-support`), behind the staff permission.
+Defaults, Library and Channels are staff-only and live in **Assistants admin** (`/assistants-admin`, Defaults & library), the one Ally-staff tab for credits, pricing and costs, safety packs, defaults, support and launch jobs. Each section needs its own grant. Code: `pages/AssistantsAdmin/`.
 
 ## The six sections
 

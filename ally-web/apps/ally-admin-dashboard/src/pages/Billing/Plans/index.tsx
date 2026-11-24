@@ -54,7 +54,7 @@ const RENEWAL_COLUMNS: Column<RenewalDue>[] = [
  * Ally admin → Plans (CR1 §C3): extra seats renewing in the next 7 days at the top, then plans and
  * seat types with their limits and prices (prices for Costs only). Every change needs a note.
  */
-export const BillingPlans: React.FC = () => {
+export const BillingPlans: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const { data, isLoading, isError } = useGetPlansCatalogueQuery();
   const [savePlan] = useSavePlanMutation();
   const [saveSeatType] = useSaveSeatTypeMutation();
@@ -146,8 +146,10 @@ export const BillingPlans: React.FC = () => {
       data-testid="billing-plans-page"
     >
       <div className="min-w-0">
-        <h1 className="font-secondary text-2xl text-typography-900">{P.page.title}</h1>
-        <p className="max-w-3xl pt-1 text-sm text-typography-700">{P.page.intro}</p>
+        {!embedded && (
+          <h1 className="font-secondary text-2xl text-typography-900">{P.page.title}</h1>
+        )}
+        {!embedded && <p className="max-w-3xl pt-1 text-sm text-typography-700">{P.page.intro}</p>}
       </div>
       {isError && (
         <p role="alert" className="text-sm text-destructive-500">

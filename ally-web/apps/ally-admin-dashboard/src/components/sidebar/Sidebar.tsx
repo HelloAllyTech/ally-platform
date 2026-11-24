@@ -17,7 +17,6 @@ import {
   Chat,
   ChatBot,
   Chemistry,
-  Currency,
   MachineLearningModel,
   Roadmap,
   Close,
@@ -294,16 +293,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
         return <Mic />;
       case SIDEBAR_ITEMS.LLM_MODEL_CATALOG:
         return <MachineLearningModel size={20} />;
-      // CR1: the price list, and what it all costs.
-      case SIDEBAR_ITEMS.BILLING_MODELS:
-        return <Currency size={20} />;
-      case SIDEBAR_ITEMS.BILLING_COSTS:
-        return <BarChart3 size={20} />;
-      case SIDEBAR_ITEMS.BILLING_PLANS:
-        return <Catalog size={20} />;
-      case SIDEBAR_ITEMS.BILLING_CREDITS:
-        return <Currency size={20} />;
-      case SIDEBAR_ITEMS.SAFETY_PACKS:
+      // Assistants admin: Ally staff's controls for the Assistants product (credits, pricing,
+      // safety, defaults, support).
+      case SIDEBAR_ITEMS.ASSISTANTS_ADMIN:
         return <ShieldCheck size={20} strokeWidth={1.5} aria-hidden />;
       case SIDEBAR_ITEMS.AI_TASKS:
         return <Catalog size={20} />;
@@ -372,7 +364,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       case SIDEBAR_ITEMS.MOBILE_RELEASES:
         return <Mobile size={20} />;
       case SIDEBAR_ITEMS.WHATSAPP_BOT:
-      case SIDEBAR_ITEMS.ASSISTANT_DEFAULTS:
         return <Chat size={20} />;
       // Bug Hunter is the one tab that is a *someone* rather than a section:
       // its own page presents it as a test engineer on the team, and the nav

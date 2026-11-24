@@ -1,0 +1,336 @@
+/* Assistants admin chrome. IBM Plex Serif everywhere (inherited), Carbon type scale and spacing:
+   productive heading-05 for the page, heading-03 for a section, body-01 for supporting text. */
+.aa {
+  min-width: 0;
+  color: var(--cds-text-primary, #161616);
+}
+.aa__head {
+  padding-bottom: 16px;
+}
+.aa__title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 400;
+}
+.aa__lede {
+  margin: 8px 0 0;
+  max-width: 720px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--cds-text-secondary, #525252);
+}
+.aa__body {
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.aa__section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 760px;
+}
+.aa__section-title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 400;
+}
+.aa__purpose {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--cds-text-secondary, #525252);
+}
+.aa__tasks {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.aa__tasks li {
+  padding: 2px 10px;
+  border-radius: 24px;
+  background: var(--cds-layer-accent-01, #e0e0e0);
+  font-size: 12px;
+  line-height: 18px;
+}
+.aa__note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--cds-text-secondary, #525252);
+}
+.aa__note a {
+  color: var(--cds-link-primary, #0f62fe);
+}
+.aa__views {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+}
+.aa__hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--cds-text-secondary, #525252);
+}
+.aa__panel {
+  min-width: 0;
+}
+
+/* Overview */
+.aa-ov {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+.aa-ov__h {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 400;
+}
+.aa-ov__sub {
+  margin: 4px 0 16px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--cds-text-secondary, #525252);
+}
+.aa-ov__cards {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.aa-ov__card.cds--tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 168px;
+}
+.aa-ov__headline {
+  margin: 4px 0 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+.aa-ov__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--cds-text-secondary, #525252);
+}
+.aa-ov__open {
+  margin-top: auto;
+  font-size: 13px;
+  color: var(--cds-link-primary, #0f62fe);
+}
+.aa-ov__stats {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  margin-top: 12px;
+}
+.aa-ov__stat-label {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--cds-text-secondary, #525252);
+}
+.aa-ov__stat-value {
+  margin: 8px 0 0;
+  font-size: 28px;
+  line-height: 36px;
+}
+.aa-ov__tasks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  background: var(--cds-border-subtle, #e0e0e0);
+  border: 1px solid var(--cds-border-subtle, #e0e0e0);
+}
+.aa-ov__task {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--cds-layer, #fff);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--cds-text-primary, #161616);
+  text-decoration: none;
+}
+.aa-ov__task:hover {
+  background: var(--cds-layer-hover, #e8e8e8);
+}
+.aa-ov__task:focus-visible {
+  outline: 2px solid var(--cds-focus, #0f62fe);
+  outline-offset: -2px;
+}
+
+/* Launch & data */
+.aa-launch {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1040px;
+}
+.aa-launch__lede {
+  margin: 0;
+  max-width: 760px;
+  font-size: 14px;
+  line-height: 22px;
+}
+.aa-launch__h {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.aa-launch__sub {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--cds-text-secondary, #525252);
+}
+.aa-code {
+  padding: 1px 6px;
+  background: var(--cds-layer-accent-01, #e0e0e0);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  word-break: break-word;
+}
+.aa-pre {
+  margin: 0;
+  padding: 12px 16px;
+  overflow-x: auto;
+  background: var(--cds-layer-accent-01, #e0e0e0);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.aa-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--cds-border-subtle, #e0e0e0);
+}
+.aa-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 18px;
+}
+.aa-table th {
+  padding: 10px 16px;
+  text-align: left;
+  font-weight: 600;
+  background: var(--cds-layer-accent-01, #f4f4f4);
+}
+.aa-table td {
+  padding: 12px 16px;
+  vertical-align: top;
+  border-top: 1px solid var(--cds-border-subtle, #e0e0e0);
+}
+.aa-table td:first-child {
+  width: 32%;
+}
+.aa-table td:last-child {
+  width: 110px;
+}
+.aa-table__note {
+  display: block;
+  margin-top: 4px;
+  color: var(--cds-text-secondary, #525252);
+}
+.aa-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.aa-steps__item {
+  display: flex;
+  gap: 16px;
+  padding: 20px 0;
+  border-top: 1px solid var(--cds-border-subtle, #e0e0e0);
+}
+.aa-steps__item:first-child {
+  border-top: 0;
+}
+.aa-steps__n {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--cds-layer-accent-01, #e0e0e0);
+  font-size: 14px;
+}
+.aa-steps__main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.aa-steps__body {
+  margin: 0;
+  max-width: 760px;
+  font-size: 14px;
+  line-height: 22px;
+}
+.aa-steps__meta {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--cds-text-secondary, #525252);
+}
+.aa-jobs {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+}
+.aa-job.cds--tile {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.aa-job__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.aa-job__what {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+.aa-job__needs {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--cds-text-secondary, #525252);
+}
+
+/* The app pins Carbon's interactive colour to brand navy; the switcher's selected segment follows
+   it instead of Carbon's default near-black, so it matches the tab underline above it. */
+.aa .cds--content-switcher-btn.cds--content-switcher--selected {
+  background-color: var(--cds-button-primary, #0f62fe);
+  color: var(--cds-text-on-color, #fff);
+}
+.aa .cds--content-switcher-btn.cds--content-switcher--selected::after {
+  background-color: var(--cds-button-primary, #0f62fe);
+}

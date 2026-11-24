@@ -11,7 +11,6 @@ import {
 } from "@constants";
 
 import { hasFeature } from "./permissions";
-import { SAFETY_PACKS_COPY } from "../pages/SafetyPacks/copy";
 
 /** The sidebar's sections, in display order. Item membership is `NavigationItem.section`. */
 export const NAV_SECTION_IDS = [
@@ -118,38 +117,6 @@ const buildNavigationItems = (): NavigationItem[] => {
       path: ROUTES.MANAGE_LLM_MODEL_CATALOG,
       section: "ai-languages",
     },
-    // Ally admin → Models and → Costs (CR1): the only screens with dollars, `manage_costs` only.
-    {
-      id: S.BILLING_MODELS,
-      label: l.billingModels,
-      path: ROUTES.BILLING_MODELS,
-      section: "ai-languages",
-    },
-    {
-      id: S.BILLING_COSTS,
-      label: l.billingCosts,
-      path: ROUTES.BILLING_COSTS,
-      section: "ai-languages",
-    },
-    {
-      id: S.BILLING_PLANS,
-      label: l.billingPlans,
-      path: ROUTES.BILLING_PLANS,
-      section: "ai-languages",
-    },
-    {
-      id: S.BILLING_CREDITS,
-      label: l.billingCredits,
-      path: ROUTES.BILLING_CREDITS,
-      section: "ai-languages",
-    },
-    // Assistants stage 9: safety pack releases, for Ally curators.
-    {
-      id: S.SAFETY_PACKS,
-      label: SAFETY_PACKS_COPY.nav,
-      path: ROUTES.SAFETY_PACKS,
-      section: "ai-languages",
-    },
     {
       id: S.SCENARIO_VOICES,
       label: l.voices,
@@ -213,12 +180,12 @@ const buildNavigationItems = (): NavigationItem[] => {
       path: ROUTES.WHATSAPP_BOT,
       section: "product",
     },
-    // Staff only: the defaults, shared quick replies, library and numbers every chatbot inherits
-    // (moved out of the builder's own screens, stage 2).
+    // Ally staff's one home for the Assistants product: credits, pricing and costs, safety packs,
+    // defaults and library, support and launch. Replaces six separate sidebar items.
     {
-      id: S.ASSISTANT_DEFAULTS,
-      label: en.assistantDefaults.navLabel,
-      path: ROUTES.ASSISTANT_DEFAULTS,
+      id: S.ASSISTANTS_ADMIN,
+      label: l.assistantsAdmin,
+      path: ROUTES.ASSISTANTS_ADMIN,
       section: "product",
     },
     { id: S.ALLY_GUIDE, label: l.allyConsole, path: ROUTES.ALLY_CONSOLE, section: "product" },
@@ -382,6 +349,15 @@ export const deriveNavigationItems = ({
     if (item.id === SIDEBAR_ITEMS.CONVERSATION_DRIFT)
       return hasFeature(features, FeatureToggleKey.ANALYTICS);
 
+    // Assistants admin opens on the costs toggle alone, like the Models and Costs items it
+    // replaced did, so it doesn't wait for the permission list to load. Its other two grants
+    // (safety-pack curator, system access) are permissions and are checked below.
+    if (
+      item.id === SIDEBAR_ITEMS.ASSISTANTS_ADMIN &&
+      hasFeature(features, FeatureToggleKey.MANAGE_COSTS)
+    )
+      return true;
+
     switch (item.id) {
       // Permission-gated tabs require permissions to be loaded; until then
       // show nothing for them.
@@ -418,12 +394,16 @@ export const deriveNavigationItems = ({
               (hasFeature(features, FeatureToggleKey.ALLY_GUIDE_ORG) &&
                 permissions!.includes(Permissions.VIEW_ALLY_GUIDE))
             );
-          // Stage 9: the safety-pack curator grant only; staff pages never depend on the Chatbots toggle.
-          case SIDEBAR_ITEMS.SAFETY_PACKS:
-            return permissions!.includes(Permissions.MANAGE_SAFETY_PACKS);
-          // Ally staff only: the system grant alone (never a tenant's own admin).
-          case SIDEBAR_ITEMS.ASSISTANT_DEFAULTS:
-            return permissions!.includes(Permissions.SYSTEM_ACCESS);
+          // Assistants admin: any one of its sections' own grants opens the tab (costs toggle, the
+          // safety-pack curator grant, or the system grant). Each section re-checks its own grant
+          // inside the page, so nobody sees a section they could not use. Staff pages never depend
+          // on the Chatbots toggle.
+          case SIDEBAR_ITEMS.ASSISTANTS_ADMIN:
+            return (
+              hasFeature(features, FeatureToggleKey.MANAGE_COSTS) ||
+              permissions!.includes(Permissions.MANAGE_SAFETY_PACKS) ||
+              permissions!.includes(Permissions.SYSTEM_ACCESS)
+            );
           // The Ally Console: the ally_guide toggle AND the view grant, like Course Copilot, so
           // deliberately NOT in buildSidebarItemFeatureKeyMap (which would make it toggle-only and
           // drop the permission). The permission alone shows it to every platform admin.

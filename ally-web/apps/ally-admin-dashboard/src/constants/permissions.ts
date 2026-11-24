@@ -142,6 +142,7 @@ export const SIDEBAR_ITEMS = {
   WHATSAPP_BOT: "whatsapp-bot",
   /** Staff only (system:access): what every chatbot inherits. */
   ASSISTANT_DEFAULTS: "assistant-defaults",
+  ASSISTANTS_ADMIN: "assistants-admin",
   BUG_HUNTER: "bug-hunter",
   PM_AGENT: "pm-agent",
   BUG_HUNTER_V2: "bug-hunter-v2",
