@@ -37,7 +37,12 @@ export const PM_PIPELINE = {
    * infra_cost). 12000 leaves room for a full recommendation; the ledger still reserves per pass.
    */
   LANE_MAX_TOKENS: 12000,
-  CRITIC_MAX_TOKENS: 3000,
+  /**
+   * The critic reviews every candidate in one call. At 3000 it was cut off at max_tokens (local
+   * run 2026-11-24, 3 candidates): no verdicts, so every candidate was dropped. Same reasoning
+   * headroom as a lane.
+   */
+  CRITIC_MAX_TOKENS: 12000,
   /** Per-call SDK deadline (passed to the provider, so a hung call stops billing). */
   CALL_TIMEOUT_MS: 90_000,
   /** Wall clock per lane and per run. */
