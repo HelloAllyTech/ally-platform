@@ -9,6 +9,8 @@ import type { HomeSafety, RuleChange, SafetyRule } from "@types";
 
 import { COPY, fill } from "../../Onboarding/copy";
 import { HOME } from "../copy";
+import { TF1_COPY } from "../copy/tf1";
+import { useSafetySettings } from "../safety/useSafetySettings";
 import { Group, LinesField, SectionHead, TextField } from "../fields";
 import { useHomeField } from "../useHomeField";
 
@@ -379,7 +381,63 @@ export const SafetySection: React.FC<SectionProps> = ({ bot, home, canEdit, canM
           multiline
           maxLength={1000}
         />
+        <HelplineConfirm botId={bot.id} canEdit={canEdit} />
       </Group>
     </>
+  );
+};
+
+/**
+ * TF1 S4: a helpline number a template wrote stays out of crisis replies until the owner confirms
+ * it (Q4 G7). The confirm was only in the staff engine panel; it belongs here, beside the reply.
+ */
+export const HelplineConfirm: React.FC<{ botId: string; canEdit: boolean }> = ({
+  botId,
+  canEdit,
+}) => {
+  const settings = useSafetySettings(botId);
+  const [note, setNote] = useState<string | null>(null);
+  const values = settings.values as unknown as {
+    helplineNumbers?: string | null;
+    helplineSource?: string | null;
+    helplineConfirmedAt?: string | null;
+  };
+  const numbers = values.helplineNumbers?.trim() ?? "";
+  const waiting =
+    Boolean(numbers) &&
+    Boolean(values.helplineSource) &&
+    values.helplineSource !== "owner" &&
+    !values.helplineConfirmedAt;
+  const t1 = TF1_COPY.helpline;
+  if (!waiting) {
+    return note ? (
+      <p className="ally-small" role="status" data-testid="helpline-confirmed">
+        {note}
+      </p>
+    ) : null;
+  }
+  return (
+    <div data-testid="helpline-unconfirmed" className="ally-home__row">
+      <p className="ally-small">{fill(t1.waiting, { numbers })}</p>
+      {canEdit && (
+        <Button
+          variant={ButtonVariant.PRIMARY}
+          type="button"
+          disabled={settings.saving}
+          onClick={() =>
+            void settings
+              .save({ helplineConfirm: true } as never)
+              .then(reason => setNote(reason ? t1.failed : fill(t1.confirmed, { numbers })))
+          }
+        >
+          {t1.confirm}
+        </Button>
+      )}
+      {note && (
+        <p className="ally-small" role="alert">
+          {note}
+        </p>
+      )}
+    </div>
   );
 };

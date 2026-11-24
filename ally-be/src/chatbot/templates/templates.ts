@@ -151,7 +151,8 @@ export const TEMPLATES: UseCaseTemplate[] = [
         key: 'helpline',
         ask: 'What’s your helpline number, and when is it open?',
         kind: 'text',
-        hint: 'Every crisis reply gives this number beside the national ones.',
+        // COPY: needs approval (TF1 S4)
+        hint: 'Crisis replies give this number beside the national ones once you confirm it in Settings, under Safety.',
         fills: [{ to: 'helpline' }, { to: 'fact' }],
       },
       fact('on_a_call', 'What happens when someone calls? Who picks up?'),
@@ -1635,7 +1636,8 @@ export const TEMPLATES: UseCaseTemplate[] = [
         key: 'helpline',
         ask: 'What’s the number people should call, and when?',
         kind: 'text',
-        hint: 'Every crisis reply gives this number beside the national ones.',
+        // COPY: needs approval (TF1 S4)
+        hint: 'Crisis replies give this number beside the national ones once you confirm it in Settings, under Safety.',
         fills: [{ to: 'helpline' }, { to: 'fact' }],
       },
       fact('therapists', 'Who are your therapists, and what do sessions cost?'),

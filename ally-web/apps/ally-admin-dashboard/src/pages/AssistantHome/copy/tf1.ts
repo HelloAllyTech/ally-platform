@@ -17,4 +17,12 @@ export const TF1_COPY = {
     budgetNone:
       "It can't answer anyone yet: no credits are set aside for it. Add some in Settings, under Budget.",
   },
+  helpline: {
+    /** S4: a template-written helpline number waits for the owner's confirmation. */
+    waiting:
+      "Your helpline number ({numbers}) isn't in crisis replies yet. Check it's right, then confirm it.",
+    confirm: "Use it in crisis replies",
+    confirmed: "Crisis replies now give {numbers} beside the national numbers.",
+    failed: "Couldn't confirm it. Try again.",
+  },
 } as const;
