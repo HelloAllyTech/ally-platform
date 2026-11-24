@@ -168,6 +168,46 @@ describe('KnowledgeReviewService.holdIfPersonal', () => {
   });
 });
 
+// TF1 F4: every organisation PDF was held for its own front desk number and info@ address.
+describe('an organisation’s own published contacts in an uploaded file (TF1 F4)', () => {
+  const BROCHURE =
+    'Saathi Youth Helpline. Call +91 20 4860 2525, 10 am to 10 pm. Write to listen@saathi-youth.example.';
+
+  it('are not held when there are only a few of them', async () => {
+    const { service, held } = setup();
+    expect(
+      await service.holdIfPersonal(
+        doc({ sourceType: KbDocumentSourceType.PDF, tags: [] }),
+        BROCHURE,
+      ),
+    ).toBe(false);
+    expect(held()).toBe(false);
+  });
+
+  it('a longer list of numbers still is', async () => {
+    const { service } = setup();
+    const many = [1, 2, 3, 4, 5]
+      .map((n) => `Member ${n}: +91 98450 1234${n}`)
+      .join('\n');
+    expect(
+      await service.holdIfPersonal(
+        doc({ sourceType: KbDocumentSourceType.PDF, tags: [] }),
+        many,
+      ),
+    ).toBe(true);
+  });
+
+  it('an identity number still is', async () => {
+    const { service } = setup();
+    expect(
+      await service.holdIfPersonal(
+        doc({ sourceType: KbDocumentSourceType.PDF, tags: [] }),
+        `${BROCHURE} Aadhaar 2345 6789 0123.`,
+      ),
+    ).toBe(true);
+  });
+});
+
 describe('ownerTyped', () => {
   it('tells typed text from uploads and crawled pages', () => {
     expect(ownerTyped({ tags: ['owner-notes'] })).toBe(true);

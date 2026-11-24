@@ -8,6 +8,8 @@ import { BUILD_COPY, PAUSED_REASON_COPY, PausedKind, pausedKindOf } from "./copy
 import { crawlFailureText, isCreditsRequired, codeOf, messageOf } from "./logic";
 import { SOURCE_ACCEPT, filesOk } from "./useSources";
 import { fill } from "../copy";
+import { TF1_COPY } from "../../AssistantHome/copy/tf1";
+import { Review as KnowledgeReview } from "../../AssistantHome/sections/KnowledgeTools";
 
 const T = BUILD_COPY.form;
 
@@ -131,7 +133,9 @@ export const SourcesSection: React.FC<{
                 const kind = pausedKindOf(d.statusMessage);
                 return kind
                   ? PAUSED_REASON_COPY[kind].document
-                  : (T.fileStatus[d.status] ?? d.status);
+                  : d.status === "needs_review"
+                    ? TF1_COPY.sources.held
+                    : (T.fileStatus[d.status] ?? d.status);
               })()}
             </span>
           </li>
@@ -143,6 +147,10 @@ export const SourcesSection: React.FC<{
           </li>
         ))}
       </ul>
+      {/* TF1 F4: a file held for personal details is approved here, where it was added. */}
+      {chatbotId && attached.some(d => d.status === "needs_review") && (
+        <KnowledgeReview botId={chatbotId} canEdit={!disabled} canManage={!disabled} />
+      )}
       {creditsOut && <p className="ally-small">{BUILD_COPY.credits.field}</p>}
       {pausedNotes.length > 0 && (
         <p className="ally-small" role="status" data-testid="sources-paused">

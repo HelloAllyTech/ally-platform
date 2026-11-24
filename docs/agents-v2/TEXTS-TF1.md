@@ -25,3 +25,4 @@ Every new line a person or an owner can see, from the TF1 fixes. In code each on
 | S5 | Inbox, an older chat when they have a newer one | They've started a newer chat. Reply there so they see it. |
 | S5 | the same, its link | Open their latest chat |
 | S5 | Inbox badge for a chat the crisis check flagged (was "Needs a person · undefined") | Needs a person · May be at risk |
+| F4 | Create → Sources, a file held for personal details (was a raw "needs_review") | Waiting for you: check it for personal details below |

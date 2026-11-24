@@ -38,4 +38,8 @@ export const TF1_COPY = {
     /** A chat the crisis check flagged showed "Needs a person · undefined". */
     crisisReason: "May be at risk",
   },
+  sources: {
+    /** F4: a file held for personal details, where it was added (was a raw "needs_review"). */
+    held: "Waiting for you: check it for personal details below",
+  },
 } as const;
