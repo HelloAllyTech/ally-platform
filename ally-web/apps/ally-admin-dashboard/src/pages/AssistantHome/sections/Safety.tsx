@@ -381,7 +381,6 @@ export const SafetySection: React.FC<SectionProps> = ({ bot, home, canEdit, canM
           multiline
           maxLength={1000}
         />
-        <HelplineConfirm botId={bot.id} canEdit={canEdit} />
       </Group>
     </>
   );
