@@ -25,6 +25,18 @@ const RULES = [
   ),
 ];
 
+/**
+ * The person speaks of harming themselves ("I want to die", "hurt myself", "mujhe mar jaana hai").
+ * Only then does a safeguarding message keep the fixed at-risk reply: the crisis check's own
+ * `self_harm` flag also fires on harm to someone else ("her uncle hurts her").
+ */
+const SELF_HARM_HERE =
+  /\b(?:kill(?:ing)? myself|end(?:ing)? (?:my life|it all)|hurt(?:ing)? myself|harm(?:ing)? myself|suicid\w*|i (?:want|wanna) to die|don'?t want to (?:live|be here)|mar jaa?na|marna chaht[ae]|khud ko (?:nuksan|maar)|jaan de)\b|आत्महत्या|मरना चाहत|खुद को (?:नुकसान|मार)/iu;
+
+export function selfHarmHere(text: string | null | undefined): boolean {
+  return SELF_HARM_HERE.test(text ?? '');
+}
+
 /** Whether the message is a worry about a child's safety. */
 export function isChildSafeguarding(text: string | null | undefined): boolean {
   const t = text ?? '';

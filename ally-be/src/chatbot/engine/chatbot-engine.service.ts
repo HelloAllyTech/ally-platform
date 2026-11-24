@@ -83,7 +83,11 @@ import {
 import { caringDecline } from './caring-decline';
 import { crisisHelplines } from './crisis-helplines';
 import { replyLanguageOf } from './reply-language';
-import { isChildSafeguarding, withSafeguardingLine } from './safeguarding';
+import {
+  isChildSafeguarding,
+  selfHarmHere,
+  withSafeguardingLine,
+} from './safeguarding';
 import { helplineNumbersWithExtras } from '../quick-replies/quick-reply-copy.service';
 import {
   curatedLanguageOf,
@@ -968,7 +972,7 @@ export class ChatbotEngineService {
       isUrgent(verdict) &&
       !(
         safeguarding &&
-        !verdict.value.self_harm &&
+        !selfHarmHere(turn.text) &&
         crisisLevelOf(verdict.value) !== 'emergency'
       );
 

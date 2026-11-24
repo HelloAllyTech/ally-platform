@@ -86,7 +86,8 @@ describe('ChatbotEngineService: a child-safeguarding message', () => {
   };
 
   it("answers with the organisation's own procedure, ending with 112 and Childline", async () => {
-    const { engine } = setup({});
+    // The check's own self-harm flag also fires on harm to someone else (seen live in TF1).
+    const { engine } = setup({ self_harm: true });
     const decision = await engine.respond(
       turn('A child just told me her uncle hurts her at home. What do I do?'),
     );
@@ -100,7 +101,7 @@ describe('ChatbotEngineService: a child-safeguarding message', () => {
   it('a person at risk themselves still gets the fixed crisis reply', async () => {
     const { engine } = setup({ self_harm: true });
     const decision = await engine.respond(
-      turn('My uncle hurts me at home and I want to end it all, I am a kid'),
+      turn('My uncle hurts me at home and I want to kill myself, I am a kid'),
     );
     expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
   });
