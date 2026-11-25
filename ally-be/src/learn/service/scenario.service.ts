@@ -30,7 +30,10 @@ import { Scenarios } from '../entity/scenarios.entity';
 import {
   CharacterDetails,
   normaliseCharacterDetails,
+  normaliseSettings,
   parseCharacterDetails,
+  parseSettings,
+  RoleplaySettings,
 } from '../util/character-details-enhance.util';
 import { CreateScenariosDto } from '../dto/create-scenarios.dto';
 import { UpdateScenarioDto } from '../dto/update-scenario.dto';
@@ -3884,8 +3887,15 @@ export class ScenarioService {
   async enhanceField(
     enhanceScenarioFieldDto: EnhanceScenarioFieldDto,
   ): Promise<EnhanceScenarioFieldResponseDto> {
-    const { fieldName, currentValue, guidance, model, provider, translateTo } =
-      enhanceScenarioFieldDto;
+    const {
+      fieldName,
+      currentValue,
+      guidance,
+      model,
+      provider,
+      translateTo,
+      fieldLabel,
+    } = enhanceScenarioFieldDto;
 
     if (!currentValue?.trim()) {
       throw new BadRequestException(
@@ -3905,7 +3915,31 @@ export class ScenarioService {
     let expectJson = false;
     let stateInput: { name: string; guidelines: string } | null = null;
     let characterInput: CharacterDetails | null = null;
-    if (fieldName === EnhanceableField.CHARACTER_DETAILS) {
+    let settingsInput: RoleplaySettings | null = null;
+    if (
+      (fieldName === EnhanceableField.TEXT ||
+        fieldName === EnhanceableField.SETTINGS) &&
+      !fieldLabel?.trim()
+    ) {
+      throw new BadRequestException(
+        `fieldLabel is required to enhance the ${fieldName} field.`,
+      );
+    }
+    if (fieldName === EnhanceableField.SETTINGS) {
+      settingsInput = parseSettings(currentValue);
+      if (!settingsInput) {
+        throw new BadRequestException(
+          'currentValue for the settings must be a JSON object of true/false, numbers and text.',
+        );
+      }
+      promptCode = ENHANCE_FIELD_PROMPT_CODE;
+      variables = {
+        fieldLabel: `${ENHANCEABLE_FIELD_LABELS[fieldName]}\n${fieldLabel!.trim()}`,
+        currentValue: JSON.stringify(settingsInput),
+        guidance: effectiveGuidance,
+      };
+      expectJson = true;
+    } else if (fieldName === EnhanceableField.CHARACTER_DETAILS) {
       characterInput = parseCharacterDetails(currentValue);
       if (!characterInput) {
         throw new BadRequestException(
@@ -3951,7 +3985,10 @@ export class ScenarioService {
     } else {
       promptCode = ENHANCE_FIELD_PROMPT_CODE;
       variables = {
-        fieldLabel: ENHANCEABLE_FIELD_LABELS[fieldName] ?? fieldName,
+        fieldLabel:
+          fieldName === EnhanceableField.TEXT
+            ? fieldLabel!.trim()
+            : (ENHANCEABLE_FIELD_LABELS[fieldName] ?? fieldName),
         currentValue,
         guidance: effectiveGuidance,
       };
@@ -3977,6 +4014,15 @@ export class ScenarioService {
     // has to parse free-form prose. A missing key falls back to the original
     // value; unparseable output is a hard failure (surfaced as a 500 → error
     // toast) rather than silently corrupting the field.
+    if (fieldName === EnhanceableField.SETTINGS && settingsInput) {
+      const settings = normaliseSettings(content, settingsInput);
+      if (!settings) {
+        throw new InternalServerErrorException(
+          'Settings enhancement returned malformed JSON.',
+        );
+      }
+      return { fieldName, content: JSON.stringify(settings) };
+    }
     if (fieldName === EnhanceableField.CHARACTER_DETAILS && characterInput) {
       const details = normaliseCharacterDetails(content, characterInput);
       if (!details) {

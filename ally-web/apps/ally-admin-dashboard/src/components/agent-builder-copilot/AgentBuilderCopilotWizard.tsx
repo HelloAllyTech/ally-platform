@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-import { CheckCircle, FailIcon } from "@icons";
 import { UseFormReturn, useWatch } from "react-hook-form";
 
 import { AutoExpandableTextarea } from "@ally-ui-mono/ui-shared";
@@ -18,19 +17,20 @@ import {
   useSuggestAgentBuilderCharactersMutation,
 } from "@api";
 import { en } from "@constants";
-import { applyCharacterToForm } from "@utils/characterApply";
-import { layOutPlanStates } from "@utils/roleplayStates";
+import { CheckCircle, FailIcon } from "@icons";
 import { RoleplayInterviewGeneration } from "@types";
-
-import { RoleplayInterviewPanel } from "../roleplay-interview";
 import {
   ModeRecommendation,
   recommendMode,
   suggestNextSteps,
 } from "@utils/agentBuilderSuggestions";
+import { applyCharacterToForm } from "@utils/characterApply";
+import { LIBRARY_CHARACTER_FIELDS } from "@utils/roleplayAgentFields";
+import { layOutPlanStates } from "@utils/roleplayStates";
 
 import { Button } from "../button";
 import { Competency } from "../competency";
+import { RoleplayInterviewPanel } from "../roleplay-interview";
 import { ButtonVariant } from "../types";
 import {
   GenerationTask,
@@ -261,6 +261,7 @@ const RevisionBlock = ({ revision }: { revision: Revision }) => (
                   {row.label}
                 </span>
                 {row.error && <span className="text-xs text-typography-500">· {row.error}</span>}
+                {row.detail && <span className="text-xs text-typography-600">· {row.detail}</span>}
               </li>
             ))}
           </ul>
@@ -393,22 +394,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
   const syncLibraryCharacter = async () => {
     if (!interviewSessionId || character) return;
     const v = formMethods.getValues() as Record<string, unknown>;
-    const fields = [
-      "name",
-      "age",
-      "gender",
-      "genderIdentity",
-      "sexualOrientation",
-      "profession",
-      "currentLocation",
-      "characterProfileText",
-      "coverImageUrl",
-      "coverVideoUrl",
-      "languageVoices",
-      "languageCharacteristics",
-      "linguisticStyleSamples",
-      "knowledgeSources",
-    ];
+    const fields = LIBRARY_CHARACTER_FIELDS;
     try {
       const session = await saveInterviewCharacter({
         id: interviewSessionId,

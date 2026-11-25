@@ -117,3 +117,57 @@ export function normaliseCharacterDetails(
     KEYS.map((key) => [key, next[key]]),
   ) as unknown as CharacterDetails;
 }
+
+// ── Settings ────────────────────────────────────────────────────────────────
+
+/** The roleplay's settings as the studio sends them: each a true/false, a number or text. */
+export type RoleplaySettings = Record<string, boolean | number | string>;
+
+const isSetting = (value: unknown): value is boolean | number | string =>
+  typeof value === 'boolean' ||
+  typeof value === 'string' ||
+  (typeof value === 'number' && Number.isFinite(value));
+
+/** The settings object, or null when it is not a flat object of settings. */
+export function parseSettings(currentValue: string): RoleplaySettings | null {
+  const parsed = parseObject(currentValue ?? '');
+  if (!parsed) return null;
+  const entries = Object.entries(parsed).filter(([, v]) => isSetting(v));
+  return entries.length
+    ? (Object.fromEntries(entries) as RoleplaySettings)
+    : null;
+}
+
+/**
+ * The model's answer held to the settings it was given: only those keys, each of the same type
+ * (a "true" string for a toggle is read as true), anything else keeping its value. Whether a
+ * value is one of a choice's allowed values is the studio's check, which knows them.
+ */
+export function normaliseSettings(
+  raw: string,
+  original: RoleplaySettings,
+): RoleplaySettings | null {
+  const parsed = parseObject(raw ?? '');
+  if (!parsed) return null;
+  const out: RoleplaySettings = {};
+  for (const [key, before] of Object.entries(original)) {
+    const value = parsed[key];
+    if (typeof before === 'boolean') {
+      out[key] =
+        typeof value === 'boolean'
+          ? value
+          : value === 'true'
+            ? true
+            : value === 'false'
+              ? false
+              : before;
+    } else if (typeof before === 'number') {
+      const n = typeof value === 'string' ? Number(value) : value;
+      out[key] = typeof n === 'number' && Number.isFinite(n) ? n : before;
+    } else {
+      out[key] =
+        typeof value === 'string' && value.trim() ? value.trim() : before;
+    }
+  }
+  return out;
+}

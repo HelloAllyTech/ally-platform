@@ -28,6 +28,8 @@ export interface RevisionPlan {
 
 /** The client's details (name, age, gender…) as one JSON field; see `EnhanceableField`. */
 export const CHARACTER_DETAILS_FIELD_ID = 'characterDetails';
+/** The roleplay's settings as one JSON field (the studio's `settings`). */
+export const SETTINGS_FIELD_ID = 'settings';
 
 /**
  * A request about who the client is: their gender or age (a rename the planner sees itself, in the
@@ -138,8 +140,9 @@ export function withDependentFields(
     'names or describes the client, update their name, pronouns, gendered words, age and what ' +
     'follows from them, such as how they speak of a partner. Do not add details this text did not ' +
     'have, and leave anything that does not depend on the client as it is.';
+  // Settings (toggles, choices) never follow from who the client is.
   const dependents = offeredIds
-    .filter((id) => !chosen.has(id))
+    .filter((id) => !chosen.has(id) && id !== SETTINGS_FIELD_ID)
     .map((id) => ({ id, change: consistency }));
   const expanded = fields.map((f) =>
     f === character || f.change.includes(consistency)

@@ -16184,6 +16184,8 @@ export const en = {
       `That change couldn't be made${error ? ` (${error})` : ""}. Nothing was changed; try again.`,
     kept: "Everything else is kept as it was, including your edits.",
     characterDetails: "Character details (name, age, gender)",
+    settings: "Settings (difficulty, time limit, what the learner sees, toggles)",
+    noSettingChanged: "no setting needed changing",
     voices: "Voices to match the character",
     noMatchingVoice: (language: string) => `no voice in ${language} fits; pick one on the form`,
     coverImage: "Cover image",

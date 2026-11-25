@@ -154,3 +154,20 @@ describe('withDependentFields', () => {
     ).toBe(plan);
   });
 });
+
+describe('withDependentFields and settings', () => {
+  it('never rewrites the settings for a change to the client', () => {
+    const plan = withDependentFields(
+      {
+        fields: [{ id: 'characterDetails', change: 'Make her a girl.' }],
+        reply: 'ok',
+      },
+      'make him a girl',
+      ['characterDetails', 'roleInstruction', 'settings'],
+    );
+    expect(plan.fields.map((f) => f.id)).toEqual([
+      'characterDetails',
+      'roleInstruction',
+    ]);
+  });
+});

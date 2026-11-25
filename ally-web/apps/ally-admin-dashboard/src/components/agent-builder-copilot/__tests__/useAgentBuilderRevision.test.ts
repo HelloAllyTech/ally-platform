@@ -7,12 +7,20 @@ vi.mock("@api", () => ({
   useRevisePlanMutation: () => [vi.fn()],
 }));
 vi.mock("@constants", () => ({
-  en: { agentBuilderRevision: { characterDetails: "Character details" } },
+  en: {
+    agentBuilderRevision: {
+      characterDetails: "Character details",
+      settings: "Settings",
+      noSettingChanged: "no setting needed changing",
+    },
+  },
 }));
 
 import {
+  acceptSetting,
   CHARACTER_DETAILS_ID,
   describeCharacterChange,
+  SETTINGS_ID,
   readRevisableFields,
   voicesForGender,
 } from "../useAgentBuilderRevision";
@@ -80,5 +88,58 @@ describe("describeCharacterChange", () => {
     expect(
       describeCharacterChange({ name: "Arjun", age: 22 }, { name: "Arjun", age: 30 }),
     ).not.toContain("use exactly");
+  });
+});
+
+describe("fields from the registry", () => {
+  const form = (values: Record<string, unknown>) =>
+    ({ getValues: (key: string) => values[key] }) as any;
+  const catalog = [
+    { language_id: 1, label: "English (India)", value: "en-IN" },
+    { language_id: 2, label: "Hindi (India)", value: "hi-IN" },
+  ] as any;
+
+  it("offers every kind of field the registry lists, by the id the plan uses", () => {
+    const fields = readRevisableFields(
+      form({
+        prompt: "Be Arjun.",
+        context: "A late call.",
+        linguisticStyleSamples: { "2": ["Main theek hoon."] },
+        knowledgeSources: [{ id: "k1", title: "Family", content: "His parents live in Nagpur." }],
+        difficultyLevel: "MEDIUM",
+        showScoreMeter: true,
+        temperature: 0.7,
+      }),
+      catalog,
+    );
+    const byId = Object.fromEntries(fields.map(field => [field.id, field]));
+    expect(byId.roleInstruction.value).toBe("Be Arjun.");
+    expect(byId.context.value).toBe("A late call.");
+    expect(byId["linguisticStyleSamples:2"].label).toContain("Hindi (India)");
+    expect(byId["knowledgeSources:k1"].value).toBe("His parents live in Nagpur.");
+    expect(JSON.parse(byId[SETTINGS_ID].value)).toEqual({
+      difficultyLevel: "MEDIUM",
+      showScoreMeter: true,
+    });
+    // Trainer-only and app fields are never offered.
+    expect(fields.some(field => field.id === "temperature")).toBe(false);
+  });
+
+  it("offers the time limit as the form keeps it, HH:MM:SS in its range", () => {
+    const fields = readRevisableFields(form({ prompt: "Be Arjun.", maxTimeValue: "00:10:00" }));
+    expect(JSON.parse(fields.find(field => field.id === SETTINGS_ID)!.value)).toEqual({
+      maxTimeValue: "00:10:00",
+    });
+    expect(acceptSetting("maxTimeValue", "00:15:00")).toBe(true);
+    expect(acceptSetting("maxTimeValue", "00:01:00")).toBe(false);
+    expect(acceptSetting("maxTimeValue", "03:00:00")).toBe(false);
+    expect(acceptSetting("maxTimeValue", 15)).toBe(false);
+  });
+
+  it("keeps only settings the form can hold", () => {
+    expect(acceptSetting("difficultyLevel", "HARD")).toBe(true);
+    expect(acceptSetting("difficultyLevel", "IMPOSSIBLE")).toBe(false);
+    expect(acceptSetting("showScoreMeter", "no")).toBe(false);
+    expect(acceptSetting("temperature", 0.2)).toBe(false);
   });
 });
