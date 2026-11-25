@@ -163,7 +163,10 @@ export class TemplateAdminService {
       const live = versions.find((v) => v.status === 'published');
       const draft = versions.find((v) => v.status === 'draft');
       const code = builtIn.get(key);
-      const shown = live?.manifest ?? draft?.manifest ?? code!;
+      // Live, else the open draft, else the built-in, else the newest version kept (a staff-made
+      // template taken down has only retired versions).
+      const shown =
+        live?.manifest ?? draft?.manifest ?? code ?? versions[0].manifest;
       const latest = versions.reduce<Date | null>(
         (a, v) => (!a || v.updatedAt > a ? v.updatedAt : a),
         null,
@@ -201,12 +204,17 @@ export class TemplateAdminService {
     if (!code && !versions.length) throw this.notFound();
     const live = versions.find((v) => v.status === 'published') ?? null;
     const draft = versions.find((v) => v.status === 'draft') ?? null;
+    const lastRetired = versions.find((v) => v.status === 'retired') ?? null;
     const installs = (await this.installCounts()).get(key) ?? 0;
     return {
       key,
       origin: code ? 'built_in' : 'custom',
       built_in: code,
       live: live ? { ...view(live), manifest: live.manifest } : null,
+      /** The newest version that is no longer live: what a taken-down template looked like. */
+      last_retired: lastRetired
+        ? { ...view(lastRetired), manifest: lastRetired.manifest }
+        : null,
       draft: draft
         ? {
             ...view(draft),
@@ -454,7 +462,13 @@ export class TemplateAdminService {
     const live = await this.rows.findOne({
       where: { templateKey: key, status: 'published' },
     });
-    const found = live?.manifest ?? TEMPLATES.find((t) => t.id === key);
+    const found =
+      live?.manifest ??
+      TEMPLATES.find((t) => t.id === key) ??
+      // A staff-made template that was taken down: start again from its newest version.
+      (await this.rows.find({ where: { templateKey: key } })).sort(
+        (a, b) => b.version - a.version,
+      )[0]?.manifest;
     if (!found) throw this.notFound();
     return found;
   }

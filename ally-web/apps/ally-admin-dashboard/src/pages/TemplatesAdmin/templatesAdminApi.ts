@@ -122,6 +122,8 @@ export interface TemplateDetail {
   origin: "built_in" | "custom";
   built_in: TemplateManifest | null;
   live: (TemplateVersion & { manifest: TemplateManifest }) | null;
+  /** The newest version no longer live: what a taken-down template looked like. */
+  last_retired: (TemplateVersion & { manifest: TemplateManifest }) | null;
   draft: TemplateDraft | null;
   versions: TemplateVersion[];
   installs: number;

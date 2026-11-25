@@ -211,6 +211,37 @@ describe('TemplateAdminService', () => {
     );
   });
 
+  it('a staff-made template that was taken down still lists, and can be edited again', async () => {
+    const { admin } = build();
+    await admin.createDraft({
+      key: 'dental_clinic',
+      name: 'Dental clinic',
+      from: { key: 'clinic' },
+    });
+    await admin.publish('dental_clinic');
+    await admin.unpublish('dental_clinic');
+
+    const { templates } = await admin.list();
+    expect(templates.find((t) => t.key === 'dental_clinic')).toMatchObject({
+      name: 'Dental clinic',
+      origin: 'custom',
+      state: 'unpublished',
+      live_version: null,
+      draft_version: null,
+    });
+    const detail = await admin.get('dental_clinic');
+    expect(detail.live).toBeNull();
+    expect(detail.last_retired?.manifest.name).toBe('Dental clinic');
+
+    // “Edit this template” on it starts a new draft from the newest version.
+    const again = await admin.createDraft({
+      key: 'dental_clinic',
+      from: { key: 'dental_clinic' },
+    });
+    expect(again).toMatchObject({ version: 2, status: 'draft' });
+    expect(again.manifest.name).toBe('Dental clinic');
+  });
+
   it('saving keeps only a template’s own fields and forces its key', async () => {
     const { admin } = build();
     await admin.createDraft({ key: 'dental', name: 'Dental' });

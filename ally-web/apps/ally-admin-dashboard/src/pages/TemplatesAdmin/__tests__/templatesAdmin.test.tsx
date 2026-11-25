@@ -168,6 +168,7 @@ const detail = (over: Partial<TemplateDetail> = {}): TemplateDetail => ({
   origin: "built_in",
   built_in: manifest(),
   live: null,
+  last_retired: null,
   draft: null,
   versions: [],
   installs: 0,
@@ -302,6 +303,24 @@ describe("Live template (no draft)", () => {
     fireEvent.click(screen.getByTestId("template-edit"));
     await waitFor(() =>
       expect(h.create).toHaveBeenCalledWith({ key: "clinic", from: { key: "clinic" } }),
+    );
+  });
+
+  it("shows a taken-down staff-made template from its newest version, and can edit it again", async () => {
+    h.detail = detail({
+      key: "dental_clinic",
+      origin: "custom",
+      built_in: null,
+      last_retired: { ...draft({ id: "r1", status: "retired", version: 1 }) },
+    });
+    renderPanel("/x?template=dental_clinic");
+    expect(screen.getByTestId("template-live")).toHaveTextContent("Books visits.");
+    fireEvent.click(screen.getByTestId("template-edit"));
+    await waitFor(() =>
+      expect(h.create).toHaveBeenCalledWith({
+        key: "dental_clinic",
+        from: { key: "dental_clinic" },
+      }),
     );
   });
 

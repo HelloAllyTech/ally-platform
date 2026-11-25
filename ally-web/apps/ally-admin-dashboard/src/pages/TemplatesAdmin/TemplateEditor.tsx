@@ -61,7 +61,7 @@ const LiveView: React.FC<{
   const [create, { isLoading: creating }] = useCreateTemplateDraftMutation();
   const [unpublish, { isLoading: unpublishing }] = useUnpublishTemplateMutation();
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const shown = detail.live?.manifest ?? detail.built_in;
+  const shown = detail.live?.manifest ?? detail.built_in ?? detail.last_retired?.manifest;
 
   const edit = async () => {
     setMessage(null);
