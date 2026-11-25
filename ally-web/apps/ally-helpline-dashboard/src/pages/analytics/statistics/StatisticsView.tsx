@@ -197,13 +197,22 @@ export const StatisticsView: FunctionComponent<StatisticsViewProps> = ({
             className={gridClass}
             data-testid={`statistics-run-${run.section}`}
           >
-            {firstSubjectRun && subjectKind && runs.slice(0, index).some(r => !r.subject) && (
-              <h2
-                className="col-span-full mt-2 border-t border-[#cfc9bb] pt-4 font-secondary text-2xl font-medium text-typography-900 xl:col-span-2"
-                data-testid="statistics-subject-heading"
+            {firstSubjectRun && subjectKind && (
+              <div
+                className={`col-span-full flex flex-wrap items-end justify-between gap-4 xl:col-span-2 ${
+                  runs.slice(0, index).some(r => !r.subject)
+                    ? "mt-2 border-t border-[#cfc9bb] pt-4"
+                    : ""
+                }`}
               >
-                {t(`statisticsLibrary.subject.heading.${subjectKind}`)}
-              </h2>
+                <h2
+                  className="font-secondary text-2xl font-medium text-typography-900"
+                  data-testid="statistics-subject-heading"
+                >
+                  {t(`statisticsLibrary.subject.heading.${subjectKind}`)}
+                </h2>
+                <SubjectSelector kind={subjectKind} value={subjectId} onChange={onSubjectChange} />
+              </div>
             )}
             {showCards && (
               <h2
@@ -258,9 +267,6 @@ export const StatisticsView: FunctionComponent<StatisticsViewProps> = ({
       <div className="flex flex-col gap-4 py-4" data-testid={`statistics-view-${view.id}`}>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-wrap items-end gap-4">
-            {subjectKind && (
-              <SubjectSelector kind={subjectKind} value={subjectId} onChange={onSubjectChange} />
-            )}
             <ToggleButtonGroup
               data-testid="statistics-range-toggle"
               value={range}

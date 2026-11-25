@@ -143,6 +143,7 @@ import { TenantInsightsService } from './service/tenant-insights.service';
 import { CustomerStatisticsRepository } from './repository/customer-statistics.repository';
 import { CustomerStatisticsService } from './service/customer-statistics.service';
 import { CustomerStatisticsController } from './controller/customer-statistics.controller';
+import { TenantDepthRepository } from './repository/tenant-depth.repository';
 import { TenantBehaviourRepository } from './repository/tenant-behaviour.repository';
 import { TenantScopeSummaryRepository } from './repository/tenant-scope-summary.repository';
 import { TenantScopeOptionsRepository } from './repository/tenant-scope-options.repository';
@@ -373,6 +374,7 @@ import { TenantModule } from 'src/tenant/tenant.module';
     TenantScopeOptionsRepository,
     TenantScopeSummaryRepository,
     TenantBehaviourRepository,
+    TenantDepthRepository,
     CustomerStatisticsRepository,
     CustomerStatisticsService,
     TenantInsightStateRepository,

@@ -1,6 +1,5 @@
 import { TENANT_CHART_LIBRARY } from '../tenant-chart-library.constants';
 import {
-  STATISTICS_DEFAULT_LAYOUT_CAP,
   STATISTICS_DEFAULT_PINS,
   STATISTICS_VIEWS,
 } from '../tenant-statistics-views.constants';
@@ -64,14 +63,11 @@ describe('STATISTICS_VIEWS', () => {
         );
       });
 
-      it('has a default layout of listed charts, within the cap, with no repeats', () => {
-        expect(view.defaultLayout.length).toBeLessThanOrEqual(
-          STATISTICS_DEFAULT_LAYOUT_CAP,
-        );
+      it('starts with every chart of the view, in order, with no repeats', () => {
+        expect(view.defaultLayout).toEqual(listed);
         expect(new Set(view.defaultLayout).size).toBe(
           view.defaultLayout.length,
         );
-        view.defaultLayout.forEach((id) => expect(listed).toContain(id));
       });
 
       it('keeps the default layout in section order, so no heading repeats', () => {

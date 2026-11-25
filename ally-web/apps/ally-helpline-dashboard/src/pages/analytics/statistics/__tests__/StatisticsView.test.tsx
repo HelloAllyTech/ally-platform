@@ -18,6 +18,7 @@ vi.mock("@api", () => ({
   useGetStatisticsScopeOptionsQuery: () => ({ data: [{ id: "c1", label: "Basic Counselling" }] }),
 }));
 vi.mock("../ScopeChooser", () => ({ ScopeChooser: () => null }));
+vi.mock("../SubjectSelector", () => ({ SubjectSelector: () => <span>subject-selector</span> }));
 vi.mock("../renderers", () => ({
   CHART_RENDERERS: Object.fromEntries(
     ["TSQ-038", "TSQ-042", "TSQ-043"].map(id => [id, { kind: "data", pin: () => null }]),
@@ -117,7 +118,7 @@ describe("a chart tab", () => {
     expect(within(run).queryByTestId("statistics-section-useOverTime")).toBeNull();
   });
 
-  it("draws no subject heading on a tab that has no overview above it", () => {
+  it("draws the heading, with the selector in it, even with no overview above it", () => {
     renderView({
       view: {
         ...courseView,
@@ -125,7 +126,10 @@ describe("a chart tab", () => {
       },
       layoutKeys: ["TSQ-042", "TSQ-043"],
     });
-    expect(screen.queryByTestId("statistics-subject-heading")).toBeNull();
+    const heading = screen.getByTestId("statistics-subject-heading");
+    expect(heading).toBeTruthy();
+    // The selector sits beside the heading, not in the toolbar above the cards.
+    expect(heading.parentElement?.textContent).toContain("subject-selector");
   });
 
   it("hands the chosen course to the cards of a subject section, and not the others", () => {

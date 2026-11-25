@@ -4038,7 +4038,13 @@
       "unhelpfulUp": "Unhelpful responses rose from {{first}}% to {{latest}}% of practices.",
       "unhelpfulFlat": "Unhelpful responses stayed at about {{latest}}% of practices.",
       "attempts": "Learners who tried a roleplay again scored {{first}} the first time and {{latest}} by the latest attempt.",
-      "attemptsFlat": "Scores did not rise with repeat attempts: {{first}} the first time, {{latest}} by the latest."
+      "attemptsFlat": "Scores did not rise with repeat attempts: {{first}} the first time, {{latest}} by the latest.",
+      "across": "{{done}} of {{total}} learners have finished every module.",
+      "difficulty": "{{hard}}% finish the hard modules, against {{easy}}% for the easy ones.",
+      "change": "{{improving}} improving, {{steady}} steady and {{declining}} declining.",
+      "cohorts": "The latest cohort finished at {{latest}}%, against {{first}}% for the first.",
+      "behaviourGroup": "“{{text}}” is shown in {{learner}}% of this learner's practices, against {{group}}% of everyone's.",
+      "waiting": "The oldest has waited {{days}} days."
     },
     "table": {
       "learner": "Learner",
@@ -4198,7 +4204,19 @@
       "started": "Started",
       "completed": "Completed",
       "completionRate": "Completion rate",
-      "medianDays": "Typical time to finish"
+      "medianDays": "Typical time to finish",
+      "submitted": "Completed sessions",
+      "reviewed": "Reviewed",
+      "pending": "Waiting for review",
+      "turnaroundDays": "Typical time to first review",
+      "withinTwoDays": "Reviewed within 2 days",
+      "joined": "Joined",
+      "coursesAssigned": "Courses assigned",
+      "coursesFinished": "Courses finished",
+      "cohorts": "Cohorts",
+      "scored": "Conversations scored",
+      "checked": "Checked by a clinician",
+      "checkedPercent": "Share checked by a clinician"
     },
     "performance": {
       "started": "Started",
@@ -4288,7 +4306,10 @@
       "learning": "Learning",
       "progress": "Progress",
       "allLearners": "All learners",
-      "acrossCourses": "Across courses"
+      "acrossCourses": "Across courses",
+      "modules": "Modules",
+      "profile": "About this learner",
+      "reviewsAndRatings": "Reviews and ratings"
     },
     "subject": {
       "label": {
@@ -4565,6 +4586,89 @@
           "same_other": "Nothing new since {{date}}. {{count}} still need a message.",
           "sameClear": "Nothing new since {{date}}, and no organisation needs a message."
         }
+      }
+    },
+    "across": {
+      "none": "No learner is on this course yet.",
+      "completed": "Finished",
+      "inProgress": "In progress",
+      "notStarted": "Not started",
+      "minutes": "{{count}} min",
+      "truncated": "Showing the {{count}} most recently active learners.",
+      "learner": "Learner"
+    },
+    "difficulty": {
+      "none": "No module has been reached yet.",
+      "level": {
+        "easy": "Easy",
+        "medium": "Medium",
+        "hard": "Hard",
+        "untagged": "No level set"
+      },
+      "columns": {
+        "module": "Module",
+        "level": "Level",
+        "modules": "Modules",
+        "reached": "Learners reached",
+        "completion": "Finished",
+        "score": "Average score",
+        "attempts": "Attempts each",
+        "time": "Typical time"
+      }
+    },
+    "roleplays": {
+      "none": "No roleplay in this course has been played yet.",
+      "columns": {
+        "roleplay": "Roleplay",
+        "sessions": "Sessions",
+        "abandonment": "Left unfinished",
+        "score": "Average score",
+        "rating": "Rating"
+      }
+    },
+    "spread": {
+      "none": "No roleplay has enough scored sessions yet.",
+      "legend": "Low to high (10th to 90th percentile), with the typical score marked",
+      "range": "{{low}} to {{high}}, typically {{typical}} ({{count}} sessions)"
+    },
+    "change": {
+      "none": "Not enough scored sessions to compare yet.",
+      "improving": "Improving",
+      "steady": "Steady",
+      "declining": "Declining",
+      "line": "{{first}} → {{latest}}"
+    },
+    "grid": {
+      "none": "Not enough scored practice yet to fill this grid.",
+      "legend": "Average skill level, from 1 (low) to 4 (high); a cell needs at least 3 learners"
+    },
+    "behaviourGroup": {
+      "none": "Not enough scored practice for this learner yet.",
+      "learner": "This learner",
+      "group": "Everyone",
+      "slices_one": "Share of {{count}} scored practice with this behaviour",
+      "slices_other": "Share of {{count}} scored practices with this behaviour"
+    },
+    "waiting": {
+      "none": "No completed session is waiting for review.",
+      "total_one": "{{count}} completed session is waiting for review. The oldest are first.",
+      "total_other": "{{count}} completed sessions are waiting for review. The oldest are first.",
+      "columns": {
+        "scenario": "Simulation",
+        "learner": "Learner",
+        "completed": "Completed",
+        "waiting": "Waiting"
+      },
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days"
+    },
+    "cohorts": {
+      "none": "No learner has started this course yet.",
+      "columns": {
+        "start": "Started",
+        "size": "Learners",
+        "completed": "Finished",
+        "score": "Average score"
       }
     }
   }

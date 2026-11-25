@@ -41,6 +41,7 @@ import {
   MeasuresData,
   TenantScopeSummaryRepository,
 } from '../repository/tenant-scope-summary.repository';
+import { TenantDepthRepository } from '../repository/tenant-depth.repository';
 import { TenantBehaviourRepository } from '../repository/tenant-behaviour.repository';
 import { FoundationalSkillsTransferRepository } from '../repository/foundational-skills-transfer.repository';
 import { FHS_RUBRIC_VERSION } from 'src/foundational-skills/constants/helping-skills-rubric.constants';
@@ -257,6 +258,7 @@ export class TenantChartLibraryService {
     private readonly summaryRepo: TenantScopeSummaryRepository,
     private readonly behaviourRepo: TenantBehaviourRepository,
     private readonly transferRepo: FoundationalSkillsTransferRepository,
+    private readonly depthRepo: TenantDepthRepository,
   ) {
     this.handlers = {
       // Headline numbers: the summary block of organization-metrics, plus the
@@ -356,6 +358,65 @@ export class TenantChartLibraryService {
       // Each roleplay in a course: finishers, tries and session length.
       'TSQ-053': (tenantId, p, code) =>
         this.summaryRepo.getRoleplayAttempts(tenantId, code, p.courseId),
+      // Who reached which module, and how long each took, in one course.
+      'TSQ-088': (tenantId, p, code) =>
+        this.depthRepo.getLearnersAcrossModules(
+          tenantId,
+          code,
+          this.requireCourse(p),
+        ),
+      // Modules easiest to hardest, and how learners fare at each level.
+      'TSQ-047': (tenantId, p, code) =>
+        this.depthRepo.getModuleDifficulty(
+          tenantId,
+          code,
+          this.requireCourse(p),
+        ),
+      // Each roleplay of a course: sessions, abandonment, score and rating.
+      'TSQ-083': (tenantId, p, code) =>
+        this.depthRepo.getRoleplayTable(tenantId, code, this.requireCourse(p)),
+      // Which skills each roleplay tests, and where learners fall short.
+      'TSQ-084': (tenantId, p, code) =>
+        this.depthRepo.getRoleplaySkills(tenantId, code, this.requireCourse(p)),
+      // The low, typical and high score of each roleplay.
+      'TSQ-085': (tenantId, p, code) =>
+        this.depthRepo.getScoreSpread(tenantId, code, this.requireCourse(p)),
+      // Each learner's first score against their latest.
+      'TSQ-086': (tenantId, p, code) =>
+        this.depthRepo.getLearnerChange(tenantId, code, p.courseId),
+      // Later cohorts against earlier ones, in one course.
+      'TSQ-044': (tenantId, p, code) =>
+        this.depthRepo.getCohorts(tenantId, code, this.requireCourse(p)),
+      // Skills against courses.
+      'TSQ-036': (tenantId, _p, code) =>
+        this.depthRepo.getSkillsByCourse(tenantId, code),
+      // How quickly completed sessions get their first review.
+      'TSQ-034': (tenantId, _p, code) =>
+        this.depthRepo.getReviewTurnaround(
+          tenantId,
+          code,
+          this.windowFor('90d').start,
+        ),
+      // How many scored conversations a clinician has checked.
+      'TSQ-087': (tenantId, _p, code) =>
+        this.depthRepo.getScoreTrust(tenantId, code),
+      // Completed sessions still waiting for a review, oldest first.
+      'TSQ-070': (tenantId, p, code) =>
+        this.depthRepo.getSessionsWaiting(tenantId, code, p.learnerId),
+      // Who a learner is and what they are enrolled in.
+      'TSQ-062': (tenantId, p, code) =>
+        this.depthRepo.getLearnerProfile(
+          tenantId,
+          code,
+          this.requireLearner(p),
+        ),
+      // How often a learner shows each helpful behaviour, against the group.
+      'TSQ-066': (tenantId, p, code) =>
+        this.depthRepo.getBehavioursAgainstGroup(
+          tenantId,
+          code,
+          this.requireLearner(p),
+        ),
       // Which helpful behaviours learners show more of now than at the start.
       'TSQ-050': (tenantId, p, code) =>
         this.behaviourRepo.getHelpfulBehaviours(tenantId, code, {

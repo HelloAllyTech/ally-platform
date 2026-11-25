@@ -4,6 +4,7 @@ import { TENANT_CHART_LIBRARY } from '../../constants/tenant-chart-library.const
 import { TenantScopeSummaryRepository } from '../../repository/tenant-scope-summary.repository';
 import { TenantScopeOptionsRepository } from '../../repository/tenant-scope-options.repository';
 import { TenantChartQueryRepository } from '../../repository/tenant-chart-query.repository';
+import { TenantDepthRepository } from '../../repository/tenant-depth.repository';
 import { TenantBehaviourRepository } from '../../repository/tenant-behaviour.repository';
 import { FoundationalSkillsTransferRepository } from '../../repository/foundational-skills-transfer.repository';
 import { TenantOutcomesRepository } from '../../repository/tenant-outcomes.repository';
@@ -42,6 +43,7 @@ describe('TenantChartLibraryService', () => {
   let summary: jest.Mocked<TenantScopeSummaryRepository>;
   let behaviour: jest.Mocked<TenantBehaviourRepository>;
   let transfer: jest.Mocked<FoundationalSkillsTransferRepository>;
+  let depth: jest.Mocked<TenantDepthRepository>;
   let service: TenantChartLibraryService;
 
   beforeEach(() => {
@@ -97,6 +99,21 @@ describe('TenantChartLibraryService', () => {
     transfer = {
       getCutScenarios: jest.fn(),
     } as unknown as jest.Mocked<FoundationalSkillsTransferRepository>;
+    depth = {
+      getLearnersAcrossModules: jest.fn(),
+      getModuleDifficulty: jest.fn(),
+      getRoleplayTable: jest.fn(),
+      getRoleplaySkills: jest.fn(),
+      getScoreSpread: jest.fn(),
+      getLearnerChange: jest.fn(),
+      getCohorts: jest.fn(),
+      getSkillsByCourse: jest.fn(),
+      getReviewTurnaround: jest.fn(),
+      getScoreTrust: jest.fn(),
+      getSessionsWaiting: jest.fn(),
+      getLearnerProfile: jest.fn(),
+      getBehavioursAgainstGroup: jest.fn(),
+    } as unknown as jest.Mocked<TenantDepthRepository>;
     service = new TenantChartLibraryService(
       repo,
       analytics,
@@ -107,6 +124,7 @@ describe('TenantChartLibraryService', () => {
       summary,
       behaviour,
       transfer,
+      depth,
     );
   });
 
@@ -167,21 +185,34 @@ describe('TenantChartLibraryService', () => {
         'TSQ-024',
         'TSQ-026',
         'TSQ-027',
+        'TSQ-034',
+        'TSQ-036',
         'TSQ-038',
         'TSQ-039',
         'TSQ-041',
         'TSQ-042',
         'TSQ-043',
+        'TSQ-044',
         'TSQ-045',
         'TSQ-046',
+        'TSQ-047',
         'TSQ-049',
         'TSQ-050',
         'TSQ-051',
         'TSQ-053',
         'TSQ-055',
+        'TSQ-062',
         'TSQ-063',
         'TSQ-064',
         'TSQ-065',
+        'TSQ-066',
+        'TSQ-070',
+        'TSQ-083',
+        'TSQ-084',
+        'TSQ-085',
+        'TSQ-086',
+        'TSQ-087',
+        'TSQ-088',
       ]);
       const byId = Object.fromEntries(lib.charts.map((c) => [c.id, c]));
       expect(byId['TSQ-001'].state).toBe('available');
@@ -221,9 +252,9 @@ describe('TenantChartLibraryService', () => {
       await expect(
         service.getChartData(TENANT, 'TSQ-999', {}),
       ).rejects.toBeInstanceOf(NotFoundException);
-      // TSQ-036 (skills by course) is planned: the id exists, nothing is offered.
+      // TSQ-030 (completion against target) is planned: the id exists, nothing is offered.
       await expect(
-        service.getChartData(TENANT, 'TSQ-036', {}),
+        service.getChartData(TENANT, 'TSQ-030', {}),
       ).rejects.toBeInstanceOf(NotFoundException);
       // TSQ-029 (seats) is blocked on a seat model.
       await expect(
@@ -1209,6 +1240,89 @@ describe('TenantChartLibraryService', () => {
         familiar: null,
         unfamiliar: null,
       });
+    });
+
+    it('the depth charts of a course read that course, and ask for one when none is chosen', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(
+        caps({
+          courseEnrolments: 20,
+          scoredSessions90: 50,
+          skillScoredCuts: 50,
+        }),
+      );
+      scopeOptions.describe.mockResolvedValue('Course A');
+      depth.getLearnersAcrossModules.mockResolvedValue({
+        modules: [],
+        learners: [],
+        truncated: false,
+      });
+      depth.getModuleDifficulty.mockResolvedValue({ modules: [], levels: [] });
+      depth.getRoleplayTable.mockResolvedValue({ rows: [] });
+      depth.getScoreSpread.mockResolvedValue({ rows: [] });
+      depth.getRoleplaySkills.mockResolvedValue({
+        rows: [],
+        skills: [],
+        cells: [],
+      });
+      depth.getCohorts.mockResolvedValue({ rows: [] });
+      const ids = [
+        'TSQ-088',
+        'TSQ-047',
+        'TSQ-083',
+        'TSQ-085',
+        'TSQ-084',
+        'TSQ-044',
+      ];
+      for (const id of ids) {
+        await expect(service.getChartData(TENANT, id, {})).rejects.toThrow();
+        await service.getChartData(TENANT, id, { courseId: COURSE });
+      }
+      expect(depth.getLearnersAcrossModules).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        COURSE,
+      );
+      expect(depth.getCohorts).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        COURSE,
+      );
+    });
+
+    it('learner change reads the organisation, or one course; waiting sessions one learner', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(
+        caps({ scoredSessions90: 50, sessions90: 50 }),
+      );
+      scopeOptions.describe.mockResolvedValue('Course A');
+      depth.getLearnerChange.mockResolvedValue({
+        counts: { improving: 0, steady: 0, declining: 0 },
+        rows: [],
+      });
+      depth.getSessionsWaiting.mockResolvedValue({ total: 0, rows: [] });
+      await service.getChartData(TENANT, 'TSQ-086', {});
+      await service.getChartData(TENANT, 'TSQ-086', { courseId: COURSE });
+      await service.getChartData(TENANT, 'TSQ-070', { learnerId: 4 });
+      expect(depth.getLearnerChange.mock.calls.map((c) => c[2])).toEqual([
+        undefined,
+        COURSE,
+      ]);
+      expect(depth.getSessionsWaiting).toHaveBeenCalledWith(
+        TENANT,
+        'internal1',
+        4,
+      );
+    });
+
+    it('the learner charts need a learner', async () => {
+      enabled();
+      repo.getCapabilities.mockResolvedValue(
+        caps({ learners: 20, skillScoredCuts: 50 }),
+      );
+      for (const id of ['TSQ-062', 'TSQ-066']) {
+        await expect(service.getChartData(TENANT, id, {})).rejects.toThrow();
+      }
     });
 
     it('quiz pass rates narrow to one course', async () => {

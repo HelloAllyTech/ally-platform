@@ -3,8 +3,6 @@ import { describe, expect, it } from "vitest";
 import type { StatisticsChartEntry, StatisticsChartState, StatisticsViewConfig } from "@types";
 
 import {
-  DEFAULT_LAYOUT_CAP,
-  DEFAULT_LAYOUT_FLOOR,
   buildDefaultLayout,
   groupBySection,
   insertIntoSection,
@@ -48,20 +46,21 @@ const view: StatisticsViewConfig = {
 };
 
 describe("buildDefaultLayout", () => {
-  it("is the view's default, topped up to the floor from the rest of the view", () => {
+  it("is every chart of the view, in section order", () => {
     const offered = ["TSQ-001", "TSQ-007", "TSQ-038", "TSQ-024", "TSQ-008", "TSQ-014"].map(id =>
       chart(id),
     );
     expect(buildDefaultLayout(view, offered)).toEqual([
       "TSQ-001",
       "TSQ-007",
-      "TSQ-038",
-      "TSQ-024",
       "TSQ-008",
+      "TSQ-038",
+      "TSQ-014",
+      "TSQ-024",
     ]);
   });
 
-  it("skips charts that are sparse or unavailable", () => {
+  it("keeps a small sample, which shows counts, and leaves out what cannot be filled", () => {
     const offered = [
       chart("TSQ-001"),
       chart("TSQ-007", "sparse"),
@@ -70,31 +69,28 @@ describe("buildDefaultLayout", () => {
       chart("TSQ-008"),
       chart("TSQ-014"),
     ];
-    // Two of the four defaults remain, so it is topped up to the floor from the rest of the view.
-    expect(buildDefaultLayout(view, offered)).toEqual(["TSQ-001", "TSQ-024", "TSQ-008", "TSQ-014"]);
+    expect(buildDefaultLayout(view, offered)).toEqual([
+      "TSQ-001",
+      "TSQ-007",
+      "TSQ-008",
+      "TSQ-014",
+      "TSQ-024",
+    ]);
   });
 
-  it("tops a small organisation up to the floor, in section order, and no further", () => {
-    const offered = ["TSQ-001", "TSQ-008", "TSQ-014", "TSQ-024"].map(id => chart(id));
-    const layout = buildDefaultLayout(view, offered);
-    expect(layout.length).toBeLessThanOrEqual(DEFAULT_LAYOUT_FLOOR);
-    expect(layout.slice(0, 2)).toEqual(["TSQ-001", "TSQ-024"]);
-  });
-
-  it("never goes past the cap", () => {
+  it("has no cap: a view with many charts shows them all", () => {
+    const ids = Array.from({ length: 14 }, (_, i) => `TSQ-${String(i + 100)}`);
     const many: StatisticsViewConfig = {
       ...view,
-      defaultLayout: Array.from({ length: 14 }, (_, i) => `TSQ-${String(i + 100)}`),
-      sections: [
-        {
-          key: "all",
-          subject: false,
-          charts: Array.from({ length: 14 }, (_, i) => `TSQ-${String(i + 100)}`),
-        },
-      ],
+      defaultLayout: ids,
+      sections: [{ key: "all", subject: false, charts: ids }],
     };
-    const offered = many.defaultLayout.map(id => chart(id));
-    expect(buildDefaultLayout(many, offered)).toHaveLength(DEFAULT_LAYOUT_CAP);
+    expect(
+      buildDefaultLayout(
+        many,
+        ids.map(id => chart(id)),
+      ),
+    ).toHaveLength(14);
   });
 
   it("is empty when nothing is offered", () => {

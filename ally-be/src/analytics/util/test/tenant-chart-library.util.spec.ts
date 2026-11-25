@@ -33,8 +33,8 @@ describe('tenant chart library registry', () => {
     expect(validateChartLibrary()).toEqual([]);
   });
 
-  it('holds the reviewed catalogue: 59 charts', () => {
-    expect(TENANT_CHART_LIBRARY).toHaveLength(59);
+  it('holds the reviewed catalogue: 65 charts', () => {
+    expect(TENANT_CHART_LIBRARY).toHaveLength(65);
   });
 
   it('keeps the first-release ids 1 to 27 where they were', () => {

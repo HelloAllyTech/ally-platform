@@ -33,17 +33,16 @@ export interface StatisticsViewConfig {
   subject: ChartFilterKey | null;
   sections: readonly StatisticsViewSection[];
   /**
-   * The layout before a person customises, in section order so a heading is
-   * never repeated. Only charts the organisation can fill are used, up to
-   * {@link STATISTICS_DEFAULT_LAYOUT_CAP}.
+   * The layout before a person customises: every chart of the view, in section
+   * order so a heading is never repeated. Derived from `sections`, never written
+   * by hand, so a chart added to a section is on the page by default. The page
+   * leaves out the ones the organisation cannot fill; a person removes, reorders
+   * and brings back charts from the library.
    */
   defaultLayout: readonly string[];
 }
 
-/** The most cards a default layout holds. */
-export const STATISTICS_DEFAULT_LAYOUT_CAP = 10;
-/** A default layout is topped up from the rest of the view to at least this many. */
-export const STATISTICS_DEFAULT_LAYOUT_FLOOR = 5;
+type StatisticsViewDefinition = Omit<StatisticsViewConfig, 'defaultLayout'>;
 
 /**
  * The cards pinned to For you until a person pins their own. Two, so the page
@@ -55,7 +54,7 @@ export const STATISTICS_DEFAULT_PINS: readonly string[] = [
   'TSQ-007', // Learner status
 ];
 
-export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
+const STATISTICS_VIEW_DEFINITIONS: readonly StatisticsViewDefinition[] = [
   {
     id: 'organisation',
     subject: null,
@@ -80,21 +79,17 @@ export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
         subject: false,
         charts: ['TSQ-020', 'TSQ-021', 'TSQ-022'],
       },
-      { key: 'reviews', subject: false, charts: ['TSQ-027'] },
-      { key: 'skills', subject: false, charts: ['TSQ-024'] },
+      {
+        key: 'reviews',
+        subject: false,
+        charts: ['TSQ-027', 'TSQ-034', 'TSQ-070'],
+      },
+      {
+        key: 'skills',
+        subject: false,
+        charts: ['TSQ-024', 'TSQ-036', 'TSQ-087'],
+      },
       { key: 'feedback', subject: false, charts: ['TSQ-026'] },
-    ],
-    defaultLayout: [
-      'TSQ-001',
-      'TSQ-007',
-      'TSQ-002',
-      'TSQ-038',
-      'TSQ-014',
-      'TSQ-013',
-      'TSQ-020',
-      'TSQ-027',
-      'TSQ-024',
-      'TSQ-026',
     ],
   },
   {
@@ -112,6 +107,7 @@ export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
           'TSQ-015',
           'TSQ-016',
           'TSQ-017',
+          'TSQ-036',
         ],
       },
       {
@@ -123,27 +119,24 @@ export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
       {
         key: 'useOverTime',
         subject: true,
-        charts: ['TSQ-042', 'TSQ-043', 'TSQ-045', 'TSQ-046'],
+        charts: ['TSQ-042', 'TSQ-043', 'TSQ-044'],
       },
-      { key: 'roleplays', subject: true, charts: ['TSQ-053', 'TSQ-020'] },
+      {
+        key: 'modules',
+        subject: true,
+        charts: ['TSQ-045', 'TSQ-046', 'TSQ-088', 'TSQ-047'],
+      },
+      {
+        key: 'roleplays',
+        subject: true,
+        charts: ['TSQ-083', 'TSQ-053', 'TSQ-085', 'TSQ-084', 'TSQ-020'],
+      },
       {
         key: 'learning',
         subject: true,
-        charts: ['TSQ-018', 'TSQ-019', 'TSQ-050', 'TSQ-051'],
+        charts: ['TSQ-018', 'TSQ-019', 'TSQ-050', 'TSQ-051', 'TSQ-086'],
       },
       { key: 'feedback', subject: true, charts: ['TSQ-026', 'TSQ-022'] },
-    ],
-    defaultLayout: [
-      'TSQ-038',
-      'TSQ-039',
-      'TSQ-014',
-      'TSQ-013',
-      'TSQ-041',
-      'TSQ-042',
-      'TSQ-043',
-      'TSQ-045',
-      'TSQ-046',
-      'TSQ-053',
     ],
   },
   {
@@ -153,24 +146,27 @@ export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] = [
       {
         key: 'allLearners',
         subject: false,
-        charts: ['TSQ-023', 'TSQ-008', 'TSQ-009'],
+        charts: ['TSQ-023', 'TSQ-008', 'TSQ-009', 'TSQ-086'],
       },
+      { key: 'profile', subject: true, charts: ['TSQ-062'] },
       { key: 'practice', subject: true, charts: ['TSQ-063'] },
       { key: 'progress', subject: true, charts: ['TSQ-064'] },
       {
         key: 'skills',
         subject: true,
-        charts: ['TSQ-065', 'TSQ-051', 'TSQ-024'],
+        charts: ['TSQ-065', 'TSQ-051', 'TSQ-066', 'TSQ-024'],
       },
-    ],
-    defaultLayout: [
-      'TSQ-023',
-      'TSQ-008',
-      'TSQ-009',
-      'TSQ-063',
-      'TSQ-064',
-      'TSQ-065',
-      'TSQ-024',
+      {
+        key: 'reviewsAndRatings',
+        subject: true,
+        charts: ['TSQ-070', 'TSQ-026'],
+      },
     ],
   },
 ];
+
+export const STATISTICS_VIEWS: readonly StatisticsViewConfig[] =
+  STATISTICS_VIEW_DEFINITIONS.map((view) => ({
+    ...view,
+    defaultLayout: view.sections.flatMap((section) => section.charts),
+  }));

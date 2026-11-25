@@ -24,10 +24,6 @@ export const STATISTICS_SUBJECTS_PREF_KEY = "statistics_subjects";
 export type StatisticsLayoutKey = "organisation" | "course" | "learner" | "pins" | "customers";
 export type SavedLayouts = Partial<Record<StatisticsLayoutKey, string[]>>;
 
-/** The most cards a default layout holds, and the fewest it is topped up to. */
-export const DEFAULT_LAYOUT_CAP = 10;
-export const DEFAULT_LAYOUT_FLOOR = 5;
-
 /** The filters a card can carry, in the order they are written. */
 export const FILTER_KEYS: readonly StatisticsFilterKey[] = ["course", "simulation", "learner"];
 
@@ -72,19 +68,17 @@ export const sectionOf = (view: StatisticsViewConfig, chartId: string) =>
   view.sections.find(section => section.charts.includes(chartId));
 
 /**
- * The default layout for a tab: the view's own default, keeping charts the
- * organisation can fill, up to the cap. A small organisation gets fewer, so the
- * result is topped up from the rest of the view (in section order) to the floor.
+ * The default layout for a tab: every chart of the view that the organisation can
+ * fill (enough data, or a small sample that shows counts only), in section order.
+ * A chart it cannot fill is not drawn as an empty box; it waits in the library
+ * with the reason. A person removes, reorders and brings back charts from there.
  */
 export const buildDefaultLayout = (
   view: StatisticsViewConfig,
   charts: readonly StatisticsChartEntry[],
 ): string[] => {
-  const available = new Set(charts.filter(c => c.state === "available").map(c => c.id));
-  const layout = view.defaultLayout.filter(id => available.has(id)).slice(0, DEFAULT_LAYOUT_CAP);
-  if (layout.length >= DEFAULT_LAYOUT_FLOOR) return layout;
-  const spare = viewChartIds(view).filter(id => available.has(id) && !layout.includes(id));
-  return [...layout, ...spare].slice(0, DEFAULT_LAYOUT_FLOOR);
+  const fillable = new Set(charts.filter(c => c.state !== "unavailable").map(c => c.id));
+  return viewChartIds(view).filter(id => fillable.has(id));
 };
 
 /**

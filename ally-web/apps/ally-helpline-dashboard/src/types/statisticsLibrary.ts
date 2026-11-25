@@ -479,3 +479,117 @@ export interface RecordCustomerOutreachRequest {
   tenantId: string;
   note?: string;
 }
+
+/** TSQ-088 */
+export interface LearnersAcrossModulesData {
+  modules: Array<{ sectionId: string; title: string }>;
+  learners: Array<{
+    learnerId: number;
+    name: string;
+    cells: Array<{ status: "completed" | "inProgress" | "notStarted"; minutes: number | null }>;
+  }>;
+  truncated: boolean;
+}
+
+export type ModuleDifficultyLevel = "easy" | "medium" | "hard";
+
+/** TSQ-047 */
+export interface ModuleDifficultyData {
+  modules: Array<{
+    sectionId: string;
+    title: string;
+    difficulty: ModuleDifficultyLevel | null;
+    reached: number;
+    completionPercent: number | null;
+    averageScore: number | null;
+    averageAttempts: number | null;
+  }>;
+  levels: Array<{
+    difficulty: ModuleDifficultyLevel;
+    modules: number;
+    reached: number;
+    completionPercent: number | null;
+    averageScore: number | null;
+    medianMinutes: number | null;
+  }>;
+}
+
+/** TSQ-083 */
+export interface RoleplayTableData {
+  rows: Array<{
+    itemId: string;
+    title: string;
+    sessions: number;
+    abandonmentPercent: number | null;
+    averageScore: number | null;
+    averageRating: number | null;
+    ratings: number;
+  }>;
+}
+
+/** TSQ-085 */
+export interface ScoreSpreadData {
+  rows: Array<{
+    itemId: string;
+    title: string;
+    sessions: number;
+    low: number;
+    typical: number;
+    high: number;
+  }>;
+}
+
+/** TSQ-086 */
+export interface LearnerChangeData {
+  counts: { improving: number; steady: number; declining: number };
+  rows: Array<{
+    learnerId: number;
+    name: string;
+    first: number;
+    latest: number;
+    change: number;
+    trend: "improving" | "steady" | "declining";
+  }>;
+}
+
+/** TSQ-036 and TSQ-084 */
+export interface SkillGridData {
+  rows: Array<{ id: string; title: string }>;
+  skills: string[];
+  cells: Array<{ rowId: string; skill: string; level: number; learners: number }>;
+}
+
+/** TSQ-066 */
+export interface BehavioursAgainstGroupData {
+  learnerSlices: number;
+  groupSlices: number;
+  rows: Array<{
+    code: string;
+    skill: string;
+    text: string;
+    learnerPercent: number;
+    groupPercent: number;
+  }>;
+}
+
+/** TSQ-070 */
+export interface SessionsWaitingData {
+  total: number;
+  rows: Array<{
+    sessionId: string;
+    scenarioTitle: string;
+    learnerName: string;
+    completedAt: string;
+    daysWaiting: number;
+  }>;
+}
+
+/** TSQ-044 */
+export interface CohortsData {
+  rows: Array<{
+    start: string;
+    size: number;
+    completedPercent: number;
+    averageScore: number | null;
+  }>;
+}
