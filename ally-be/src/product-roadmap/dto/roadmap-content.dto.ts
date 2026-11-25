@@ -1,19 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  ArrayMaxSize,
-  IsArray,
-  IsBoolean,
-  IsIn,
   IsInt,
   IsObject,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
   Min,
   MinLength,
-  ValidateNested,
 } from 'class-validator';
 import { ROADMAP_LIMITS } from '../constants/product-roadmap.constants';
 import { RoadmapSavedViewState } from '../type/roadmap-saved-view.type';
@@ -44,8 +38,6 @@ export class CreateCommentDto {
   @MaxLength(ROADMAP_LIMITS.COMMENT_MAX)
   body!: string;
 }
-
-export class UpdateCommentDto extends CreateCommentDto {}
 
 // ── interview notes ──────────────────────────────────────────────────────────
 export class CreateInterviewNoteDto {
@@ -113,11 +105,10 @@ export class CreateSavedViewDto {
 }
 
 /**
- * `pinned` is deliberately ABSENT. Pinning is a separate endpoint gated on
- * edit:admin:product-roadmap, so a view's owner cannot pin their own view for everyone by
- * PATCHing this field. That replaces the source's enforce_pin_admin() trigger, which existed
- * only because RLS let a creator update their own row including `pinned`. The service also
- * rejects the field explicitly if a client sends it.
+ * `pinned` is deliberately ABSENT, so a view's owner cannot pin their own view for everyone by
+ * PATCHing this field. (Pinning had its own manage-gated route on the old Product Roadmap; it
+ * was retired with that page, and views pinned then stay pinned.) The service also rejects the
+ * field explicitly if a client sends it.
  */
 export class UpdateSavedViewDto {
   @ApiPropertyOptional({ maxLength: ROADMAP_LIMITS.SAVED_VIEW_NAME_MAX })
@@ -133,24 +124,6 @@ export class UpdateSavedViewDto {
   state?: RoadmapSavedViewState;
 }
 
-export class PinSavedViewDto {
-  @ApiProperty()
-  @IsBoolean()
-  pinned!: boolean;
-}
-
-export class SetTabOrderDto {
-  @ApiProperty({
-    type: [String],
-    description:
-      'Saved-view ids in display order. Tolerant: stale ids are ignored and views missing ' +
-      'from the list are appended by the client, so this need not be exhaustive.',
-  })
-  @IsArray()
-  @IsUUID(undefined, { each: true })
-  viewIds!: string[];
-}
-
 // ── taxonomy ─────────────────────────────────────────────────────────────────
 export class CreateTaxonomyItemDto {
   @ApiProperty({ maxLength: ROADMAP_LIMITS.GOAL_NAME_MAX })
@@ -162,148 +135,11 @@ export class CreateTaxonomyItemDto {
 
 export class RenameTaxonomyItemDto extends CreateTaxonomyItemDto {}
 
-export class ReorderTaxonomyDto {
-  @ApiProperty({
-    type: [String],
-    description: 'Goal/owner uuids in the desired display order',
-  })
-  @IsArray()
-  @IsUUID(undefined, { each: true })
-  ids!: string[];
-}
-
 // ── AI ───────────────────────────────────────────────────────────────────────
-export class AiDraftDto {
-  @ApiProperty({ maxLength: ROADMAP_LIMITS.DESCRIPTION_MAX })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(ROADMAP_LIMITS.DESCRIPTION_MAX)
-  description!: string;
-
-  @ApiPropertyOptional({
-    description: 'Scopes duplicate candidates to one goal',
-  })
-  @IsOptional()
-  @IsString()
-  productGoal?: string;
-}
-
-export class AiGenerateClaudePromptDto {
-  @ApiProperty({ maxLength: ROADMAP_LIMITS.DESCRIPTION_MAX })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(ROADMAP_LIMITS.DESCRIPTION_MAX)
-  description!: string;
-
-  @ApiPropertyOptional({
-    maxLength: ROADMAP_LIMITS.PRD_MAX,
-    description: 'Optional long-form PRD to fold into the generated prompt.',
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(ROADMAP_LIMITS.PRD_MAX)
-  prd?: string;
-}
-
 export class AiSummariseDto {
   @ApiProperty({ maxLength: ROADMAP_LIMITS.INTERVIEW_TRANSCRIPT_MAX })
   @IsString()
   @MinLength(1)
   @MaxLength(ROADMAP_LIMITS.INTERVIEW_TRANSCRIPT_MAX)
   transcript!: string;
-}
-
-/** One turn of the opportunity interview, in the order it was said. */
-export class OpportunityInterviewMessageDto {
-  @ApiProperty({ enum: ['admin', 'agent'] })
-  @IsIn(['admin', 'agent'])
-  role!: 'admin' | 'agent';
-
-  @ApiProperty({ maxLength: ROADMAP_LIMITS.OPPORTUNITY_INTERVIEW_CONTENT_MAX })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(ROADMAP_LIMITS.OPPORTUNITY_INTERVIEW_CONTENT_MAX)
-  content!: string;
-}
-
-/**
- * The whole interview so far, sent on every turn — to the opportunity copilot.
- *
- * STATELESS BY DESIGN: a session table plus a message table plus a migration is a lot of
- * durable schema for a conversation whose only durable output is the opportunity it files.
- * The cost is that closing the drawer loses the conversation, which the drawer warns about —
- * see OpportunityInterviewDrawer in ally-web.
- *
- * `messages` may be empty: that is how the client asks for the OPENING question, so the agent
- * writes the first turn rather than the frontend hardcoding a greeting that would then drift
- * from the prompt.
- */
-export class OpportunityInterviewTurnDto {
-  @ApiProperty({
-    type: [OpportunityInterviewMessageDto],
-    maxItems: ROADMAP_LIMITS.OPPORTUNITY_INTERVIEW_MESSAGE_MAX,
-    description:
-      'Empty on the first call, which asks for the opening question.',
-  })
-  @IsArray()
-  @ArrayMaxSize(ROADMAP_LIMITS.OPPORTUNITY_INTERVIEW_MESSAGE_MAX)
-  @ValidateNested({ each: true })
-  @Type(() => OpportunityInterviewMessageDto)
-  messages!: OpportunityInterviewMessageDto[];
-
-  /**
-   * The `brief` from the previous turn's response, unchanged. It is how what the copilot found
-   * on one turn survives to the next without a session table — and why it is re-normalised on
-   * the way in rather than trusted: it has been through the browser.
-   */
-  @ApiPropertyOptional({
-    type: 'object',
-    additionalProperties: true,
-    nullable: true,
-    description:
-      "The previous turn's `brief`, echoed back. Omit on the first turn.",
-  })
-  @IsOptional()
-  @IsObject()
-  brief?: Record<string, any> | null;
-}
-
-/**
- * Options for POST admin/import. Multipart, so every value arrives as a STRING — hence the
- * explicit 'true' comparisons rather than @IsBoolean.
- */
-export class RoadmapImportRequestDto {
-  @ApiPropertyOptional({
-    description:
-      'Send "false" to COMMIT. Anything else, including omitting it, is a dry run — writing must ' +
-      'be deliberate, so the safe value is the default.',
-  })
-  @IsOptional()
-  @IsString()
-  dryRun?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Send "true" to create Ally accounts for source voters who have none.',
-  })
-  @IsOptional()
-  @IsString()
-  createMissingUsers?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Second, independent confirmation for user creation. Both this and createMissingUsers ' +
-      'must be "true" — it is the only step that writes outside the roadmap_* namespace.',
-  })
-  @IsOptional()
-  @IsString()
-  allowUserCreation?: string;
-
-  @ApiPropertyOptional({
-    description:
-      'Tenant for any created user. Never guessed; required if users will be created.',
-  })
-  @IsOptional()
-  @IsUUID()
-  tenantId?: string;
 }

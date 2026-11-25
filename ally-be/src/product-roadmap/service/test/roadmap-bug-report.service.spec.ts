@@ -4,7 +4,6 @@ import { User } from 'src/user/entity/user.entity';
 import { UserRole } from 'src/common/constants/user.constants';
 
 import { RoadmapOpportunityRepository } from '../../repository/roadmap-opportunity.repository';
-import { RoadmapNotificationService } from '../roadmap-notification.service';
 import { RoadmapOpportunityService } from '../roadmap-opportunity.service';
 import { RoadmapVectorService } from '../roadmap-vector.service';
 import { BUG_REPORT_DEFAULT_PRODUCT_GOAL } from '../../constants/product-roadmap.constants';
@@ -85,7 +84,6 @@ describe('RoadmapOpportunityService.createBugReport', () => {
       {
         indexQuietly: jest.fn().mockResolvedValue(undefined),
       } as unknown as RoadmapVectorService,
-      { emit: jest.fn() } as unknown as RoadmapNotificationService,
       userRepository as unknown as Repository<User>,
       // Images play no part in a bug report; these satisfy the constructor.
       { parseS3Url: jest.fn() } as never,
@@ -224,7 +222,6 @@ describe('RoadmapOpportunityService.createBugReport', () => {
       {
         indexQuietly: jest.fn().mockResolvedValue(undefined),
       } as unknown as RoadmapVectorService,
-      { emit: jest.fn() } as unknown as RoadmapNotificationService,
       userRepository as unknown as Repository<User>,
       // Images play no part in a bug report; these satisfy the constructor.
       { parseS3Url: jest.fn() } as never,

@@ -64,9 +64,9 @@ export class PlanSettingsService {
   }
 
   /**
-   * Kept apart from `get()` on purpose: that one is served to every roadmap
-   * viewer as `GET product-roadmap/plans/settings`, and its shape must not
-   * change while the flag is off.
+   * Kept apart from `get()` on purpose: that one is the first plan flow's
+   * settings (it was served as `GET product-roadmap/plans/settings`, since
+   * retired), and its shape must not change while the flag is off.
    */
   async getRoadmapV2(): Promise<RoadmapV2Settings> {
     const row = await this.repository.findOne({

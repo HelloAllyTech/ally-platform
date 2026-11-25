@@ -59,9 +59,8 @@ interface ReadinessTokenPayload {
 }
 
 /**
- * Signs the readiness verdict on the way out of the guided interview
- * (`POST ai/opportunity-interview`, once every criterion is met), and verifies it on the way
- * into `POST /opportunities`.
+ * Signs the readiness verdict on the way out of the copilot interview (once every criterion is
+ * met), and verifies it on the way into `RoadmapOpportunityService.create`.
  *
  * ## Why a token rather than re-grading on create
  *

@@ -1,11 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsArray,
-  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
-  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -31,13 +28,6 @@ export class RenameStrategyGoalDto {
   @MinLength(1)
   @MaxLength(ROADMAP_LIMITS.STRATEGY_GOAL_NAME_MAX)
   name!: string;
-}
-
-export class ReorderStrategyGoalsDto {
-  @ApiProperty({ type: [String] })
-  @IsArray()
-  @IsUUID('4', { each: true })
-  ids!: string[];
 }
 
 /**
@@ -132,19 +122,6 @@ export class ProdDirectorResponseDto {
   @ApiProperty({ nullable: true }) userId!: number | null;
   @ApiProperty({ type: [ProdDirectorCandidateDto] })
   candidates!: ProdDirectorCandidateDto[];
-}
-
-export class SetDirectorStarDto {
-  @ApiProperty()
-  @IsBoolean()
-  starred!: boolean;
-}
-
-export class GoalImpactVerdictDto {
-  @ApiProperty() goalName!: string;
-  @ApiProperty() helped!: boolean;
-  @ApiPropertyOptional({ nullable: true }) reason?: string | null;
-  @ApiProperty() assessedAt!: Date;
 }
 
 export class BulkAssessResponseDto {

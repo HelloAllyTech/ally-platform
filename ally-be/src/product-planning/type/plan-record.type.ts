@@ -17,7 +17,10 @@ export interface PlanRecord {
   parked?: boolean;
   /** How the first words arrived. Informational. */
   captureMode?: 'typed' | 'voice';
-  /** A `roadmap_idea_drafts` row this plan was created from. */
+  /**
+   * A `roadmap_idea_drafts` row this plan was created from. Historical: only the retired
+   * idea-drafts migration and the Roadmap cutover wrote it; nothing writes it now.
+   */
   migratedFromDraftId?: string;
 
   /** The private Idea stage: the copilot's last verdict, held server-side. */

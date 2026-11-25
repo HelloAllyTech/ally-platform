@@ -11,14 +11,10 @@ import {
   UpdateInterviewNoteDto,
 } from '../dto/roadmap-content.dto';
 import { ROADMAP_LIST_DEFAULTS } from '../constants/product-roadmap.constants';
-import { RoadmapNotificationService } from './roadmap-notification.service';
 
 @Injectable()
 export class RoadmapInterviewNoteService {
-  constructor(
-    private readonly repository: RoadmapInterviewNoteRepository,
-    private readonly notifications: RoadmapNotificationService,
-  ) {}
+  constructor(private readonly repository: RoadmapInterviewNoteRepository) {}
 
   async list(query: RoadmapListQueryDto) {
     const [items, count] = await this.repository.search(
@@ -46,7 +42,6 @@ export class RoadmapInterviewNoteService {
         updatedBy: userId,
       }),
     );
-    this.invalidate(userId);
     return saved;
   }
 
@@ -71,7 +66,6 @@ export class RoadmapInterviewNoteService {
     note.updatedBy = userId;
 
     const saved = await this.repository.save(note);
-    this.invalidate(userId);
     return saved;
   }
 
@@ -79,7 +73,6 @@ export class RoadmapInterviewNoteService {
     const note = await this.require(id);
     this.assertCanMutate(note, userId, canManage);
     await this.repository.softDelete(id);
-    this.invalidate(userId);
   }
 
   private async require(id: string): Promise<RoadmapInterviewNote> {
@@ -98,13 +91,5 @@ export class RoadmapInterviewNoteService {
         'Only the author or a roadmap manager can change this interview note',
       );
     }
-  }
-
-  private invalidate(userId: number): void {
-    this.notifications.emit({
-      kind: 'ROADMAP_INVALIDATED',
-      actorId: userId,
-      reason: 'interviews',
-    });
   }
 }

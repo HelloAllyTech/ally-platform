@@ -8,7 +8,6 @@ import {
 } from '../repository/roadmap-strategy.repository';
 import { ROADMAP_RANK } from '../constants/product-roadmap.constants';
 import { RoadmapAiService } from './roadmap-ai.service';
-import { RoadmapNotificationService } from './roadmap-notification.service';
 
 /** What a bulk run did, and what is left. */
 export interface BulkAssessResult {
@@ -54,13 +53,7 @@ export class RoadmapGoalImpactService {
     private readonly impactRepository: RoadmapGoalImpactRepository,
     private readonly opportunityRepository: RoadmapOpportunityRepository,
     private readonly aiService: RoadmapAiService,
-    private readonly notifications: RoadmapNotificationService,
   ) {}
-
-  /** One opportunity's stored verdicts, for the drawer breakdown. */
-  listForOpportunity(opportunityId: string): Promise<GoalImpactVerdict[]> {
-    return this.impactRepository.findForOpportunity(opportunityId);
-  }
 
   /**
    * Assess one opportunity against the current strategy and store the result.
@@ -70,10 +63,7 @@ export class RoadmapGoalImpactService {
    * error, and the composite rank already degrades to the other three factors when the goal
    * count is zero.
    */
-  async assess(
-    opportunityId: string,
-    actorId: number,
-  ): Promise<GoalImpactVerdict[]> {
+  async assess(opportunityId: string): Promise<GoalImpactVerdict[]> {
     const opportunity = await this.opportunityRepository.findOne({
       where: { id: opportunityId },
     });
@@ -90,15 +80,6 @@ export class RoadmapGoalImpactService {
     );
     await this.impactRepository.replaceForOpportunity(opportunityId, verdicts);
 
-    // The score changed, so every card's relative position may have. Board-wide rather than a
-    // per-row delta for the same reason a weight change is: the normalisation bases are maxima,
-    // so one row's new score can move everything else.
-    this.notifications.emit({
-      kind: 'ROADMAP_INVALIDATED',
-      actorId,
-      reason: 'goals',
-    });
-
     return this.impactRepository.findForOpportunity(opportunityId);
   }
 
@@ -109,9 +90,9 @@ export class RoadmapGoalImpactService {
    * a model failure here would fail a request whose work is already done. Mirrors how the
    * vector-indexing call is treated on the same paths.
    */
-  async assessQuietly(opportunityId: string, actorId: number): Promise<void> {
+  async assessQuietly(opportunityId: string): Promise<void> {
     try {
-      await this.assess(opportunityId, actorId);
+      await this.assess(opportunityId);
     } catch (error) {
       this.logger.warn(
         `[ROADMAP] Goal-impact assessment failed for ${opportunityId}; ` +
@@ -133,7 +114,6 @@ export class RoadmapGoalImpactService {
    * other twenty-four.
    */
   async assessMissing(
-    actorId: number,
     limit = ROADMAP_RANK.BULK_ASSESS_LIMIT,
   ): Promise<BulkAssessResult> {
     const goals = await this.goalRepository.findAllOrdered();
@@ -145,7 +125,7 @@ export class RoadmapGoalImpactService {
 
     for (const id of ids) {
       try {
-        await this.assess(id, actorId);
+        await this.assess(id);
         assessed += 1;
       } catch (error) {
         failed += 1;

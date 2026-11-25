@@ -1,18 +1,11 @@
-import {
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
 import { MoreThan, Repository } from 'typeorm';
 import { BuilderEvidenceService } from 'src/builder/service/builder-evidence.service';
-import { BuilderSessionService } from 'src/builder/service/builder-session.service';
 import { PlanSuggestion } from 'src/product-planning/entity/plan-suggestion.entity';
-import { PlanStage } from 'src/product-planning/enum/product-planning.enum';
 import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
 import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
-import type { PlanResearchPlan } from 'src/product-planning/type/plan-record.type';
 import { RoadmapOpportunity } from '../entity/roadmap-opportunity.entity';
 import { PlanAiService, PLANNING_PROMPTS } from './plan-ai.service';
 import { PlanIdeaService } from './plan-idea.service';
@@ -40,10 +33,11 @@ export function suggestionFingerprint(title: string): string {
 }
 
 /**
- * Discovery (rev 5.2 §B.8.3, P10): the research planner, which turns a plan's
- * riskiest assumption into a real-user test, and the weekly signal scout,
- * which suggests ideas from aggregated signals. Neither files, votes or
- * contacts anyone; a person acts on what they produce.
+ * Discovery (rev 5.2 §B.8.3, P10): the weekly signal scout, which suggests
+ * ideas from aggregated signals. It never files, votes or contacts anyone; a
+ * person acts on what it produces. (The research planner went with the first
+ * plan flow's routes, and so did the routes that listed, dismissed and worked
+ * up suggestions: see listSuggestions below.)
  */
 @Injectable()
 export class PlanDiscoveryService {
@@ -51,7 +45,6 @@ export class PlanDiscoveryService {
     private readonly store: PlanSessionStore,
     private readonly ai: PlanAiService,
     private readonly evidence: BuilderEvidenceService,
-    private readonly builderSessions: BuilderSessionService,
     private readonly ideas: PlanIdeaService,
     private readonly access: PlanAccessService,
     private readonly settings: PlanSettingsService,
@@ -61,46 +54,9 @@ export class PlanDiscoveryService {
     private readonly opportunities: Repository<RoadmapOpportunity>,
   ) {}
 
-  async researchPlan(
-    sessionId: string,
-    userId: number,
-  ): Promise<PlanResearchPlan> {
-    await this.settings.assertEnabled();
-    const plan = await this.store.get(sessionId);
-    if (plan.leadUserId !== userId)
-      throw new ForbiddenException(
-        'Only this plan’s lead can plan its research.',
-      );
-    const detail = await this.builderSessions.getSessionDetail(
-      sessionId,
-      plan.createdBy,
-    );
-    const out = await this.ai.json<Partial<PlanResearchPlan>>({
-      promptCode: PLANNING_PROMPTS.RESEARCH_PLAN,
-      payload: JSON.stringify({ title: plan.title, prd: detail.prd }).slice(
-        0,
-        120_000,
-      ),
-      maxTokens: 3000,
-      sessionId,
-      stage: PlanStage.PRD,
-      actorUserId: userId,
-      specialist: 'research_planner',
-    });
-    const research: PlanResearchPlan = {
-      assumption: String(out?.assumption ?? '').slice(0, 1000),
-      who: String(out?.who ?? '').slice(0, 1000),
-      questions: (out?.questions ?? [])
-        .slice(0, 5)
-        .map((q) => String(q).slice(0, 500)),
-      alternativeTest: String(out?.alternativeTest ?? '').slice(0, 2000),
-      decisionRule: String(out?.decisionRule ?? '').slice(0, 1000),
-      draftedAt: new Date().toISOString(),
-    };
-    await this.store.patchPlan(sessionId, { research });
-    return research;
-  }
-
+  // listSuggestions, dismiss and workUp lost their routes (`product-roadmap/plans/signals*`)
+  // with the first plan flow's controller; nothing calls them now. They go with the scout in
+  // the v1 planning clean-up, which also decides whether the weekly scout keeps running.
   async listSuggestions(userId: number): Promise<PlanSuggestion[]> {
     await this.settings.assertEnabled();
     await this.access.assertLead(userId);

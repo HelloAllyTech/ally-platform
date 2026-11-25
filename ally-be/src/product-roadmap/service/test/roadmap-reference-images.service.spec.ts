@@ -9,14 +9,12 @@ import { S3Service } from 'src/aws/service/s3.service';
 import { RoadmapOpportunityService } from '../roadmap-opportunity.service';
 import { RoadmapOpportunityRepository } from '../../repository/roadmap-opportunity.repository';
 import { RoadmapVectorService } from '../roadmap-vector.service';
-import { RoadmapNotificationService } from '../roadmap-notification.service';
 import {
   CreateOpportunityDto,
   UpdateOpportunityDto,
 } from '../../dto/roadmap-opportunity.dto';
 import {
   ROADMAP_LIMITS,
-  ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES,
   ROADMAP_REFERENCE_IMAGE_S3_PREFIX,
 } from '../../constants/product-roadmap.constants';
 
@@ -56,9 +54,6 @@ describe('RoadmapOpportunityService — reference images', () => {
       parseS3Url: new S3Service({
         aws: { region: 'ap-south-1' },
       } as never).parseS3Url,
-      getPresignedUrlForImageUpload: jest
-        .fn()
-        .mockResolvedValue({ presignedUrl: 'https://signed', imageUrl: OURS }),
     };
 
     const service = new RoadmapOpportunityService(
@@ -81,7 +76,6 @@ describe('RoadmapOpportunityService — reference images', () => {
       {
         indexQuietly: jest.fn().mockResolvedValue(undefined),
       } as unknown as RoadmapVectorService,
-      { emit: jest.fn() } as unknown as RoadmapNotificationService,
       { find: jest.fn().mockResolvedValue([]) } as unknown as Repository<User>,
       s3Service as unknown as S3Service,
       { s3: { assetsBucket: BUCKET } } as never,
@@ -215,27 +209,6 @@ describe('RoadmapOpportunityService — reference images', () => {
 
     await expect(service.findOne(1, OPP_ID)).resolves.toEqual(
       expect.objectContaining({ referenceImages: [] }),
-    );
-  });
-
-  it('presigns into the roadmap prefix, under the roadmap size cap', async () => {
-    const { service, s3Service } = build();
-
-    await expect(
-      service.createReferenceImageUploadUrl({
-        fileName: 'shot.png',
-        fileSize: 1024,
-        contentType: 'image/png' as never,
-      }),
-    ).resolves.toEqual({ presignedUrl: 'https://signed', imageUrl: OURS });
-
-    expect(s3Service.getPresignedUrlForImageUpload).toHaveBeenCalledWith(
-      BUCKET,
-      ROADMAP_REFERENCE_IMAGE_S3_PREFIX,
-      'shot.png',
-      1024,
-      'image/png',
-      ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES,
     );
   });
 });

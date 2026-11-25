@@ -18,7 +18,6 @@ function build(enabled = true) {
   const gateway = new RoadmapGateway(
     { webSocketMiddleware: jest.fn(() => jest.fn()) } as never,
     notifications as never,
-    { list: jest.fn() } as never,
     planSettings as never,
     dataSource as never,
   );

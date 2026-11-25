@@ -9,7 +9,6 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
-  Put,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -24,87 +23,22 @@ import { TokenUser } from 'src/auth/type/auth.types';
 import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
 
 import {
-  CreateCommentDto,
   CreateSavedViewDto,
-  PinSavedViewDto,
-  SetTabOrderDto,
-  UpdateCommentDto,
   UpdateSavedViewDto,
 } from '../dto/roadmap-content.dto';
-import { RoadmapCommentService } from '../service/roadmap-comment.service';
 import { RoadmapSavedViewService } from '../service/roadmap-saved-view.service';
 import { RoadmapAccessService } from '../service/roadmap-access.service';
 
-/** Comments and saved views — the per-user collaboration surface. */
+/** Saved views — the Roadmap queue's per-user filter tabs. */
 @ApiTags('Product Roadmap')
 @ApiBearerAuth()
 @ApiSecurity('access-token')
 @Controller({ path: 'product-roadmap', version: '1' })
 export class RoadmapCollaborationController {
   constructor(
-    private readonly commentService: RoadmapCommentService,
     private readonly savedViewService: RoadmapSavedViewService,
     private readonly access: RoadmapAccessService,
   ) {}
-
-  // ── comments ──────────────────────────────────────────────────────────────
-
-  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
-    permissions: [PERMISSIONS.VIEW_PRODUCT_ROADMAP],
-  })
-  @Get('opportunities/:id/comments')
-  @ApiOperation({ summary: 'Comments on an opportunity, oldest first' })
-  listComments(@Param('id', ParseUUIDPipe) id: string) {
-    return this.commentService.list(id);
-  }
-
-  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
-    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
-  })
-  @Post('opportunities/:id/comments')
-  @ApiOperation({ summary: 'Add a comment' })
-  createComment(
-    @CurrentUser() user: TokenUser,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: CreateCommentDto,
-  ) {
-    return this.commentService.create(user.id, id, dto);
-  }
-
-  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
-    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
-  })
-  @Patch('comments/:commentId')
-  @ApiOperation({
-    summary: 'Edit your own comment',
-    description:
-      'AUTHOR ONLY — a roadmap manager may delete someone else’s comment but may not rewrite ' +
-      'it. That asymmetry is intentional and ported from the source’s RLS.',
-  })
-  updateComment(
-    @CurrentUser() user: TokenUser,
-    @Param('commentId', ParseUUIDPipe) commentId: string,
-    @Body() dto: UpdateCommentDto,
-  ) {
-    return this.commentService.update(user.id, commentId, dto);
-  }
-
-  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
-    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
-  })
-  @Delete('comments/:commentId')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete a comment (author or roadmap manager)' })
-  async removeComment(
-    @CurrentUser() user: TokenUser,
-    @Param('commentId', ParseUUIDPipe) commentId: string,
-  ): Promise<void> {
-    return this.commentService.remove(
-      user.id,
-      commentId,
-      await this.access.canManage(user.id),
-    );
-  }
 
   // ── saved views ───────────────────────────────────────────────────────────
 
@@ -134,20 +68,6 @@ export class RoadmapCollaborationController {
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
     permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
   })
-  @Put('views/tab-order')
-  @ApiOperation({
-    summary: 'Reorder your saved-view tabs',
-    description:
-      'Tolerant of stale and missing ids by design — the client skips unknown ids and appends ' +
-      'new views, so a slightly-stale array degrades to a wrong order rather than a hidden tab.',
-  })
-  setTabOrder(@CurrentUser() user: TokenUser, @Body() dto: SetTabOrderDto) {
-    return this.savedViewService.setTabOrder(user.id, dto.viewIds);
-  }
-
-  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {
-    permissions: [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
-  })
   @Post('views')
   @ApiOperation({ summary: 'Save the current filters as a named view' })
   createView(@CurrentUser() user: TokenUser, @Body() dto: CreateSavedViewDto) {
@@ -161,7 +81,7 @@ export class RoadmapCollaborationController {
   @ApiOperation({
     summary: 'Rename or re-snapshot a view (owner or manager)',
     description:
-      'Rejects `pinned`; use PUT /views/:id/pin, which requires manage permission.',
+      'Rejects `pinned`: pinning a view for everyone is not offered on this route.',
   })
   async updateView(
     @CurrentUser() user: TokenUser,
@@ -174,23 +94,6 @@ export class RoadmapCollaborationController {
       dto,
       await this.access.canManage(user.id),
     );
-  }
-
-  @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP_MANAGE, {
-    permissions: [PERMISSIONS.EDIT_PRODUCT_ROADMAP],
-  })
-  @Put('views/:id/pin')
-  @ApiOperation({
-    summary: 'Pin or unpin a view for everyone',
-    description:
-      'This decorator IS the enforcement, replacing the source’s enforce_pin_admin() trigger.',
-  })
-  pinView(
-    @CurrentUser() user: TokenUser,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: PinSavedViewDto,
-  ) {
-    return this.savedViewService.setPinned(user.id, id, dto.pinned);
   }
 
   @RequireFeatureToggle(FeatureToggleKey.PRODUCT_ROADMAP, {

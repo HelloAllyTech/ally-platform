@@ -12,7 +12,6 @@ import { RoadmapOpportunityService } from '../roadmap-opportunity.service';
 import { RoadmapGoalImpactService } from '../roadmap-goal-impact.service';
 import { RoadmapStrategyGoalService } from '../roadmap-strategy-goal.service';
 import { RoadmapVectorService } from '../roadmap-vector.service';
-import { RoadmapNotificationService } from '../roadmap-notification.service';
 import { RoadmapReadinessTokenService } from '../roadmap-readiness-token.service';
 import { RoadmapOpportunityRepository } from '../../repository/roadmap-opportunity.repository';
 import { RoadmapAllocationRepository } from '../../repository/roadmap-allocation.repository';
@@ -109,7 +108,6 @@ describe('RoadmapOpportunityService — readiness gate', () => {
           provide: RoadmapVectorService,
           useValue: { indexQuietly: jest.fn().mockResolvedValue(undefined) },
         },
-        { provide: RoadmapNotificationService, useValue: { emit: jest.fn() } },
         {
           provide: getRepositoryToken(User),
           useValue: { find: jest.fn().mockResolvedValue([]) },

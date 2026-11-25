@@ -494,7 +494,7 @@ export class UxSignalsService {
    *
    * A goal name the taxonomy does not contain becomes null rather than being
    * stored. Unvalidated model taxonomy once polluted more than half the roadmap's
-   * goal data; the same guard lives in RoadmapAiService.classifyGoal.
+   * goal data, which is why the (since retired) roadmap goal classifier had the same guard.
    */
   private normalise(raw: RawTriageItem[], goalNames: string[]): TriagedItem[] {
     const goals = new Set(goalNames);

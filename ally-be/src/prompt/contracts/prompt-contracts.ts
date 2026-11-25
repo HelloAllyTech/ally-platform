@@ -1046,30 +1046,9 @@ export const PLANNING_OUTCOME_REVIEW = definePrompt(
   { output: 'json' },
 );
 
-/** src/prompts/planning/launch_plan.txt */
-export const PLANNING_LAUNCH_PLAN = definePrompt(
-  'planning_launch_plan',
-  {},
-  { output: 'json' },
-);
-
-/** src/prompts/planning/research_plan.txt */
-export const PLANNING_RESEARCH_PLAN = definePrompt(
-  'planning_research_plan',
-  {},
-  { output: 'json' },
-);
-
 /** src/prompts/planning/signal_scout.txt */
 export const PLANNING_SIGNAL_SCOUT = definePrompt(
   'planning_signal_scout',
-  {},
-  { output: 'json' },
-);
-
-/** src/prompts/roadmap/classify_goal.txt */
-export const ROADMAP_CLASSIFY_GOAL = definePrompt(
-  'roadmap_classify_goal',
   {},
   { output: 'json' },
 );
@@ -1079,12 +1058,6 @@ export const ROADMAP_DUPLICATE_CHECK = definePrompt(
   'roadmap_duplicate_check',
   {},
   { output: 'json' },
-);
-
-/** src/prompts/roadmap/generate_claude_prompt.txt */
-export const ROADMAP_GENERATE_CLAUDE_PROMPT = definePrompt(
-  'roadmap_generate_claude_prompt',
-  {},
 );
 
 /** src/prompts/roadmap/goal_impact.txt */

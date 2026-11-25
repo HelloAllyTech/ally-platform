@@ -7,6 +7,9 @@ import { ReleasePolicySettingsService } from '../service/release-policy-settings
  * does not exist until the cutover. Applied at controller level, so it runs
  * before the JWT and toggle guards on each route.
  *
+ * Turning the flag off is no longer a rollback: the old Product Roadmap routes and page are
+ * gone, so every Roadmap route simply 404s until it is switched back on.
+ *
  * TODO(P0): swap the settings read for P0's own flag guard once it is merged.
  */
 @Injectable()

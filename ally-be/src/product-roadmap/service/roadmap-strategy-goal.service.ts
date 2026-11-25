@@ -14,7 +14,6 @@ import {
 } from '../repository/roadmap-strategy.repository';
 import { RankContext } from '../repository/roadmap-opportunity.repository';
 import { ROADMAP_RANK } from '../constants/product-roadmap.constants';
-import { RoadmapNotificationService } from './roadmap-notification.service';
 
 /**
  * Product strategy goals and the composite-rank weights — the two things an admin tunes in
@@ -31,7 +30,6 @@ export class RoadmapStrategyGoalService {
     private readonly goalRepository: RoadmapStrategyGoalRepository,
     private readonly impactRepository: RoadmapGoalImpactRepository,
     private readonly weightsRepository: RoadmapRankWeightsRepository,
-    private readonly notifications: RoadmapNotificationService,
   ) {}
 
   // ── strategy goals ─────────────────────────────────────────────────────────
@@ -70,7 +68,6 @@ export class RoadmapStrategyGoalService {
     const saved = await this.goalRepository.save(
       this.goalRepository.create({ name: trimmed, position: count }),
     );
-    this.invalidate(userId);
     return {
       goal: saved,
       unassessed: await this.goalRepository.countUnassessed(trimmed),
@@ -105,7 +102,6 @@ export class RoadmapStrategyGoalService {
 
     goal.name = trimmed;
     const saved = await this.goalRepository.save(goal);
-    this.invalidate(userId);
     return saved;
   }
 
@@ -128,15 +124,7 @@ export class RoadmapStrategyGoalService {
       where: { goalName: goal.name },
     });
     await this.goalRepository.remove(goal);
-    this.invalidate(userId);
     return { discardedVerdicts };
-  }
-
-  async reorderGoals(userId: number, ids: string[]): Promise<void> {
-    for (const [position, id] of ids.entries()) {
-      await this.goalRepository.update({ id }, { position });
-    }
-    this.invalidate(userId);
   }
 
   /**
@@ -196,7 +184,6 @@ export class RoadmapStrategyGoalService {
     }
 
     const saved = await this.weightsRepository.save(next);
-    this.invalidate(userId);
     return saved;
   }
 
@@ -236,7 +223,6 @@ export class RoadmapStrategyGoalService {
       ...current,
       prodDirectorUserId: userId,
     });
-    this.invalidate(actorId);
     return { userId };
   }
 
@@ -267,17 +253,5 @@ export class RoadmapStrategyGoalService {
       },
       bases,
     };
-  }
-
-  /**
-   * A board-wide invalidation rather than a per-row delta: a goal or weight change reorders an
-   * unbounded number of cards this service never sees.
-   */
-  invalidate(userId: number): void {
-    this.notifications.emit({
-      kind: 'ROADMAP_INVALIDATED',
-      actorId: userId,
-      reason: 'goals',
-    });
   }
 }

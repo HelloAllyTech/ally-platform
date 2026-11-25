@@ -11,7 +11,6 @@ import {
 import { AiService } from 'src/ai/service/ai.service';
 
 import { RoadmapOpportunityRepository } from '../repository/roadmap-opportunity.repository';
-import { RoadmapProductGoalRepository } from '../repository/roadmap-taxonomy.repository';
 
 /** AI-task-registry row id; the key for per-task model config. */
 const AI_TASK_ID = 'roadmap-ai';
@@ -28,10 +27,8 @@ import {
 } from '../dto/roadmap-response.dto';
 
 const MAX_TOKENS = {
-  CLASSIFY: 1000,
   DUPLICATES: 1000,
   SUMMARISE: 2000,
-  CLAUDE_PROMPT: 2000,
   TITLE: 120,
   // A verdict plus a ≤200-char reason per goal, at the 12-goal ceiling, with headroom.
   GOAL_IMPACT: 1600,
@@ -46,50 +43,7 @@ export class RoadmapAiService {
     private readonly llmCompletion: LlmCompletionService,
     private readonly aiService: AiService,
     private readonly opportunityRepository: RoadmapOpportunityRepository,
-    private readonly goalRepository: RoadmapProductGoalRepository,
   ) {}
-
-  /**
-   * Map a draft to one of the existing product goals.
-   *
-   * Returns `category: null` when the model answers with something that is not a live goal.
-   * That guard matters: the standalone app had no equivalent, so when its backfill run failed
-   * wholesale it wrote its FALLBACK category ('Foundation & Experiments', confidence 0) to 241
-   * opportunities and reported success — which is why ~54% of production goal data is now
-   * meaningless. Never let an unvalidated model answer become stored taxonomy.
-   */
-  async classifyGoal(description: string): Promise<{
-    category: string | null;
-    confidence: number;
-    rationale: string;
-  }> {
-    const goals = await this.goalRepository.findAllOrdered();
-    const parsed = await this.runJson<{
-      category?: string;
-      confidence?: number;
-      rationale?: string;
-    }>(
-      ROADMAP_PROMPT_CODES.CLASSIFY_GOAL,
-      `Available product goals:\n${goals.map((g) => `- ${g.name}`).join('\n')}\n\n` +
-        `Opportunity to classify:\n"""\n${description}\n"""`,
-      MAX_TOKENS.CLASSIFY,
-      LlmTask.AUTOFILL_ENHANCE_FIELD,
-      'classify',
-    );
-
-    const valid = goals.some((g) => g.name === parsed?.category);
-    if (!valid && parsed?.category) {
-      this.logger.warn(
-        `[ROADMAP] Classifier returned "${parsed.category}", which is not a live product goal. ` +
-          `Discarding rather than storing it.`,
-      );
-    }
-    return {
-      category: valid ? (parsed!.category as string) : null,
-      confidence: Number(parsed?.confidence ?? 0),
-      rationale: parsed?.rationale ?? '',
-    };
-  }
 
   /**
    * A one-line title for idea text that has none. Never throws and never returns blank for
@@ -247,33 +201,6 @@ export class RoadmapAiService {
       );
       return { matches: [] };
     }
-  }
-
-  /**
-   * Turn an opportunity's description (+ optional PRD) into a ready-to-paste implementation
-   * brief for Claude Code. Plain text, not JSON — same reasoning as summariseTranscript: the
-   * output is multiline prose, and forcing it through JSON only adds a fragile parse step for
-   * no benefit.
-   *
-   * NOTE: no longer reachable from the admin UI. The drawer's "Open in Builder Agent" replaced
-   * the generate-a-prompt flow; this endpoint is kept until the `claudePrompt` column is
-   * dropped, and should go with it.
-   */
-  async generateClaudeCodePrompt(
-    description: string,
-    prd?: string,
-  ): Promise<string> {
-    const sections = [`Title:\n"""\n${description}\n"""`];
-    if (prd?.trim()) {
-      sections.push(`PRD:\n"""\n${prd.trim()}\n"""`);
-    }
-    return this.runText(
-      ROADMAP_PROMPT_CODES.GENERATE_CLAUDE_PROMPT,
-      sections.join('\n\n'),
-      MAX_TOKENS.CLAUDE_PROMPT,
-      LlmTask.AUTOFILL_ENHANCE_FIELD,
-      'generate-claude-prompt',
-    );
   }
 
   // ── LLM plumbing ───────────────────────────────────────────────────────────

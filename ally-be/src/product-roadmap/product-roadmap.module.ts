@@ -9,12 +9,6 @@ import { User } from 'src/user/entity/user.entity';
 import { RoadmapAllocation } from './entity/roadmap-allocation.entity';
 import { RoadmapVoteGrant } from './entity/roadmap-vote-grant.entity';
 import { RoadmapInterviewNote } from './entity/roadmap-interview-note.entity';
-import { RoadmapIdeaDraft } from './entity/roadmap-idea-draft.entity';
-import { RoadmapCutoverLog } from './entity/roadmap-cutover-log.entity';
-import { RoadmapCutoverController } from './cutover/roadmap-cutover.controller';
-import { RoadmapCutoverService } from './cutover/roadmap-cutover.service';
-import { RoadmapIdeaDraftController } from './controller/roadmap-idea-draft.controller';
-import { RoadmapIdeaDraftService } from './service/roadmap-idea-draft.service';
 import { RoadmapIdeaTranscriptionService } from './service/roadmap-idea-transcription.service';
 import { RoadmapOpportunity } from './entity/roadmap-opportunity.entity';
 import { RoadmapOpportunityComment } from './entity/roadmap-opportunity-comment.entity';
@@ -24,7 +18,6 @@ import { RoadmapStrategyGoal } from './entity/roadmap-strategy-goal.entity';
 import { RoadmapOpportunityGoalImpact } from './entity/roadmap-opportunity-goal-impact.entity';
 import { RoadmapRankWeights } from './entity/roadmap-rank-weights.entity';
 import { RoadmapSavedView } from './entity/roadmap-saved-view.entity';
-import { RoadmapUserMap } from './entity/roadmap-user-map.entity';
 import { RoadmapUserTabOrder } from './entity/roadmap-user-tab-order.entity';
 
 import { RoadmapAllocationRepository } from './repository/roadmap-allocation.repository';
@@ -36,10 +29,7 @@ import {
 } from './repository/roadmap-content.repository';
 import { RoadmapOpportunityRepository } from './repository/roadmap-opportunity.repository';
 import { RoadmapSavedViewRepository } from './repository/roadmap-saved-view.repository';
-import {
-  RoadmapOpportunityOwnerRepository,
-  RoadmapProductGoalRepository,
-} from './repository/roadmap-taxonomy.repository';
+import { RoadmapProductGoalRepository } from './repository/roadmap-taxonomy.repository';
 import {
   RoadmapGoalImpactRepository,
   RoadmapRankWeightsRepository,
@@ -59,10 +49,8 @@ import { RoadmapAllocationService } from './service/roadmap-allocation.service';
 import { RoadmapMultiplierService } from './service/roadmap-multiplier.service';
 import { RoadmapCommentService } from './service/roadmap-comment.service';
 import { RoadmapInterviewNoteService } from './service/roadmap-content.service';
-import { RoadmapImportService } from './service/roadmap-import.service';
 import { RoadmapOpportunityService } from './service/roadmap-opportunity.service';
 import { RoadmapSavedViewService } from './service/roadmap-saved-view.service';
-import { RoadmapSplitMergeService } from './service/roadmap-split-merge.service';
 import { RoadmapBuilderService } from './service/roadmap-builder.service';
 import { RoadmapUpNextService } from './service/roadmap-up-next.service';
 import { RoadmapUpNextController } from './controller/roadmap-up-next.controller';
@@ -86,13 +74,10 @@ import { PlanLeadService } from './plan/plan-lead.service';
 import { PlanCheckService } from './plan/plan-check.service';
 import { PlanAiService } from './plan/plan-ai.service';
 import { PlanOutcomeService } from './plan/plan-outcome.service';
-import { PlanLaunchService } from './plan/plan-launch.service';
 import { PlanDiscoveryService } from './plan/plan-discovery.service';
-import { PlanExportService } from './plan/plan-export.service';
 import { PlanSchedulerRegistrationService } from './plan/plan-scheduler-registration.service';
 
 import { ContextLibraryModule } from 'src/context-library/context-library.module';
-import { RoadmapBoardService } from './service/roadmap-board.service';
 import { RoadmapTaxonomyService } from './service/roadmap-taxonomy.service';
 import { RoadmapStrategyGoalService } from './service/roadmap-strategy-goal.service';
 import { RoadmapGoalImpactService } from './service/roadmap-goal-impact.service';
@@ -180,11 +165,8 @@ import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-cla
       RoadmapVoteGrant,
       RoadmapOpportunityComment,
       RoadmapInterviewNote,
-      RoadmapIdeaDraft,
-      RoadmapCutoverLog,
       RoadmapSavedView,
       RoadmapUserTabOrder,
-      RoadmapUserMap,
       // Read-only: resolving createdBy ints to an email/name for responses. createdBy has no
       // FK, so this is a join done in the mapper rather than by the ORM.
       User,
@@ -242,8 +224,6 @@ import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-cla
   controllers: [
     // Roadmap v2 (plans/roadmap-builder-merge): 404 while roadmap_v2 is off.
     RoadmapItemController,
-    // P6: Switch on Roadmap. The one pair that answers while roadmap_v2 is off.
-    RoadmapCutoverController,
     // P3: New idea, drafts, dictation, review and the lead.
     RoadmapDraftController,
     RoadmapReviewController,
@@ -257,7 +237,6 @@ import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-cla
     RoadmapCollaborationController,
     RoadmapAdminController,
     RoadmapUpNextController,
-    RoadmapIdeaDraftController,
     RoadmapPlanController,
     RoadmapItemReleaseController,
     RoadmapReleaseController,
@@ -278,8 +257,6 @@ import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-cla
     RoadmapMetricsService,
     RoadmapItemBuildService,
     RoadmapRoleAdminService,
-    // Roadmap v2 P6: the Owner's switch-on action.
-    RoadmapCutoverService,
     // The idea-to-outcome plan flow (plans/roadmap-owns-planning rev 5.2).
     PlanSessionStore,
     PlanStageService,
@@ -292,9 +269,7 @@ import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-cla
     PlanTurnService,
     PlanAiService,
     PlanOutcomeService,
-    PlanLaunchService,
     PlanDiscoveryService,
-    PlanExportService,
     PlanSchedulerRegistrationService,
     PlanHandoffService,
     PlanRoadmapToolsService,
@@ -303,7 +278,6 @@ import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-cla
     RoadmapStrategyGoalRepository,
     RoadmapGoalImpactRepository,
     RoadmapRankWeightsRepository,
-    RoadmapOpportunityOwnerRepository,
     RoadmapOpportunityRepository,
     RoadmapAllocationRepository,
     RoadmapVoteGrantRepository,
@@ -313,25 +287,21 @@ import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-cla
     RoadmapUserTabOrderRepository,
     // services (RoadmapNotificationService now comes from ProductPlanningModule)
     RoadmapAccessService,
-    // Signs the readiness verdict on the way out of ai/readiness and verifies it on the way
-    // into POST /opportunities — the readiness gate's server-side half.
+    // Signs the copilot's readiness verdict and verifies it when a draft is filed — the
+    // readiness gate's server-side half.
     RoadmapReadinessTokenService,
     RoadmapVectorService,
-    RoadmapImportService,
     RoadmapOpportunityService,
     RoadmapAllocationService,
     RoadmapMultiplierService,
-    RoadmapSplitMergeService,
     RoadmapBuilderService,
     RoadmapUpNextService,
-    RoadmapBoardService,
     RoadmapCommentService,
     RoadmapSavedViewService,
     RoadmapTaxonomyService,
     RoadmapStrategyGoalService,
     RoadmapGoalImpactService,
     RoadmapInterviewNoteService,
-    RoadmapIdeaDraftService,
     RoadmapIdeaTranscriptionService,
     RoadmapAiService,
     // The opportunity copilot: the guided interview's tool loop, its tools, and the Vision &

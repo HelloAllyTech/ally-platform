@@ -159,8 +159,6 @@ export const ROADMAP_COPILOT = {
    * its caps, and an adaptive-thinking model spends from the same allowance before it writes.
    */
   MAX_TOKENS: 16_000,
-  /** Keep-alive on the SSE stream; a turn that researches for 40s otherwise emits nothing. */
-  SSE_PING_MS: 15_000,
   /** One tool result handed back to the model — a whole file is never what it needs. */
   TOOL_RESULT_MAX_CHARS: 12_000,
   /** How many board rows the always-loaded context lists, highest-ranked first. */
@@ -204,7 +202,8 @@ export const ROADMAP_STRATEGY_CONTEXT_LIMITS = {
 } as const;
 
 /**
- * Where reference images land in the assets bucket, and the ceiling on one upload.
+ * Where reference images landed in the assets bucket (the presign route that wrote them is
+ * retired; stored images are still validated against it).
  *
  * The prefix is load-bearing, not cosmetic: `assertOwnReferenceImages` requires every stored URL
  * to resolve to this bucket and this prefix, so a caller cannot use the images array to park an
@@ -212,12 +211,8 @@ export const ROADMAP_STRATEGY_CONTEXT_LIMITS = {
  * roadmap viewer then loads in their browser. Changing it orphans nothing already stored — the
  * guard admits any key under the prefix, and existing rows keep the keys they have — but it does
  * mean older uploads would stop validating on a later edit, so treat it as append-only.
- *
- * 5 MB matches the blog's image cap. A screenshot is well under it; a photo off a phone is not
- * always, which is why it is not tighter.
  */
 export const ROADMAP_REFERENCE_IMAGE_S3_PREFIX = 'roadmap/reference-images';
-export const ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 
 /**
  * Composite-rank tuning that is NOT admin-settable, kept here so the two places that need it
@@ -272,31 +267,6 @@ export const ROADMAP_LIST_DEFAULTS = {
 } as const;
 
 /**
- * Month board tuning.
- *
- * The default window is asymmetric on purpose. One month back is enough to see what just
- * shipped without turning the board into an archive; four forward is about as far as this team
- * actually commits, and a board of empty lanes reads as a plan nobody has made. The window is a
- * READ concern only — nothing stops a card being planned into a month outside it, and the
- * response reports `bounds` so the UI can say so rather than silently hiding the card.
- *
- * MAX_ROWS is a safety bound, not a product limit: at a few hundred opportunities the whole
- * board fits comfortably, and if it is ever hit the response says so via `truncated` instead of
- * quietly dropping lanes.
- */
-export const ROADMAP_BOARD_DEFAULTS = {
-  WINDOW_MONTHS_BACK: 1,
-  WINDOW_MONTHS_FORWARD: 4,
-  /** How far a prev/next click moves the window. */
-  WINDOW_STEP_MONTHS: 3,
-  LANE_LIMIT: 50,
-  MAX_LANE_LIMIT: 200,
-  MAX_ROWS: 1000,
-  /** Cap on one reorder payload, so a lane rewrite cannot be unbounded. */
-  MAX_LANE_IDS: 500,
-} as const;
-
-/**
  * Duplicate detection, ported from the standalone app's /api/ai/duplicates route.
  * Vector top-N then an LLM confirmation pass that returns at most MAX_CONFIRMED.
  *
@@ -318,13 +288,11 @@ export const ROADMAP_DUPLICATES = {
  * settings table.
  */
 export const ROADMAP_PROMPT_CODES = {
-  CLASSIFY_GOAL: 'roadmap_classify_goal',
   DUPLICATE_CHECK: 'roadmap_duplicate_check',
   GOAL_IMPACT: 'roadmap_goal_impact',
   SUMMARISE_INTERVIEW: 'roadmap_summarise_interview',
   /** Writes a one-line title for idea text that has none. See RoadmapAiService.suggestTitle. */
   SUGGEST_TITLE: 'roadmap_suggest_title',
-  GENERATE_CLAUDE_PROMPT: 'roadmap_generate_claude_prompt',
   /**
    * The copilot that walks an admin to a fileable, strategically grounded draft. Grades the
    * SAME ROADMAP_READINESS_CRITERIA the filing gate grades — see the prompt file for why that

@@ -18,7 +18,6 @@ import { RoadmapAllocationRepository } from '../../repository/roadmap-allocation
 import { RoadmapVectorService } from '../roadmap-vector.service';
 import { RoadmapStrategyGoalService } from '../roadmap-strategy-goal.service';
 import { RoadmapGoalImpactService } from '../roadmap-goal-impact.service';
-import { RoadmapNotificationService } from '../roadmap-notification.service';
 import { RoadmapReadinessTokenService } from '../roadmap-readiness-token.service';
 import {
   CreateOpportunityDto,
@@ -123,7 +122,6 @@ describe('RoadmapOpportunityService — owners', () => {
           provide: RoadmapGoalImpactService,
           useValue: { assessQuietly: jest.fn() },
         },
-        { provide: RoadmapNotificationService, useValue: { emit: jest.fn() } },
         // Reference images play no part in owner resolution; these satisfy the constructor.
         { provide: S3Service, useValue: { parseS3Url: jest.fn() } },
         {
