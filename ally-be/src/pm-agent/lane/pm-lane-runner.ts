@@ -127,7 +127,12 @@ export class PmLaneRunner {
         system: input.system,
         messages,
         tools: finalPass ? [submitTool] : [...research, submitTool],
-        maxTokens: PM_PIPELINE.LANE_MAX_TOKENS,
+        maxTokens: finalPass
+          ? PM_PIPELINE.SUBMIT_MAX_TOKENS
+          : PM_PIPELINE.LANE_MAX_TOKENS,
+        // The submit pass only writes up what was researched: low reasoning leaves the output
+        // budget for the cards themselves.
+        ...(finalPass ? { effort: PM_PIPELINE.SUBMIT_EFFORT } : {}),
         // Only the submit tool is offered here: where the provider allows it, make the call
         // mandatory. Without this gpt-5-mini kept calling research tools from the history.
         ...(finalPass ? { toolChoice: 'required' as const } : {}),

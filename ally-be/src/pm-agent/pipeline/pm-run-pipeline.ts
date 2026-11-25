@@ -87,6 +87,12 @@ export interface PmPipelineDeps {
 
 /** Typical share of the worst-case lane cost a lane really spends (for degradation only). */
 const TYPICAL_LANE_SHARE = 0.5;
+/**
+ * Passes a lane is estimated at when the run plans its budget. Deliberately not MAX_PASSES:
+ * raising the cap (6 → 10, for code_health's checks) must not make every lane look 10/6 as
+ * dear and push runs onto the cheap model or skip lanes. The ledger still caps real spend.
+ */
+const TYPICAL_LANE_PASSES = 6;
 /** Prompt size assumed when estimating a lane before its context exists. */
 const ESTIMATE_INPUT_CHARS = 40_000;
 /** Critic batch bound: the best this many by preliminary score are reviewed. */
@@ -277,7 +283,7 @@ export class PmRunPipeline {
           ESTIMATE_INPUT_CHARS,
           PM_PIPELINE.LANE_MAX_TOKENS,
         ) *
-        PM_PIPELINE.MAX_PASSES *
+        TYPICAL_LANE_PASSES *
         TYPICAL_LANE_SHARE;
       const perLane = Math.min(
         PM_PIPELINE.MAX_CANDIDATES_PER_LANE,

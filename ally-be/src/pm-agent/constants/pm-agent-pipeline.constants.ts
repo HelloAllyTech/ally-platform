@@ -27,8 +27,13 @@ export const PM_PIPELINE = {
   MAX_CANDIDATES_PER_LANE: 2,
   /** Lanes one run may select (revisions excluded). */
   MAX_LANES_PER_RUN: 4,
-  /** Tool-loop passes per lane, the forced-submit pass included. */
-  MAX_PASSES: 6,
+  /**
+   * Tool-loop passes per lane, the forced-submit pass included. Was 6: prod 2026-11-25,
+   * code_health opened dead_code_list, spent passes 2–5 confirming items were unused, was
+   * forced to submit mid-check and (as its prompt says) dropped what it had not confirmed.
+   * Research passes take ~5–10 s; the lane's wall clock (LANE_TIMEOUT_MS) still caps the lane.
+   */
+  MAX_PASSES: 10,
   /** Tool calls a single pass may make (extra calls are refused, not run). */
   MAX_TOOL_CALLS_PER_PASS: 6,
   /**
@@ -37,6 +42,13 @@ export const PM_PIPELINE = {
    * infra_cost). 12000 leaves room for a full recommendation; the ledger still reserves per pass.
    */
   LANE_MAX_TOKENS: 12000,
+  /**
+   * The submit pass: research is done, the model only writes the cards. At medium reasoning
+   * (the gpt-5 default) prod analytics spent all 12000 output tokens and the submit arrived
+   * empty (2026-11-25, `max_tokens`). Low effort on this pass, and a higher cap as headroom.
+   */
+  SUBMIT_MAX_TOKENS: 16000,
+  SUBMIT_EFFORT: 'low' as const,
   /**
    * The critic reviews every candidate in one call. At 3000 it was cut off at max_tokens (local
    * run 2026-11-24, 3 candidates): no verdicts, so every candidate was dropped. Same reasoning
