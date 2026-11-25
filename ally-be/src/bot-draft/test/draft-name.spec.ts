@@ -51,7 +51,7 @@ describe('the name typed in setup names the not-yet-live assistant', () => {
     await h.service.update(h.draft('Saathi Youth Helpline'), {});
     expect(h.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /UPDATE chatbots SET name = \$2 WHERE id = \$1 AND status = 'draft'/,
+        /UPDATE chatbots SET name = \$2,[\s\S]*WHERE id = \$1 AND status = 'draft'/,
       ),
       ['bot-1', 'Saathi Youth Helpline'],
     );
@@ -61,5 +61,22 @@ describe('the name typed in setup names the not-yet-live assistant', () => {
     const h = setup();
     await h.service.update(h.draft('Your assistant'), {});
     expect(h.query).not.toHaveBeenCalled();
+  });
+
+  // TF1 N3: the card and the chat label said "Your assistant" after the owner had named it.
+  it('the chat name follows the name while it is still the default', async () => {
+    const h = setup();
+    const draft = h.draft('Saathi Youth Helpline');
+    draft.draftConfig.assistantName = 'Your assistant';
+    const saved = await h.service.update(draft, {});
+    expect(saved.draftConfig.assistantName).toBe('Saathi Youth Helpline');
+  });
+
+  it('never touches a chat name the owner chose', async () => {
+    const h = setup();
+    const draft = h.draft('Saathi Youth Helpline');
+    draft.draftConfig.assistantName = 'Saathi';
+    const saved = await h.service.update(draft, {});
+    expect(saved.draftConfig.assistantName).toBe('Saathi');
   });
 });
