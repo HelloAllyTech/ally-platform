@@ -214,9 +214,19 @@ export const StartPanel: React.FC<{
           {S.back}
         </Button>
       )}
+      {/* Right under the screen's title: it says where the test chatbot is, before the choices. */}
+      {!scratch && <p className="ally-small">{S.starterNote}</p>}
       <h2 className="ally-heading">{scratch ? S.scratch : S.heading}</h2>
       {scratch && creditsOut && <p className="ally-small">{BUILD_COPY.credits.body}</p>}
-      <ul className="ally-methods" style={{ gridTemplateColumns: "1fr" }}>
+      <ul
+        className="ally-methods"
+        data-testid="start-methods"
+        // The two ways to begin sit side by side; the ways to start from scratch stay a list. Narrow
+        // halves (the build area in tabs) drop back to one column on their own.
+        style={{
+          gridTemplateColumns: scratch ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))",
+        }}
+      >
         {options.map(o => (
           <li key={o.id}>
             <button
@@ -232,7 +242,6 @@ export const StartPanel: React.FC<{
           </li>
         ))}
       </ul>
-      {!scratch && <p className="ally-small">{S.starterNote}</p>}
       {error}
     </div>
   );

@@ -1480,7 +1480,7 @@ const SkillChange = ({ data }: DataRendererProps<SkillChangeData>) => {
           {t("statisticsLibrary.skills.first")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-full bg-[#2a5db0]" />
+          <span className="inline-block h-3 w-3 rounded-full bg-primary-500" />
           {t("statisticsLibrary.skills.latest")}
         </span>
         <span>{t("statisticsLibrary.skills.scale")}</span>
@@ -1496,17 +1496,17 @@ const SkillChange = ({ data }: DataRendererProps<SkillChangeData>) => {
                 {label(row.skill)}
               </span>
               <span className="relative h-4 flex-1">
-                <span className="absolute left-0 right-0 top-[7px] h-0.5 bg-[#efebe0]" />
+                <span className="absolute left-0 right-0 top-[7px] h-0.5 bg-background-tertiary" />
                 <span
-                  className="absolute top-[7px] h-0.5 bg-[#2a5db0]"
+                  className="absolute top-[7px] h-0.5 bg-primary-500"
                   style={{ left: `${from}%`, width: `${width}%` }}
                 />
                 <span
-                  className="absolute top-0.5 -ml-1.5 h-3 w-3 rounded-full border-2 border-[#2a5db0] bg-white"
+                  className="absolute top-0.5 -ml-1.5 h-3 w-3 rounded-full border-2 border-primary-500 bg-white"
                   style={{ left: `${levelPercent(row.first)}%` }}
                 />
                 <span
-                  className="absolute top-0.5 -ml-1.5 h-3 w-3 rounded-full bg-[#2a5db0]"
+                  className="absolute top-0.5 -ml-1.5 h-3 w-3 rounded-full bg-primary-500"
                   style={{ left: `${levelPercent(row.latest)}%` }}
                 />
               </span>
@@ -1677,7 +1677,7 @@ const TimeToFinish = ({ data }: DataRendererProps<TimeToFinishData>) => {
           key: String(i),
           label: label(i),
           count,
-          colour: "#2a5db0",
+          colour: "rgb(var(--color-primary-500))",
         }))}
       />
     </div>
@@ -1704,13 +1704,13 @@ const ModuleFunnel = ({ data }: DataRendererProps<ModuleFunnelData>) => {
           <span className="flex-[0_0_32%] truncate text-typography-900" title={row.title}>
             {row.title}
           </span>
-          <span className="relative h-3 flex-1 rounded-md bg-[#efebe0]">
+          <span className="relative h-3 flex-1 rounded-md bg-background-tertiary">
             <span
-              className="absolute left-0 top-0 h-3 rounded-md bg-[#b9c8e4]"
+              className="absolute left-0 top-0 h-3 rounded-md bg-primary-200"
               style={{ width: `${(row.reached / top) * 100}%` }}
             />
             <span
-              className="absolute left-0 top-0 h-3 rounded-md bg-[#2a5db0]"
+              className="absolute left-0 top-0 h-3 rounded-md bg-primary-500"
               style={{ width: `${(row.completed / top) * 100}%` }}
             />
           </span>
@@ -1766,7 +1766,7 @@ const ModuleTime = ({ data }: DataRendererProps<ModuleTimeData>) => {
           label: row.title,
           count:
             unit === "hours" ? Math.round((row.medianMinutes / 60) * 10) / 10 : row.medianMinutes,
-          colour: "#2a5db0",
+          colour: "rgb(var(--color-primary-500))",
           suffix:
             unit === "hours"
               ? t("statisticsLibrary.modules.hoursShort")
@@ -1808,7 +1808,7 @@ const RoleplayAttempts = ({ data }: DataRendererProps<RoleplayAttemptsData>) => 
       </thead>
       <tbody>
         {data.rows.map(row => (
-          <tr key={row.itemId} className="border-t border-[#efebe0]">
+          <tr key={row.itemId} className="border-t border-border-light">
             <td
               className="max-w-0 truncate py-2 pr-3 text-typography-900"
               title={row.courseTitle ? `${row.title} · ${row.courseTitle}` : row.title}
@@ -1913,8 +1913,8 @@ const NewCharacter = ({ data }: DataRendererProps<NewCharacterData>) => {
     );
   }
   const bars = [
-    { key: "familiar", value: data.familiar, colour: "#8f8a7e" },
-    { key: "unfamiliar", value: data.unfamiliar, colour: "#2a5db0" },
+    { key: "familiar", value: data.familiar, colour: "rgb(var(--color-border-dark))" },
+    { key: "unfamiliar", value: data.unfamiliar, colour: "rgb(var(--color-primary-500))" },
   ];
   return (
     <div className="flex flex-col gap-3" data-testid="statistics-new-character">
@@ -1928,7 +1928,7 @@ const NewCharacter = ({ data }: DataRendererProps<NewCharacterData>) => {
               {t("statisticsLibrary.newCharacter.value", { value: bar.value })}
             </span>
           </span>
-          <span className="h-3 rounded-md bg-[#efebe0]">
+          <span className="h-3 rounded-md bg-background-tertiary">
             <span
               className="block h-3 rounded-md"
               style={{ width: `${levelPercent(bar.value)}%`, background: bar.colour }}
@@ -1965,11 +1965,11 @@ const HelpfulBehaviours = ({ data }: DataRendererProps<HelpfulBehavioursData>) =
     <div className="flex flex-col gap-3" data-testid="statistics-helpful-behaviours">
       <div className="flex flex-wrap gap-4 text-xs text-typography-600">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-sm bg-[#c9c3b3]" />
+          <span className="inline-block h-3 w-3 rounded-sm bg-border-medium" />
           {t("statisticsLibrary.behaviours.first")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-sm bg-[#2a5db0]" />
+          <span className="inline-block h-3 w-3 rounded-sm bg-primary-500" />
           {t("statisticsLibrary.behaviours.latest")}
         </span>
       </div>
@@ -1978,11 +1978,11 @@ const HelpfulBehaviours = ({ data }: DataRendererProps<HelpfulBehavioursData>) =
           <li key={row.code} className="flex flex-col gap-1 text-sm">
             <span className="text-typography-900">{row.text}</span>
             {[
-              { key: "first", value: row.beforePercent, colour: "#c9c3b3" },
-              { key: "latest", value: row.afterPercent, colour: "#2a5db0" },
+              { key: "first", value: row.beforePercent, colour: "rgb(var(--color-border-medium))" },
+              { key: "latest", value: row.afterPercent, colour: "rgb(var(--color-primary-500))" },
             ].map(bar => (
               <span key={bar.key} className="flex items-center gap-2">
-                <span className="h-2.5 flex-1 rounded-md bg-[#efebe0]">
+                <span className="h-2.5 flex-1 rounded-md bg-background-tertiary">
                   <span
                     className="block h-2.5 rounded-md"
                     style={{ width: `${bar.value}%`, background: bar.colour }}
@@ -2082,9 +2082,9 @@ const ScoreByAttempt = ({ data }: DataRendererProps<ScoreByAttemptData>) => {
               {t("statisticsLibrary.attempts.learners", { count: step.learners })}
             </span>
           </span>
-          <span className="h-3 rounded-md bg-[#efebe0]">
+          <span className="h-3 rounded-md bg-background-tertiary">
             <span
-              className="block h-3 rounded-md bg-[#2a5db0]"
+              className="block h-3 rounded-md bg-primary-500"
               style={{ width: `${Math.min(100, step.averageScore)}%` }}
             />
           </span>
@@ -2115,9 +2115,9 @@ const dash = (v: number | null, unit = "") => (v === null ? "—" : `${v}${unit}
 // TSQ-088 Learners across modules
 
 const MODULE_STATUS_COLOUR = {
-  completed: "#1e6b3a",
-  inProgress: "#2a5db0",
-  notStarted: "#d9d4c6",
+  completed: "rgb(var(--color-tone-sage))",
+  inProgress: "rgb(var(--color-primary-500))",
+  notStarted: "rgb(var(--color-border-medium))",
 } as const;
 
 const LearnersAcrossModules = ({ data }: DataRendererProps<LearnersAcrossModulesData>) => {
@@ -2152,7 +2152,7 @@ const LearnersAcrossModules = ({ data }: DataRendererProps<LearnersAcrossModules
           </thead>
           <tbody>
             {data.learners.map(learner => (
-              <tr key={learner.learnerId} className="border-t border-[#efebe0]">
+              <tr key={learner.learnerId} className="border-t border-border-light">
                 <td className={`${TD} font-medium text-typography-900`}>{learner.name}</td>
                 {learner.cells.map((cell, i) => (
                   <td key={data.modules[i].sectionId} className={TD}>
@@ -2219,7 +2219,7 @@ const ModuleDifficulty = ({ data }: DataRendererProps<ModuleDifficultyData>) => 
             </thead>
             <tbody>
               {data.levels.map(level => (
-                <tr key={level.difficulty} className="border-t border-[#efebe0]">
+                <tr key={level.difficulty} className="border-t border-border-light">
                   <td className={`${TD} font-medium text-typography-900`}>
                     {levelLabel(t, level.difficulty)}
                   </td>
@@ -2251,7 +2251,7 @@ const ModuleDifficulty = ({ data }: DataRendererProps<ModuleDifficultyData>) => 
           </thead>
           <tbody>
             {data.modules.map(m => (
-              <tr key={m.sectionId} className="border-t border-[#efebe0]">
+              <tr key={m.sectionId} className="border-t border-border-light">
                 <td className={`${TD} font-medium text-typography-900`}>{m.title}</td>
                 <td className={TD}>{levelLabel(t, m.difficulty)}</td>
                 <td className={TD}>{m.reached}</td>
@@ -2296,7 +2296,7 @@ const RoleplayTable = ({ data }: DataRendererProps<RoleplayTableData>) => {
         </thead>
         <tbody>
           {data.rows.map(r => (
-            <tr key={r.itemId} className="border-t border-[#efebe0]">
+            <tr key={r.itemId} className="border-t border-border-light">
               <td className={`${TD} font-medium text-typography-900`}>{r.title}</td>
               <td className={TD}>{r.sessions}</td>
               <td className={TD}>{dash(r.abandonmentPercent, "%")}</td>
@@ -2326,13 +2326,13 @@ const ScoreSpread = ({ data }: DataRendererProps<ScoreSpreadData>) => {
             <span className="truncate text-typography-900" title={r.title}>
               {r.title}
             </span>
-            <span className="relative h-3 rounded-md bg-[#efebe0]">
+            <span className="relative h-3 rounded-md bg-background-tertiary">
               <span
-                className="absolute top-0 h-3 rounded-md bg-[#9db5dd]"
+                className="absolute top-0 h-3 rounded-md bg-primary-300"
                 style={{ left: `${r.low}%`, width: `${Math.max(1, r.high - r.low)}%` }}
               />
               <span
-                className="absolute top-[-2px] h-4 w-1 rounded bg-[#264d8e]"
+                className="absolute top-[-2px] h-4 w-1 rounded bg-primary-500"
                 style={{ left: `${r.typical}%` }}
               />
             </span>
@@ -2353,7 +2353,11 @@ const ScoreSpread = ({ data }: DataRendererProps<ScoreSpreadData>) => {
 
 // TSQ-086 Learner change
 
-const TREND_COLOUR = { improving: "#1e6b3a", steady: "#8f8a7e", declining: "#b4490a" } as const;
+const TREND_COLOUR = {
+  improving: "rgb(var(--color-tone-sage))",
+  steady: "rgb(var(--color-border-dark))",
+  declining: "rgb(var(--color-tone-alarm))",
+} as const;
 
 const LearnerChange = ({ data }: DataRendererProps<LearnerChangeData>) => {
   const { t } = useTranslation();
@@ -2379,7 +2383,7 @@ const LearnerChange = ({ data }: DataRendererProps<LearnerChangeData>) => {
             <span className="w-36 flex-none truncate text-typography-900" title={r.name}>
               {r.name}
             </span>
-            <span className="relative h-3 flex-1 rounded-md bg-[#efebe0]">
+            <span className="relative h-3 flex-1 rounded-md bg-background-tertiary">
               <span
                 className="absolute top-0 h-3 rounded-md opacity-40"
                 style={{
@@ -2441,7 +2445,7 @@ const SkillGrid = ({ data }: DataRendererProps<SkillGridData>) => {
           </thead>
           <tbody>
             {data.rows.map(row => (
-              <tr key={row.id} className="border-t border-[#efebe0]">
+              <tr key={row.id} className="border-t border-border-light">
                 <td className={`${TD} font-medium text-typography-900`}>{row.title}</td>
                 {data.skills.map(skill => {
                   const c = cell(row.id, skill);
@@ -2478,11 +2482,11 @@ const BehavioursAgainstGroup = ({ data }: DataRendererProps<BehavioursAgainstGro
     <div className="flex flex-col gap-3" data-testid="statistics-behaviours-group">
       <div className="flex flex-wrap gap-4 text-xs text-typography-600">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-sm bg-[#2a5db0]" />
+          <span className="inline-block h-3 w-3 rounded-sm bg-primary-500" />
           {t("statisticsLibrary.behaviourGroup.learner")}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-sm bg-[#c9c3b3]" />
+          <span className="inline-block h-3 w-3 rounded-sm bg-border-medium" />
           {t("statisticsLibrary.behaviourGroup.group")}
         </span>
       </div>
@@ -2491,11 +2495,15 @@ const BehavioursAgainstGroup = ({ data }: DataRendererProps<BehavioursAgainstGro
           <li key={row.code} className="flex flex-col gap-1 text-sm">
             <span className="text-typography-900">{row.text}</span>
             {[
-              { key: "learner", value: row.learnerPercent, colour: "#2a5db0" },
-              { key: "group", value: row.groupPercent, colour: "#c9c3b3" },
+              {
+                key: "learner",
+                value: row.learnerPercent,
+                colour: "rgb(var(--color-primary-500))",
+              },
+              { key: "group", value: row.groupPercent, colour: "rgb(var(--color-border-medium))" },
             ].map(bar => (
               <span key={bar.key} className="flex items-center gap-2">
-                <span className="h-2.5 flex-1 rounded-md bg-[#efebe0]">
+                <span className="h-2.5 flex-1 rounded-md bg-background-tertiary">
                   <span
                     className="block h-2.5 rounded-md"
                     style={{ width: `${bar.value}%`, background: bar.colour }}
@@ -2552,7 +2560,7 @@ const SessionsWaiting = ({ data }: DataRendererProps<SessionsWaitingData>) => {
           </thead>
           <tbody>
             {data.rows.map(r => (
-              <tr key={r.sessionId} className="border-t border-[#efebe0]">
+              <tr key={r.sessionId} className="border-t border-border-light">
                 <td className={`${TD} font-medium text-typography-900`}>{r.scenarioTitle}</td>
                 <td className={TD}>{r.learnerName}</td>
                 <td className={TD}>
@@ -2597,7 +2605,7 @@ const Cohorts = ({ data }: DataRendererProps<CohortsData>) => {
         </thead>
         <tbody>
           {data.rows.map(r => (
-            <tr key={r.start} className="border-t border-[#efebe0]">
+            <tr key={r.start} className="border-t border-border-light">
               <td className={`${TD} font-medium text-typography-900`}>
                 {new Date(r.start).toLocaleDateString(i18n.language, {
                   month: "short",
@@ -2638,9 +2646,9 @@ const courseFactsTakeaway = (data: MeasuresData, t: TFunction) => {
 // ── TSQ-064 Progress in each course ────────────────────────────
 
 const STATUS_COLOUR: Record<LearnerCoursesData["rows"][number]["status"], string> = {
-  completed: "#1e6b3a",
-  inProgress: "#2a5db0",
-  notStarted: "#8f8a7e",
+  completed: "rgb(var(--color-tone-sage))",
+  inProgress: "rgb(var(--color-primary-500))",
+  notStarted: "rgb(var(--color-border-dark))",
 };
 
 const LearnerCourses = ({ data }: DataRendererProps<LearnerCoursesData>) => {
@@ -2669,7 +2677,7 @@ const LearnerCourses = ({ data }: DataRendererProps<LearnerCoursesData>) => {
                 })}
               </span>
             </span>
-            <span className="h-3 rounded-md bg-[#efebe0]">
+            <span className="h-3 rounded-md bg-background-tertiary">
               <span
                 className="block h-3 rounded-md"
                 style={{ width: `${percent}%`, background: STATUS_COLOUR[row.status] }}

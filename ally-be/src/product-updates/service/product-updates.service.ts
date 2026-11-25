@@ -57,6 +57,7 @@ export class ProductUpdatesService {
       limit,
       offset,
       surface: query.surface,
+      area: query.area,
     });
     return {
       updates: updates.map((update) => ({

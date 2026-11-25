@@ -50,7 +50,7 @@ export const LISTS = {
       "Stop using {number} for this assistant? People who message it get no reply until it's connected again.",
     stopConfirm: "Stop using it",
     keep: "Keep it",
-    ownerOnly: "Only the assistant's owner can connect a number.",
+    ownerOnly: "Only the assistant's author can connect a number.",
     empty: "No number yet.",
   },
   team: {
@@ -58,9 +58,9 @@ export const LISTS = {
     roleLabel: "What they can do",
     viewer: "Can view and try it",
     editor: "Can change it",
-    owner: "Owner: also manages the team",
+    owner: "Author: also manages the team",
     you: "You",
-    ownerOnly: "Only an owner can change the team.",
+    ownerOnly: "Only an author can change the team.",
   },
   documents: {
     upload: "Upload a file",

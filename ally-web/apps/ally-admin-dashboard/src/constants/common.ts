@@ -389,6 +389,8 @@ export const ApiEndpoints = {
       `/v1/blog-review/posts/${encodeURIComponent(id)}/suggestions/${encodeURIComponent(suggestionId)}`,
   },
   PRODUCT_UPDATES: {
+    /** Open to everyone: the live, public updates. The corner drawer's Change log reads it. */
+    PUBLIC: "/v1/product-updates/public",
     LIST: "/v1/product-updates",
     STATUS: "/v1/product-updates/status",
     RUN: "/v1/product-updates/run",

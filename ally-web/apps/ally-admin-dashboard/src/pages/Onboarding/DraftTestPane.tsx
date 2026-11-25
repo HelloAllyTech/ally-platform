@@ -13,12 +13,13 @@ import { LikelyQuestions } from "./LikelyQuestions";
 import { PERSONA_SCRIPTS } from "./personaScripts";
 import { ConfirmationCard, ReplyPartsView, TestOnly } from "../../botPage/components/parts";
 import { pickCopy } from "../../botPage/copy";
+import { surfaceProps } from "../../botPage/theme";
 
 import type { FixTools } from "./FixThis";
 import type { PersonaScript } from "./personaScripts";
 import type { SplitBridge } from "./splitBridge";
 import type { BotDraftView } from "./types";
-import type { PublicConfirmation, ReplyParts } from "../../botPage/types";
+import type { BotPageBranding, PublicConfirmation, ReplyParts } from "../../botPage/types";
 
 import "./draftTest.css";
 import "../../botPage/page.css";
@@ -634,216 +635,256 @@ export const DraftTestPane: React.FC<{
           ))}
         </ul>
       )}
-      <div className="ally-dt__scroll" ref={scroller}>
-        {likelyRun > 0 && (
-          <LikelyQuestions
-            key={likelyRun}
-            draftId={draftId}
-            disabled={Boolean(pending) || Boolean(playing)}
-            onOpen={openInChat}
-            onFinished={() => setFinished(true)}
-            onBusy={setLikelyBusy}
-            onClose={() => setLikelyRun(0)}
-          />
-        )}
-        {channel !== "page" && (
-          <div
-            className={`ally-dt__strip ally-dt__strip--${channel}`}
-            data-testid="draft-test-strip"
+      {/* The conversation and its composer are what the person who chats will see: the visitor
+          design (`.brand-surface`, in the bot's own colour), not the builder's. Anything that is
+          the builder's own tooling inside it is put back on the builder's system (`.ally-v2`). */}
+      <div
+        className="brand-surface ally-dt__stage"
+        {...surfaceProps({
+          accentColour: view.draft.branding?.accentColour ?? "",
+        } as BotPageBranding)}
+        data-testid="draft-test-stage"
+      >
+        <div className="ally-dt__scroll" ref={scroller}>
+          {likelyRun > 0 && (
+            <div className="ally-v2 ally-dt__builder">
+              <LikelyQuestions
+                key={likelyRun}
+                draftId={draftId}
+                disabled={Boolean(pending) || Boolean(playing)}
+                onOpen={openInChat}
+                onFinished={() => setFinished(true)}
+                onBusy={setLikelyBusy}
+                onClose={() => setLikelyRun(0)}
+              />
+            </div>
+          )}
+          {channel !== "page" && (
+            <div
+              className={`ally-dt__strip ally-dt__strip--${channel}`}
+              data-testid="draft-test-strip"
+            >
+              {channel === "whatsapp" ? T_CHANNEL.whatsappStrip : T_CHANNEL.widgetStrip}
+              {view.draft.assistantName ? ` · ${view.draft.assistantName}` : ""}
+            </div>
+          )}
+          {items.length === 0 && !pending && (
+            <div className="ally-dt__intro">
+              {view.draft.introduction && (
+                <p className="bp-bubble bp-bubble--assistant">
+                  {view.draft.assistantName && <strong>{view.draft.assistantName}</strong>}
+                  {view.draft.assistantName ? ": " : ""}
+                  {view.draft.introduction}
+                </p>
+              )}
+              {!finished && !aiOff && suggestions.length > 0 && (
+                <div className="ally-chips" role="group" aria-label={T.suggested}>
+                  {suggestions.map(question => (
+                    <Chip key={question} outline onToggle={() => void send(question, "new")}>
+                      {question}
+                    </Chip>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          <ol
+            className={`ally-dt__list ally-dt__list--${channel}`}
+            data-testid="draft-test-transcript"
           >
-            {channel === "whatsapp" ? T_CHANNEL.whatsappStrip : T_CHANNEL.widgetStrip}
-            {view.draft.assistantName ? ` · ${view.draft.assistantName}` : ""}
-          </div>
-        )}
-        {items.length === 0 && !pending && (
-          <div className="ally-dt__intro">
-            {view.draft.introduction && (
-              <p>
-                {view.draft.assistantName && <strong>{view.draft.assistantName}</strong>}
-                {view.draft.assistantName ? ": " : ""}
-                {view.draft.introduction}
-              </p>
-            )}
-            {!finished && !aiOff && suggestions.length > 0 && (
-              <div className="ally-chips" role="group" aria-label={T.suggested}>
-                {suggestions.map(question => (
-                  <Chip key={question} outline onToggle={() => void send(question, "new")}>
-                    {question}
-                  </Chip>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        <ol
-          className={`ally-dt__list ally-dt__list--${channel}`}
-          data-testid="draft-test-transcript"
-        >
-          {items.map(item => {
-            if (item.kind === "note") {
+            {items.map(item => {
+              if (item.kind === "note") {
+                return (
+                  <li key={item.id} className="ally-dt__note ally-small">
+                    {T.updated}
+                  </li>
+                );
+              }
+              if (item.kind === "info") {
+                return (
+                  <li key={item.id} className="ally-dt__note ally-small" role="status">
+                    {item.text}
+                  </li>
+                );
+              }
+              if (item.kind === "user") {
+                return (
+                  <li key={item.id} className="ally-dt__msg ally-dt__msg--user">
+                    <span className="ally-dt__who">{T.you}</span>
+                    <p className={channel === "page" ? "bp-bubble bp-bubble--user" : undefined}>
+                      {item.text}
+                    </p>
+                  </li>
+                );
+              }
+              const isLast = item === lastReply;
               return (
-                <li key={item.id} className="ally-dt__note ally-small">
-                  {T.updated}
-                </li>
-              );
-            }
-            if (item.kind === "info") {
-              return (
-                <li key={item.id} className="ally-dt__note ally-small" role="status">
-                  {item.text}
-                </li>
-              );
-            }
-            if (item.kind === "user") {
-              return (
-                <li key={item.id} className="ally-dt__msg ally-dt__msg--user">
-                  <span className="ally-dt__who">{T.you}</span>
-                  <p>{item.text}</p>
-                </li>
-              );
-            }
-            const isLast = item === lastReply;
-            return (
-              <li
-                key={item.id}
-                className={`ally-dt__msg ally-dt__msg--assistant${item.faded ? " is-faded" : ""}`}
-              >
-                <span className="ally-dt__who">
-                  {T.assistant}
-                  {olderThanNow(item) && <span className="ally-dt__older"> · {T.older}</span>}
-                </span>
-                <p>{item.text}</p>
-                {(item.parts || item.confirmation) && (
-                  // BT1: the bot page's own cards and chips, in its look.
-                  <div className="brand-surface ally-dt__parts">
-                    {item.confirmation && (
-                      <ConfirmationCard
-                        confirmation={item.confirmation}
-                        copy={pageCopy}
-                        when={item.confirmation.title}
-                      >
-                        <TestOnly text={item.confirmation.testOnly} />
-                      </ConfirmationCard>
+                <li
+                  key={item.id}
+                  className={`ally-dt__msg ally-dt__msg--assistant${item.faded ? " is-faded" : ""}`}
+                >
+                  <span className="ally-dt__who">
+                    {T.assistant}
+                    {olderThanNow(item) && <span className="ally-dt__older"> · {T.older}</span>}
+                  </span>
+                  <p className={channel === "page" ? "bp-bubble bp-bubble--assistant" : undefined}>
+                    {item.text}
+                  </p>
+                  {(item.parts || item.confirmation) && (
+                    // BT1: the bot page's own cards and chips, in its look.
+                    <div className="brand-surface ally-dt__parts">
+                      {item.confirmation && (
+                        <ConfirmationCard
+                          confirmation={item.confirmation}
+                          copy={pageCopy}
+                          when={item.confirmation.title}
+                        >
+                          <TestOnly text={item.confirmation.testOnly} />
+                        </ConfirmationCard>
+                      )}
+                      {item.parts && (
+                        <ReplyPartsView
+                          parts={item.parts}
+                          active={isLast && !pending}
+                          onTap={button => void send(button.label, "new", button.token)}
+                        />
+                      )}
+                    </div>
+                  )}
+                  <div className="ally-v2 ally-dt__builder">
+                    {item.starter && (
+                      <p className="ally-small" data-testid="draft-test-starter">
+                        {BUILD_COPY.starter}
+                      </p>
                     )}
-                    {item.parts && (
-                      <ReplyPartsView
-                        parts={item.parts}
-                        active={isLast && !pending}
-                        onTap={button => void send(button.label, "new", button.token)}
+                    {item.workingCopy && (
+                      <p className="ally-small" data-testid="draft-test-working-copy">
+                        {BUILD_COPY.workingCopy}
+                      </p>
+                    )}
+                    {(item.pendingDocuments > 0 || !item.editsSearchable) && (
+                      <p className="ally-small">
+                        {item.afterFix || !item.editsSearchable
+                          ? SPLIT_COPY.stillLearning
+                          : T.stillReading}
+                      </p>
+                    )}
+                    {item.why && <ReplyDetails why={item.why} />}
+                    {fix && !item.faded && (
+                      <div className="ally-dt__actions">
+                        <Button
+                          variant="ghost"
+                          aria-expanded={fixing === item.id}
+                          onClick={() => setFixing(f => (f === item.id ? null : item.id))}
+                        >
+                          {T_FIX.button}
+                        </Button>
+                        {view.chatbotId && (
+                          <SaveAsTest chatbotId={view.chatbotId} question={item.question} />
+                        )}
+                      </div>
+                    )}
+                    {fix && fixing === item.id && (
+                      <FixPanel
+                        id={item.id}
+                        question={item.question}
+                        view={view}
+                        tools={fix}
+                        onFixed={() => reask(item.question, item.id)}
+                        onClose={() => setFixing(null)}
                       />
                     )}
-                  </div>
-                )}
-                {item.starter && (
-                  <p className="ally-small" data-testid="draft-test-starter">
-                    {BUILD_COPY.starter}
-                  </p>
-                )}
-                {item.workingCopy && (
-                  <p className="ally-small" data-testid="draft-test-working-copy">
-                    {BUILD_COPY.workingCopy}
-                  </p>
-                )}
-                {(item.pendingDocuments > 0 || !item.editsSearchable) && (
-                  <p className="ally-small">
-                    {item.afterFix || !item.editsSearchable
-                      ? SPLIT_COPY.stillLearning
-                      : T.stillReading}
-                  </p>
-                )}
-                {item.why && <ReplyDetails why={item.why} />}
-                {fix && !item.faded && (
-                  <div className="ally-dt__actions">
-                    <Button
-                      variant="ghost"
-                      aria-expanded={fixing === item.id}
-                      onClick={() => setFixing(f => (f === item.id ? null : item.id))}
-                    >
-                      {T_FIX.button}
-                    </Button>
-                    {view.chatbotId && (
-                      <SaveAsTest chatbotId={view.chatbotId} question={item.question} />
+                    {fix && !item.faded && item.unanswered && (
+                      <AddFactBox
+                        id={item.id}
+                        question={item.question}
+                        tools={fix}
+                        onDone={() => reask(item.question, item.id)}
+                      />
+                    )}
+                    {isLast && stale && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          const asked = [...items].reverse().find(i => i.kind === "user");
+                          if (asked?.kind === "user") void send(asked.text, "again");
+                        }}
+                      >
+                        {T.askAgain}
+                      </Button>
                     )}
                   </div>
-                )}
-                {fix && fixing === item.id && (
-                  <FixPanel
-                    id={item.id}
-                    question={item.question}
-                    view={view}
-                    tools={fix}
-                    onFixed={() => reask(item.question, item.id)}
-                    onClose={() => setFixing(null)}
-                  />
-                )}
-                {fix && !item.faded && item.unanswered && (
-                  <AddFactBox
-                    id={item.id}
-                    question={item.question}
-                    tools={fix}
-                    onDone={() => reask(item.question, item.id)}
-                  />
-                )}
-                {isLast && stale && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      const asked = [...items].reverse().find(i => i.kind === "user");
-                      if (asked?.kind === "user") void send(asked.text, "again");
-                    }}
-                  >
-                    {T.askAgain}
-                  </Button>
-                )}
+                </li>
+              );
+            })}
+            {pending && (
+              <li className="ally-dt__msg ally-dt__msg--assistant" data-testid="draft-test-pending">
+                <span className="ally-dt__who">{T.assistant}</span>
+                {pending.text ? <p>{pending.text}</p> : null}
+                <p className="ally-small ally-dt__status" role="status">
+                  <Orb size={14} working />
+                  {T.status[pending.status]}
+                </p>
               </li>
-            );
-          })}
-          {pending && (
-            <li className="ally-dt__msg ally-dt__msg--assistant" data-testid="draft-test-pending">
-              <span className="ally-dt__who">{T.assistant}</span>
-              {pending.text ? <p>{pending.text}</p> : null}
-              <p className="ally-small ally-dt__status" role="status">
-                <Orb size={14} working />
-                {T.status[pending.status]}
-              </p>
-            </li>
+            )}
+          </ol>
+          {failed && (
+            <div className="ally-v2 ally-dt__builder ally-dt__failed" role="alert">
+              <p>{T.failed}</p>
+              <Button variant="secondary" onClick={() => void send(failed, "retry")}>
+                {T.tryAgain}
+              </Button>
+            </div>
           )}
-        </ol>
-        {failed && (
-          <div className="ally-dt__failed" role="alert">
-            <p>{T.failed}</p>
-            <Button variant="secondary" onClick={() => void send(failed, "retry")}>
-              {T.tryAgain}
-            </Button>
+          {finished && <p className="ally-small">{T.finished}</p>}
+        </div>
+        {!finished && (
+          <div className="ally-v2 ally-dt__builder">
+            <CrawlProgress view={view} />
           </div>
         )}
-        {finished && <p className="ally-small">{T.finished}</p>}
-      </div>
-      {!finished && <CrawlProgress view={view} />}
-      {!finished && aiOff && (
-        <p className="ally-small" role="note" data-testid="draft-test-credits">
-          {aiOff}
-        </p>
-      )}
-      {!finished && !aiOff && (
-        <form className="ally-dt__form" onSubmit={submit}>
-          <input
-            className="ally-input"
-            aria-label={T.inputLabel}
-            placeholder={T.inputPlaceholder}
-            value={text}
-            disabled={Boolean(pending) || Boolean(playing)}
-            onChange={event => setText(event.target.value)}
-          />
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={Boolean(pending) || Boolean(playing) || !text.trim()}
+        {!finished && aiOff && (
+          <p
+            className="ally-small ally-dt__builder-note"
+            role="note"
+            data-testid="draft-test-credits"
           >
-            {T.send}
-          </Button>
-        </form>
-      )}
+            {aiOff}
+          </p>
+        )}
+        {!finished && !aiOff && (
+          <form className="bp-composer ally-dt__composer" onSubmit={submit}>
+            <div className="bp-composer__box">
+              <input
+                className="ally-dt__composer-input"
+                aria-label={T.inputLabel}
+                placeholder={T.inputPlaceholder}
+                value={text}
+                disabled={Boolean(pending) || Boolean(playing)}
+                onChange={event => setText(event.target.value)}
+              />
+              <button
+                type="submit"
+                className="bp-send ally-press"
+                aria-label={T.send}
+                disabled={Boolean(pending) || Boolean(playing) || !text.trim()}
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  aria-hidden="true"
+                >
+                  <path d="M12 19V5M6 11l6-6 6 6" />
+                </svg>
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </section>
   );
 };

@@ -47,7 +47,7 @@ button.ally-link--inline.ally-small {
 }
 .ally-lists__empty-art span {
   height: 12px;
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--ally-sunken);
 }
 .ally-lists__empty-art span:nth-child(1) {
@@ -114,7 +114,7 @@ button.ally-lists__start:first-child {
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--ally-info-bg);
   color: var(--ally-info);
   font-size: 16px;
@@ -155,7 +155,7 @@ button.ally-lists__tab {
   min-height: 40px;
   padding: 0 14px;
   border: 0;
-  border-radius: 9px;
+  border-radius: 0;
   background: transparent;
   color: var(--ally-muted);
   font: 500 14px/1 var(--ally-font-ui);
@@ -165,7 +165,7 @@ button.ally-lists__tab {
 button.ally-lists__tab[aria-selected="true"] {
   background: var(--ally-surface);
   color: var(--ally-ink);
-  box-shadow: 0 1px 2px rgba(23, 23, 28, 0.08);
+  box-shadow: none;
 }
 button.ally-lists__tab:focus-visible {
   outline: none;

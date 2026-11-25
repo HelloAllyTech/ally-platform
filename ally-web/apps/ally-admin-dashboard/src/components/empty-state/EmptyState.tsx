@@ -9,6 +9,8 @@ export interface EmptyStateProps {
   onAction?: () => void;
   className?: string;
   hideActionButton?: boolean;
+  /** A picture under the text (decorative: give it `aria-hidden`). */
+  illustration?: React.ReactNode;
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
@@ -18,6 +20,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   onAction,
   className,
   hideActionButton = false,
+  illustration,
 }) => {
   return (
     <div
@@ -29,6 +32,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           {subtitle}
         </p>
       )}
+      {illustration && <div className="mt-2 mb-4">{illustration}</div>}
       {actionLabel && !hideActionButton && (
         <button
           onClick={onAction}

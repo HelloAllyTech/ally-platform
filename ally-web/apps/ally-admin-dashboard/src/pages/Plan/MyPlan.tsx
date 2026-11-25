@@ -134,19 +134,14 @@ export const MyPlanBody: React.FC<{ plan: MyPlanView }> = ({ plan }) => (
 
 /**
  * The owner's Plan and usage (CR1 §C3), from the account menu: the plan, each assistant's seats
- * and this month's counts as plain bars. The monthly usage allowance is the one amount in dollars:
+ * and this month's counts as plain bars. `MyPlanPanel` is the content alone, which the corner
+ * menu's drawer also draws as its Seats and plan tab. The monthly usage allowance is the one amount in dollars:
  * what is used of it, when it resets, and that assistants stop answering when it is used up.
  */
-export const MyPlan: React.FC = () => {
+export const MyPlanPanel: React.FC = () => {
   const { data, isLoading, isError } = useGetMyPlanQuery();
   return (
-    <div className="ally-v2 ally-list-page" data-testid="my-plan-page">
-      <header className="ally-list-page__head">
-        <div className="ally-list-page__title">
-          <h1 className="ally-display">{PLAN.title}</h1>
-          <p className="ally-small">{PLAN.intro}</p>
-        </div>
-      </header>
+    <>
       {isLoading && <p className="ally-small">{PLAN.loading}</p>}
       {isError && (
         <p className="ally-error" role="alert">
@@ -154,8 +149,20 @@ export const MyPlan: React.FC = () => {
         </p>
       )}
       {data && <MyPlanBody plan={data} />}
-    </div>
+    </>
   );
 };
+
+export const MyPlan: React.FC = () => (
+  <div className="ally-v2 ally-list-page" data-testid="my-plan-page">
+    <header className="ally-list-page__head">
+      <div className="ally-list-page__title">
+        <h1 className="ally-display">{PLAN.title}</h1>
+        <p className="ally-small">{PLAN.intro}</p>
+      </div>
+    </header>
+    <MyPlanPanel />
+  </div>
+);
 
 export default MyPlan;

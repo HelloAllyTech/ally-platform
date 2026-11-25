@@ -9,10 +9,6 @@ const labels: SplitBuildLabels = {
   group: "Build and test",
   build: "Build",
   test: "Test",
-  presets: "Layout",
-  half: "Half and half",
-  more: "More room for the assistant",
-  only: "Assistant only",
   divider: "Resize the build and test areas",
 };
 
@@ -99,27 +95,19 @@ describe("SplitBuild at 1280 px and wider", () => {
     expect(divider().getAttribute("aria-valuenow")).toBe("30");
   });
 
-  it("has three layout presets", () => {
+  it("has no layout buttons: the divider is the only control", () => {
     renderSplit();
-    fireEvent.click(screen.getByRole("button", { name: "More room for the assistant" }));
-    expect(divider().getAttribute("aria-valuenow")).toBe("40");
-    expect(
-      screen
-        .getByRole("button", { name: "More room for the assistant" })
-        .getAttribute("aria-pressed"),
-    ).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: "Half and half" }));
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+    expect(screen.queryByText("Half and half")).toBeNull();
+    expect(screen.queryByText("More room for the assistant")).toBeNull();
+    expect(screen.queryByText("Assistant only")).toBeNull();
     expect(divider().getAttribute("aria-valuenow")).toBe("50");
   });
 
-  it("'Assistant only' hides the build half (kept mounted) and the divider", () => {
+  it("ignores an older 'assistant only' choice and keeps both halves", () => {
+    window.localStorage.setItem(SPLIT_STORAGE_KEY, JSON.stringify({ pct: 50, only: true }));
     renderSplit();
-    fireEvent.click(screen.getByRole("button", { name: "Assistant only" }));
-    expect(screen.queryByRole("separator")).toBeNull();
-    // Hidden, not removed: what is typed in it survives coming back.
-    expect(screen.getByText("build content", { selector: "button" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "build content" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Half and half" }));
+    expect(divider()).toBeTruthy();
     expect(screen.getByRole("button", { name: "build content" })).toBeTruthy();
   });
 
@@ -128,7 +116,6 @@ describe("SplitBuild at 1280 px and wider", () => {
     fireEvent.keyDown(divider(), { key: "ArrowRight", shiftKey: true });
     expect(JSON.parse(window.localStorage.getItem(SPLIT_STORAGE_KEY) as string)).toEqual({
       pct: 60,
-      only: false,
     });
     unmount();
     renderSplit();
@@ -142,7 +129,7 @@ describe("SplitBuild at 1280 px and wider", () => {
   });
 
   it("clamps a stored value that is out of range", () => {
-    window.localStorage.setItem(SPLIT_STORAGE_KEY, JSON.stringify({ pct: 95, only: false }));
+    window.localStorage.setItem(SPLIT_STORAGE_KEY, JSON.stringify({ pct: 95 }));
     renderSplit();
     expect(divider().getAttribute("aria-valuenow")).toBe("70");
   });
