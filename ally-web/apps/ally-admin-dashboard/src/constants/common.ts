@@ -1713,6 +1713,8 @@ export const TAG_TYPES = {
   WHATSAPP_BOT_DOCUMENTS: "whatsAppBotDocuments",
   WHATSAPP_BOT_STATS: "whatsAppBotStats",
   WHATSAPP_BOT_TEMPLATES: "whatsAppBotTemplates",
+  /** Staff-managed use-case templates (Assistants admin → Templates). */
+  ASSISTANT_TEMPLATES_ADMIN: "assistantTemplatesAdmin",
   WHATSAPP_BOT_SETTINGS: "whatsAppBotSettings",
   WHATSAPP_BOT_CONVERSATIONS: "whatsAppBotConversations",
   WHATSAPP_BOT_UNANSWERED: "whatsAppBotUnanswered",

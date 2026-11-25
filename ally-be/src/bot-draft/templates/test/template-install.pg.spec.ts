@@ -13,7 +13,10 @@ import { ListRecordsService } from '../../../chatbot/lists/list-records.service'
 import { ListConsentService } from '../../../chatbot/agent-tools/list-consent.service';
 import { ListToolsService } from '../../../chatbot/agent-tools/list-tools.service';
 import { memoryRedis } from '../../../chatbot/agent-tools/test/agent-tools.fakes';
-import { TEMPLATES } from '../../../chatbot/templates/templates';
+import {
+  TEMPLATES,
+  type UseCaseTemplate,
+} from '../../../chatbot/templates/templates';
 import { ChatbotCheckupCase } from '../../entity/chatbot-checkup.entity';
 import { ChatbotTemplateInstall } from '../../entity/chatbot-template-install.entity';
 import { SafetyPackId } from '../../enum/bot-draft.enum';
@@ -29,6 +32,10 @@ describePg('Use-case templates: install (Postgres)', () => {
   let records: ListRecordsService;
   let service: TemplateService;
   let bot: string;
+  const managed = new Map<
+    string,
+    { template: UseCaseTemplate; version: number }
+  >();
 
   const settings = {
     getForChatbot: async (chatbot: { settings?: Record<string, unknown> }) =>
@@ -75,16 +82,65 @@ describePg('Use-case templates: install (Postgres)', () => {
       records,
       drafts as never,
       publish as never,
+      // The built-in templates, with `managed` laid over them as a published version would be.
+      {
+        all: async () => TEMPLATES.map((t) => managed.get(t.id)?.template ?? t),
+        byId: async (id: string) => {
+          const over = managed.get(id);
+          const template = over?.template ?? TEMPLATES.find((t) => t.id === id);
+          return template
+            ? {
+                template,
+                source: over ? 'managed' : 'code',
+                version: over?.version ?? null,
+                overrides: Boolean(over),
+              }
+            : undefined;
+        },
+      } as never,
     );
   });
   afterAll(async () => closeTestDataSource(ds));
   beforeEach(async () => {
+    managed.clear();
     await resetTables(ds);
     await ds.query(
       `TRUNCATE chatbot_template_installs, chatbot_checkup_cases, bot_drafts CASCADE`,
     );
     bot = await seedChatbot(ds, 'T1 bot');
     await ds.query(`UPDATE chatbots SET status = 'draft' WHERE id = $1`, [bot]);
+  });
+
+  it('installs a staff-published version, and records which version it started from', async () => {
+    const clinic = TEMPLATES.find((t) => t.id === 'clinic')!;
+    // The published version adds nothing but a smaller set of lists.
+    const edited: UseCaseTemplate = {
+      ...clinic,
+      lists: clinic.lists.slice(0, 1),
+    };
+    managed.set('clinic', { template: edited, version: 7 });
+
+    await service.installOnAssistant(bot, 'clinic', {});
+    expect(await keys()).toEqual([clinic.lists[0].key]);
+
+    const [install] = await ds.query(
+      `SELECT template_id, template_version, template_kind FROM chatbot_template_installs WHERE chatbot_id = $1`,
+      [bot],
+    );
+    expect(install).toEqual({
+      template_id: 'clinic',
+      template_version: 7,
+      template_kind: 'code',
+    });
+  });
+
+  it('records no version for a built-in', async () => {
+    await service.installOnAssistant(bot, 'clinic', {});
+    const [install] = await ds.query(
+      `SELECT template_version FROM chatbot_template_installs WHERE chatbot_id = $1`,
+      [bot],
+    );
+    expect(install.template_version).toBeNull();
   });
 
   it.each(TEMPLATES.map((t) => [t.id] as const))(

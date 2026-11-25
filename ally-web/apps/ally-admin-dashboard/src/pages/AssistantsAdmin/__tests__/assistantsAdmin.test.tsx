@@ -53,6 +53,7 @@ vi.mock("../panels/embedded", () => {
     QuickRepliesView: panel("replies panel"),
     KnowledgeLibraryView: panel("library panel"),
     ChannelsView: panel("channels panel"),
+    TemplatesView: panel("templates panel"),
     SupportPanel: panel("support panel"),
   };
 });
