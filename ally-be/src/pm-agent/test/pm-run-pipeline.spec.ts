@@ -572,6 +572,18 @@ describe('filing to the roadmap: what a card must be before an admin sees it', (
     ).toHaveLength(0);
   });
 
+  it('runs the selected lanes in parallel, not one after another', async () => {
+    // local 2026-11-25: one after another, a gpt-5 run took the sum of its lanes and timed out.
+    const h = harness(oneRec({ pass: true, reasons: [] }));
+    await h.run();
+    const laneCalls = h.llm.calls.filter((call) => call.kind === 'lane');
+    const lanes = new Set(laneCalls.map((call) => call.lane));
+    expect(lanes.size).toBeGreaterThan(1);
+    // Every lane's first pass starts before any lane's second.
+    const firstRound = laneCalls.slice(0, lanes.size).map((call) => call.lane);
+    expect(new Set(firstRound).size).toBe(lanes.size);
+  });
+
   it('the critic reads a cited figure that sits past the first few hundred characters of its evidence', async () => {
     // prod 2026-11-25: the critic saw 600 characters of an analytics result the lane had read in
     // full, and refused "116 of 298" as unsupported.
