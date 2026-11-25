@@ -14,8 +14,8 @@ import { ChatbotAccessMode } from "@types";
 
 import { ACCESS_COPY as C } from "../../Credits/copy";
 import { TF1_COPY } from "../copy/tf1";
-import { useHomeField } from "../useHomeField";
 import { Group } from "../fields";
+import { useHomeField } from "../useHomeField";
 
 import type { SectionProps } from "./props";
 
