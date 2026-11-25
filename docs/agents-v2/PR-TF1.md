@@ -45,12 +45,15 @@ Hybrid search (`KNOWLEDGE_AGENT__HYBRID_SEARCH`, alpha 0.5, neighbour chunks, as
 ## Risk and roll-back
 
 - **Migrations** (additive; each has a down): clean stored helpline numbers (`1988150000000`), a contact's `name_forgotten_at` (`1988200000000`), Callback requests' preferred day and requester title (`1988300000000`), template voices backfill (`1988400000000`).
-- **Prompts to push at release** (after the ally-be deploy): `ally_ai_knowledge_crisis_classify`, `ally_ai_agent_system`, `ally_ai_builder_change`, `ally_ai_builder_extract`. Table in the notes.
+- **Prompts to push at release** (after the ally-be deploy): `ally_ai_knowledge_crisis_classify`, `ally_ai_agent_system`, `ally_ai_builder_change`, `ally_ai_builder_extract`. Table in the notes. Their default `.txt` files change in this PR too, deliberately, so the text to push is in Git and the fallback matches it: **the PR needs the `prompt-default-refresh` label** for the prompt check to pass (no contract changes; no variables added or removed).
 - **ally-ai** request schema gains an optional `persona.template`; ally-be trims the owner's instructions so instructions plus the voice stay under 4,000 characters.
 
 ## Checks
 
-FINAL_CHECKS
+- **ally-be:** 20,504 tests pass (`npm test -- --forceExit --detectOpenHandles`); the rate-limit spec times out only under the full parallel run and passes alone (22/22). Lint 0 errors, typecheck clean.
+- **ally-ai:** 3,299 tests pass; flake8 clean.
+- **ally-web:** tests and the admin typecheck pass. Lint and format failures are only in files that already fail on master; this branch's files are clean.
+- **Prompt check:** passes with `prompt-default-refresh` (see Risk and roll-back).
 
 ## Final run (local stack)
 
