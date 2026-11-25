@@ -456,6 +456,9 @@ export function BotPageApp({
           );
       setPending(p => (p ? { ...p, text: target.slice(0, shown) } : p));
     }, REVEAL_TICK_MS);
+    // Leaving the page (or a newer message) aborts this send: its reveal stops with it, so the
+    // timer never writes state after unmount.
+    controller.signal.addEventListener("abort", () => clearInterval(timer));
     /** Let the reveal catch up before the stored reply replaces it (at most 4 s). */
     const finishReveal = async () => {
       const deadline = Date.now() + REVEAL_MAX_MS;
@@ -524,10 +527,12 @@ export function BotPageApp({
         ]);
       } catch (err) {
         clearInterval(timer);
+        // Aborted: the page has gone, or a newer message took over and owns the reply area
+        // (stopping its steps or clearing its pending reply would undo that one).
+        if (controller.signal.aborted) return;
         // A failed run ends its steps quietly; the error, if any, is the page's usual one.
         live.stop();
         setPending(null);
-        if (controller.signal.aborted) return;
         const blockedState = err instanceof BotPageApiError ? BLOCKED_CODES[err.code] : undefined;
         if (blockedState) {
           setMessages(m => [
