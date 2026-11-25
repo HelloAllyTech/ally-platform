@@ -50,9 +50,11 @@ export const COURSE_COPILOT_INLINE_SPECIALIST_TIMEOUT_MS = 90_000;
 
 export const COURSE_COPILOT_LIMITS = {
   activeSessionsPerUser: 2,
-  sections: Math.min(8, TRACK_MAX_SECTIONS),
-  items: 40,
-  itemsPerSection: Math.min(12, TRACK_MAX_ITEMS_PER_SECTION),
+  // A course as large as trainers build by hand (80-90 items), in any shape the course builder
+  // allows: its own section and per-section limits.
+  sections: TRACK_MAX_SECTIONS,
+  items: 100,
+  itemsPerSection: TRACK_MAX_ITEMS_PER_SECTION,
   newCases: 2,
   images: 12,
   languagesPerRoleplay: 4,

@@ -242,7 +242,8 @@ export const EDIT_TOOL_DEFINITIONS: AgentToolDefinition[] = [
       'minDurationSeconds} where completionLogic is SCORE, DURATION, SCORE_AND_DURATION (the ' +
       'default: both gates) or PARTICIPATION (completes on launch, no gate); minDurationSeconds 0 = ' +
       'no minimum, omitted = the platform default. CASE {minScore}, QUIZ / ANNOTATED_ARTIFACT ' +
-      '{passScore 0-100}, BRANCHING_SCENARIO {passScore 0-100, 0 = explore}, VIDEO {watchPct 1-100}, ' +
+      '{passScore 0-100}, BRANCHING_SCENARIO {passScore 0-100: 0 = explore, 75 = only a positive ending ' +
+      'passes}, VIDEO {watchPct 1-100}, ' +
       'ARTICLE {minReadSeconds}. GAME and BUCKET_SORT have none.',
     input_schema: {
       type: 'object',
@@ -1560,10 +1561,14 @@ export class CourseCopilotEditToolsService {
   ): TrackItemCompletionCriteria | undefined {
     if (!raw || typeof raw !== 'object') return undefined;
     const source = raw as Record<string, any>;
+    // A whole percent: a scenario quiz's save refuses a fractional pass mark ("70.5"), and the
+    // model sometimes writes "80%".
     const pct = (value: unknown, min = 0) => {
-      const number = Number(value);
+      const number = Number(
+        typeof value === 'string' ? value.trim().replace(/%$/, '') : value,
+      );
       return Number.isFinite(number)
-        ? Math.max(min, Math.min(100, number))
+        ? Math.max(min, Math.min(100, Math.round(number)))
         : undefined;
     };
     const seconds = (value: unknown) => {

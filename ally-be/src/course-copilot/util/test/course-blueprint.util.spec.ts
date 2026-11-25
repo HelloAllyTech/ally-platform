@@ -448,17 +448,17 @@ describe('validateBlueprint', () => {
   });
 
   it('flags section, item and per-section limits', () => {
-    const sections = Array.from({ length: 9 }, (_, index) => ({
+    const sections = Array.from({ length: 21 }, (_, index) => ({
       title: `S${index}`,
-      items: Array.from({ length: index === 0 ? 13 : 4 }, () =>
+      items: Array.from({ length: index === 0 ? 31 : 4 }, () =>
         rawItem('JOURNAL'),
       ),
     }));
     const blueprint = normaliseBlueprint({ sections }, brief());
     expect(validateBlueprint(blueprint, brief())).toEqual([
-      'The course has 9 sections; a course can have at most 8. Merge or remove some.',
-      'The course has 45 items; a course can have at most 40. Remove some.',
-      "Section 1 · 'S0' has 13 items; a section can hold at most 12. Split it in two.",
+      'The course has 21 sections; a course can have at most 20. Merge or remove some.',
+      'The course has 111 items; a course can have at most 100. Remove some.',
+      "Section 1 · 'S0' has 31 items; a section can hold at most 30. Split it in two.",
     ]);
   });
 
