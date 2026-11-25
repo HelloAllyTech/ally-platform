@@ -77,7 +77,6 @@ function build(
     })),
   };
   const opportunities = { update: jest.fn(async () => ({})) };
-  const strategyGoals = { invalidate: jest.fn() };
   const planStore = {
     update: jest.fn(async () => ({})),
     patchPlan: jest.fn(async () => undefined),
@@ -95,7 +94,6 @@ function build(
     lookup as never,
     reader as never,
     opportunities as never,
-    strategyGoals as never,
     planStore as never,
     planStage as never,
     events as never,
@@ -111,7 +109,6 @@ function build(
     events,
     inbox,
     notifications,
-    strategyGoals,
   };
 }
 
@@ -263,14 +260,13 @@ describe('RoadmapItemEditService.patch', () => {
 });
 
 describe('RoadmapItemEditService.setStar', () => {
-  it('stars as the Owner and invalidates the board rank', async () => {
-    const { service, dataSource, strategyGoals, notifications } = build();
+  it('stars as the Owner and tells open queues', async () => {
+    const { service, dataSource, notifications } = build();
     const result = await service.setStar(ME, 'OPP-0388', true);
     const update: unknown[] | undefined = dataSource.query.mock.calls.find(
       (c: any[]) => String(c[0]).includes('"directorStarred" = $2'),
     );
     expect(update?.[1]).toEqual([ITEM_ID, true, ME, ME]);
-    expect(strategyGoals.invalidate).toHaveBeenCalledWith(ME);
     expect(notifications.emit).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'ITEM_CHANGED', fields: ['starred'] }),
     );

@@ -1990,21 +1990,6 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configPath: 'openai.transcriptionModel',
   },
   {
-    id: 'roadmap-idea-transcribe',
-    task: LlmTask.TRANSCRIPTION,
-    runtime: LlmRuntime.ALLY_BE,
-    trigger: 'An admin speaks an idea into the mic-and-bulb idea capture',
-    detail:
-      'One call per spoken phrase: the browser cuts a clip at each pause (or ' +
-      'every 30 s of unbroken speech) and skips clips with no speech in them. ' +
-      'Auto-detects the language. Nothing is stored.',
-    kind: AiTaskKind.TRANSCRIPTION,
-    provider: 'openai',
-    defaultModel: 'whisper-1',
-    configuredBy: 'OPENAI_TRANSCRIPTION_MODEL',
-    configPath: 'openai.transcriptionModel',
-  },
-  {
     id: 'voice-note-extract',
     task: LlmTask.VOICE_NOTE_EXTRACT,
     runtime: LlmRuntime.ALLY_BE,
@@ -2411,20 +2396,20 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.REASONING,
     trigger:
-      'The roadmap board classifies, de-duplicates or assesses an opportunity (including one the PM Agent files)',
+      'The Roadmap de-duplicates or assesses an idea (including one the PM Agent files), or summarises an interview note',
     detail:
-      "Goal classification, the duplicate check's confirmation pass, goal-impact assessment, " +
+      "The duplicate check's confirmation pass, goal-impact assessment " +
       '(the PM Agent runs the duplicate check once per accepted card before filing it, and its ' +
       "filing is assessed like any other; that spend is the roadmap's, not the PM Agent budget), " +
-      "interview-note summaries, Claude-prompt generation, and the Builder drawer's split/merge " +
-      'guard. Filing itself moved to the opportunity copilot (its own row). The standalone ' +
-      'readiness check, review and enhance calls were removed with the blank filing form. ' +
-      "Goal-impact assessment re-runs when an idea's text changes, whether from the drawer or " +
-      "from Roadmap v2's inline edit (PATCH /v1/roadmap/items/:code), which reuses the same update path. " +
+      'and interview-note summaries (POST /v1/product-roadmap/ai/summarise). Filing itself moved to the ' +
+      'opportunity copilot (its own row). Goal classification, Claude-prompt generation and the old ' +
+      "board's split/merge guard went with the old Product Roadmap page; the standalone readiness check, " +
+      'review and enhance calls were removed earlier with the blank filing form. ' +
+      "Goal-impact assessment re-runs when an idea's text changes through Roadmap v2's inline edit " +
+      '(PATCH /v1/roadmap/items/:code), and can be caught up in bulk from Strategy settings ' +
+      '(POST /v1/product-roadmap/strategy-goals/assess-missing). ' +
       "Roadmap v2 reuses the duplicate check twice more: a draft page's Similar ideas (GET /v1/roadmap/drafts/:code/similar, " +
       "debounced by the client after typing stops) and the Owner's triage pane (GET /v1/roadmap/items/:code/similar). " +
-      "The Roadmap cutover (POST /v1/roadmap/cutover, an Owner's one-off switch-on) assesses each idea it files for a " +
-      'live direct Builder session once, after its commit, as any filing is (and embeds it for the duplicate check). ' +
       'Start planning (POST /v1/roadmap/items/:code/start-planning) runs the duplicate check once per idea, as the Owner who ' +
       "pressed it, to list similar ideas in the planning agent's dated hand-off (PlanHandoffService); a failure leaves the list empty.",
     kind: AiTaskKind.COMPLETION,
@@ -2439,11 +2424,12 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     runtime: LlmRuntime.ALLY_BE,
     tier: LlmModelTier.REASONING,
     trigger:
-      'A roadmap plan runs a review-board check (on its own the first time the PRD reads ready, or when the planner asks), drafts launch materials, plans user research, reviews an outcome, or the weekly signal scout runs',
+      'A roadmap plan runs a review-board check (on its own the first time the PRD reads ready, or when the planner asks), reviews an outcome, or the weekly signal scout runs',
     detail:
       'The planning_* prompts: the safety, privacy and AI-quality reviewers (cold, from the PRD and ' +
-      'design only), the outcome reviewer (scheduled after release), the launch planner, the ' +
-      "research planner and the weekly signal scout. Every call is priced into the plan's " +
+      'design only), the outcome reviewer (scheduled after release) and the weekly signal scout ' +
+      '(both only while the first plan flow is switched on). The launch and research planners ' +
+      "went with that flow's routes. Every call is priced into the plan's " +
       'spend ledger (plan_spend_entries). Nothing they write leaves Ally without a person ' +
       'publishing it.',
     kind: AiTaskKind.COMPLETION,
@@ -2474,8 +2460,8 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     task: LlmTask.ROADMAP_OPPORTUNITY_COPILOT,
     runtime: LlmRuntime.ALLY_BE,
     trigger:
-      'Someone files a roadmap opportunity — every turn of the "New opportunity" conversation, ' +
-      "and (Roadmap v2) Check my idea and every reply on a private draft's page",
+      "Someone works an idea up on the Roadmap: Check my idea and every reply on a private draft's page " +
+      '(the old board\'s "New opportunity" conversation went with the old Product Roadmap page)',
     detail:
       'A tool loop per turn: up to 8 research passes (the board, user-interview notes, the ' +
       'Analytics Agent, UX signals, Bug Hunter findings, repo docs, GitHub code and wiki, ' +

@@ -32,15 +32,9 @@ import { LabEvaluatorService } from 'src/lab/service/lab-evaluator.service';
 import { BUG_REPORT_RATE_LIMIT } from 'src/product-roadmap/constants/product-roadmap.constants';
 import { RoadmapAiService } from 'src/product-roadmap/service/roadmap-ai.service';
 import { RoadmapOpportunityController } from 'src/product-roadmap/controller/roadmap-opportunity.controller';
-import { RoadmapAccessService } from 'src/product-roadmap/service/roadmap-access.service';
-import { PlanAccessService } from 'src/product-planning/service/plan-access.service';
-import { PlanSettingsService } from 'src/product-planning/service/plan-settings.service';
 import { RoadmapAllocationService } from 'src/product-roadmap/service/roadmap-allocation.service';
-import { RoadmapBoardService } from 'src/product-roadmap/service/roadmap-board.service';
-import { RoadmapBuilderService } from 'src/product-roadmap/service/roadmap-builder.service';
 import { RoadmapMultiplierService } from 'src/product-roadmap/service/roadmap-multiplier.service';
 import { RoadmapOpportunityService } from 'src/product-roadmap/service/roadmap-opportunity.service';
-import { RoadmapSplitMergeService } from 'src/product-roadmap/service/roadmap-split-merge.service';
 import {
   HELPLINE_SESSION_RATE_LIMIT,
   HelplinePublicController,
@@ -141,12 +135,6 @@ describe('Rate-limited routes', () => {
           },
           { provide: RoadmapAllocationService, useValue: {} },
           { provide: RoadmapMultiplierService, useValue: {} },
-          { provide: RoadmapSplitMergeService, useValue: {} },
-          { provide: RoadmapBuilderService, useValue: {} },
-          { provide: RoadmapBoardService, useValue: {} },
-          { provide: RoadmapAccessService, useValue: {} },
-          { provide: PlanAccessService, useValue: {} },
-          { provide: PlanSettingsService, useValue: {} },
           { provide: RoadmapAiService, useValue: {} },
         ],
         [

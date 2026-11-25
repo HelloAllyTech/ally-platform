@@ -37,7 +37,7 @@ const UNCLASSIFIED: RepoClassification = {
  * starting a fix session is never asked to guess a codebase from free text
  * themselves — see BugFixSessionService.start.
  *
- * Same shape as RoadmapAiService.classifyGoal, including its guardrail: an
+ * Same guardrail the retired roadmap goal classifier had: an
  * unvalidated model answer never becomes the repo a fix session dispatches
  * to. `repo` is null whenever the model's answer isn't a live entry in
  * BUG_FIX_SESSION_REPOS.

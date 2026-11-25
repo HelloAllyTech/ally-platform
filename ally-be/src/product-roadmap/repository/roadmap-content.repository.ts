@@ -51,20 +51,4 @@ export class RoadmapUserTabOrderRepository extends Repository<RoadmapUserTabOrde
   constructor(private readonly dataSource: DataSource) {
     super(RoadmapUserTabOrder, dataSource.createEntityManager());
   }
-
-  /**
-   * Upsert the caller's tab order. `viewIds` is stored as given and is deliberately NOT
-   * validated against existing views: the frontend tolerates stale and missing ids (it skips
-   * unknown ones and appends new views), so rejecting a slightly-stale array would break
-   * reordering for no benefit.
-   */
-  async setOrder(userId: number, viewIds: string[]): Promise<void> {
-    await this.dataSource.query(
-      `INSERT INTO roadmap_user_tab_order ("userId", "viewIds")
-            VALUES ($1, $2::uuid[])
-       ON CONFLICT ("userId")
-       DO UPDATE SET "viewIds" = EXCLUDED."viewIds", "updatedAt" = now()`,
-      [userId, viewIds],
-    );
-  }
 }

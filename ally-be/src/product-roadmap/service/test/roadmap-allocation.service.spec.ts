@@ -9,7 +9,6 @@ import { DataSource } from 'typeorm';
 import { RoadmapAllocationService } from '../roadmap-allocation.service';
 import { RoadmapAllocationRepository } from '../../repository/roadmap-allocation.repository';
 import { RoadmapVoteGrantRepository } from '../../repository/roadmap-vote-grant.repository';
-import { RoadmapNotificationService } from '../roadmap-notification.service';
 import { RoadmapMultiplierService } from '../roadmap-multiplier.service';
 import { RoadmapAllocation } from '../../entity/roadmap-allocation.entity';
 import { RoadmapOpportunity } from '../../entity/roadmap-opportunity.entity';
@@ -36,7 +35,6 @@ describe('RoadmapAllocationService', () => {
     consume: jest.Mock;
     refund: jest.Mock;
   };
-  let notifications: { emit: jest.Mock };
   let multipliers: { multiplierFor: jest.Mock; getBreadthInTx: jest.Mock };
 
   /** An existing allocation row for this user/opportunity/period, or none. */
@@ -74,7 +72,6 @@ describe('RoadmapAllocationService', () => {
       refund: jest.fn(),
     };
 
-    notifications = { emit: jest.fn() };
     multipliers = {
       multiplierFor: jest.fn(async () => 1),
       getBreadthInTx: jest.fn(async () => ({ multiplier: 1, qualifying: 0 })),
@@ -89,7 +86,6 @@ describe('RoadmapAllocationService', () => {
           useValue: allocationRepository,
         },
         { provide: RoadmapVoteGrantRepository, useValue: grantRepository },
-        { provide: RoadmapNotificationService, useValue: notifications },
         { provide: RoadmapMultiplierService, useValue: multipliers },
       ],
     }).compile();
@@ -382,25 +378,6 @@ describe('RoadmapAllocationService', () => {
       // sums every period forever.
       expect(result.periodKey).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/);
       expect(service.setVotes).toHaveLength(3); // (userId, opportunityId, votes)
-    });
-  });
-
-  describe('broadcasts', () => {
-    it('emits ALLOCATION_CHANGED with the actor id for echo suppression', async () => {
-      givenExistingAllocation(null);
-      manager.query.mockResolvedValue([{ total: '42' }]);
-
-      await service.setVotes(USER, OPP_ID, 5);
-
-      expect(notifications.emit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          kind: 'ALLOCATION_CHANGED',
-          actorId: USER,
-          opportunityId: OPP_ID,
-          votes: 5,
-          priorityScore: 42,
-        }),
-      );
     });
   });
 

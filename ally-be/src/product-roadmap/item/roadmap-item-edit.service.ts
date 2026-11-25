@@ -21,7 +21,6 @@ import { PlanSessionStore } from '../plan/plan-session.store';
 import { PlanStageService } from '../plan/plan-stage.service';
 import { RoadmapNotificationService } from '../service/roadmap-notification.service';
 import { RoadmapOpportunityService } from '../service/roadmap-opportunity.service';
-import { RoadmapStrategyGoalService } from '../service/roadmap-strategy-goal.service';
 import { PatchRoadmapItemDto } from './roadmap-item.dto';
 import { RoadmapItemLookupService } from './roadmap-item-lookup.service';
 import { RoadmapItemReadService } from './roadmap-item-read.service';
@@ -65,7 +64,6 @@ export class RoadmapItemEditService {
     private readonly lookup: RoadmapItemLookupService,
     private readonly reader: RoadmapItemReadService,
     private readonly opportunities: RoadmapOpportunityService,
-    private readonly strategyGoals: RoadmapStrategyGoalService,
     private readonly planStore: PlanSessionStore,
     private readonly planStage: PlanStageService,
     private readonly events: PlanEventService,
@@ -241,8 +239,6 @@ export class RoadmapItemEditService {
         WHERE id = $1`,
       [ref.id, starred, starred ? userId : null, userId],
     );
-    // The star moves the composite rank, so every card's queue position can move.
-    this.strategyGoals.invalidate(userId);
     this.notifications.emit({
       kind: 'ITEM_CHANGED',
       actorId: userId,

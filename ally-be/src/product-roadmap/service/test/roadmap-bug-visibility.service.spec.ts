@@ -3,13 +3,9 @@ import { Repository } from 'typeorm';
 import { User } from 'src/user/entity/user.entity';
 
 import { RoadmapOpportunityRepository } from '../../repository/roadmap-opportunity.repository';
-import { RoadmapNotificationService } from '../roadmap-notification.service';
 import { RoadmapOpportunityService } from '../roadmap-opportunity.service';
 import { RoadmapVectorService } from '../roadmap-vector.service';
-import {
-  RoadmapOpportunitySource,
-  RoadmapOpportunityType,
-} from '../../enum/roadmap-opportunity.enum';
+import { RoadmapOpportunityType } from '../../enum/roadmap-opportunity.enum';
 
 /**
  * Bugs still WRITE a roadmap row — it is the record of who reported what, and
@@ -18,9 +14,8 @@ import {
  *
  * The reads are excluded in SQL (see EXCLUDE_BUGS_SQL in
  * RoadmapOpportunityRepository) and are covered against a real database rather
- * than here. What IS unit-testable, and is the half most likely to be forgotten,
- * is the realtime push: a filed bug that still broadcasts would flash a card onto
- * the very board it is meant to have left, and no query filter can stop it.
+ * than here. What IS unit-testable is the other half: a filed bug still enters
+ * Bug Hunter's queue, with its repo classified when the report names none.
  */
 describe('RoadmapOpportunityService — bugs stay off the board', () => {
   const saved = (type: RoadmapOpportunityType) => ({
@@ -36,7 +31,6 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
       rationale: '',
     },
   ) => {
-    const emit = jest.fn();
     const opportunityRepository = {
       create: jest.fn().mockImplementation((v) => v),
       save: jest.fn().mockResolvedValue(saved(type)),
@@ -78,7 +72,6 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
       {
         indexQuietly: jest.fn().mockResolvedValue(undefined),
       } as unknown as RoadmapVectorService,
-      { emit } as unknown as RoadmapNotificationService,
       { find: jest.fn().mockResolvedValue([]) } as unknown as Repository<User>,
       // Images play no part in bug visibility; these satisfy the constructor.
       { parseS3Url: jest.fn() } as never,
@@ -98,42 +91,11 @@ describe('RoadmapOpportunityService — bugs stay off the board', () => {
       repoClassifier as never,
     );
 
-    return { service, emit, bugHunterV2, repoClassifier };
+    return { service, bugHunterV2, repoClassifier };
   };
 
-  it('does not broadcast a filed bug to the roadmap board', async () => {
-    const { service, emit } = build(RoadmapOpportunityType.BUG);
-
-    await service.create(
-      1,
-      {
-        description: 'Search returns nothing after login',
-        type: RoadmapOpportunityType.BUG,
-        productGoal: 'Reported bugs',
-      },
-      { source: RoadmapOpportunitySource.CONSUMER },
-    );
-
-    expect(emit).not.toHaveBeenCalled();
-  });
-
-  it('still broadcasts an idea, which the board does list', async () => {
-    const { service, emit } = build(RoadmapOpportunityType.IDEA);
-
-    await service.create(1, {
-      description: 'Let counsellors pin a case',
-      type: RoadmapOpportunityType.IDEA,
-      productGoal: 'Scribe',
-    });
-
-    expect(emit).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'OPPORTUNITY_UPSERTED' }),
-    );
-  });
-
   /**
-   * The half that must NOT change. Suppressing the broadcast is a display
-   * decision; the Bug Hunter inbox row is the entire point of filing a bug, and
+   * The half that must NOT change: the Bug Hunter inbox row is the entire point of filing a bug, and
    * it is now the only place the bug will ever be seen.
    */
   it('still queues the bug in Bug Hunter, which is where it now lives', async () => {

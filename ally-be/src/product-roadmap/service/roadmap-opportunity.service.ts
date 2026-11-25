@@ -7,7 +7,7 @@ import {
   UnprocessableEntityException,
   Optional,
 } from '@nestjs/common';
-import { EntityManager, In, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LoggerService } from 'src/logger/logger.service';
 import { User } from 'src/user/entity/user.entity';
@@ -36,7 +36,6 @@ import {
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
-  RoadmapReviewState,
 } from '../enum/roadmap-opportunity.enum';
 import {
   RoadmapOpportunityRepository,
@@ -51,7 +50,6 @@ import {
   ROADMAP_SINGLE_IDEA_EFFORTS,
   ROADMAP_OWNER_EMAILS,
   ROADMAP_READINESS_REQUIRE_TOKEN,
-  ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES,
   ROADMAP_REFERENCE_IMAGE_S3_PREFIX,
 } from '../constants/product-roadmap.constants';
 import {
@@ -59,7 +57,6 @@ import {
   CreateOpportunityDto,
   ListOpportunitiesQueryDto,
   RoadmapReferenceImageDto,
-  RoadmapReferenceImageUploadUrlDto,
   UpdateOpportunityDto,
 } from '../dto/roadmap-opportunity.dto';
 import {
@@ -67,7 +64,6 @@ import {
   OpportunityResponseDto,
   RoadmapEligibleOwnerDto,
   RoadmapFacetsDto,
-  RoadmapReferenceImageUploadUrlResponseDto,
   RoadmapUserRefDto,
   OpportunityBriefResponseDto,
   RoadmapVoterDto,
@@ -83,7 +79,6 @@ import { joinDescription } from '../item/roadmap-item-query.util';
 import { RoadmapGoalImpactService } from './roadmap-goal-impact.service';
 import { RoadmapStrategyGoalService } from './roadmap-strategy-goal.service';
 import { RoadmapVectorService } from './roadmap-vector.service';
-import { RoadmapNotificationService } from './roadmap-notification.service';
 import { RoadmapReadinessTokenService } from './roadmap-readiness-token.service';
 
 /** Fields whose change requires re-embedding. `prd` and `owner` deliberately do not. */
@@ -104,7 +99,6 @@ export class RoadmapOpportunityService {
     private readonly strategyGoalService: RoadmapStrategyGoalService,
     private readonly goalImpactService: RoadmapGoalImpactService,
     private readonly vectorService: RoadmapVectorService,
-    private readonly notifications: RoadmapNotificationService,
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     private readonly s3Service: S3Service,
     private readonly config: AppConfigService,
@@ -167,36 +161,6 @@ export class RoadmapOpportunityService {
     );
     if (!row) throw new NotFoundException(`Opportunity ${id} not found`);
     return (await this.toResponseList([row], userId))[0];
-  }
-
-  /**
-   * Set or clear the Prod Director's star. Only the configured director may; everyone else gets
-   * 403. Raises the opportunity's composite rank by the star weight, so the whole board is
-   * invalidated (other cards' queue positions move too).
-   */
-  async setDirectorStar(
-    userId: number,
-    id: string,
-    starred: boolean,
-  ): Promise<OpportunityResponseDto> {
-    if (!(await this.strategyGoalService.isProdDirector(userId))) {
-      throw new ForbiddenException(
-        'Only the Prod Director can star opportunities.',
-      );
-    }
-    const existing = await this.opportunityRepository.findOne({
-      where: { id },
-    });
-    if (!existing) throw new NotFoundException(`Opportunity ${id} not found`);
-    await this.opportunityRepository.update(id, {
-      directorStarred: starred,
-      // Who gave the star (Roadmap v2, D16). Written beside the flag so the attribution the
-      // P0 migration backfilled stays true until the Owner star replaces this route.
-      starredByUserId: starred ? userId : null,
-      updatedBy: userId,
-    });
-    this.strategyGoalService.invalidate(userId);
-    return this.findOne(userId, id);
   }
 
   /**
@@ -359,7 +323,7 @@ export class RoadmapOpportunityService {
     // Score the new row against the strategy before it is first read, so it enters the board
     // ranked rather than sitting at zero coverage until someone notices. Same best-effort
     // contract as the vector index above: a model outage must not fail a committed write.
-    await this.goalImpactService.assessQuietly(saved.id, userId);
+    await this.goalImpactService.assessQuietly(saved.id);
 
     // A filed bug enters Bug Hunter's queue (bughunter.bugs); its mode decides whether and
     // when it is worked on. Best effort: a failure here never fails the roadmap write that
@@ -380,21 +344,7 @@ export class RoadmapOpportunityService {
       });
     }
 
-    const response = await this.findOne(userId, saved.id);
-    // Bugs are not broadcast. The realtime channel exists to slot a new card
-    // onto an open board, and bugs are no longer listed on that board — pushing
-    // one would make a filed bug flash up on the one screen it is meant to have
-    // left. Everything else about the create path is unchanged for a bug: the
-    // row, the vector, and above all the Bug Hunter inbox row above.
-    if (saved.type !== RoadmapOpportunityType.BUG) {
-      this.notifications.emit({
-        kind: 'OPPORTUNITY_UPSERTED',
-        actorId: userId,
-        // Broadcast to every client: the star is the director's private view.
-        opportunity: { ...response, directorStarred: null },
-      });
-    }
-    return response;
+    return this.findOne(userId, saved.id);
   }
 
   /**
@@ -475,77 +425,6 @@ export class RoadmapOpportunityService {
         `This opportunity is not ready to file yet (${failed.join(', ')}). ` +
           `Keep the interview going until every item is met.`,
       );
-    }
-  }
-
-  /**
-   * The Roadmap cutover's one filing door (Roadmap v2 P6, plans/roadmap-builder-merge §6): an
-   * idea for an in-flight direct Builder session that never had one, so every live build sits
-   * on the Roadmap from switch-on day.
-   *
-   * A labelled path of its own rather than a flag on `create()`:
-   * - it runs inside the cutover's transaction (`manager`), so the idea, its link to the
-   *   session and the flag commit or fail together;
-   * - the readiness gate does not apply, because the work is already under way and the idea
-   *   records it rather than proposing it — the row says so with
-   *   `source = 'migrated_builder_session'`;
-   * - it is already accepted (`reviewState`), Prioritised (as "Open in Builder Agent" makes a
-   *   linked idea) and linked by `builderSessionId`, the same column every other link uses.
-   *   `UQ_roadmap_opps_builder_session` is the backstop against a second idea for one session.
-   *
-   * The vector index and goal-impact assessment run after the commit, best-effort, through
-   * `afterMigratedFiling` — as `create()` runs them after its own save.
-   */
-  async fileMigratedBuilderSession(
-    manager: EntityManager,
-    input: {
-      sessionId: string;
-      description: string;
-      productGoal: string;
-      /** The session's creator: the idea's author, and its lead. */
-      creatorUserId: number;
-      /** The Owner running the cutover: the reviewer of record. */
-      actorUserId: number;
-    },
-  ): Promise<{ id: string; code: string }> {
-    const repository = manager.getRepository(RoadmapOpportunity);
-    const saved = await repository.save(
-      repository.create({
-        description: input.description,
-        type: RoadmapOpportunityType.IDEA,
-        stage: RoadmapOpportunityStage.PRIORITISED,
-        productGoal: input.productGoal,
-        effort: null,
-        ownerUserId: null,
-        referenceImages: [],
-        builderSessionId: input.sessionId,
-        reviewState: RoadmapReviewState.ACCEPTED,
-        reviewedBy: input.actorUserId,
-        reviewedAt: new Date(),
-        createdBy: input.creatorUserId,
-        updatedBy: input.actorUserId,
-        source: RoadmapOpportunitySource.MIGRATED_BUILDER_SESSION,
-        tenantId: null,
-        reporterContext: null,
-      }),
-    );
-    // `code` comes from the column default; read it back inside the same transaction.
-    const [row] = await manager.query(
-      `SELECT code FROM "roadmap_opportunities" WHERE id = $1`,
-      [saved.id],
-    );
-    return { id: saved.id, code: String(row?.code ?? saved.code ?? '') };
-  }
-
-  /**
-   * What `create()` does after its save, for ideas the cutover filed: index each one for the
-   * duplicate check and score it against the strategy. Both are best-effort and swallow their
-   * own failures, so a model outage never undoes a committed cutover.
-   */
-  async afterMigratedFiling(ids: string[], actorUserId: number): Promise<void> {
-    for (const id of ids) {
-      await this.vectorService.indexQuietly(id);
-      await this.goalImpactService.assessQuietly(id, actorUserId);
     }
   }
 
@@ -734,21 +613,10 @@ export class RoadmapOpportunityService {
       dto.description !== undefined &&
       dto.description.trim() !== existing.description;
     if (descriptionChanged) {
-      await this.goalImpactService.assessQuietly(id, userId);
+      await this.goalImpactService.assessQuietly(id);
     }
 
-    const response = await this.findOne(userId, id);
-    // Same reasoning as create(): a bug is not on the board, so there is nothing
-    // for an upsert broadcast to update there.
-    if (response.type !== RoadmapOpportunityType.BUG) {
-      this.notifications.emit({
-        kind: 'OPPORTUNITY_UPSERTED',
-        actorId: userId,
-        // Broadcast to every client: the star is the director's private view.
-        opportunity: { ...response, directorStarred: null },
-      });
-    }
-    return response;
+    return this.findOne(userId, id);
   }
 
   /**
@@ -771,42 +639,6 @@ export class RoadmapOpportunityService {
       existing.stage !== RoadmapOpportunityStage.RELEASED;
     if (becomingReleased) return new Date();
     return existing.releasedAt ?? null;
-  }
-
-  /**
-   * Soft delete. Hard-deletes the opportunity's allocations (via the FK's ON DELETE CASCADE
-   * this would only fire on a hard delete, so it is done explicitly) so the votes are returned
-   * to their owners' budgets and the priority score disappears, and removes the opportunity
-   * from the vector index so duplicate-detection stops proposing it.
-   */
-  async remove(userId: number, id: string): Promise<void> {
-    const existing = await this.opportunityRepository.findOne({
-      where: { id },
-    });
-    if (!existing) throw new NotFoundException(`Opportunity ${id} not found`);
-
-    await this.opportunityRepository.manager.transaction(async (manager) => {
-      // Explicit: a soft delete does not trigger ON DELETE CASCADE, and leaving the rows would
-      // keep other people's votes locked up in an invisible opportunity.
-      await manager.query(
-        `DELETE FROM roadmap_allocations WHERE "opportunityId" = $1`,
-        [id],
-      );
-      await manager.softDelete(RoadmapOpportunity, id);
-      await manager.query(
-        `UPDATE roadmap_opportunity_comments SET "deletedAt" = now()
-          WHERE "opportunityId" = $1 AND "deletedAt" IS NULL`,
-        [id],
-      );
-    });
-
-    await this.vectorService.removeQuietly(id);
-
-    this.notifications.emit({
-      kind: 'OPPORTUNITY_DELETED',
-      actorId: userId,
-      opportunityId: id,
-    });
   }
 
   async getFacets(): Promise<RoadmapFacetsDto> {
@@ -900,35 +732,15 @@ export class RoadmapOpportunityService {
   // ── reference images ────────────────────────────────────────────────────────
 
   /**
-   * Hand the browser a presigned PUT so a 5 MB screenshot never travels through this service.
-   *
-   * Deliberately does NOT record anything: an upload is not an attachment. The object exists as
-   * soon as the PUT lands, but it is only attached when the returned `imageUrl` comes back in a
-   * create or update — so abandoning the drawer leaves an unreferenced object rather than a row
-   * pointing at a picture nobody meant to keep.
-   */
-  async createReferenceImageUploadUrl(
-    dto: RoadmapReferenceImageUploadUrlDto,
-  ): Promise<RoadmapReferenceImageUploadUrlResponseDto> {
-    return this.s3Service.getPresignedUrlForImageUpload(
-      this.assetsBucket(),
-      ROADMAP_REFERENCE_IMAGE_S3_PREFIX,
-      dto.fileName,
-      dto.fileSize,
-      dto.contentType,
-      ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES,
-    );
-  }
-
-  /**
    * Trim captions, drop empty ones, and refuse any URL that is not one of our own uploads.
    *
    * THE GUARD IS THE POINT. `referenceImages` is rendered as `<img src>` in the admin dashboard
    * for every roadmap viewer, so without this the array is a way for one filer to point every
    * reader's browser at a host of their choosing — a beacon at best, and at worst a request
-   * carrying whatever that host's cookies imply. The presign endpoint is the only way to get an
-   * object into the prefix, so requiring the URL to resolve to that bucket AND that prefix means
-   * the only images that can be attached are ones this service handed out an address for.
+   * carrying whatever that host's cookies imply. The (since retired) presign endpoint was the
+   * only way to get an object into the prefix, so requiring the URL to resolve to that bucket
+   * AND that prefix means the only images that can be attached are ones this service handed out
+   * an address for.
    *
    * It also scopes the check to THIS feature's prefix rather than to the bucket as a whole: the
    * assets bucket holds badges, blog headers and scenario covers too, and letting an opportunity

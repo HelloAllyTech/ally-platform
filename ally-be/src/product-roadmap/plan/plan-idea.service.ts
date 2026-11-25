@@ -25,7 +25,6 @@ import {
   PlanStage,
 } from 'src/product-planning/enum/product-planning.enum';
 import { RoadmapOpportunity } from '../entity/roadmap-opportunity.entity';
-import { RoadmapIdeaDraft } from '../entity/roadmap-idea-draft.entity';
 import { RoadmapCopilotService } from '../service/roadmap-copilot.service';
 import { RoadmapOpportunityService } from '../service/roadmap-opportunity.service';
 import { RoadmapBuilderService } from '../service/roadmap-builder.service';
@@ -87,8 +86,6 @@ export class PlanIdeaService {
     private readonly dataSource: DataSource,
     @InjectRepository(RoadmapOpportunity)
     private readonly opportunities: Repository<RoadmapOpportunity>,
-    @InjectRepository(RoadmapIdeaDraft)
-    private readonly drafts: Repository<RoadmapIdeaDraft>,
     /** Roadmap v2's one ceiling per idea; a no-op while the flag is off. */
     @Optional()
     private readonly ceiling?: PlanCeilingService,
@@ -475,49 +472,12 @@ export class PlanIdeaService {
     return { archived, purged };
   }
 
-  /**
-   * Once, when planning is switched on: every parked `roadmap_idea_drafts`
-   * row becomes a parked private plan, and the old row is retired. Idempotent
-   * by `migratedFromDraftId`.
-   *
-   * Skips a row the Roadmap cutover already copied (`migratedAt`): that row is
-   * kept on purpose so turning Roadmap off shows it unchanged, and retiring or
-   * copying it again here would undo that or move it twice.
-   */
-  async migrateIdeaDrafts(): Promise<number> {
-    const settings = await this.settings.get();
-    if (!settings.enabled) return 0;
-    const drafts = await this.drafts.find({
-      where: { migratedAt: IsNull() },
-      take: 1000,
-    });
-    let moved = 0;
-    for (const draft of drafts) {
-      const existing: { id: string }[] = await this.dataSource.query(
-        `SELECT id FROM "builder_sessions" WHERE kind = 'plan' AND plan->>'migratedFromDraftId' = $1 LIMIT 1`,
-        [draft.id],
-      );
-      if (!existing.length) {
-        await this.createPrivatePlan(draft.ownerUserId, draft.rawText, {
-          parked: true,
-          captureMode: draft.captureMode === 'voice' ? 'voice' : 'typed',
-          migratedFromDraftId: draft.id,
-          lastActiveAt: draft.updatedAt?.toISOString?.(),
-        });
-      }
-      await this.drafts.softDelete({ id: draft.id });
-      moved++;
-    }
-    return moved;
-  }
-
   private async createPrivatePlan(
     userId: number,
     text: string,
     record: {
       parked: boolean;
       captureMode: 'typed' | 'voice';
-      migratedFromDraftId?: string;
       lastActiveAt?: string;
     },
   ): Promise<string> {
@@ -537,9 +497,6 @@ export class PlanIdeaService {
     await this.store.patchPlan(session.id, {
       parked: record.parked,
       captureMode: record.captureMode,
-      ...(record.migratedFromDraftId
-        ? { migratedFromDraftId: record.migratedFromDraftId }
-        : {}),
       lastActiveAt: record.lastActiveAt ?? now.toISOString(),
     });
     await this.messages.appendMessage(session.id, {

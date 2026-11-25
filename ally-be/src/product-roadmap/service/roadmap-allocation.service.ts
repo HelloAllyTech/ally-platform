@@ -23,7 +23,6 @@ import {
   VoteBudgetDto,
   SetAllocationResponseDto,
 } from '../dto/roadmap-response.dto';
-import { RoadmapNotificationService } from './roadmap-notification.service';
 import { RoadmapMultiplierService } from './roadmap-multiplier.service';
 import { RoadmapInboxService } from 'src/product-planning/service/roadmap-inbox.service';
 
@@ -37,7 +36,6 @@ export class RoadmapAllocationService {
     private readonly dataSource: DataSource,
     private readonly allocationRepository: RoadmapAllocationRepository,
     private readonly grantRepository: RoadmapVoteGrantRepository,
-    private readonly notifications: RoadmapNotificationService,
     private readonly multipliers: RoadmapMultiplierService,
     /** Roadmap v2's inbox, for the voter's milestones watch. Optional for fixtures. */
     @Optional() private readonly inbox?: RoadmapInboxService,
@@ -191,15 +189,6 @@ export class RoadmapAllocationService {
           userId,
         );
         const budget: VoteBudgetDto = { available };
-
-        this.notifications.emit({
-          kind: 'ALLOCATION_CHANGED',
-          actorId: userId,
-          opportunityId,
-          periodKey,
-          votes,
-          priorityScore,
-        });
 
         return {
           opportunityId,

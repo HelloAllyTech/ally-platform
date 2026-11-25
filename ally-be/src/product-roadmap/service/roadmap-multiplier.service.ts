@@ -1,16 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager, In } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { AppConfigService } from 'src/config/config.service';
 
 import { User } from 'src/user/entity/user.entity';
-import { PERMISSIONS } from '../../authorization/constants/permissions.constants';
 import { ROADMAP_MULTIPLIER_WINDOW_DAYS } from '../constants/product-roadmap.constants';
 import {
   breadthMultiplier,
   breadthTarget,
   nextDrop,
 } from '../util/roadmap-multiplier.util';
-import { BreadthDto, BreadthEveryoneRowDto } from '../dto/roadmap-response.dto';
+import { BreadthDto } from '../dto/roadmap-response.dto';
 
 /**
  * Breadth multiplier: a vote is worth more when the voter has recently backed many DIFFERENT
@@ -132,45 +131,5 @@ export class RoadmapMultiplierService {
       nextDropMultiplier: drop?.multiplierAfter ?? null,
       nextDropAuthorName,
     };
-  }
-
-  /** Everyone who can vote, with their current breadth. Small set (platform admins). */
-  async getEveryone(): Promise<BreadthEveryoneRowDto[]> {
-    const manager = this.dataSource.manager;
-    const eligible = await manager.query<{ userId: number }[]>(
-      `SELECT DISTINCT ug."userId"
-         FROM user_groups ug
-         INNER JOIN group_permissions gp ON gp."groupId" = ug."groupId"
-         INNER JOIN permissions p ON p.id = gp."permissionId"
-        WHERE p.name = $1`,
-      [PERMISSIONS.VOTE_PRODUCT_ROADMAP],
-    );
-    const ids = eligible.map((r) => r.userId);
-    if (ids.length === 0) return [];
-    const users = await manager.find(User, {
-      where: { id: In(ids) },
-      select: ['id', 'name'],
-    });
-    const rows = await Promise.all(
-      users.map(async (u) => {
-        const [authors, candidates] = await Promise.all([
-          this.qualifyingAuthors(manager, u.id),
-          this.candidateAuthorCount(manager, u.id),
-        ]);
-        const target = breadthTarget(candidates);
-        return {
-          userId: u.id,
-          name: u.name,
-          multiplier: this.enabled
-            ? breadthMultiplier(authors.length, target)
-            : 1,
-          qualifying: authors.length,
-          target,
-        };
-      }),
-    );
-    return rows.sort(
-      (a, b) => b.multiplier - a.multiplier || a.name.localeCompare(b.name),
-    );
   }
 }

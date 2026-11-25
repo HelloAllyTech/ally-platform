@@ -2,9 +2,8 @@ import { DataSource } from 'typeorm';
 import { RoadmapOpportunityRepository } from '../roadmap-opportunity.repository';
 
 /**
- * findOneWithScore backs create(), update() (including the OPPORTUNITY_UPSERTED websocket
- * payload) and the GET-by-id deep link. It must project queueRank the same way projectedQuery
- * does for listOpportunities/listBoard — otherwise the queue position badge renders blank
+ * findOneWithScore backs create(), update() and the GET-by-id deep link. It must project
+ * queueRank the same way projectedQuery does for listOpportunities — otherwise the queue position badge renders blank
  * until the next full list refresh, even though the opportunity has a real position.
  */
 /** Neutral rank context: the ordering tests are about tiebreaks, not about the weighting. */

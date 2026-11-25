@@ -109,7 +109,6 @@ function build(
     events: { record: jest.fn() },
     inbox: { deliver: jest.fn() },
     broadcast: { emit: jest.fn() },
-    strategyGoals: { invalidate: jest.fn() },
     builderSessions: {
       createSession: jest.fn(async () => ({ id: 'new-session' })),
     },

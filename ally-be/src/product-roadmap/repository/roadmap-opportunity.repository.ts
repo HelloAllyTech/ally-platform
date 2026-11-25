@@ -1,9 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { RoadmapOpportunity } from '../entity/roadmap-opportunity.entity';
 import { RoadmapEmbeddingStatus } from '../enum/roadmap-opportunity.enum';
 import {
-  ROADMAP_BOARD_DEFAULTS,
   ROADMAP_EFFORT_UNSIZED,
   ROADMAP_OWNER_UNASSIGNED,
   ROADMAP_LIST_DEFAULTS,
@@ -67,50 +66,6 @@ export interface RoadmapOpportunityRow extends RoadmapOpportunity {
    */
   queueRank: number | null;
 }
-
-/** A board row: the list projection plus the lane it belongs to, resolved in SQL. */
-export interface RoadmapBoardRow extends RoadmapOpportunityRow {
-  /** The lane this row belongs to under the requested grouping. Null is the catch-all lane. */
-  laneKey: string | null;
-  effectiveMonth: string | null;
-}
-
-/**
- * The lane a card belongs to, in SQL.
- *
- * MUST stay equivalent to effectiveMonthOf() in roadmap-month.util.ts — that one serves the
- * write path and the API response, this one groups and windows the read. They are duplicated
- * rather than unified because the alternative is a generated column or a view, and either would
- * put the rule somewhere `migration:generate` can silently rewrite it.
- *
- * to_char on a `timestamp without time zone` reads the stored value with no conversion, which is
- * what makes this agree with currentPeriodKey(): both end up on the UTC month.
- */
-import { RoadmapBoardGroupBy } from '../enum/roadmap-opportunity.enum';
-
-const EFFECTIVE_MONTH_SQL = `CASE
-  WHEN opp."stage" = 'released' AND opp."releasedAt" IS NOT NULL
-    THEN to_char(opp."releasedAt", 'YYYY-MM')
-  ELSE opp."plannedMonth"
-END`;
-
-/**
- * The lane key, per grouping. One map so the select, the ORDER BY, the GROUP BY of the totals
- * query and the move endpoint's destination predicate all read the same expression — four copies
- * of "which lane is this card in" is how a board starts disagreeing with its own counts.
- *
- * Every value here is a literal, never interpolated from a request: `groupBy` is validated
- * against RoadmapBoardGroupBy by the DTO, and this is the only place a column name is chosen.
- */
-const LANE_KEY_SQL: Record<RoadmapBoardGroupBy, string> = {
-  [RoadmapBoardGroupBy.MONTH]: EFFECTIVE_MONTH_SQL,
-  [RoadmapBoardGroupBy.STAGE]: 'opp."stage"',
-  [RoadmapBoardGroupBy.PRODUCT_GOAL]: 'opp."productGoal"',
-  [RoadmapBoardGroupBy.OWNER]: 'opp."owner"',
-  // ::text because every laneKey is compared and bucketed as a string; an integer id here
-  // would make the createdBy board's keys the one lane type that != its laneKeysFor values.
-  [RoadmapBoardGroupBy.CREATED_BY]: 'opp."createdBy"::text',
-};
 
 /**
  * Everything the composite rank needs that is not on the opportunity row: the admin-set factor
@@ -176,29 +131,6 @@ export interface ListOpportunitiesOptions {
    * bases, which is the property that makes the ordering a total order at all.
    */
   rank: RankContext;
-}
-
-export interface ListBoardOptions extends Omit<
-  ListOpportunitiesOptions,
-  'sortBy' | 'order' | 'limit' | 'offset'
-> {
-  /**
-   * Inclusive month window, 'YYYY-MM'. Resolved by the service, never defaulted here.
-   * Applied ONLY when grouping by month — see listBoard.
-   */
-  from: string;
-  to: string;
-  /** Defaults to MONTH, which is the board this started as. */
-  groupBy?: RoadmapBoardGroupBy;
-}
-
-export interface ListBoardResult {
-  rows: RoadmapBoardRow[];
-  /** Exact card count per lane, keyed by month (null = Unscheduled). */
-  totals: Map<string | null, number>;
-  maxScore: number;
-  /** True when the global row cap bit and some lanes hold fewer rows than their total. */
-  truncated: boolean;
 }
 
 export interface ListOpportunitiesResult {
@@ -519,203 +451,6 @@ export class RoadmapOpportunityRepository extends Repository<RoadmapOpportunity>
       .getRawMany<RoadmapOpportunityRow>();
 
     return { items, count, maxScore: await this.getMaxScore() };
-  }
-
-  /**
-   * The month board read: every card in the requested month window, plus everything unscheduled.
-   *
-   * WHY NO OFFSET. The table paginates by offset because a flat list can be read in pages. A
-   * lane cannot: filling the first 50 rows of an offset window would stuff January and leave
-   * February through May looking like nobody has planned anything. So the board bounds by MONTH
-   * (a small, meaningful window the user steps through) and takes a global row cap purely as a
-   * safety net.
-   *
-   * Ordering puts unscheduled FIRST (NULLS FIRST) on purpose: it is the lane people drag out of,
-   * so if the row cap ever bites it must bite a future month rather than the backlog. Truncation
-   * is reported, never swallowed — lane totals come from a separate exact aggregate, so a capped
-   * lane still knows how many cards it is hiding.
-   *
-   * Backed by idx_roadmap_opps_month_board.
-   */
-  async listBoard(options: ListBoardOptions): Promise<ListBoardResult> {
-    const { userId, periodKey, from, to } = options;
-    const groupBy = options.groupBy ?? RoadmapBoardGroupBy.MONTH;
-    const laneKey = LANE_KEY_SQL[groupBy];
-    const isMonth = groupBy === RoadmapBoardGroupBy.MONTH;
-
-    const qb = this.projectedQuery(userId, periodKey, options.rank);
-    this.applyFilters(qb, options);
-    // The window is a MONTH concept. Applying it to a stage or owner board would silently drop
-    // every card with no planned month — which is most of them — from lanes that have nothing
-    // to do with dates.
-    if (isMonth) this.applyMonthWindow(qb, from, to);
-
-    const ordered = qb
-      .addSelect(laneKey, 'laneKey')
-      .addSelect(EFFECTIVE_MONTH_SQL, 'effectiveMonth')
-      .orderBy(laneKey, 'ASC', 'NULLS FIRST');
-
-    // boardPosition is the MONTH board's hand-ordering and means nothing in the other
-    // groupings — one column cannot hold four independent orders. There, priority (the vote
-    // total) is the order, which is the ranking the whole board exists to express; a second
-    // hand-ordering per grouping would compete with it.
-    if (isMonth) ordered.addOrderBy('opp."boardPosition"', 'ASC');
-
-    const rows = await ordered
-      // Falls through to the composite rank while a lane has never been hand-ordered — this is
-      // what lets boardPosition ship with DEFAULT 0 and no backfill and still look sorted on
-      // day one. Moved off priorityScore with the composite default so a card does not change
-      // places depending on whether you are looking at the table or the board.
-      .addOrderBy('"compositeScore"', 'DESC')
-      .addOrderBy('opp."createdAt"', 'DESC')
-      .addOrderBy('opp.id', 'ASC')
-      .limit(ROADMAP_BOARD_DEFAULTS.MAX_ROWS + 1)
-      .getRawMany<RoadmapBoardRow>();
-
-    const truncated = rows.length > ROADMAP_BOARD_DEFAULTS.MAX_ROWS;
-    if (truncated) rows.length = ROADMAP_BOARD_DEFAULTS.MAX_ROWS;
-
-    return {
-      rows,
-      totals: await this.getLaneTotals(options),
-      maxScore: await this.getMaxScore(),
-      truncated,
-    };
-  }
-
-  /**
-   * Exact per-lane counts, independent of the row cap and of laneLimit.
-   *
-   * Separate query rather than counting the fetched rows: a lane that shows 50 of 63 has to know
-   * about the 13, and counting what we happened to fetch would make the number agree with the
-   * truncation instead of with the database.
-   */
-  private async getLaneTotals(
-    options: ListBoardOptions,
-  ): Promise<Map<string | null, number>> {
-    const groupBy = options.groupBy ?? RoadmapBoardGroupBy.MONTH;
-    const laneKey = LANE_KEY_SQL[groupBy];
-
-    const qb = this.projectedQuery(
-      options.userId,
-      options.periodKey,
-      options.rank,
-    );
-    this.applyFilters(qb, options);
-    if (groupBy === RoadmapBoardGroupBy.MONTH) {
-      this.applyMonthWindow(qb, options.from, options.to);
-    }
-
-    const rows = await qb
-      .select(laneKey, 'lane')
-      .addSelect('COUNT(*)::int', 'total')
-      .groupBy(laneKey)
-      .getRawMany<{ lane: string | null; total: number }>();
-
-    return new Map(rows.map((r) => [r.lane, Number(r.total)]));
-  }
-
-  /**
-   * Earliest and latest month holding any opportunity at all.
-   *
-   * Deliberately UNFILTERED, by the same argument as maxScore: this drives whether the window's
-   * prev/next arrows are live, and arrows that appeared and vanished as you typed in the search
-   * box would be unusable. Unscheduled rows are excluded — they have no month to bound.
-   */
-  async getMonthBounds(): Promise<{
-    earliest: string | null;
-    latest: string | null;
-  }> {
-    const [row] = await this.dataSource.query<
-      { earliest: string | null; latest: string | null }[]
-    >(
-      `SELECT MIN(m) AS earliest, MAX(m) AS latest
-         FROM (SELECT CASE
-                        WHEN opp."stage" = 'released' AND opp."releasedAt" IS NOT NULL
-                          THEN to_char(opp."releasedAt", 'YYYY-MM')
-                        ELSE opp."plannedMonth"
-                      END AS m
-                 FROM roadmap_opportunities opp
-                WHERE opp."deletedAt" IS NULL
-                  AND ${EXCLUDE_BUGS_SQL}) s
-        WHERE m IS NOT NULL`,
-    );
-    return { earliest: row?.earliest ?? null, latest: row?.latest ?? null };
-  }
-
-  /**
-   * Rewrite one lane's manual order in a single statement.
-   *
-   * `unnest(...) WITH ORDINALITY` turns the client's array into (id, position) pairs, so a
-   * 60-card lane is one UPDATE rather than 60 — the taxonomy reorder loops one query per row, but
-   * it deals in a handful of goals, not a lane.
-   *
-   * The lane predicate is what makes a stale drag safe: an id the client thought was here but
-   * which somebody else has since moved simply does not match, so it keeps its own lane's
-   * position instead of being pulled into this one. `IS NOT DISTINCT FROM` rather than `=` because
-   * the Unscheduled lane's month is NULL, and `= NULL` would make every unscheduled reorder a
-   * silent no-op.
-   *
-   * Returns the ids it actually touched, so the caller can report a short list rather than
-   * claiming success for cards it did not move.
-   *
-   * Takes an EntityManager so the move that precedes it shares one transaction: the lane
-   * predicate reads the row's month, so committing the move separately would leave a window where
-   * the card is in its new lane holding its old lane's position.
-   */
-  async reorderLane(
-    orderedIds: string[],
-    month: string | null,
-    updatedBy: number,
-    manager: EntityManager = this.manager,
-  ): Promise<string[]> {
-    if (orderedIds.length === 0) return [];
-
-    const result = await manager.query<
-      [{ id: string }[], number] | { id: string }[]
-    >(
-      `UPDATE roadmap_opportunities AS o
-          SET "boardPosition" = v.pos,
-              "updatedBy"     = $3
-         FROM (SELECT id, (ord - 1)::int AS pos
-                 FROM unnest($1::uuid[]) WITH ORDINALITY AS t(id, ord)) AS v
-        WHERE o.id = v.id
-          AND o."deletedAt" IS NULL
-          AND (CASE
-                 WHEN o."stage" = 'released' AND o."releasedAt" IS NOT NULL
-                   THEN to_char(o."releasedAt", 'YYYY-MM')
-                 ELSE o."plannedMonth"
-               END) IS NOT DISTINCT FROM $2
-      RETURNING o.id`,
-      [orderedIds, month, updatedBy],
-    );
-
-    // ⚠️ For an UPDATE ... RETURNING, TypeORM's `query()` resolves to the TUPLE
-    // [rows, affectedRowCount], not to rows. Mapping the tuple directly yields
-    // [undefined, undefined], so `reordered` came back empty for every successful drag while the
-    // positions were in fact written correctly — a silent wrong answer, not a crash. Same trap the
-    // copilot's appendMessage hit; normalise before touching it.
-    const rows = Array.isArray(result[0])
-      ? (result[0] as { id: string }[])
-      : (result as { id: string }[]);
-
-    const touched = new Set(rows.map((r) => r.id));
-    // Returned in the CLIENT's order, not the database's — the caller is echoing back the order
-    // it just applied, and RETURNING order is not defined.
-    return orderedIds.filter((id) => touched.has(id));
-  }
-
-  private applyMonthWindow(
-    qb: ReturnType<RoadmapOpportunityRepository['createQueryBuilder']>,
-    from: string,
-    to: string,
-  ): void {
-    // Month keys are 'YYYY-MM', so lexicographic BETWEEN IS chronological — no date casting.
-    // Unscheduled rows are always in scope: they are the lane you drag out of.
-    qb.andWhere(
-      `(${EFFECTIVE_MONTH_SQL} IS NULL OR ${EFFECTIVE_MONTH_SQL} BETWEEN :monthFrom AND :monthTo)`,
-      { monthFrom: from, monthTo: to },
-    );
   }
 
   /** Unfiltered MAX(priorityScore) — see ListOpportunitiesResult.maxScore. */
