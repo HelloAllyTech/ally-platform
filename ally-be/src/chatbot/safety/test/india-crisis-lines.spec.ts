@@ -89,14 +89,16 @@ describe('every fixed crisis surface in India carries 112 and 14416', () => {
     for (const text of [
       blockedNotice('OUT_OF_CREDITS', { language: 'en', india: true }),
       blockedNotice('REMOVED_FROM_LIST', { language: 'hi', india: true }),
-      holdingMessage('hi-latn', null, true),
       noOneAvailableMessage('en', '9152987821', true),
     ]) {
       expect(text).toMatch(/\b112\b/);
       expect(text).toContain('14416');
       expect(text).toContain(LINK);
     }
-    expect(holdingMessage('en', null)).not.toMatch(/112|14416/);
+    // TF1 round 2 (approved 25 Nov): the line after a crisis reply doesn't repeat the numbers
+    // the reply just gave.
+    expect(holdingMessage('hi-latn')).not.toMatch(/112|14416/);
+    expect(holdingMessage('en')).not.toMatch(/112|14416/);
   });
 });
 

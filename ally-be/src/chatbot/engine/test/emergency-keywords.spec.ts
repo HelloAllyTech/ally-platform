@@ -1,5 +1,6 @@
 import {
   atRiskByKeywords,
+  selfHarmByKeywords,
   upsetByKeywords,
   emergencyByKeywords,
   lifeThreatening,
@@ -205,6 +206,8 @@ describe('distress is upset, not at risk (TF1 round 2, S-3)', () => {
 
   it.each([
     "I'm tired of living",
+    'main zindagi se thak gaya hoon',
+    'मैं ज़िंदगी से थक गई हूँ',
     "I can't go on",
     'tired of everything, I just want it all to end',
   ])('still at risk: %s', (text) => {
@@ -220,6 +223,31 @@ describe('distress is upset, not at risk (TF1 round 2, S-3)', () => {
     expect(
       atRiskByKeywords("I can't go on the trip on Sunday", 'mental_health'),
     ).toBeNull();
+  });
+});
+
+describe('self-harm in the first person, on every assistant (TF1 round 2)', () => {
+  it.each([
+    "I've started cutting myself again",
+    'I keep hurting myself',
+    "I'm thinking about hurting myself",
+    'I self harm',
+    'khud ko phir se kaat rahi hoon',
+    'मैं खुद को काट लेती हूँ',
+  ])('at risk: %s', (text) => {
+    expect(selfHarmByKeywords(text)).toMatchObject({
+      level: 'at_risk',
+      self_harm: true,
+    });
+  });
+
+  it.each([
+    'I cut myself while cooking, should I see a doctor?',
+    'Do you help people who self harm?',
+    'How can I support a friend who is hurting herself?',
+    'What is your self-harm policy for volunteers?',
+  ])('left to the classifier: %s', (text) => {
+    expect(selfHarmByKeywords(text)).toBeNull();
   });
 });
 

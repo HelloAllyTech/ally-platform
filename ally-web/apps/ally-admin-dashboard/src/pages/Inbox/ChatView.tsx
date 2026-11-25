@@ -131,7 +131,8 @@ export const ChatView: React.FC<{
     } catch (failure) {
       // Stage 1b: refused until the responder agreement is accepted: show it.
       if (needsAgreement(failure)) {
-        agreement.require();
+        // TF1 round 2 (Saathi B-11): once they accept, the same action runs (no second click).
+        agreement.require(() => void run(action));
         setError(PEOPLE.agreement.required);
       } else {
         setError(errorText(failure));

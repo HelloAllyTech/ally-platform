@@ -74,8 +74,11 @@ export const Inbox: React.FC<{ chatbotId?: string; onForbidden?: () => void }> =
     error: listError,
   } = useGetInboxQuery({ view, channel, chatbotId });
   const { data: bots } = useGetChatbotsQuery();
-  // Counts are the caller's own assistants; staff are on none, so they'd only mislead.
-  const { data: counts } = useGetInboxCountsQuery(undefined, { skip: readOnly });
+  // Counts are the caller's own assistants (or the one the Inbox is held to); staff are on none,
+  // so they'd only mislead.
+  const { data: counts } = useGetInboxCountsQuery(chatbotId ? { chatbotId } : undefined, {
+    skip: readOnly,
+  });
   const { user } = useUser();
   const [sound, setSoundState] = useState(soundOn());
   const [askNotify, setAskNotify] = useState(canAskForNotifications());

@@ -33,6 +33,7 @@ from app.core.agent_runtime.tools import gateway_tools
 from app.core.agent_runtime.tools.lists import (
     books_into,
     looks_up_records,
+    offers_change,
     offers_create,
     takes_details,
 )
@@ -66,11 +67,32 @@ RULE_REFUSALS = frozenset(
 )
 
 
+def _personal(state: AgentState) -> str:
+    """What the person told us: memory, summary and name, and (TF1 round 2, B-2)
+    their own messages in this chat, so "Your name is Asha" after "Hi, I'm Asha" is
+    theirs even before the name reaches memory."""
+    said = [
+        str(turn.get("content") or "").strip()
+        for turn in recent(state.get("history")) or ()
+        if turn.get("role") == "user"
+    ]
+    return "\n".join(p for p in [personal_context(state["bot"]), *said] if p)
+
+
 def can_pass_on(bot: Dict[str, Any]) -> bool:
     """Whether the run can pass a request on (chunk 6b): `hand_over` is offered, or
     a create tool on a list that takes the person's details."""
     names = {tool.name for tool in gateway_tools(bot)}
-    return "hand_over" in names or takes_details(bot.get("gateway_definitions"))
+    definitions = bot.get("gateway_definitions")
+    # TF1 round 2: a list linking the person (Questions for the team) passes it on.
+    return (
+        "hand_over" in names
+        or takes_details(definitions)
+        or any(
+            (d or {}).get("kind") == "create" and (d or {}).get("passes_on")
+            for d in definitions or []
+        )
+    )
 
 
 def make_agent_check_node(service: KnowledgeAgentService) -> Node:
@@ -118,8 +140,9 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             decline_text=state["bot"].get("decline_text"),
             avoid_topics=(state["bot"].get("persona") or {}).get("avoid_topics") or (),
             purpose=(state["bot"].get("persona") or {}).get("purpose"),
+            template=(state["bot"].get("persona") or {}).get("template"),
             can_book=offers_create(state["bot"].get("gateway_definitions")),
-            personal=personal_context(state["bot"]),
+            personal=_personal(state),
             looked_up=bool(finds),
             can_pass_on=can_pass_on(state["bot"]),
             # Carried entries and key facts (Q4 G3): citable, not found by this run.
@@ -132,6 +155,7 @@ def make_agent_check_node(service: KnowledgeAgentService) -> Node:
             crisis_line=state["bot"].get("support_helplines") or "",
             upset=bool(state["bot"].get("mood")),
             books=books_into(state["bot"].get("gateway_definitions")),
+            can_change=offers_change(state["bot"].get("gateway_definitions")),
             looks_up=looks_up_records(state["bot"].get("gateway_definitions")),
             found_nothing=any(
                 call.get("nearest") or not (call.get("added") or call.get("aggregate"))

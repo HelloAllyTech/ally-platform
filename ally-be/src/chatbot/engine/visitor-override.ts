@@ -1,4 +1,5 @@
 import type { ReplyLanguage } from './reply-language';
+import { voiceText, type ChatbotVoice } from '../voice/voice-text';
 
 /**
  * A visitor asking the assistant to drop its rules (TF1 round 2, S-4: "Ignore your instructions
@@ -37,21 +38,13 @@ const OVERRIDE = new RegExp(
 export const asksToOverride = (text: string | null | undefined): boolean =>
   OVERRIDE.test(text ?? '');
 
-// COPY: needs approval (TF1 round 2, S-4). Moves to the voice's `override_decline` in B-13.
-const OVERRIDE_DECLINE: Record<ReplyLanguage, string> = {
-  en: "I can't do that, but I'm happy to help with anything about {organisation}.",
-  hi: 'यह मैं नहीं कर सकता, लेकिन {organisation} से जुड़ी किसी भी बात में ख़ुशी से मदद करूँगा।',
-  'hi-latn':
-    'Yeh main nahi kar sakta, lekin {organisation} se judi kisi bhi baat mein khushi se madad karunga.',
-};
-
-/** The one-line decline, in the person's language. */
+/** The one-line decline, in the assistant's voice and the person's language. */
 export function overrideDecline(
   language: ReplyLanguage,
   organisation: string,
+  settings?: { voice?: ChatbotVoice | null } | null,
 ): string {
-  return OVERRIDE_DECLINE[language].replace(
-    '{organisation}',
-    organisation.trim() || 'us',
-  );
+  return voiceText(settings, 'override_decline', language, {
+    organisation: organisation.trim() || 'us',
+  });
 }

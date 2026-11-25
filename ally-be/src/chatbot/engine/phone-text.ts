@@ -5,7 +5,7 @@
  */
 
 /** A phone number: an optional +, then at least 8 digits with spaces, dashes or brackets. */
-const PHONE = /\+?\d[\d\s\-()]{6,}\d/g;
+const PHONE = /\(?\+?\d[\d\s\-()]{6,}\d/g;
 /** "2024-2025" has 8 digits but is a span of years. */
 const YEAR_RANGE = /^(?:19|20)\d\d\s*[-–]\s*(?:19|20)\d\d$/;
 /**
@@ -18,11 +18,26 @@ const YEAR = /^(?:19|20)\d\d$/;
 
 const digits = (text: string) => text.replace(/\D/g, '');
 
+/**
+ * A number never ends inside a bracket it didn't open: "+91 80 4567 8800 (9 am–6 pm)" is
+ * "+91 80 4567 8800", not "+91 80 4567 8800 (9" (TF1 round 2: Pawsome's contact line).
+ */
+function balanced(number: string): string {
+  let out = number;
+  while ((out.match(/\(/g) ?? []).length > (out.match(/\)/g) ?? []).length) {
+    out = out.slice(0, out.lastIndexOf('(')).trim();
+  }
+  while ((out.match(/\)/g) ?? []).length > (out.match(/\(/g) ?? []).length) {
+    out = out.slice(0, out.lastIndexOf(')')).trim();
+  }
+  return out;
+}
+
 /** Every real phone number in a text, as written. Years, prices and times have too few digits. */
 export function phonesIn(text: string): string[] {
   const found: string[] = [];
   for (const match of text.match(PHONE) ?? []) {
-    const number = match.trim();
+    const number = balanced(match.trim());
     const count = digits(number).length;
     if (count < 8 || count > 13 || YEAR_RANGE.test(number)) continue;
     found.push(number);

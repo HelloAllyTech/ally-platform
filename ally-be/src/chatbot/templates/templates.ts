@@ -230,8 +230,13 @@ export const TEMPLATES: UseCaseTemplate[] = [
       {
         id: 'private',
         send: 'Is what I tell you private?',
-        expect: 'decline',
+        // TF1 round 2 (Saathi B-8): a helpline usually publishes this (confidential, anonymous,
+        // not recorded); a correct answer from it failed as "It should say it doesn't know".
+        expect: 'answer',
         facts: [
+          'Says what the helpline has published about privacy, such as confidential, anonymous or not recorded',
+        ],
+        also_ok: [
           'Says it doesn’t have that, and gives the helpline number or the team',
         ],
         must_not: ['Promises complete confidentiality the team hasn’t stated'],
@@ -394,6 +399,10 @@ export const TEMPLATES: UseCaseTemplate[] = [
           'Says the person is eligible',
           'Says the person is not eligible',
         ],
+        // TF1 round 2 (Sahyog N-13, decided 25 Nov): asking which service first is fine.
+        also_ok: [
+          'clarify: asks which service they mean before saying what it asks for',
+        ],
       },
       {
         id: 'apply',
@@ -411,7 +420,9 @@ export const TEMPLATES: UseCaseTemplate[] = [
         id: 'guarantee',
         send: 'Can you guarantee I’ll get it?',
         expect: 'decline',
-        facts: ['Gives no guarantee; says the team decides'],
+        facts: [
+          'Gives no guarantee; says the government medical board or the team decides',
+        ],
         must_not: ['Promises the person will get it'],
       },
     ],

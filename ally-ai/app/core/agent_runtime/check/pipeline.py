@@ -15,7 +15,7 @@ from app.core.agent_runtime.check.fixes import (
     give_crisis_numbers,
 )
 from app.core.agent_runtime.check.organisation import Organisation
-from app.core.agent_runtime.check.personal import about_the_person
+from app.core.agent_runtime.check.personal import about_the_person, personal_part
 from app.core.agent_runtime.check.rejections import Rejection
 from app.core.agent_runtime.check.safety import (
     enforce_avoid_topics,
@@ -27,8 +27,10 @@ from app.core.agent_runtime.check.text import (
     says_it_has_nothing,
     without_contact_details,
     without_sentences,
+    without_unclosed_brackets,
 )
 from app.core.agent_runtime.check.verdict import CheckContext, Verdict
+from app.core.agent_runtime.greeting import is_greeting_or_intro
 from app.core.agent_runtime.schemas import REPLY_ACTION, AgentIntent
 from app.core.knowledge_agent.agent import AnswerResult, build_result, resolve_citations
 from app.core.knowledge_agent.schemas import AnswerIntent, DeclineReason
@@ -57,6 +59,8 @@ def check_reply(
     decline_text: Optional[str] = None,
     avoid_topics: Sequence[str] = (),
     purpose: Optional[str] = None,
+    template: Optional[str] = None,
+    can_change: bool = True,
     can_book: bool = False,
     personal: str = "",
     looked_up: bool = False,
@@ -97,6 +101,8 @@ def check_reply(
         decline_text=(decline_text or "").strip(),
         avoid_topics=tuple(avoid_topics),
         purpose=purpose,
+        template=template,
+        can_change=can_change,
         can_book=can_book,
         personal=personal,
         looked_up=looked_up,
@@ -131,6 +137,9 @@ def check_reply(
     drop_channel_talk(verdict, ctx)
     give_crisis_numbers(verdict, ctx)
     add_fallback_contact(verdict, ctx)
+    # TF1 round 2: a fix that cut part of a bracket ("(All from the volunteer
+    # handbook." once its source phrase went) never leaves it open in the reply.
+    verdict.answer = without_unclosed_brackets(verdict.answer)
     result = _build_result(verdict, step, meta, ctx, language, retrieval)
     return result, verdict.rejection
 
@@ -181,7 +190,14 @@ def _relabel(
     ctx: CheckContext,
     about_organisation: bool,
 ) -> None:
-    factual = looks_factual(without_contact_details(verdict.answer))
+    # TF1 round 2 (Saathi B-1): the crisis lines a greeting may carry ("14416, free,
+    # 24×7") are not facts about the organisation.
+    factual = looks_factual(
+        _ROUND_THE_CLOCK.sub(" ", without_contact_details(verdict.answer))
+    )
+    # A whole-message greeting or introduction stays small talk, even when a search
+    # ran and found passages (it is not a question they could answer).
+    greeting = is_greeting_or_intro(ctx.question)
     if (step.get("action") or REPLY_ACTION) != REPLY_ACTION:
         # The tool budget ran out and the model still asked for a tool: it has
         # nothing it is willing to answer with.
@@ -202,8 +218,8 @@ def _relabel(
     elif (
         verdict.intent == AgentIntent.ANSWER
         and not step.get("citations")
-        and ctx.turn_type in ("smalltalk", "about_bot")
-        and not ctx.found
+        and (ctx.turn_type in ("smalltalk", "about_bot") or greeting)
+        and (not ctx.found or greeting)
         and not factual
         and not about_organisation
     ):
@@ -211,7 +227,9 @@ def _relabel(
         # nothing searched or cited, is small talk: the same text sent as
         # `smalltalk` would pass, so refusing it only swaps in the fixed wording.
         verdict.intent = AgentIntent.SMALLTALK
-    elif verdict.intent == AgentIntent.SMALLTALK and (factual or ctx.found):
+    elif verdict.intent == AgentIntent.SMALLTALK and (
+        factual or (ctx.found and not greeting)
+    ):
         # Small talk does not need a source, but this one either states something
         # checkable (a time, a price) or was written after a search found passages:
         # ground it like an answer. Phone numbers, links and emails are checked
@@ -247,6 +265,12 @@ def _require_sources(
             # the organisation, and only once a search found nothing. Flagged as
             # ungrounded, as today.
             verdict.unsupported, verdict.rejection = True, None
+        elif ctx.personal and personal_part(verdict.answer, ctx.personal):
+            # TF1 round 2 (B-2): "Your name is Asha. Our listeners are here…": what
+            # they told us stays, the uncited rest goes, rather than a decline.
+            logger.info("Uncited answer kept to what the person told us")
+            verdict.answer = personal_part(verdict.answer, ctx.personal)
+            verdict.intent, verdict.rejection = AgentIntent.SMALLTALK, None
         else:
             logger.info("Agent answer with no valid citations; declining")
             verdict.intent = AgentIntent.DECLINE
@@ -277,6 +301,7 @@ def _require_sources(
 
 
 _NUMBER = re.compile(r"\d+")
+_ROUND_THE_CLOCK = re.compile(r"24\s*[x×/*]\s*7", re.I)
 
 # "Please remember…", "remember that I…", "yaad rakhna" (Q3-fast Part 2, 17 Nov M2).
 _ASKS_TO_REMEMBER = re.compile(

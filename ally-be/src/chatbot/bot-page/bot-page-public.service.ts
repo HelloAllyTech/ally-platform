@@ -29,6 +29,7 @@ import { AppConfigService } from '../../config/config.service';
 import { ErrorCode } from '../../exception/error-code.enum';
 import { LoggerService } from '../../logger/logger.service';
 import { WaUnansweredQuestion } from '../../whatsapp/entity/wa-unanswered-question.entity';
+import { INTERNAL_TITLES } from '../../whatsapp/util/reply-composer';
 import {
   WaHandledBy,
   WaMessageDirection,
@@ -246,9 +247,22 @@ export interface PublicMessage {
   createdAt: string;
   /** Whether "Was this helpful?" shows under it (chunk Q2a): never on a crisis reply. */
   rateable: boolean;
+  /**
+   * TF1 round 2 (Sahyog N-11): the card and parts the reply showed when it was sent, kept with it
+   * (`retrieval_meta.page_card`) so a reload draws them again. Only the latest reply's buttons
+   * can be tapped, and a token past its 30 minutes says so.
+   */
+  confirmation?: PublicConfirmation;
+  parts?: ReplyParts;
 }
 
+/** What a reply showed beside its text, kept on its stored message for a reload (N-11). */
+const PAGE_CARD = 'page_card';
+
 /** The stream's `final`: the reply as stored, never the run behind it. */
+/** The bot page and the widget show the start notice above the chat, so no reply repeats it. */
+const SHOWS_NOTICE_ABOVE_CHAT = true;
+
 export interface PublicFinal {
   reply: string;
   citations: PublicCitation[];
@@ -272,6 +286,8 @@ export interface PublicFinal {
    * crisis keyword the crisis reply. The page shows it with the crisis information.
    */
   blocked?: 'OUT_OF_CREDITS' | 'REMOVED_FROM_LIST';
+  /** TF1 round 2 (Saathi B-2): the name this reply saved, for "Your name: … · Remove". */
+  name?: string;
 }
 
 /** The bot page's refusals, mapped onto the repo's `ErrorCode` contract (see error-code.enum.ts). */
@@ -685,10 +701,16 @@ export class BotPagePublicService {
   async conversation(
     slug: string,
     req: Request,
-  ): Promise<{ conversationId: string | null; messages: PublicMessage[] }> {
+  ): Promise<{
+    conversationId: string | null;
+    messages: PublicMessage[];
+    /** TF1 round 2 (Saathi B-2): the name the assistant keeps for them, shown with Remove. */
+    name?: string | null;
+  }> {
     const available = await this.page(slug);
     const ready = await this.requireReady(available, req);
     const contact = await this.contactOf(available, ready, false);
+    const name = contact?.displayName?.trim() || null;
     const current = contact
       ? await this.conversations.currentConversation(
           available.chatbot.id,
@@ -697,13 +719,14 @@ export class BotPagePublicService {
           available.botSettings.conversationIdleMinutes,
         )
       : null;
-    if (!current) return { conversationId: null, messages: [] };
+    if (!current) return { conversationId: null, messages: [], name };
     const rows = await this.conversations.recentMessages(
       current.id,
       BOT_PAGE_BOUNDS.resumeMessages,
     );
     return {
       conversationId: current.id,
+      name,
       messages: rows
         .filter((row) => row.text?.trim())
         .map((row) => ({
@@ -723,8 +746,25 @@ export class BotPagePublicService {
           rateable:
             row.role !== ConversationMessageRole.USER &&
             RATEABLE.has(row.handledBy ?? ''),
+          ...(row.role === ConversationMessageRole.ASSISTANT
+            ? pageCardOf(row.retrievalMeta)
+            : {}),
         })),
     };
+  }
+
+  /**
+   * "Your name: Asha · Remove" on the bot page (TF1 round 2, Saathi B-2): the name the assistant
+   * keeps for this visitor goes, and nothing fills it back until they give it again.
+   */
+  async forgetName(slug: string, req: Request): Promise<{ ok: true }> {
+    const available = await this.page(slug);
+    const ready = await this.requireReady(available, req);
+    const contact = await this.contactOf(available, ready, false);
+    if (contact && this.memory) {
+      await this.memory.forgetName(available.chatbot.id, contact.id);
+    }
+    return { ok: true };
   }
 
   async newConversation(slug: string, req: Request): Promise<{ ok: true }> {
@@ -854,7 +894,7 @@ export class BotPagePublicService {
     const contact = (await this.contactOf(available, ready, true))!;
     const conversation = await this.openWithIntake(available, contact, ready);
     // BT1: a tap counts only in its own conversation, for its own person; the message stored and
-    // answered is what it stands for ("Confirmed: Sun 29 Nov 2026, 11:00").
+    // answered is what it stands for ("Confirm", "I'd like to change it.").
     const tap =
       admitted.action && this.actions
         ? await this.actions.redeem(admitted.action, {
@@ -972,8 +1012,10 @@ export class BotPagePublicService {
       );
     }
 
-    // Stage 4: the conversation's first reply carries the fixed start notice (bot page and widget).
-    if (isFirstMessage) {
+    // Stage 4: the conversation's first reply carries the fixed start notice. TF1 round 2 (Saathi):
+    // not on the bot page or the widget, which show the notice and the disclaimer above the chat
+    // all the time (`page.notice`, `page.disclaimer`); in the reply too, it appeared twice.
+    if (isFirstMessage && !SHOWS_NOTICE_ABOVE_CHAT) {
       decision = {
         ...decision,
         body: withFirstMessageParts({
@@ -987,6 +1029,20 @@ export class BotPagePublicService {
             organisation: chatbot.name,
           }),
         }),
+      };
+    }
+
+    // TF1 round 2 (Saathi B-2): the name they just gave is kept, and this reply says so, once.
+    const nameNotice = await this.privacy?.nameNotice({
+      chatbot,
+      contactId: contact.id,
+      decision,
+      text,
+    });
+    if (nameNotice) {
+      decision = {
+        ...decision,
+        body: `${decision.body}\n\n${nameNotice.notice}`,
       };
     }
 
@@ -1106,6 +1162,20 @@ export class BotPagePublicService {
         .filter((m) => m.role === 'user')
         .map((m) => m.content),
     });
+    // TF1 round 2 (Sahyog N-11): the card goes with the stored reply, so a reload shows it again.
+    if (confirmation || (parts && Object.keys(parts).length)) {
+      await this.conversations
+        .updateMessage(outbound.id, {
+          retrievalMeta: {
+            ...(decision.retrievalMeta ?? {}),
+            [PAGE_CARD]: {
+              ...(confirmation ? { confirmation } : {}),
+              ...(parts && Object.keys(parts).length ? { parts } : {}),
+            },
+          },
+        })
+        .catch(() => undefined);
+    }
     return {
       reply: decision.body,
       citations: publicCitations(decision.citations),
@@ -1119,6 +1189,7 @@ export class BotPagePublicService {
       decision.blocked === 'REMOVED_FROM_LIST'
         ? { blocked: decision.blocked }
         : {}),
+      ...(nameNotice ? { name: nameNotice.name } : {}),
     };
   }
 
@@ -1139,6 +1210,7 @@ export class BotPagePublicService {
         write.record_id,
         contactId,
         decision.agent.runId,
+        write.kind as 'create' | 'update' | 'cancel',
       );
       if (!record) return null;
       return {
@@ -1581,6 +1653,8 @@ export function publicCitations(
   for (const citation of citations ?? []) {
     // A list record (chunk 6) reads "Slots · Thu 13 Nov, 11:15": the list, then the record.
     const name = String(citation.document_title ?? citation.title ?? '').trim();
+    // TF1 round 2: the setup's own working documents are never a source (as on WhatsApp).
+    if (INTERNAL_TITLES.test(name)) continue;
     const section = String(citation.section_path ?? '').trim();
     const title =
       citation.record_id && name && section ? `${name} · ${section}` : name;
@@ -1610,4 +1684,18 @@ function speaksEnglishAndHindi(chatbot: {
     (l) => l.trim().toLowerCase().split('-')[0],
   );
   return bases.includes('en') && bases.includes('hi');
+}
+
+/** The card and parts a stored reply showed (N-11), or nothing. */
+function pageCardOf(
+  meta: Record<string, unknown> | null | undefined,
+): Pick<PublicMessage, 'confirmation' | 'parts'> {
+  const card = meta?.[PAGE_CARD] as
+    | { confirmation?: PublicConfirmation; parts?: ReplyParts }
+    | undefined;
+  if (!card || typeof card !== 'object') return {};
+  return {
+    ...(card.confirmation ? { confirmation: card.confirmation } : {}),
+    ...(card.parts ? { parts: card.parts } : {}),
+  };
 }

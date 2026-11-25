@@ -34,11 +34,14 @@ export const INVITE_COPY = {
  * blocks new take-overs (and a responder-only member's reading of new chats) until accepted, never
  * conversations a person already holds.
  */
-export const RESPONDER_AGREEMENT_VERSION = 'v1';
+export const RESPONDER_AGREEMENT_VERSION = 'v2-interim';
 
-// COPY: needs approval — placeholder text; the plan (section 7) needs sign-off before stage 1b ships.
-export const RESPONDER_AGREEMENT_TEXT = `PLACEHOLDER - NOT APPROVED.
-When you reply to people through this chatbot you agree to:
-- treat what people tell you as private and not share it outside the team;
-- follow the chatbot's crisis guidance and never give medical, legal or emergency instructions;
-- say you are a person when you take over, and hand the chat back when you are done.`;
+// COPY: needs approval (TF1 round 2, Saathi B-10). Interim terms until Sandeep approves the final
+// text; replace them, and bump the version, when he does.
+export const RESPONDER_AGREEMENT_TEXT = `Interim terms, until the final version is approved.
+When you reply to people through this assistant, you agree to:
+- reply kindly and plainly, and say you are a person from the team when you take over;
+- never give medical, legal or financial advice, or a diagnosis;
+- pass on anyone who may be at risk at once, following the assistant's crisis guidance, and tell them to call 112 if they are in danger;
+- keep every chat confidential: never share what people tell you outside the team;
+- hand the chat back to the assistant when you are done.`;

@@ -176,6 +176,37 @@ describePg('Inbox (Postgres)', () => {
     expect((await inbox.thread(bot, second))?.newerChatId).toBeNull();
   });
 
+  // TF1 round 2 (Sahyog P2): after "Forget me" the row said "16 CHATS", erased ones included.
+  it('does not count chats the person erased', async () => {
+    const erased = await chat('[erased]', '2026-11-09T08:00:00Z');
+    const [{ contact_id: ravi }] = await dataSource.query(
+      `SELECT contact_id FROM chatbot_conversations WHERE id = $1`,
+      [erased],
+    );
+    // The reply confirming the erasure comes after it and is not blanked.
+    await dataSource.query(
+      `INSERT INTO chatbot_messages (conversation_id, channel, direction, role, text, "createdAt")
+       VALUES ($1, 'web', 'outbound', 'assistant', 'Done. I have erased your conversations.', '2026-11-09T08:01:00Z')`,
+      [erased],
+    );
+    const kept = await chat('Still here', '2026-11-09T09:00:00Z');
+    const later = await chat('Hello again', '2026-11-09T10:00:00Z');
+    await dataSource.query(
+      `UPDATE chatbot_conversations SET contact_id = $2 WHERE id = ANY($1::uuid[])`,
+      [[kept, later], ravi],
+    );
+    const inbox = new InboxService(dataSource, {
+      accessibleChatbotIds: async () => [bot],
+      assert: async () => undefined,
+    } as never);
+    expect((await inbox.list()).map((c) => [c.id, c.chats])).toEqual([
+      [later, 2],
+    ]);
+    expect(
+      (await inbox.thread(bot, later))?.otherChats.map((o) => o.id),
+    ).toEqual([kept]);
+  });
+
   it('marks website chats, and filters Website apart from Bot page (chunk 13)', async () => {
     const page = await chat('From the page', '2026-11-09T10:00:00Z');
     const widget = await chat(

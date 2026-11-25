@@ -17,8 +17,8 @@ export interface AccessEntry {
   label?: string | null;
   createdAt?: string;
   /**
-   * TODO(stage 6, ally-be): the list route does not return whether an entry has ever matched a
-   * sender yet. When it does (`everMatched`), the screen shows "Matched" / "Never matched".
+   * Phone and email entries: whether that person has proved the address to the assistant (a code
+   * on the page, or a WhatsApp message from the number). Users and organisations have none.
    */
   everMatched?: boolean;
 }

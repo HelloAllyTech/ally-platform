@@ -79,12 +79,78 @@ export function contactValuesIn(text: string | null | undefined): string[] {
   return [...(body.match(EMAIL) ?? []), ...(body.match(PHONE) ?? [])];
 }
 
+/**
+ * TF1 round 2, N-3 (Sahyog's own PDF was held for its centre numbers, complaints email and
+ * centre manager): contact details the document gives as the organisation's own are not personal
+ * data. An address of a shared mailbox (info@, feedback@) or on the organisation's own domain,
+ * and a number or address the sentence presents as a centre's, an office's or "ours", when the
+ * sentence gives only that one. A list of numbers in one sentence is never waved through.
+ */
+const ORG_CUE =
+  /\b(?:centre|center|office|branch|helpline|hotline|reception|front desk|call us|contact us|write to us|reach us|email us|whatsapp us|our (?:number|phone|email|helpline|office|centre|center|team))\b/i;
+const ROLE_MAILBOX =
+  /^(?:info|contact|contactus|hello|help|helpdesk|support|feedback|complaints?|enquir(?:y|ies)|inquir(?:y|ies)|office|admin|team|care|connect|listen|reception|desk|services?|grievances?)$/i;
+
+/** The sentence (or line) around a match. */
+function sentenceAt(body: string, index: number, length: number): string {
+  const before = body.slice(0, index);
+  const start = Math.max(
+    before.lastIndexOf('\n'),
+    ...['. ', '! ', '? ', '; '].map((s) => before.lastIndexOf(s)),
+  );
+  const after = body.slice(index + length);
+  const ends = ['\n', '. ', '! ', '? ', '; ']
+    .map((s) => after.indexOf(s))
+    .filter((i) => i >= 0);
+  const end = index + length + (ends.length ? Math.min(...ends) : after.length);
+  return body.slice(start + 1, end);
+}
+
+const domainOf = (email: string) => email.toLowerCase().split('@')[1] ?? '';
+
+/**
+ * TF1 round 2, N-3: a person named in a public staff role ("the centre manager, Ms. Kavita
+ * Meena", "Dr Rao, our dentist") is the organisation's contact, not a private individual.
+ */
+const ROLE =
+  '(?:manager|director|head|co-?ordinator|officer|secretary|founder|chair(?:person|man|woman)?|trustee|principal|in-?charge|president|treasurer|counsell?or|doctor|caseworker|social worker|nurse|dentist|teacher|lawyer|advocate|therapist|psychologist|physiotherapist|administrator|superintendent|registrar|contact person|spokesperson|ceo|coo|cfo)';
+const HONORIFIC = '(?:(?:mr|mrs|ms|miss|dr|shri|smt|prof)\\.?\\s+)';
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+export function inPublicRole(text: string, name: string): boolean {
+  const bare = name
+    .trim()
+    .replace(new RegExp(`^${HONORIFIC}`, 'i'), '')
+    .trim();
+  if (bare.length < 3) return false;
+  const n = escape(bare).replace(/\s+/g, '\\s+');
+  const before = new RegExp(
+    `\\b${ROLE}\\b[\\s,:–—-]{1,4}${HONORIFIC}?${n}\\b`,
+    'i',
+  );
+  const after = new RegExp(
+    `\\b${HONORIFIC}?${n}\\b\\s*[,(–—-]\\s*(?:(?:is|who is)\\s+)?(?:our|the)?\\s*(?:[\\w-]+\\s+){0,2}${ROLE}\\b`,
+    'i',
+  );
+  const all = new RegExp(`\\b${n}\\b`, 'gi');
+  const occurrences = [...text.matchAll(all)].length;
+  if (!occurrences) return false;
+  // Every mention must be in its role: one mention elsewhere could be private.
+  const inRole =
+    [...text.matchAll(new RegExp(before.source, 'gi'))].length +
+    [...text.matchAll(new RegExp(after.source, 'gi'))].length;
+  return inRole >= occurrences;
+}
+
 /** The regex scan. `publicValues`: contact details the owner marked public, never findings. */
 export function scanForPii(
   text: string,
   publicValues: string[] = [],
 ): PiiScanResult {
   const allowed = publicKeys(publicValues);
+  const orgDomains = new Set(
+    publicValues.filter((v) => v.includes('@')).map(domainOf),
+  );
   const found = new Map<string, PiiFinding>();
   const add = (kind: PiiKind, value: string) => {
     const key = `${kind}:${value}`;
@@ -104,15 +170,28 @@ export function scanForPii(
   ]) {
     add('id_number', m);
   }
-  for (const m of body.match(EMAIL) ?? []) {
-    if (allowed.has(m.toLowerCase())) continue;
-    add('email', m.toLowerCase());
+  // N-3: one contact of a kind in a sentence that presents it as the organisation's.
+  const theOrganisations = (m: RegExpMatchArray, kind: RegExp) => {
+    const sentence = sentenceAt(body, m.index ?? 0, m[0].length);
+    const same = (sentence.match(kind) ?? []).filter(
+      (v) => kind !== PHONE || digitsOf(v).length >= 10,
+    );
+    return same.length === 1 && ORG_CUE.test(sentence);
+  };
+  for (const m of body.matchAll(EMAIL)) {
+    const email = m[0].toLowerCase();
+    if (allowed.has(email)) continue;
+    if (ROLE_MAILBOX.test(email.split('@')[0])) continue;
+    if (orgDomains.has(domainOf(email))) continue;
+    if (theOrganisations(m, EMAIL)) continue;
+    add('email', email);
   }
-  for (const m of body.match(PHONE) ?? []) {
-    const d = digitsOf(m);
+  for (const m of body.matchAll(PHONE)) {
+    const d = digitsOf(m[0]);
     if (d.length < 10 || d.length > 13) continue;
     if (ids.has(d)) continue;
     if (allowed.has(d.slice(-10))) continue;
+    if (theOrganisations(m, PHONE)) continue;
     add('phone', d);
   }
   const findings = [...found.values()];

@@ -80,4 +80,29 @@ describe('ChatbotAudienceService', () => {
       ),
     ).toThrow(BadRequestException);
   });
+
+  it('marks a phone or email entry signed in once that identity is proven', async () => {
+    const listed = [
+      { kind: ChatbotAudienceKind.EMAIL, value: 'asha@example.org' },
+      { kind: ChatbotAudienceKind.EMAIL, value: 'ravi@example.org' },
+      { kind: ChatbotAudienceKind.PHONE, value: '+919876543210' },
+      { kind: ChatbotAudienceKind.USER, value: '42' },
+    ];
+    const query = jest.fn(async () => [
+      { value: 'asha@example.org' },
+      { value: '+919876543210' },
+    ]);
+    const withIdentities = new ChatbotAudienceService({
+      find: async () => listed,
+      manager: { query },
+    } as never);
+    const out = await withIdentities.list('bot-1');
+    expect(
+      out.map((e) => (e as { everMatched?: boolean }).everMatched),
+    ).toEqual([true, false, true, undefined]);
+    expect(query.mock.calls[0]).toEqual([
+      expect.any(String),
+      ['bot-1', 'email', ['email', 'whatsapp']],
+    ]);
+  });
 });

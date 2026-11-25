@@ -363,3 +363,14 @@ From the manual test on Saathi Youth Helpline (`88578d65-c50d-4d06-b432-b79ae42c
   - the WhatsApp link (it needs a connected number)
   - public and organisation modes (not offered)
   - "Reach more communities" (dropped from this pass)
+
+## Round 2 (Saathi and Sahyog manual passes): results, 25 Nov
+
+Full report: `evals/tf1/runs/round2-final.md` (five assistants rebuilt from their templates; ids there). Summary and anything still open: `docs/agents-v2/PR-TF1.md` → "Final run" and "Still open".
+
+| Item | Status |
+|---|---|
+| S-1 to S-4, N-1, N-2 (safety) | Fixed and re-run live; every must-pass case passes with the stack unloaded |
+| Crisis check under load | Open: a slow verdict falls back to a decline (now always with 112 and 14416) |
+| B-1 to B-12, N-3 to N-14 | Fixed and re-run live, except N-9 (where to check) and N-10 (phone unasked): open |
+| Doubled reply on the bot page (found 25 Nov) | Fixed: a rewrite clears the draft at once; the final reply replaces the streamed bubble |

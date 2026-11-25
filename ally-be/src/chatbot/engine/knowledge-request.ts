@@ -114,12 +114,32 @@ function personaRequest(turn: ChatTurn): KnowledgeAnswerRequest['persona'] {
   // Stage 9: the pack is read from its current release (`packFor`); a curator's suite run on a
   // draft release tests the draft pack on whichever chatbot it runs against.
   const packId = packOverride()?.packId ?? turn.chatbot.safetyPack;
+  // TF1 round 2 (Saathi B-13): the template's voice, as guidance beside the owner's instructions.
+  const voice = turn.chatbot.settings?.voice;
+  const voiceLines = voice?.role
+    ? [
+        `Your voice: ${voice.role}. Never claim or imply you are a person.`,
+        voice.never?.length
+          ? `Never say or do: ${voice.never.join('; ')}.`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : '';
+  // ally-ai caps `system_prompt` at 4000: the voice lines are kept whole, the owner's text trimmed.
+  const own = (persona.systemPrompt?.trim() ?? '').slice(
+    0,
+    Math.max(0, 4000 - (voiceLines ? voiceLines.length + 2 : 0)),
+  );
+  const instructions = [own, voiceLines].filter(Boolean).join('\n\n');
   const out = {
     display_name: persona.displayName?.trim() || undefined,
-    system_prompt: persona.systemPrompt?.trim() || undefined,
+    system_prompt: instructions || undefined,
     tone: persona.tone?.trim() || undefined,
     // The base safety block (stage 4), the bot's safety pack and its owner's Never rules (chunk
     // 20a), on every run, in their own field: an editor's instructions can't remove them.
+    // TF1 round 2 (Sahyog N-2): the template it was built from, for checks that depend on it.
+    template: voice?.template || undefined,
     safety_rules: packRulesBlock(
       packId,
       [

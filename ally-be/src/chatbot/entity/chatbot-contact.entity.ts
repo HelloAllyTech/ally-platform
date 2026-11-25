@@ -24,4 +24,12 @@ export class ChatbotContact extends BaseWithoutTenantEntity {
   /** What to call them. Null on WhatsApp, which records only the number today. */
   @Column({ type: 'text', name: 'display_name', nullable: true })
   displayName?: string | null;
+
+  /**
+   * When the person asked the assistant to forget their name (TF1 round 2, Saathi B-2). While set,
+   * nothing fills the name for them (the WhatsApp profile, a list entry); it clears when they give
+   * their name again.
+   */
+  @Column({ type: 'timestamp', name: 'name_forgotten_at', nullable: true })
+  nameForgottenAt?: Date | null;
 }

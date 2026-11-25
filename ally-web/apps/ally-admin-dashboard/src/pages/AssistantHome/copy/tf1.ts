@@ -66,5 +66,8 @@ export const TF1_COPY = {
     sitesHintPublic:
       "The chat bubble can go on any website. These are the sites it has appeared on. While your page is public, anyone can chat there without signing in.",
     switchFailed: "Couldn't change who can chat. Try again.",
+    /** TF1 round 2 (Akshar): an organisation-only page shows its setting as a choice. COPY: needs approval. */
+    organisationChoice: "Organisation only",
+    organisationChoiceHint: "People in your organisation, after they confirm their work email.",
   },
 } as const;

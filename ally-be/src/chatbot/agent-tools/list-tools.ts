@@ -85,6 +85,8 @@ export interface ListToolDefinition {
    * can't answer, and lets the assistant say the team will get back to them.
    */
   takes_details?: boolean;
+  /** A create whose entry reaches the team with the person on it (TF1 round 2): see `passesOn`. */
+  passes_on?: boolean;
   /**
    * What the list's offered tools do, so the run gets that kind's playbook (Q3-fast Part 2b): a
    * create with a date-and-time target books; a create with a phone or person field takes details;
@@ -177,6 +179,15 @@ const hasPersonField = (list: ListView): boolean =>
 /** A list the assistant saves someone's details to: a phone field it fills in (chunk 6b). */
 export const takesDetails = (list: ListView): boolean =>
   writableFields(list).some((f) => f.type === ListFieldType.PHONE);
+
+/**
+ * TF1 round 2: a list whose entries reach the team with the person on them: a phone field, or the
+ * person linked (Questions for the team, applications). The reply may then say it will pass their
+ * request on; without this, "I can pass this question to the team" was trimmed on an assistant
+ * that shows the card a turn later.
+ */
+export const passesOn = (list: ListView): boolean =>
+  takesDetails(list) || hasPersonField(list);
 
 // ---- schemas ------------------------------------------------------------------------------------
 
@@ -478,7 +489,13 @@ function findDescription(list: ListView): string {
     (hasPersonField(list)
       ? ' It returns only the entries of the person in this chat, so when they ask about their own ' +
         '("what did I book?", "my request", "cancel that"), call it first, with memory on or off; ' +
-        'never ask for their name or phone to find them.'
+        'never ask for their name or phone to find them.' +
+        // TF1 round 2 (Sahyog N-9): "the status of my pension application from March" is the
+        // government's record, not this list's.
+        ` It holds only what was made here, in ${list.name}: never a government or other ` +
+        "organisation's record (a pension, a certificate, a court case). When they ask about one of " +
+        "those, say you can't see it and where they can check (the office or portal in the " +
+        "information), and don't list their other entries instead."
       : '')
   ).replace(/\.\s+returns/, '. Returns');
 }
@@ -497,8 +514,13 @@ function createDescription(list: ListView, names: Map<string, string>): string {
       /^(requested|pending)$/i.test(f.default),
   );
   return [
-    `Add an entry to ${list.name}${person}, only after they've confirmed it.`,
-    required.length ? `Needs ${joinAnd(required)}.` : '',
+    `Add an entry to ${list.name}${person}.`,
+    // TF1 round 2 (Saathi B-3): "only after they've confirmed it" read as "wait", so "Can someone
+    // call me back tomorrow evening?" got facts instead of a card. Calling it writes nothing yet.
+    `Call it as soon as they ask for one, in any words or language ("can someone call me back?", "put me down for Saturday", "mujhe call karo kal shaam", "मुझे कल शाम कॉल करो"): it writes nothing yet, it shows them the details to confirm. Don't ask whether they want it: asking was their yes to starting.`,
+    required.length
+      ? `Needs ${joinAnd(required)}; if one is missing the tool says which: ask for that one detail in one short question, then call it again.`
+      : '',
     ...ruleSentences(list, names, 'create'),
     requested ? 'New entries start as requested: the team confirms them.' : '',
   ]
@@ -570,6 +592,7 @@ export function listToolDefinitions(
       kind: 'create',
       ...(listName ? { list_name: listName } : {}),
       ...(takesDetails(list) ? { takes_details: true } : {}),
+      ...(passesOn(list) ? { passes_on: true } : {}),
     });
     out.push({
       name: listToolName('update', list.key),

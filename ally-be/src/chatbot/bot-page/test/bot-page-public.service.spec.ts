@@ -1,4 +1,3 @@
-import { withoutStopLine } from '../../safety/chat-notice';
 import { HttpException } from '@nestjs/common';
 import { ErrorCode } from '../../../exception/error-code.enum';
 import {
@@ -73,11 +72,6 @@ function availableFor(access: BotPageAccess, prechat = false) {
     },
   };
 }
-
-// TF1 P3: the web chat's notice leaves out WhatsApp's "Reply STOP to opt out".
-const DEFAULT_NOTICE = withoutStopLine(
-  DEFAULT_WHATSAPP_SETTINGS.disclaimerText,
-);
 
 const DECISION = {
   handledBy: WaHandledBy.RAG,
@@ -641,6 +635,7 @@ describe('BotPagePublicService', () => {
           handledBy: WaHandledBy.TEMPLATE,
         }),
         consentQuestion: jest.fn().mockResolvedValue(null),
+        nameNotice: jest.fn().mockResolvedValue(null),
       };
       Object.assign(h.service, { privacy });
       Object.assign(h.engine, {
@@ -660,6 +655,7 @@ describe('BotPagePublicService', () => {
       const privacy = {
         beforeTurn: jest.fn().mockResolvedValue(null),
         consentQuestion: jest.fn().mockResolvedValue('Can I remember?'),
+        nameNotice: jest.fn().mockResolvedValue(null),
       };
       Object.assign(h.service, { privacy });
       Object.assign(h.engine, {
@@ -707,8 +703,9 @@ describe('BotPagePublicService', () => {
     it('stores the message and the reply on the web channel, with the run behind it', async () => {
       const h = harness(BotPageAccess.PUBLIC);
       const final = await answer(h);
-      // Stage 4: the conversation's first reply carries the fixed start notice.
-      const first = `${DECISION.body}\n\nYou are chatting with an AI assistant. The AI and people at ${chatbot.name} may read this chat.\n${DEFAULT_NOTICE}`;
+      // TF1 round 2 (Saathi): the page shows the start notice above the chat, so the first reply
+      // no longer repeats it (`SHOWS_NOTICE_ABOVE_CHAT`).
+      const first = DECISION.body;
       expect(h.stored).toHaveLength(2);
       expect(h.stored[0]).toMatchObject({
         channel: 'web',
@@ -894,6 +891,41 @@ describe('BotPagePublicService', () => {
       });
     });
 
+    it('a resumed reply draws its card again, from what was kept with it (N-11)', async () => {
+      const h = harness(BotPageAccess.PUBLIC);
+      h.setVisitor({});
+      const confirmation = {
+        action: 'create',
+        list: 'Applications',
+        title: 'Ravi Test',
+        headline: 'application',
+        details: [{ label: 'Service', value: 'Aids and appliances' }],
+      };
+      const parts = { done: { buttons: [] } };
+      h.conversations.recentMessages.mockResolvedValue([
+        {
+          id: 'm1',
+          role: 'user',
+          text: 'Confirm',
+          citations: null,
+          retrievalMeta: { page_card: { confirmation } },
+          createdAt: new Date('2026-11-07T10:00:00Z'),
+        },
+        {
+          id: 'm2',
+          role: 'assistant',
+          text: 'Done: your application is sent (Ravi Test).',
+          citations: null,
+          retrievalMeta: { page_card: { confirmation, parts } },
+          handledBy: 'tap',
+          createdAt: new Date('2026-11-07T10:00:05Z'),
+        },
+      ]);
+      const resumed = await h.service.conversation('sunrise', h.req);
+      expect(resumed.messages[0]).not.toHaveProperty('confirmation');
+      expect(resumed.messages[1]).toMatchObject({ confirmation, parts });
+    });
+
     it('new chat closes the open thread', async () => {
       const h = harness(BotPageAccess.PUBLIC);
       h.setVisitor({});
@@ -914,6 +946,16 @@ describe('BotPagePublicService', () => {
       { title: 'A', url: null },
       { title: 'B', url: 'https://b' },
     ]);
+  });
+
+  it('publicCitations never lists the setup working documents (TF1 round 2)', () => {
+    expect(
+      publicCitations([
+        { document_title: 'What we learned', source_url: '' },
+        { document_title: 'Owner notes', source_url: '' },
+        { document_title: 'Guide', source_url: '' },
+      ]),
+    ).toEqual([{ title: 'Guide', url: null }]);
   });
 
   it('publicCitations shows a list record as the list and the record (chunk 6)', () => {

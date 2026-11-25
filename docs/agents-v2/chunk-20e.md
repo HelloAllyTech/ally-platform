@@ -12,7 +12,7 @@ Many small businesses (a therapist, a clinic, a coach) have a weak website or no
 
 ### 1. What the page is
 
-- Lives at `<BOT_PAGE_BASE_URL>/<slug>` (the bot page stays at `/b/<slug>`). If the landing page is off, `/<slug>` redirects to `/b/<slug>`.
+- Lives at `<BOT_PAGE_BASE_URL>/<slug>` (the bot page is at `/chat/<id>` since SB1; `/b/<slug>` redirects). If the landing page is off, `/<slug>` redirects to `/b/<slug>`.
 - Turned on per bot from **Look and feel** (20d) and from the "Give it a landing page" card after publishing.
 - **Public only.** Available when the bot page's access is "Anyone with the link" (so after `botPagePublicAllowed`). For organisation or invite-only bots, the option is shown disabled with copy §18's note.
 

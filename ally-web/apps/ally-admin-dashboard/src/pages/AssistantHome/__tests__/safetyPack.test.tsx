@@ -52,9 +52,17 @@ describe("PackChooser", () => {
 
   it("offers every other pack, marking the less strict one", () => {
     open();
-    expect(screen.queryByLabelText(/Care for young people/)).not.toBeInTheDocument();
     expect(screen.getByLabelText(/Medical safety/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Facts only/)).toHaveAccessibleName(/Less strict/);
+  });
+
+  // TF1 round 2 (Sahyog P2): it opened with nothing selected.
+  it("opens on the pack in use, and changes nothing until another is picked", () => {
+    open();
+    const current = screen.getByLabelText(/Care for young people/);
+    expect(current).toBeChecked();
+    expect(current).toHaveAccessibleName(/In use now/);
+    expect(screen.getByRole("button", { name: t.change })).toBeDisabled();
   });
 
   it("changes to a stricter pack at once, with no reason", async () => {

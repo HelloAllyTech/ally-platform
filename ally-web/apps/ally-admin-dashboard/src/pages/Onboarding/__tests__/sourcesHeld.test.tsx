@@ -6,6 +6,8 @@ import { describe, expect, it, vi } from "vitest";
 // `@constants` first: the admin app's barrel does module-load-time work.
 import "@constants";
 
+const refetchReview = vi.hoisted(() => vi.fn());
+
 /** TF1 F4: a held PDF showed a raw "needs_review", and Approve was only in Knowledge. */
 vi.mock("@api", async importOriginal => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -17,6 +19,7 @@ vi.mock("@api", async importOriginal => ({
     ],
   }),
   useGetKnowledgeReviewQuery: () => ({
+    refetch: refetchReview,
     data: {
       documents: [
         {
@@ -52,5 +55,8 @@ describe("a file held for personal details, in Create", () => {
     expect(screen.getByText(TF1_COPY.sources.held)).toBeTruthy();
     expect(screen.queryByText("needs_review")).toBeNull();
     expect(screen.getByTestId("knowledge-review")).toBeTruthy();
+    // TF1 round 2, N-3: the panel said "Nothing is waiting" until a reload; a newly held source
+    // fetches the review list again, so the two agree.
+    expect(refetchReview).toHaveBeenCalled();
   });
 });

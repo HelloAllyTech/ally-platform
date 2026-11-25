@@ -114,7 +114,11 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
   let promptShared: { getPromptsByOptions: jest.Mock };
   let templateService: { match: jest.Mock; findByKind: jest.Mock };
   /** Stage 5: erase in chat and memory consent (`ChatPrivacyService`), mocked. */
-  let privacy: { beforeTurn: jest.Mock; consentQuestion: jest.Mock };
+  let privacy: {
+    beforeTurn: jest.Mock;
+    consentQuestion: jest.Mock;
+    nameNotice: jest.Mock;
+  };
   let contact: Partial<WaContact>;
   let savedMessages: Record<string, unknown>[];
   /** Keys the rate limiter has already notified (the blocked notice's once per 24 hours). */
@@ -206,6 +210,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
     privacy = {
       beforeTurn: jest.fn().mockResolvedValue(null),
       consentQuestion: jest.fn().mockResolvedValue(null),
+      nameNotice: jest.fn().mockResolvedValue(null),
     };
 
     const messageRepository = {

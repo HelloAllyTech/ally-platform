@@ -2,6 +2,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { LoggerService } from '../../logger/logger.service';
 import { WaHandledBy } from '../../whatsapp/enum/whatsapp.enum';
 import type { Chatbot } from '../entity/chatbot.entity';
+import { AgentRuntimeUsed } from '../enum/chatbot.enum';
 import type { ChatbotDecision } from '../engine/chatbot-engine.types';
 import { replyLanguageOf, type ReplyLanguage } from '../engine/reply-language';
 import { memorySettingsOf } from '../memory/memory-settings';
@@ -11,7 +12,9 @@ import {
   ERASE_CONFIRM_COPY,
   eraseResultMessage,
 } from './erase-copy';
-import { eraseConfirmStep } from './erase-intent';
+import { eraseConfirmStep, isForgetNameRequest } from './erase-intent';
+import { MemoryService } from '../memory/memory.service';
+import { voiceText } from '../voice/voice-text';
 import { MemoryConsentService } from './memory-consent.service';
 import { consentAnswerOf, consentWording } from './memory-consent-copy';
 import { safetySettingsOf } from '../safety/safety-settings';
@@ -31,7 +34,8 @@ export type PrivacyReplyKind =
   | 'erase_confirm'
   | 'erase_done'
   | 'erase_cancelled'
-  | 'consent_recorded';
+  | 'consent_recorded'
+  | 'name_forgotten';
 
 export interface PrivacyReply {
   kind: PrivacyReplyKind;
@@ -91,7 +95,52 @@ export class ChatPrivacyService {
   constructor(
     @Optional() private readonly erasure?: CustomerErasureService,
     @Optional() private readonly consent?: MemoryConsentService,
+    @Optional() private readonly memory?: MemoryService,
   ) {}
+
+  /**
+   * TF1 round 2 (Saathi B-2, decided 25 Nov): after the agent's own reply, save the name the person
+   * just gave (memory on or off: a name is contact data) and return the one-time notice for that
+   * reply, in the voice and their language. Null when nothing new was saved.
+   */
+  async nameNotice(input: {
+    chatbot: Pick<Chatbot, 'id' | 'settings' | 'safetyPack'>;
+    contactId?: string | null;
+    decision: ChatbotDecision;
+    text: string;
+    language?: string | null;
+  }): Promise<{ notice: string; name: string } | null> {
+    const { chatbot, decision } = input;
+    if (
+      !this.memory ||
+      decision.upset ||
+      !AGENT_REPLIES.has(decision.handledBy)
+    ) {
+      return null;
+    }
+    const named = await this.memory
+      .nameNow({
+        chatbot,
+        contactId: input.contactId,
+        pending:
+          decision.agent?.runtime === AgentRuntimeUsed.V2
+            ? decision.agent.memory
+            : undefined,
+        text: input.text,
+      })
+      .catch(() => null);
+    return named
+      ? {
+          name: named,
+          notice: voiceText(
+            chatbot.settings,
+            'name_notice',
+            replyLanguageOf(input.text, input.language),
+            { name: named },
+          ),
+        }
+      : null;
+  }
 
   /**
    * Erase steps, then a consent answer. A fixed reply, or null to carry on with the engine. A
@@ -103,6 +152,15 @@ export class ChatPrivacyService {
     }
     const language = replyLanguageOf(turn.text, turn.language);
     try {
+      // TF1 round 2 (Saathi B-2): "forget my name" removes only the name, at once.
+      if (turn.contactId && this.memory && isForgetNameRequest(turn.text)) {
+        await this.memory.forgetName(turn.chatbot.id, turn.contactId);
+        return {
+          kind: 'name_forgotten',
+          body: voiceText(turn.chatbot.settings, 'name_forgotten', language),
+          handledBy: WaHandledBy.TEMPLATE,
+        };
+      }
       const erase = await this.eraseStep(turn, language);
       if (erase) return erase;
       return await this.consentAnswer(turn, language);
@@ -195,7 +253,10 @@ export class ChatPrivacyService {
   async consentQuestion(input: {
     chatbot: Pick<Chatbot, 'id' | 'settings'>;
     contactId?: string | null;
-    decision: Pick<ChatbotDecision, 'handledBy' | 'blocked' | 'off' | 'held'>;
+    decision: Pick<
+      ChatbotDecision,
+      'handledBy' | 'blocked' | 'off' | 'held' | 'upset'
+    >;
     text: string;
     language?: string | null;
   }): Promise<string | null> {
@@ -206,6 +267,7 @@ export class ChatPrivacyService {
       decision.blocked ||
       decision.off ||
       decision.held ||
+      decision.upset ||
       !AGENT_REPLIES.has(decision.handledBy)
     ) {
       return null;

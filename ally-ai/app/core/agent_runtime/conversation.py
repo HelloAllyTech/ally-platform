@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.core.agent_runtime import stages
+from app.core.agent_runtime.greeting import is_greeting_or_intro
 from app.core.agent_runtime.memory import history_lead, memory_section, remember_mode
 from app.core.agent_runtime.mood import mood_section
 from app.core.agent_runtime.playbooks import playbooks_section
@@ -27,6 +28,16 @@ from app.prompts.resolver import get_backend_llm_overrides
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def reasoning_effort_for(bot: Dict[str, Any], message: str) -> Optional[str]:
+    """TF1 round 2 (Saathi speed): "minimal" for an upset turn and a whole-message
+    greeting. Each spent 10-13 s reasoning at "low" before its first word, for a
+    reply whose content code already fixes (the warmth, 112 and 14416; a greeting).
+    Every other turn keeps the configured effort."""
+    if bot.get("mood") == "upset" or is_greeting_or_intro(message):
+        return "minimal"
+    return settings.AGENT_RUNTIME.AGENT_REASONING_EFFORT
 
 
 async def agent_step(
@@ -108,7 +119,7 @@ async def agent_step(
             provider=provider,
             model=model,
             temperature=temperature if temperature is not None else 0.0,
-            reasoning_effort=settings.AGENT_RUNTIME.AGENT_REASONING_EFFORT,
+            reasoning_effort=reasoning_effort_for(bot, message),
             timeout=timeout,
         )
     finally:

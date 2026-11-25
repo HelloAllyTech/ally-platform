@@ -385,10 +385,15 @@ describe('schemas', () => {
       'Look up entries in Listings. Filter by title, locality, BHK and price; returns up to 10 ' +
         'matches as passages to cite, with the total. Use aggregate to count or to add up price.',
     );
+    // TF1 round 2 (Saathi B-3): called as soon as they ask, it only shows the details to confirm.
     expect(create.description).toBe(
-      "Add an entry to Appointments for the person in this chat, only after they've " +
-        'confirmed it. Needs slot. Fails with a reason if that slot is already taken. Fails ' +
-        'if the person already has 2 appointments.',
+      'Add an entry to Appointments for the person in this chat. Call it as soon as they ask ' +
+        'for one, in any words or language ("can someone call me back?", "put me down for ' +
+        'Saturday", "mujhe call karo kal shaam", "मुझे कल शाम कॉल करो"): it writes nothing ' +
+        "yet, it shows them the details to confirm. Don't ask whether they want it: asking was " +
+        'their yes to starting. Needs slot; if one is missing the tool says which: ask for that ' +
+        'one detail in one short question, then call it again. Fails with a reason if that ' +
+        'slot is already taken. Fails if the person already has 2 appointments.',
     );
     expect(update.description).toBe(
       'Change an entry in Appointments that belongs to the person in this chat; id comes ' +
@@ -577,6 +582,15 @@ describe('chunk 6b: what the definitions carry', () => {
     expect(
       listToolDefinitions(leads).find((d) => d.kind === 'update')!
         .takes_details,
+    ).toBeUndefined();
+  });
+
+  it('marks a create that reaches the team with the person on it as passing it on (TF1 round 2)', () => {
+    expect(create(leads).passes_on).toBe(true);
+    // A person field links whoever asked: the team can come back to them.
+    expect(create({ ...appointments, agent_write: true }).passes_on).toBe(true);
+    expect(
+      listToolDefinitions(leads).find((d) => d.kind === 'update')!.passes_on,
     ).toBeUndefined();
   });
 

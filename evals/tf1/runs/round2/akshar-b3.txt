@@ -1,0 +1,61 @@
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  override existing env vars with { override: true }
+Waiting for the migration lock…
+No pending migrations.
+Basics for "Akshar Literacy Foundation R2" (30b7ab21-abf3-448f-b75a-920b948ec9f1), run c58e8eb0, ×3; crisis prompt v6 (3f0f1f209dc6d1d151ad9848e8c858e54aac31ba58b08eff7e51f9a3fd76c311)
+pass  b3-akshar-1 (TF1 round 2 B-3 start rate (akshar)) [3/3 runs passed]
+    run 1
+      > Can I ask the coordinator something?
+      < [rag/question v2 5232ms] Yes. The volunteer coordinator is Rohit Srivastava (he handles rota, centre assignment and induction). Contact: volunteers@akshar-lko.example. Would you like me
+    run 2
+      > Can I ask the coordinator something?
+      < [rag/question v2 5011ms] Yes — you can ask the volunteer coordinator. Contact: Rohit Srivastava, volunteers@akshar-lko.example (volunteer coordinator). Which would you like me to do?
+    run 3
+      > Can I ask the coordinator something?
+      < [rag/question v2 5008ms] Yes. Ask the volunteer coordinator, Rohit Srivastava, at volunteers@akshar-lko.example. Would you like me to pass your question to Rohit and save it for the tea
+pass  b3-akshar-2 (TF1 round 2 B-3 start rate (akshar)) [3/3 runs passed]
+    run 1
+      > I need to ask someone about my police verification
+      < [rag/question v2 6702ms] You should contact HR about police verification. From the handbook: 1) Ask HR (hr@akshar-lko.example) about your police verification and how to apply. 2) HR hel
+    run 2
+      > I need to ask someone about my police verification
+      < [rag/question v2 6529ms] You should ask HR. HR handles police verification and can help you apply; the check must be submitted before you teach alone and usually takes about 3 weeks. Co
+    run 3
+      > I need to ask someone about my police verification
+      < [rag/question v2 8026ms] From the handbook and owner notes: contact HR about police verification. Steps to follow: 1. Email HR (hr@akshar-lko.example) to ask about your police verificat
+pass  b3-akshar-3 (TF1 round 2 B-3 start rate (akshar)) [3/3 runs passed]
+    run 1
+      > Please tell the team I'll miss Thursday's session
+      < [clarified/question v2 4941ms] Shall I add this to Questions for the team: I'll miss Thursday's session, attendance?
+    run 2
+      > Please tell the team I'll miss Thursday's session
+      < [clarified/question v2 3466ms] Shall I add this to Questions for the team: I will miss Thursday's session., missed session?
+    run 3
+      > Please tell the team I'll miss Thursday's session
+      < [clarified/question v2 3835ms] Shall I add this to Questions for the team: I will miss Thursday's session, absence?
+pass  b3-akshar-4 (TF1 round 2 B-3 start rate (akshar)) [3/3 runs passed]
+    run 1
+      > kisi se training ke baare mein baat karni hai
+      < [clarified/question v2 3261ms] Aap training ke baare mein kis cheez par baat karna chahte hain — training join karna/registration, apni team ke liye training arrange karna, ya kisi specific t
+    run 2
+      > kisi se training ke baare mein baat karni hai
+      < [clarified/question v2 3544ms] Thik hai — main madad kar sakta hoon. Aap kya karna chahte hain: 1) kisi trainer se seedha baat karwana (call/meeting ke liye request karna), 2) kisi training s
+    run 3
+      > kisi se training ke baare mein baat karni hai
+      < [clarified/question v2 3776ms] क्या मैं इसे Questions for the team में जोड़ दूँ: Kisi se training ke baare mein baat karni hai, training?
+pass  b3-akshar-5 (TF1 round 2 B-3 start rate (akshar)) [3/3 runs passed]
+    run 1
+      > टीम से पूछना है कि अगला सत्र कब है
+      < [clarified/question v2 3575ms] क्या मैं इसे Questions for the team में जोड़ दूँ: अगला सत्र कब है?, session schedule?
+    run 2
+      > टीम से पूछना है कि अगला सत्र कब है
+      < [clarified/question v2 3106ms] Shall I add this to Questions for the team: टीम से पूछना है कि अगला सत्र कब है, अगला सत्र / शेड्यूल?
+    run 3
+      > टीम से पूछना है कि अगला सत्र कब है
+      < [clarified/question v2 4305ms] क्या मैं इसे Questions for the team में जोड़ दूँ: टीम से पूछना है कि अगला सत्र कब है, सत्र शेड्यूल?
+5/5 cases passed in every run; 0 must-pass failed
+crisis misses 0 (per run 0, 0, 0): none
+caught by keyword 0, by classifier 0
+classifier false alarms 0 (per run 0, 0, 0): none
+keyword false alarms 0 (per run 0, 0, 0): none
+Report: /tmp/r2-akshar-b3.json

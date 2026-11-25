@@ -1151,6 +1151,29 @@ def test_can_pass_on_needs_hand_over_or_a_list_that_takes_details():
         }
     )
     assert can_pass_on({"gateway_tools": ["hand_over"]})
+    # TF1 round 2: a list that links the person (Questions for the team) passes it on.
+    questions = {"name": "create_team_questions", "kind": "create", "description": ""}
+    assert can_pass_on(
+        {
+            "gateway_tools": ["create_team_questions"],
+            "gateway_definitions": [{**questions, "passes_on": True}],
+        }
+    )
+
+
+def test_passes_on_survives_the_request_schema():
+    from app.schemas.agent_runtime import ListToolDefinition
+
+    definition = ListToolDefinition(
+        name="create_team_questions", kind="create", passes_on=True
+    )
+    assert definition.as_bot_definition()["passes_on"] is True
+    assert (
+        "passes_on"
+        not in ListToolDefinition(
+            name="create_leads", kind="create"
+        ).as_bot_definition()
+    )
 
 
 class TestChannelTalk:
@@ -1275,3 +1298,75 @@ def test_never_offers_a_lookup_it_cannot_do():
     # With a list of their own records (orders, applications), the offer stands.
     kept, none = review(answer=said + offer, citations=[1], looks_up=True)
     assert kept["answer"] == said + offer and none is None
+
+
+def test_an_upset_reply_giving_its_crisis_numbers_is_not_sent_back():
+    """TF1 round 2 (Saathi speed): the upset prompt gives 14416, 112 and the
+    organisation's confirmed line; the check took them for unsourced contact details
+    and sent every distress reply back for a second model call (27-32 s)."""
+    warm = (
+        "I'm sorry you're feeling so stressed. If it gets too much, call Tele-MANAS "
+        "on 14416 (free, 24×7), or 112 if you're in danger. You can also call "
+        "+91 20 4860 2525."
+    )
+    result, rejection = review(
+        intent="answer",
+        answer=warm,
+        citations=[1],
+        upset=True,
+        crisis_line="+91 20 4860 2525",
+    )
+    assert rejection is None
+    assert "14416" in result["answer"] and "+91 20 4860 2525" in result["answer"]
+    # Not upset and not sourced: still sent back.
+    _, rejection = review(intent="answer", answer=warm, citations=[1])
+    assert rejection == "unsourced_detail"
+
+
+class TestGreetingStaysSmalltalk:
+    """TF1 round 2 (Saathi B-1): "Hi, I'm Asha" was streamed, then swapped for the
+    fixed decline, because the pre-search found passages."""
+
+    def test_an_introduction_with_passages_found_stays_small_talk(self):
+        result, rejection = review(
+            intent="smalltalk",
+            answer="Hi Asha, I'm the Saathi Youth Helpline assistant. I can tell you "
+            "about our hours and what happens on a call.",
+            turn_type="smalltalk",
+            question="Hi, I'm Asha",
+            searched=True,
+        )
+        assert rejection is None
+        assert result["intent"] == "answer"  # small talk goes out as an answer
+        assert result["answer"].startswith("Hi Asha")
+
+    def test_labelled_answer_is_relabelled_for_a_greeting(self):
+        result, rejection = review(
+            intent="answer",
+            answer="Hello! How can I help you today?",
+            turn_type="question",
+            question="namaste ji",
+            searched=True,
+        )
+        assert rejection is None
+        assert result["answer"].startswith("Hello!")
+
+    def test_the_crisis_line_in_a_greeting_is_not_a_fact(self):
+        _, rejection = review(
+            intent="smalltalk",
+            answer="Hi Asha. If things feel heavy, Tele-MANAS is on 14416, free, 24×7.",
+            turn_type="smalltalk",
+            question="Hi, I'm Asha",
+            upset=True,
+        )
+        assert rejection is None
+
+    def test_a_question_after_the_greeting_still_needs_a_source(self):
+        result = check(
+            intent="smalltalk",
+            answer="Hi Asha! Sure, happy to help.",
+            turn_type="question",
+            question="Hi, I'm Asha, are you open now?",
+            searched=True,
+        )
+        assert result["intent"] == "decline"

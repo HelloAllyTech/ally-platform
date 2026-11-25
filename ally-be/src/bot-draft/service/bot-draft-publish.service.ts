@@ -1,4 +1,9 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PlanService } from 'src/billing/service/plan.service';
+import {
+  CHATBOT_ACTIVITY,
+  type ChatbotActivityEvent,
+} from '../../chatbot/type/chatbot-activity';
 import { LedgerService } from '../../billing/service/ledger.service';
 import { ListOwnerService } from '../../chatbot/lists/list-owner.service';
 import { realName } from '../name-placeholders';
@@ -103,6 +108,8 @@ export class BotDraftPublishService {
     @Optional() private readonly lists?: ListOwnerService,
     // TF1 S2: a starting budget, so a live assistant can answer. Optional for specs.
     @Optional() private readonly ledger?: LedgerService,
+    // TF1 round 2: going live, for the assistant's History. Optional for specs.
+    @Optional() private readonly emitter?: EventEmitter2,
   ) {}
 
   async publish(
@@ -297,6 +304,15 @@ export class BotDraftPublishService {
         );
         return null;
       });
+    if (chatbot.status !== ChatbotStatus.LIVE) {
+      this.emitter?.emit(CHATBOT_ACTIVITY, {
+        chatbotId: chatbot.id,
+        field: 'status',
+        before: chatbot.status ?? null,
+        after: ChatbotStatus.LIVE,
+        userId: Number(ExecutionManager.getUserId() ?? 0) || null,
+      } satisfies ChatbotActivityEvent);
+    }
     return {
       chatbotId: chatbot.id,
       slug: view.slug,

@@ -28,7 +28,7 @@ async function d(cmd, args = {}) {
 }
 const step = (s) => console.log(`\n## ${s}`);
 const sql = (q) =>
-  execFileSync('docker', ['exec', 'ally-be-postgres-1', 'psql', '-U', 'postgres', '-d', 'ally_tf1', '-Atc', q])
+  execFileSync('docker', ['exec', 'ally-be-postgres-1', 'psql', '-U', 'postgres', '-d', process.env.PGDATABASE ?? 'ally_local', '-Atc', q])
     .toString()
     .trim();
 const shot = (name) => d('shot', { name: `${tag}-${name}`, full: false });
@@ -53,7 +53,7 @@ await d('upload', { file: cfg.pdf });
 await d('click', { text: 'Add these files', after: 3000 });
 await d('wait', { ms: 30000 });
 chatbotId = sql(
-  `select chatbot_id from bot_drafts where owner_user_id = 1 order by "createdAt" desc limit 1`,
+  `select chatbot_id from bot_drafts where owner_user_id = ${process.env.OWNER_ID ?? 25} order by "createdAt" desc limit 1`,
 );
 draftId = sql(`select id from bot_drafts where chatbot_id = '${chatbotId}'`);
 console.log(`  chatbot ${chatbotId}, draft ${draftId}`);

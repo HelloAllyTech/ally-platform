@@ -199,6 +199,66 @@ describe('Saathi round 2 safety, through the engine', () => {
     });
   });
 
+  describe('at a spend limit, with no model call (TF1 round 2, approved 25 Nov)', () => {
+    const atZero = () => {
+      const aiService = engineAiService(ANSWER, AGENT_ANSWER);
+      const markBlockedCrisis = jest.fn().mockResolvedValue(undefined);
+      const engine = makeEngine({
+        aiService,
+        promptShared: { getPromptsByOptions: jest.fn().mockResolvedValue([]) },
+        limits: {
+          checkTurn: jest.fn().mockResolvedValue('out_of_credits'),
+          releaseTurn: jest.fn().mockResolvedValue(undefined),
+        } as never,
+        blockedCrisis: { markBlockedCrisis } as never,
+      });
+      return { aiService, engine, markBlockedCrisis };
+    };
+    const turnFor = (text: string) => ({
+      chatbot: chatbotFixture({
+        safetyPack: SafetyPackId.MENTAL_HEALTH,
+        settings: { timeZone: 'Asia/Kolkata' } as never,
+      }),
+      settings,
+      text,
+      history: [],
+      sender: { externalId: 'person-1', label: 'Asha' },
+      conversationId: 'conv-1',
+      channel: {
+        type: 'whatsapp' as const,
+        capabilities: { maxReplyChars: 4096, streaming: false },
+      },
+    });
+
+    it.each([
+      "I've started cutting myself again",
+      "I don't want to live anymore",
+      'Water is entering our house and we are trapped',
+    ])(
+      'a message the keyword rules mark at risk flags the chat and alerts: %s',
+      async (text) => {
+        const { engine, aiService, markBlockedCrisis } = atZero();
+        const decision = await engine.respond(turnFor(text));
+        expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
+        expect(decision.crisis?.path).toBe('keyword');
+        expect(decision.alert).toBeDefined();
+        expect(decision.body).toMatch(/112/);
+        expect(markBlockedCrisis).toHaveBeenCalled();
+        expect(aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
+        expect(aiService.runAgent).not.toHaveBeenCalled();
+      },
+    );
+
+    it('anything else gets the at-limit notice with 112 and 14416, and no flag', async () => {
+      const { engine, aiService } = atZero();
+      const decision = await engine.respond(turnFor('What are your hours?'));
+      expect(decision.handledBy).toBe(WaHandledBy.RATE_LIMITED);
+      expect(decision.crisis).toBeUndefined();
+      expect(decision.body).toMatch(/14416/);
+      expect(aiService.runAgent).not.toHaveBeenCalled();
+    });
+  });
+
   it('S-4: "ignore your instructions" gets one short decline and no run', async () => {
     const { engine, turn, aiService } = setup(none);
     const decision = await engine.respond(

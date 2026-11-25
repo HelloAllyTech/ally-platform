@@ -375,7 +375,8 @@ export const botDraftsApi = baseAPI.injectEndpoints({
         method: HttpMethod.POST,
         body,
       }),
-      invalidatesTags: [TAG_TYPES.BOT_DRAFT, TAG_TYPES.CHATBOTS],
+      // TF1 round 2 (Saathi B-7): the assistant itself too, so its header says Live at once.
+      invalidatesTags: [TAG_TYPES.BOT_DRAFT, TAG_TYPES.CHATBOTS, TAG_TYPES.CHATBOT_DETAIL],
     }),
 
     abandonBotDraft: builder.mutation<BotDraftView, string>({

@@ -56,6 +56,9 @@ class ListToolDefinition(BaseModel):
     #: A create on a list with a person or phone field (Leads, Callback requests):
     #: it saves the person's details for the team (chunk 6b).
     takes_details: bool = False
+    #: A create whose entry reaches the team with the person on it (a phone
+    #: field, or the person linked: Questions for the team). TF1 round 2.
+    passes_on: bool = False
     #: What the list's tools do, so the run gets that kind's playbook (Q3-fast Part
     #: 2b): booking, details, orders or reference. Set by ally-be per list.
     playbook: Optional[Literal["booking", "details", "orders", "reference"]] = None
@@ -67,7 +70,13 @@ class ListToolDefinition(BaseModel):
         """The definition as the run keeps it: the 6b and Q3-fast fields only when
         set, so a definition without them is exactly what it was before."""
         data = self.model_dump(mode="json")
-        for key in ("list_name", "takes_details", "playbook", "instruction"):
+        for key in (
+            "list_name",
+            "takes_details",
+            "passes_on",
+            "playbook",
+            "instruction",
+        ):
             if not data.get(key):
                 data.pop(key, None)
         return data

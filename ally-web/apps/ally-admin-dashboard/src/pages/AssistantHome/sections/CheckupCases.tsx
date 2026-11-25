@@ -144,7 +144,7 @@ const CaseCard: React.FC<{
             )}
             {latest?.ms ? (
               <>
-                <dt className="ally-sr-only">{t.card.time}</dt>
+                <dt className="ally-sr-only">{t.card.timeLabel}</dt>
                 <dd className="ally-small">
                   {fill(t.card.time, { s: (latest.ms / 1000).toFixed(1) })}
                 </dd>

@@ -93,6 +93,10 @@ function harness() {
   const query = jest.fn(async (sql: string, params: unknown[] = []) => {
     if (sql.includes('FROM chatbot_daily_stats')) return stored;
     if (sql.includes('WITH bots AS')) return [today];
+    // A period's conversations, each counted once (not the sum of the days).
+    if (sql.includes('COUNT(DISTINCT m.conversation_id)')) {
+      return [{ n: params[2] === '2026-11-09' ? 6 : 7 }];
+    }
     if (
       sql.includes('FROM wa_unanswered_questions q') &&
       sql.includes('LIMIT')

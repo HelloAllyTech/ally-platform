@@ -48,6 +48,13 @@ export interface ChatItem {
   confirmation?: PublicConfirmation;
   /** BT1: its chips and cards; only the latest reply's can be tapped. */
   parts?: ReplyParts;
+  /**
+   * TF1 round 2 (Sahyog N-14): the person's message didn't reach us (offline, or the server was
+   * down). Shown as not sent, with Send again; a tap's token goes with it.
+   */
+  unsent?: { action?: string };
+  /** TF1 round 2: it replaced the text streamed in its place, so it appears without rising in. */
+  inPlace?: boolean;
 }
 
 /** The reply being written: what the agent is doing, and the checked text revealed so far. */
@@ -70,12 +77,15 @@ export function Chat({
   busy = false,
   error,
   signedInAs,
+  knownName,
+  onForgetName,
   returnedDraft,
   statusLine,
   onRate,
   onAskPerson,
   onClose,
   onTap,
+  onResend,
 }: {
   page: PublicBotPage;
   copy: BotPageCopy;
@@ -86,6 +96,9 @@ export function Chat({
   busy?: boolean;
   error?: string | null;
   signedInAs?: string | null;
+  /** TF1 round 2 (Saathi B-2): the name the assistant keeps for them, and Remove. */
+  knownName?: string | null;
+  onForgetName?(): void;
   /** A message that was refused before it was answered, put back in the box to send again. */
   returnedDraft?: { text: string } | null;
   /** Under the name in the header: what the assistant is doing, or how fast it replies. */
@@ -98,6 +111,8 @@ export function Chat({
   onClose?(): void;
   /** BT1: a chip or a card's button was tapped; without it, no chips or buttons. */
   onTap?(button: TapButton): void;
+  /** TF1 round 2 (Sahyog N-14): Send again on a message that didn't reach us. */
+  onResend?(item: ChatItem): void;
 }) {
   const lastAssistantId = [...messages].reverse().find(m => m.role === "assistant")?.id;
   const { branding } = page;
@@ -145,8 +160,12 @@ export function Chat({
         <button
           type="button"
           className="bp-pill"
-          onClick={onNewChat}
-          disabled={busy || (!messages.length && !pending)}
+          onClick={() => {
+            // TF1 round 2: a new chat starts with an empty box, and works while a reply is pending.
+            setDraft("");
+            onNewChat();
+          }}
+          disabled={(busy && !pending) || (!messages.length && !pending)}
         >
           {copy.chat.newChat}
         </button>
@@ -159,6 +178,14 @@ export function Chat({
       </PageHeader>
       {signedInAs && (
         <p className="bp-signed-in">{fill(copy.chat.signedInAs, { email: signedInAs })}</p>
+      )}
+      {knownName && onForgetName && (
+        <p className="bp-signed-in" data-testid="bp-known-name">
+          {fill(copy.chat.yourName, { name: knownName })} ·{" "}
+          <button type="button" className="bp-link" onClick={onForgetName}>
+            {copy.chat.removeName}
+          </button>
+        </p>
       )}
 
       <main className="bp-thread" aria-live="polite" aria-relevant="additions">
@@ -188,13 +215,39 @@ export function Chat({
               </li>
             ) : m.role === "user" ? (
               <li key={m.id} className="bp-msg bp-msg--user ally-rise">
-                <p className="bp-bubble bp-bubble--user">
+                <p className={`bp-bubble bp-bubble--user${m.unsent ? " bp-bubble--unsent" : ""}`}>
                   <span className="ally-sr-only">{copy.chat.you}: </span>
                   {m.text}
                 </p>
+                {m.unsent && (
+                  <p className="bp-unsent" data-testid="bp-unsent">
+                    {copy.chat.notSent}
+                    {onResend && (
+                      <>
+                        {" · "}
+                        <button
+                          type="button"
+                          className="bp-link"
+                          onClick={() => {
+                            // Its words were put back in the box: they go with it.
+                            if (draft.trim() === m.text.trim()) setDraft("");
+                            onResend(m);
+                          }}
+                          disabled={busy}
+                        >
+                          {copy.chat.sendAgain}
+                        </button>
+                      </>
+                    )}
+                  </p>
+                )}
               </li>
             ) : (
-              <li key={m.id} className="bp-msg ally-rise">
+              <li
+                key={m.id}
+                className={m.inPlace ? "bp-msg" : "bp-msg ally-rise"}
+                data-testid={m.inPlace ? "bp-reply-in-place" : undefined}
+              >
                 <div className="bp-bubble bp-bubble--assistant">
                   <span className="ally-sr-only">{branding.assistantName}: </span>
                   {m.text}

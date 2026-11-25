@@ -117,6 +117,20 @@ describe('crisis on the web channel', () => {
     expect(visible.filter((e) => e.event === 'token')).toHaveLength(2);
   });
 
+  it('TF1 round 2 (Saathi B-1): a mental-health assistant never shows its draft, only the checked reply', async () => {
+    const { engine, visible, live, turn } = setup();
+    const decision = await engine.respond(
+      {
+        ...turn('what are your fees?'),
+        chatbot: chatbotFixture({ safetyPack: 'mental_health' as never }),
+      },
+      live,
+    );
+    expect(visible.some((e) => e.event === 'token')).toBe(false);
+    expect(visible.some((e) => e.event === 'status')).toBe(true);
+    expect(decision.body).toBeTruthy();
+  });
+
   it('the reply text has no "Sources:" footer: the page lists the citations itself', async () => {
     const { engine, turn } = setup();
     const onWeb = await engine.respond(turn('what are your fees?'));

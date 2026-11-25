@@ -1,0 +1,31 @@
+{
+  "tag": "jalraksha",
+  "pdf": "pdfs/5-jalraksha-flood-relief.pdf",
+  "template": "Campaigns and urgent updates",
+  "answers": [
+    {
+      "kind": "textarea",
+      "value": "From 22 November the relief camp at Bahadurpur Middle School has moved to Laheriasarai Town Hall, near Laheriasarai railway station. Free tempo from Bahadurpur school gate every 2 hours, 8 am to 6 pm.\nThe winter blanket and dry ration drive is extended from 30 November to 15 December. We still need 2,000 blankets."
+    },
+    {
+      "kind": "textarea",
+      "value": "Camp move: families registered at Bahadurpur, until 30 November (tempo).\nDonation drive: donors, until 15 December."
+    },
+    {
+      "kind": "textarea",
+      "value": "Ms. Nisha Jha, field coordinator"
+    }
+  ],
+  "audience": "Adults only",
+  "contact": "+91 6272 245 600",
+  "invite": [
+    "shehbaz.sayed+a@helloally.ai",
+    "shehbaz.sayed+b@helloally.ai",
+    "+919800000032"
+  ],
+  "name": "Jalraksha Flood Relief R2",
+  "knowsChecks": [
+    "Laheriasarai",
+    "blanket"
+  ]
+}

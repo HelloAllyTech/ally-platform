@@ -1,4 +1,9 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { withoutStopLine } from '../safety/chat-notice';
+import {
+  CHATBOT_ACTIVITY,
+  type ChatbotActivityEvent,
+} from '../type/chatbot-activity';
 import { realName } from '../../bot-draft/name-placeholders';
 import { ActionsService } from '../actions/actions.service';
 import {
@@ -292,6 +297,8 @@ export class ChatbotService {
     // BT1: taps and a reply's chips and cards in Try it. Optional for specs.
     @Optional() private readonly actions?: ActionsService,
     @Optional() private readonly parts?: ActionPartsService,
+    // TF1 round 2: going live and pausing, for the assistant's History. Optional for specs.
+    @Optional() private readonly emitter?: EventEmitter2,
   ) {}
 
   // ───────────────────────────────────────────────────────────── read
@@ -647,7 +654,8 @@ export class ChatbotService {
   }
 
   async setStatus(id: string, status: ChatbotStatus): Promise<ChatbotSummary> {
-    await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    const before = (await this.access.assert(id, ChatbotMemberRole.EDITOR))
+      ?.chatbot;
     if (status === ChatbotStatus.LIVE) {
       // Stage 4: the one go-live check, refused before anything is written.
       await this.goLive?.assertCanGoLive(id);
@@ -677,6 +685,15 @@ export class ChatbotService {
       );
     }
     this.logger.info(`Chatbot ${id} is now ${status}`);
+    if (before?.status !== status) {
+      this.emitter?.emit(CHATBOT_ACTIVITY, {
+        chatbotId: id,
+        field: 'status',
+        before: before?.status ?? null,
+        after: status,
+        userId: currentUserId() || null,
+      } satisfies ChatbotActivityEvent);
+    }
     return this.get(id);
   }
 

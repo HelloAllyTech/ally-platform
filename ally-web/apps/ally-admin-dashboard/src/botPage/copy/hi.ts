@@ -49,6 +49,12 @@ export const hi: BotPageCopy = {
     sources: "स्रोत",
     you: "आप",
     signedInAs: "{email} के रूप में साइन इन",
+    /** TF1 round 2 (Saathi B-2). COPY: needs approval. */
+    yourName: "आपका नाम: {name}",
+    removeName: "हटाएँ",
+    /** TF1 round 2 (Sahyog N-14). COPY: needs approval (TF1 round 2). */
+    notSent: "नहीं भेजा गया",
+    sendAgain: "फिर से भेजें",
     tooLong: "{count} / {max} अक्षर",
     // needs review: drafted in chunk 20d, not yet checked by a Hindi speaker.
     headerIdle: "{name} की अपनी जानकारी से जवाब",
@@ -90,6 +96,8 @@ export const hi: BotPageCopy = {
     linkLabel: "findahelpline.com",
     linkUrl: "https://findahelpline.com",
     numbers: "आप {numbers} पर कॉल कर सकते हैं।",
+    // COPY: needs approval (TF1 round 2, Saathi B-9)
+    emergency: "अगर आप खतरे में हैं, तो अपने यहाँ के आपातकालीन नंबर पर कॉल करें (भारत में 112)।",
     invited: "अगर आपको आमंत्रित किया गया था, तो वही ईमेल पता लिखें जो टीम ने आपके लिए जोड़ा था।",
   },
   blocked: {

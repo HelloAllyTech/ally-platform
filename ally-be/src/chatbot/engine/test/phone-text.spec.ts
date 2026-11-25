@@ -29,6 +29,15 @@ describe('phone numbers in text (TF1 round 2, S-1)', () => {
   });
 });
 
+describe('a number and the bracket after it (TF1 round 2, Pawsome)', () => {
+  it('never takes the start of "(9 am–6 pm)" as part of the number', () => {
+    expect(
+      phoneIn('+91 80 4567 8800 (9 am–6 pm), donate@pawsome-blr.example'),
+    ).toBe('+91 80 4567 8800');
+    expect(phoneIn('Call (080) 4567 8800 now')).toBe('(080) 4567 8800');
+  });
+});
+
 describe('helplineLines: what a crisis reply may give', () => {
   it("keeps only Saathi's number from the whole answer", () => {
     expect(helplineLines(SAATHI)).toBe('+91 20 4860 2525');

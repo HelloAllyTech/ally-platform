@@ -1,4 +1,5 @@
 import { DEFAULT_WHATSAPP_SETTINGS } from 'src/whatsapp/type/whatsapp-settings.type';
+import { crisisHelplines } from '../../engine/crisis-helplines';
 import {
   ChatbotSettingsService,
   cleanOverride,
@@ -84,6 +85,28 @@ describe('ChatbotSettingsService', () => {
     expect(view.defaults.declineText).toBe(global.declineText);
     expect(view.overrides).toEqual({ declineText: 'Ask HR.' });
     expect(view.effective.declineText).toBe('Ask HR.');
+  });
+
+  it("never gives an assistant the staff number's helpline (TF1 round 2, Sahyog N-1)", async () => {
+    const staff = new ChatbotSettingsService(
+      {
+        findOne: jest.fn().mockResolvedValue({
+          value: { ...global, helplineNumbers: 'Tele-MANAS 14416' },
+        }),
+      } as never,
+      chatbotRepository as never,
+    );
+    const none = await staff.getForChatbot({ settings: {} } as never);
+    expect(none.helplineNumbers).toBe('');
+    expect(crisisHelplines(none)).toBe('');
+    const own = await staff.getForChatbot({
+      settings: {
+        helplineNumbers: '+91 141 400 7110',
+        helplineSource: 'owner',
+        helplineConfirmedAt: '2026-11-25T10:00:00.000Z',
+      },
+    } as never);
+    expect(crisisHelplines(own)).toBe('+91 141 400 7110');
   });
 
   describe('the helpline number (TF1 round 2, S-1)', () => {

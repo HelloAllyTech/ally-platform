@@ -1,5 +1,5 @@
 import { QueryRunner } from 'typeorm';
-import { CleanHelplineNumbers1988100000000 } from './1988100000000-CleanHelplineNumbers';
+import { CleanHelplineNumbers1988150000000 } from './1988150000000-CleanHelplineNumbers';
 
 const SAATHI =
   '+91 20 4860 2525 (calls and WhatsApp chat on the same number). Open every day 10 am to 10 pm, including Sundays and public holidays. Closed on Diwali day (Lakshmi Puja) only. Calls are free from any n';
@@ -12,7 +12,7 @@ const run = async (rows: { id: string; numbers: string }[]) => {
       return sql.includes('SELECT') ? rows : [];
     }),
   } as unknown as QueryRunner;
-  await new CleanHelplineNumbers1988100000000().up(queryRunner);
+  await new CleanHelplineNumbers1988150000000().up(queryRunner);
   return calls.slice(1);
 };
 
@@ -38,7 +38,7 @@ describe('CleanHelplineNumbers (TF1 round 2, S-1)', () => {
 
   it('down puts the old text back unconfirmed, never into crisis replies', async () => {
     const calls: string[] = [];
-    await new CleanHelplineNumbers1988100000000().down({
+    await new CleanHelplineNumbers1988150000000().down({
       query: jest.fn(async (sql: string) => calls.push(sql)),
     } as unknown as QueryRunner);
     expect(calls[0]).toContain(`'helplineConfirmedAt', NULL`);

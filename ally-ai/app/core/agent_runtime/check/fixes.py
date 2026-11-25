@@ -7,6 +7,11 @@ from __future__ import annotations
 import re
 from typing import Callable, Tuple
 
+from app.core.agent_runtime.check.conditions import dropped_condition
+from app.core.agent_runtime.check.eligibility import (
+    guards_eligibility,
+    says_eligibility,
+)
 from app.core.agent_runtime.check.offered_times import ground_offered_times
 from app.core.agent_runtime.check.rejections import Rejection
 from app.core.agent_runtime.check.text import (
@@ -24,6 +29,7 @@ from app.core.agent_runtime.check.text import (
     without_source_phrases,
 )
 from app.core.agent_runtime.check.verdict import CheckContext, Verdict
+from app.core.agent_runtime.mood import NATIONAL_NUMBERS
 from app.core.agent_runtime.schemas import AgentIntent
 from app.core.knowledge_agent.agent import resolve_citations
 from app.utils.logger import get_logger
@@ -84,6 +90,11 @@ def _drop_unsourced_details(verdict: Verdict, ctx: CheckContext) -> None:
         sources.append({"text": ctx.decline_text})
         # The business's contact from its sources (Q3-fast Part 2) is sourced too.
         sources.append({"text": ctx.business_contact})
+    if ctx.upset or ctx.crisis_line:
+        # TF1 round 2 (Saathi, speed): an upset turn is told to give these numbers, so
+        # they are never "unsourced". Rejecting them sent every distress reply back for
+        # a second model call (27-32 s on Saathi).
+        sources.append({"text": f"{NATIONAL_NUMBERS} {ctx.crisis_line}"})
     unsourced = unsupported_details(verdict.answer, sources)
     if unsourced and verdict.rejection in (None, Rejection.UNSOURCED_DETAIL):
         logger.info("Reply carries %d unsourced contact detail(s)", len(unsourced))
@@ -124,6 +135,10 @@ def add_fallback_contact(verdict: Verdict, ctx: CheckContext) -> None:
     searched for or made up. Added only when the reply carries none of it. A
     decline with no text left gets the owner's wording from ally-be anyway."""
     if verdict.intent != AgentIntent.DECLINE or not verdict.answer.strip():
+        return
+    if ctx.upset:
+        # TF1 round 2 (Sahyog N-6): a distress turn gets the crisis numbers, not an
+        # office.
         return
     if not verdict.model_declined:
         return
@@ -396,11 +411,31 @@ def _ground_offered_times(verdict: Verdict, ctx: CheckContext) -> None:
 def _trim_repeated_crisis_wording(verdict: Verdict, ctx: CheckContext) -> None:
     """Trimmed, not sent back: a rewrite costs a model call for what a deterministic
     trim does. If trimming would leave nothing, the reply stays as is."""
+    if ctx.channel == "web" and _SAYS_NOT_A_CRISIS_SERVICE.search(verdict.answer):
+        # TF1 round 2 (Saathi): the bot page shows the disclaimer above the chat; the
+        # model saying it again ("(I'm not a crisis service)") showed it in every reply.
+        trimmed = _NOT_A_CRISIS_ASIDE.sub("", verdict.answer)
+        trimmed = without_sentences(
+            trimmed, lambda sentence: not _SAYS_NOT_A_CRISIS_SERVICE.search(sentence)
+        )
+        verdict.answer = trimmed.strip() or verdict.answer
+        return
     if repeated_crisis_wording(verdict.answer, ctx.turn_type, ctx.history):
         verdict.answer = (
             without_repeated_crisis_wording(verdict.answer, ctx.turn_type)
             or verdict.answer
         )
+
+
+_SAYS_NOT_A_CRISIS_SERVICE = re.compile(
+    r"not a crisis|crisis service nah|crisis line nah|hum crisis service", re.I
+)
+#: "(I'm not a crisis service)", ", not a crisis service," inside a sentence.
+_NOT_A_CRISIS_ASIDE = re.compile(
+    r"\s*\((?:[^()]*\b)?not a crisis (?:service|line)[^()]*\)"
+    r"|,\s*(?:and\s+)?(?:i'?m\s+|i am\s+)?not a crisis (?:service|line)\s*(?=[,.;])",
+    re.I,
+)
 
 
 def _trim_repeated_topic_list(verdict: Verdict, ctx: CheckContext) -> None:
@@ -485,6 +520,13 @@ _NO_CRISIS_NUMBERS = re.compile(
     r"|(crisis|helpline|emergency)\s+(numbers?|number)\s+(nahi|nahin|नहीं)",
     re.IGNORECASE,
 )
+#: A reply pointing to crisis help without a number (English, Hinglish, Hindi).
+_POINTS_TO_CRISIS_HELP = re.compile(
+    r"\b(?:emergency services?|crisis (?:line|helpline|service)s?|local emergency|"
+    r"emergency (?:number|seva)|crisis line se|helpline se sampark)\b"
+    r"|आपातकालीन सेवा|संकट (?:लाइन|हेल्पलाइन)",
+    re.IGNORECASE,
+)
 #: Fixed text (Q4 G7; in Q4-PROMPTS.md for review): the national numbers, then the
 #: organisation's own confirmed line when there is one.
 CRISIS_NUMBERS_EN = (
@@ -517,7 +559,11 @@ def give_crisis_numbers(verdict: Verdict, ctx: CheckContext) -> None:
     "Please contact the team at care@…" with no 112 or 14416)."""
     sentences = SENTENCE_END.split(verdict.answer)
     says_none = any(_NO_CRISIS_NUMBERS.search(s) for s in sentences)
-    missing = ctx.upset and "14416" not in verdict.answer
+    # TF1 round 2: a reply that sends them to "emergency services or a crisis line"
+    # names the lines, on every assistant (a crisis check too slow to answer left
+    # Sahyog's "contact your area's emergency service" with no number at all).
+    points_to_help = bool(_POINTS_TO_CRISIS_HELP.search(verdict.answer or ""))
+    missing = (ctx.upset or points_to_help) and "14416" not in verdict.answer
     if not (says_none or missing):
         return
     hindi = bool(_DEVANAGARI.search(verdict.answer))
@@ -537,6 +583,127 @@ def give_crisis_numbers(verdict: Verdict, ctx: CheckContext) -> None:
 
 
 #: Applied in this order to every reply that isn't a decline the check forced.
+def _keep_conditions(verdict: Verdict, ctx: CheckContext) -> None:
+    """TF1 round 2 (Saathi B-5): a rule keeps its condition ("…unless your life is in
+    immediate danger"). Sent back once; if the rewrite still drops it, the rule's own
+    sentence is added to the reply."""
+    if verdict.intent != AgentIntent.ANSWER or not verdict.answer.strip():
+        return
+    sentence = dropped_condition(verdict.answer, ctx.question, ctx.passages)
+    if not sentence:
+        return
+    logger.info("Reply leaves out a rule's condition")
+    if verdict.rejection is None:
+        verdict.rejection, verdict.keeps_text = Rejection.CONDITION_DROPPED, True
+    end = "" if sentence[-1] in ".!?।" else "."
+    verdict.answer = f"{verdict.answer.rstrip()} {sentence}{end}"
+
+
+#: India's national lines: never the organisation's own number (Sahyog N-1).
+_NATIONAL_LINE = re.compile(
+    r"(?<!\d)(?:112|108|14416|1098|1800[\s-]?891[\s-]?4416)(?!\d)"
+)
+_REACH = re.compile(r"\b(?:reach|contact|call|ring|whatsapp|speak to|talk to)\b", re.I)
+
+
+def _no_national_number_as_own(verdict: Verdict, ctx: CheckContext) -> None:
+    """A sentence that offers the organisation on a national number ("You can reach
+    Sahyog on Tele-MANAS 14416") is removed: those lines are given as themselves (the
+    crisis numbers), never as the organisation's own."""
+    terms = [t for t in (ctx.organisation.terms or ()) if len(t) >= 3]
+    if not terms or not verdict.answer:
+        return
+    names = re.compile("|".join(re.escape(t) for t in terms), re.I)
+
+    def presents_as_own(sentence: str) -> bool:
+        return bool(
+            names.search(sentence)
+            and _REACH.search(sentence)
+            and _NATIONAL_LINE.search(sentence)
+            and not (ctx.crisis_line and ctx.crisis_line in sentence)
+        )
+
+    if any(presents_as_own(s) for s in re.split(r"(?<=[.!?।])\s+", verdict.answer)):
+        logger.info("Reply offers the organisation on a national number; removed")
+        verdict.answer = (
+            without_sentences(verdict.answer, lambda s: not presents_as_own(s))
+            or verdict.answer
+        )
+
+
+def _no_eligibility_verdict(verdict: Verdict, ctx: CheckContext) -> None:
+    """TF1 round 2 (Sahyog N-2): on the Services template and the Legal and financial
+    pack, never whether this person qualifies. Sent back once; if the rewrite still
+    says it, the sentence goes."""
+    if not guards_eligibility(ctx.template, ctx.safety_pack) or not verdict.answer:
+        return
+    if not any(
+        says_eligibility(s) for s in re.split(r"(?<=[.!?।])\s+", verdict.answer)
+    ):
+        return
+    logger.info("Reply says whether the person qualifies; removing it")
+    if verdict.rejection is None:
+        verdict.rejection, verdict.keeps_text = Rejection.ELIGIBILITY_VERDICT, True
+    verdict.answer = (
+        without_sentences(verdict.answer, lambda s: not says_eligibility(s))
+        or verdict.answer
+    )
+
+
+#: An offer to change, cancel or withdraw an entry (TF1 round 2, Sahyog N-8).
+_CHANGE_OFFER = re.compile(
+    r"\b(?:change|cancel|withdraw|move|reschedule|edit|update|amend)\w*\b"
+    r"[^.!?\n]{0,60}\b(?:tell me|let me know|i can|i'?ll|i will|just ask|ask me)\b"
+    r"|\b(?:i can|i'?ll|i will|shall i|want me to|would you like me to)\b"
+    r"[^.!?\n]{0,40}\b(?:change|cancel|withdraw|move|reschedule|edit|update|amend)\b",
+    re.I,
+)
+
+
+def _no_change_offer_without_the_ability(verdict: Verdict, ctx: CheckContext) -> None:
+    """TF1 round 2 (Sahyog N-8): "If you need anything changed or want to withdraw it,
+    tell me and I can help" on a list whose Change ability is Never. Only what the
+    list allows is offered; the sentence goes."""
+    if ctx.can_change or not _CHANGE_OFFER.search(verdict.answer or ""):
+        return
+    logger.info("Reply offers a change the list doesn't allow; removed")
+    verdict.answer = (
+        without_sentences(verdict.answer, lambda s: not _CHANGE_OFFER.search(s))
+        or verdict.answer
+    )
+
+
+#: On a distress turn: a pitch for an action, an email address, coping tips, a menu.
+_UPSET_EXTRAS = re.compile(
+    r"\b(?:i can|i could|shall i|want me to|would you like|if you like|if you'd like|"
+    r"do you want|which would help|if you want|tell me which)\b"
+    r"[^.!?\n]{0,120}\b(?:start|appl(?:y|ying|ies|ication)|book(?:ing)?|"
+    r"register|sign you up|enrol|arrang(?:e|ing)|request|set up|explain what|"
+    r"appointment|call(?:ing)? you back|callback)\b"
+    r"|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
+    r"|\b(?:tips?|coping|breathing exercise|grounding exercise)\b"
+    r"|(?:^|\s)[1-9][).]\s",
+    re.I,
+)
+
+
+def _quiet_on_upset(verdict: Verdict, ctx: CheckContext) -> None:
+    """TF1 round 2 (Sahyog N-6): on a distress turn, acknowledge and give the numbers;
+    no pitch for the template's action, no complaints email, no coping tips, no menu
+    of options. The crisis numbers are added after this (`give_crisis_numbers`)."""
+    if not ctx.upset or not _UPSET_EXTRAS.search(
+        (verdict.answer or "").replace("’", "'")
+    ):
+        return
+    logger.info("Upset turn carries an offer, an email or tips; removed")
+    verdict.answer = (
+        without_sentences(
+            verdict.answer, lambda s: not _UPSET_EXTRAS.search(s.replace("’", "'"))
+        )
+        or verdict.answer
+    )
+
+
 WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _drop_record_ids,
     _keep_out_of_scope_declines_generic,
@@ -552,5 +719,10 @@ WORDING_FIXES: Tuple[Callable[[Verdict, CheckContext], None], ...] = (
     _ground_offered_times,
     _cut_source_phrases,
     _flag_source_talk,
+    _keep_conditions,
+    _no_national_number_as_own,
+    _no_eligibility_verdict,
+    _no_change_offer_without_the_ability,
+    _quiet_on_upset,
     _decline_if_nothing_left,
 )

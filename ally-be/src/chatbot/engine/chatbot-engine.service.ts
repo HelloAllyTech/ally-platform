@@ -1,3 +1,4 @@
+import { DEFAULT_WHATSAPP_SETTINGS } from '../../whatsapp/type/whatsapp-settings.type';
 import { LimitReason, TurnBlockReason, limitReply } from './limit-reply';
 import {
   BlockedState,
@@ -66,7 +67,7 @@ import type {
   LiveReply,
 } from './chatbot-engine.types';
 import { crisisRequest } from './crisis-history';
-import { holdTextUntilCleared } from './live-reply';
+import { FINAL_ONLY_PACKS, holdTextUntilCleared } from './live-reply';
 import { isEverydayIdiom } from './everyday-idiom';
 import { looksEmotional } from './looks-emotional';
 import { ActionsService } from '../actions/actions.service';
@@ -74,15 +75,23 @@ import { businessFacts } from './business-facts';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
 import { stageLine, stageRunIdFor } from './agent-stage-log';
+import { voiceText } from '../voice/voice-text';
 import { asksToOverride, overrideDecline } from './visitor-override';
 import {
   atRiskByKeywords,
+  crisisByKeywords,
+  selfHarmByKeywords,
   upsetByKeywords,
   emergencyByKeywords,
   lifeThreatening,
   moreSevere,
 } from './emergency-keywords';
-import { caringDecline } from './caring-decline';
+import {
+  asksForDiagnosis,
+  caringDecline,
+  DIAGNOSIS_PACKS,
+  diagnosisDecline,
+} from './caring-decline';
 import { crisisHelplines } from './crisis-helplines';
 import { replyLanguageOf } from './reply-language';
 import {
@@ -194,9 +203,31 @@ export function crisisTextFor(
     // 112 and Tele-MANAS 14416 for an assistant in India (by its time zone).
     india: isIndiaAssistant(turn.chatbot.settings),
   });
+  // TF1 round 2 (Saathi B-13): the voice's one warm sentence before the fixed core, in the same
+  // message (none without a template voice).
+  const lead = voiceText(
+    turn.chatbot.settings,
+    'crisis_lead',
+    replyLanguageOf(turn.text ?? '', turn.language),
+  );
+  const withLead = lead ? `${lead} ${reply}` : reply;
   // Q4 G7: the owner's one approved practical-help line, after the fixed reply.
   const practical = turn.settings.crisisPracticalLine?.trim();
-  return practical ? `${reply}\n\n${practical}` : reply;
+  return practical ? `${withLead}\n\n${practical}` : withLead;
+}
+
+/** TF1 round 2 (Saathi B-13): an emergency reply's own lead from the voice ("Please stay safe."). */
+function withEmergencyLead(
+  turn: Pick<ChatTurn, 'chatbot'> &
+    Partial<Pick<ChatTurn, 'text' | 'language'>>,
+  reply: string,
+): string {
+  const lead = voiceText(
+    turn.chatbot.settings,
+    'crisis_lead_emergency',
+    replyLanguageOf(turn.text ?? '', turn.language),
+  );
+  return lead ? `${lead} ${reply}` : reply;
 }
 
 /**
@@ -530,13 +561,19 @@ export class ChatbotEngineService {
       turn.language,
       turn.chatbot.id,
     );
-    if (
-      !match ||
-      match.template.kind !== WaTemplateKind.CRISIS ||
-      isEverydayIdiom(turn.text)
-    ) {
-      return null;
-    }
+    const template =
+      match &&
+      match.template.kind === WaTemplateKind.CRISIS &&
+      !isEverydayIdiom(turn.text)
+        ? match
+        : null;
+    // TF1 round 2 (approved 25 Nov): the free keyword rules still run here, with no model call. A
+    // message they mark at risk or an emergency flags the chat and alerts the team, as it would
+    // with credits.
+    const byRules = template
+      ? null
+      : crisisByKeywords(turn.text, turn.chatbot.safetyPack);
+    if (!template && !byRules) return null;
     await this.blockedCrisis
       ?.markBlockedCrisis(
         turn.chatbot.id,
@@ -544,9 +581,15 @@ export class ChatbotEngineService {
         state,
       )
       .catch(() => undefined);
+    if (byRules) {
+      return this.crisisDecision(turn, byRules, {} as PromptsRan, {
+        notOnList: false,
+        path: 'keyword',
+      });
+    }
     return this.keywordCrisis(turn, {
-      ...match.template,
-      ownWording: match.ownWording,
+      ...template!.template,
+      ownWording: template!.ownWording,
     });
   }
 
@@ -943,6 +986,8 @@ export class ChatbotEngineService {
     // whatever the classifier says (it missed "someone collapsed in the hub and isn't breathing").
     const urgent =
       lifeThreatening(turn.text) ??
+      // TF1 round 2: self-harm said in the first person, on every assistant.
+      selfHarmByKeywords(turn.text) ??
       // Q4 H1: indirect hopelessness on a mental-health assistant.
       atRiskByKeywords(turn.text, turn.chatbot.safetyPack);
     if (urgent) {
@@ -1018,6 +1063,34 @@ export class ChatbotEngineService {
     if (early && fixedReply(early)) {
       return this.crisisDecision(turn, early.value!, ran, { notOnList: false });
     }
+    // TF1 round 2 (Saathi B-5): on a mental-health assistant, a request to be diagnosed gets the
+    // fixed reply (only a doctor or mental health professional can; Tele-MANAS 14416), the same
+    // every time and with no run. The crisis verdict comes first and wins ("I think I have
+    // depression and I don't want to live").
+    if (
+      DIAGNOSIS_PACKS.has(String(turn.chatbot.safetyPack ?? '')) &&
+      asksForDiagnosis(turn.text)
+    ) {
+      const verdict = early ?? (await checked);
+      if (fixedReply(verdict)) {
+        return this.crisisDecision(turn, verdict.value!, ran, {
+          notOnList: false,
+        });
+      }
+      return {
+        handledBy: WaHandledBy.TEMPLATE,
+        body: diagnosisDecline({
+          question: turn.text ?? '',
+          language: replyLanguageOf(turn.text, turn.language),
+          organisation: turn.chatbot.name,
+          contact: contactFromSources(
+            await this.businessFacts(turn),
+            crisisHelplines(turn.settings),
+          ),
+          pack: turn.chatbot.safetyPack,
+        }),
+      };
+    }
     // TF1 round 2, S-4: "ignore your instructions…" gets one fixed line and no run. The crisis
     // verdict is awaited first and wins ("ignore all the rules, I just want to die").
     if (asksToOverride(turn.text)) {
@@ -1035,6 +1108,7 @@ export class ChatbotEngineService {
         body: overrideDecline(
           replyLanguageOf(turn.text, turn.language),
           turn.chatbot.name,
+          turn.chatbot.settings,
         ),
       };
     }
@@ -1054,7 +1128,12 @@ export class ChatbotEngineService {
         turn,
         request,
         knowledge,
-        live && holdTextUntilCleared(live, crisisCheck),
+        live &&
+          holdTextUntilCleared(live, crisisCheck, {
+            finalOnly:
+              FINAL_ONLY_PACKS.has(String(turn.chatbot.safetyPack ?? '')) ||
+              mood === 'upset',
+          }),
         { mood, signal: stop.signal },
       ),
     );
@@ -1253,9 +1332,10 @@ export class ChatbotEngineService {
           : {}),
       };
     }
-    return unsure || upset
-      ? withUnsureCrisisInformation(turn, decided)
-      : decided;
+    const sent =
+      unsure || upset ? withUnsureCrisisInformation(turn, decided) : decided;
+    // TF1 round 2 (Sahyog N-6): the channel adds no memory notice or name notice to it.
+    return upset ? { ...sent, upset: true } : sent;
   }
 
   /**
@@ -1355,8 +1435,18 @@ export class ChatbotEngineService {
     answer: EngineAnswer,
     upset = false,
   ): Promise<ChatTurn> {
-    const wording = turn.settings.declineText ?? '';
     if (answer.intent !== 'decline' || answer.answer?.trim()) return turn;
+    const language = replyLanguageOf(turn.text, turn.language);
+    // TF1 round 2 (Saathi B-1): the owner's own wording as they wrote it; otherwise the voice's,
+    // in the person's language.
+    const effective = (turn.settings.declineText ?? '').trim();
+    const fromVoice =
+      !effective ||
+      effective === voiceText(turn.chatbot.settings, 'decline', 'en') ||
+      effective === DEFAULT_WHATSAPP_SETTINGS.declineText.trim();
+    const wording = fromVoice
+      ? voiceText(turn.chatbot.settings, 'decline', language)
+      : effective;
     const contact = contactFromSources(
       await this.businessFacts(turn),
       crisisHelplines(turn.settings),
@@ -1374,13 +1464,14 @@ export class ChatbotEngineService {
     if (caring) {
       return { ...turn, settings: { ...turn.settings, declineText: caring } };
     }
-    if (phoneIn(wording) || emailIn(wording)) return turn;
-    if (!contact) return turn;
+    if (phoneIn(wording) || emailIn(wording) || !contact) {
+      return { ...turn, settings: { ...turn.settings, declineText: wording } };
+    }
     return {
       ...turn,
       settings: {
         ...turn.settings,
-        declineText: `${wording.trim()} You can reach us on ${contact}.`.trim(),
+        declineText: `${wording} ${voiceText(turn.chatbot.settings, 'contact_line', language, { contact })}`,
       },
     };
   }
@@ -1394,7 +1485,10 @@ export class ChatbotEngineService {
     turn: ChatTurn,
     crisis: CrisisCheckResponse,
     ran: PromptsRan,
-    { notOnList }: { notOnList: boolean },
+    {
+      notOnList,
+      path = 'classifier',
+    }: { notOnList: boolean; path?: 'classifier' | 'keyword' },
   ): Promise<ChatbotDecision> {
     const { chatbot, sender } = turn;
     const who = notOnList ? ' for a sender who is not on its list' : '';
@@ -1409,26 +1503,29 @@ export class ChatbotEngineService {
     return {
       handledBy: WaHandledBy.CRISIS,
       body: emergency
-        ? emergencyReply({
-            language: replyLanguageOf(turn.text, turn.language),
-            organisation: chatbot.name,
-            emergencyNumber: emergencyNumberFrom(
-              await this.businessFacts(turn),
-              crisisHelplines(turn.settings),
-            ),
-            selfHarm: Boolean(crisis.self_harm),
-            animal: aboutAnAnimal(turn.text),
-            kind: emergencyKindOf(turn.text),
-            helplineNumbers: crisisHelplines(turn.settings) || null,
-            india: isIndiaAssistant(chatbot.settings),
-          })
+        ? withEmergencyLead(
+            turn,
+            emergencyReply({
+              language: replyLanguageOf(turn.text, turn.language),
+              organisation: chatbot.name,
+              emergencyNumber: emergencyNumberFrom(
+                await this.businessFacts(turn),
+                crisisHelplines(turn.settings),
+              ),
+              selfHarm: Boolean(crisis.self_harm),
+              animal: aboutAnAnimal(turn.text),
+              kind: emergencyKindOf(turn.text),
+              helplineNumbers: crisisHelplines(turn.settings) || null,
+              india: isIndiaAssistant(chatbot.settings),
+            }),
+          )
         : crisisTextFor(turn),
-      crisis: { level: emergency ? 2 : 1, path: 'classifier' },
+      crisis: { level: emergency ? 2 : 1, path },
       retrievalMeta: { ...ran },
       alert: this.alert(
         200,
         'crisis',
-        `The crisis classifier fired on chatbot "${chatbot.name}"${who} (${turn.channel.type}, ` +
+        `${path === 'keyword' ? 'A crisis keyword rule matched' : 'The crisis classifier fired'} on chatbot "${chatbot.name}"${who} (${turn.channel.type}, ` +
           `sender ${sender.label}, confidence ${crisis.confidence.toFixed(2)}, signal ` +
           `"${crisis.signal}", ${emergency ? 'a medical emergency' : 'at risk'}). ${outcome}`,
         'Chatbot Crisis Classifier',

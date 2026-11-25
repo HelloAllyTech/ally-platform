@@ -585,9 +585,11 @@ class TestEachRunStartsClean:
 class TestReasoningEffort:
     """AGENT_RUNTIME__AGENT_REASONING_EFFORT reaches the agent step."""
 
-    async def test_unset_sends_none(self, agent_run, chunk_service):
+    # A question, not a greeting: greetings and upset turns use "minimal" (TF1 round 2).
+    async def test_unset_sends_none(self, agent_run, chunk_service, monkeypatch):
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "AGENT_REASONING_EFFORT", None)
         llm = FakeLLM(chat("Hi!"))
-        await agent_run("hi", llm)
+        await agent_run("what are your fees?", llm)
         assert llm.calls[0]["reasoning_effort"] is None
 
     async def test_setting_reaches_the_agent_step(
@@ -595,5 +597,15 @@ class TestReasoningEffort:
     ):
         monkeypatch.setattr(settings.AGENT_RUNTIME, "AGENT_REASONING_EFFORT", "low")
         llm = FakeLLM(chat("Hi!"))
-        await agent_run("hi", llm)
+        await agent_run("what are your fees?", llm)
         assert llm.calls[0]["reasoning_effort"] == "low"
+
+    async def test_a_greeting_or_an_upset_turn_uses_minimal(
+        self, agent_run, chunk_service, monkeypatch
+    ):
+        """TF1 round 2 (Saathi speed): 10-13 s of reasoning for a greeting or a
+        distress reply whose content code already fixes."""
+        monkeypatch.setattr(settings.AGENT_RUNTIME, "AGENT_REASONING_EFFORT", "low")
+        llm = FakeLLM(chat("Hi!"))
+        await agent_run("Hi, I'm Asha", llm)
+        assert llm.calls[0]["reasoning_effort"] == "minimal"

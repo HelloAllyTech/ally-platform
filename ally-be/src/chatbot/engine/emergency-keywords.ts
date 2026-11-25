@@ -204,7 +204,7 @@ export function emergencyByKeywords(
  * anything" after a booking got "Please contact the team"). On a mental-health assistant these are
  * at risk, and decide at once like the life-threatening rules.
  */
-const HOPELESS = String.raw`(?:no point (?:to|in) (?:anything|everything|living|life|going on|trying)|what'?s the point(?: of (?:anything|living|life|it all|going on|trying)(?: anymore)?| anymore|(?=\s*(?:[.?!,…]|$)))|(?:don'?t|do not) want to (?:wake up|be here|exist|live|go on)(?: anymore)?|tired of (?:living|life|being alive)|(?:want|wanna) (?:it all|everything) to (?:end|stop)|end it all|no reason to (?:live|go on|keep going)|better off without me|can'?t (?:go on|do this) anymore|can'?t go on(?:\s+(?:like this|living))?(?=\s*(?:[.!?,…]|$))|(?:kisi cheez|kuch bhi|zindagi) ka koi matlab nahi|koi matlab nahi (?:lagta|hai)|(?:uthne|jeene) ka (?:mann|man|dil) nahi|jeena nahi (?:chahta|chahti)|sab khatam karna|कोई मतलब नहीं|जीने का मन नहीं|उठने का मन नहीं|जीना नहीं चाहता|जीना नहीं चाहती)`;
+const HOPELESS = String.raw`(?:no point (?:to|in) (?:anything|everything|living|life|going on|trying)|what'?s the point(?: of (?:anything|living|life|it all|going on|trying)(?: anymore)?| anymore|(?=\s*(?:[.?!,…]|$)))|(?:don'?t|do not) want to (?:wake up|be here|exist|live|go on)(?: anymore)?|tired of (?:living|life|being alive)|(?:zindagi|zindagee|jeene|jine) se thak (?:gaya|gayi|gai|chuka|chuki)|(?:ज़िंदगी|जिंदगी|जीने) से थक|(?:want|wanna) (?:it all|everything) to (?:end|stop)|end it all|no reason to (?:live|go on|keep going)|better off without me|can'?t (?:go on|do this) anymore|can'?t go on(?:\s+(?:like this|living))?(?=\s*(?:[.!?,…]|$))|(?:kisi cheez|kuch bhi|zindagi) ka koi matlab nahi|koi matlab nahi (?:lagta|hai)|(?:uthne|jeene) ka (?:mann|man|dil) nahi|jeena nahi (?:chahta|chahti)|sab khatam karna|कोई मतलब नहीं|जीने का मन नहीं|उठने का मन नहीं|जीना नहीं चाहता|जीना नहीं चाहती)`;
 
 /** The packs whose assistants treat indirect hopelessness as at risk (Q4 H1). */
 export const HOPELESS_PACKS = new Set(['mental_health']);
@@ -252,6 +252,46 @@ export function upsetByKeywords(
         failed: false,
       } as CrisisCheckResponse)
     : null;
+}
+
+/*
+ * Self-harm said in the first person, on every assistant (TF1 round 2: "I've started cutting myself
+ * again" at a spend limit got only the at-limit notice, with no flag or alert). An act or an
+ * intent, never the topic: "I cut myself while cooking" and "do you help people who self-harm?"
+ * stay with the classifier.
+ */
+const SELF_HARM = String.raw`(?:(?:started|been|keep|kept|going to|gonna|want to|wanna|thinking (?:of|about)|feel like)\s+(?:cutting|hurting|burning|harming|starving)\s+myself|(?:cutting|hurting|burning|harming)\s+myself\s+(?:again|on purpose|every (?:day|night)|daily)|i\s+(?:self[- ]?harm(?:ed)?|cut myself on purpose|hurt myself on purpose)\b|khud ko (?:phir se |fir se )?(?:kaat|nuksaan pahunch|chot pahunch|jala)\w*\s+(?:rahi|raha|rahe|liya|li|di|diya|chahta|chahti)|(?:ख़ुद|खुद) को (?:फिर से )?(?:काट|नुकसान|नुक़सान|जला))`;
+
+export function selfHarmByKeywords(
+  text: string | null | undefined,
+): CrisisCheckResponse | null {
+  const said = (text ?? '').trim();
+  const match = said ? new RegExp(SELF_HARM, 'iu').exec(said) : null;
+  return match
+    ? ({
+        is_crisis: true,
+        level: 'at_risk',
+        self_harm: true,
+        signal: match[0].trim().slice(0, 200),
+        confidence: 1,
+        failed: false,
+      } as CrisisCheckResponse)
+    : null;
+}
+
+/**
+ * Everything the free keyword rules can say, most severe first: what still runs at a spend limit
+ * or on a paused assistant, where no model is called (TF1 round 2, approved 25 Nov).
+ */
+export function crisisByKeywords(
+  text: string | null | undefined,
+  pack?: string | null,
+): CrisisCheckResponse | null {
+  return (
+    emergencyByKeywords(text, pack) ??
+    selfHarmByKeywords(text) ??
+    atRiskByKeywords(text, pack)
+  );
 }
 
 const SEVERITY: Record<string, number> = {

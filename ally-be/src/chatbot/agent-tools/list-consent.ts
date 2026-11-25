@@ -129,6 +129,8 @@ interface Described {
   where?: string;
   /** Places it takes, on a list with a capacity rule ("1 place"). */
   places?: number;
+  /** Every detail said back, with its field (TF1 round 2: an application names its service and centre). */
+  fields: { key: string; label: string; type: ListFieldType; value: string }[];
 }
 
 /** An entry as the question names it: its title, the person, and up to two other details. */
@@ -147,6 +149,7 @@ function describe(
   let status: string | undefined;
   let person = personKey ? display[personKey] : undefined;
   let bookedFor: string | undefined;
+  const fields: Described['fields'] = [];
   for (const f of list.fields) {
     if (f.archived_at || f.privacy?.masked) continue;
     const value = String(display[f.key] ?? '').trim();
@@ -174,7 +177,8 @@ function describe(
     }
     if (f.key === personKey) continue;
     if (value === record.title) continue;
-    if (details.length < 2) details.push(value);
+    fields.push({ key: f.key, label: f.label, type: f.type, value });
+    if (details.length < 3) details.push(value);
   }
   // A contact with no name yet ("A contact"), or Try it's test visitor: not a name to say back
   // (Q4 G5, Round 8: "Shall I add this… for Try it").
@@ -189,6 +193,7 @@ function describe(
     ...(related.when ? { when: related.when } : {}),
     ...(related.where ? { where: related.where } : {}),
     ...(places !== null ? { places } : {}),
+    fields,
   };
 }
 
@@ -262,6 +267,18 @@ export function offerFor(
   if (kind === 'update' && before) {
     const b = describe(list, before);
     if (a.status && ENDS.test(a.status) && !(b.status && ENDS.test(b.status))) {
+      // TF1 round 2 (Saathi B-4): a callback request is named as one, with its day and time
+      // ("Shall I cancel your evening on 9800000007?" before).
+      if (headlineFor(list, 'create', false) === 'callback') {
+        const when = callbackWhen(b);
+        return {
+          key,
+          questions: {
+            en: `Shall I cancel your callback request${when ? ` for ${when}` : ''}?`,
+            hi: `क्या मैं आपका कॉल बैक का अनुरोध${when ? ` (${when})` : ''} रद्द कर दूँ?`,
+          },
+        };
+      }
       return {
         key,
         questions: {
@@ -351,19 +368,89 @@ function askedByKind(
     };
   }
   if (kind === 'callback') {
-    const about = what ? ` about ${what}` : '';
-    const aboutHi = what ? ` (${what})` : '';
+    // TF1 round 2 (Saathi B-4): "Shall I request a callback for Asha on 9800000007, tomorrow
+    // evening?" (the phone was the title, and the day was never said).
+    const phone = callbackPhone(a);
+    const when = callbackWhen(a);
+    const en = [phone ? ` on ${phone}` : '', when ? `, ${when}` : ''].join('');
+    const hi = [phone, when].filter(Boolean).join(', ');
     return {
-      en: `Shall I request a callback for ${a.person ?? 'you'}${about}?`,
-      hi: `क्या मैं ${a.person ? `${a.person} के लिए` : 'आपके लिए'} कॉलबैक का अनुरोध भेज दूँ${aboutHi}?`,
+      en: `Shall I request a callback for ${a.person ?? 'you'}${en}?`,
+      hi: `क्या मैं ${a.person ? `${a.person} के लिए` : 'आपके लिए'} कॉलबैक का अनुरोध भेज दूँ${hi ? ` (${hi})` : ''}?`,
     };
   }
-  const forWhom = a.person ? ` (${a.person})` : '';
+  // TF1 round 2 (Sahyog N-11, Saathi B-4): "Shall I send an application for aids and appliances
+  // at Malviya Nagar for Ravi Test (9800000011)?": the service's short name, the centre, the
+  // person, then the phone (never "your application for 9800000011, Aids and appliances (…)").
+  const phone =
+    a.fields.find((f) => f.type === ListFieldType.PHONE)?.value ??
+    callbackPhone(a);
+  const fieldLike = (re: RegExp) =>
+    a.fields.find(
+      (f) => f.type !== ListFieldType.NUMBER && re.test(`${f.key} ${f.label}`),
+    )?.value;
+  const service = fieldLike(SERVICE_FIELD);
+  const placeValue = fieldLike(PLACE_FIELD) ?? a.where;
+  const rest = [a.title, ...a.details]
+    .filter((x) => x && x !== a.person && x !== phone && x !== placeValue)
+    .join(', ');
+  // "at Malviya Nagar", not "at Malviya Nagar centre" (the approved N-11 wording).
+  const place = placeValue ? shortPlace(placeValue) : placeValue;
+  const named = service ? shortService(service) : rest;
+  const namedHi = service ? shortService(service, false) : rest;
+  const tel = phone ? ` (${phone})` : '';
+  // COPY: needs approval (TF1 round 2)
   return {
-    en: `Shall I send your application for ${what || list.name}${forWhom}?`,
-    hi: `क्या मैं ${what || list.name} के लिए आपका आवेदन भेज दूँ${forWhom}?`,
+    en:
+      `Shall I send ${a.person ? 'an' : 'your'} application` +
+      `${named ? ` for ${named}` : ''}${place ? ` at ${place}` : ''}` +
+      `${a.person ? ` for ${a.person}` : ''}${tel}?`,
+    hi:
+      `क्या मैं ${a.person ? `${a.person} के लिए ` : ''}${place ? `${place} में ` : ''}` +
+      `${namedHi ? `${namedHi} का ` : ''}${a.person ? '' : 'आपका '}आवेदन भेज दूँ${tel}?`,
   };
 }
+
+/** "Malviya Nagar centre" → "Malviya Nagar"; a name that is only "Centre" stays as it is. */
+export function shortPlace(name: string): string {
+  const short = name
+    .replace(/^\s*the\s+/i, '')
+    .replace(/\s+(?:centre|center|branch|office)\s*$/i, '')
+    .trim();
+  return short || name.trim();
+}
+
+/** The detail that names an application's service, and the one that names its centre. */
+const SERVICE_FIELD = /service|scheme|programme|program|benefit/i;
+const PLACE_FIELD = /centre|center|location|branch|office|venue|place|where/i;
+
+/**
+ * A service's short name mid-sentence: "Aids and appliances (wheelchairs, hearing aids…)" →
+ * "aids and appliances"; "Help with a disability certificate (UDID card)" → "a disability
+ * certificate". An acronym keeps its capitals ("UDID card").
+ */
+export function shortService(name: string, lower = true): string {
+  const short = name
+    .replace(/\s*\([^)]*\)/g, '')
+    .replace(/^\s*help with\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!short) return name.trim();
+  return lower
+    ? short.replace(/^\p{Lu}(?!\p{Lu})/u, (c) => c.toLowerCase())
+    : short;
+}
+
+const PHONE_LIKE = /^\+?[\d\s()-]{8,}$/;
+/** A callback's phone, among the title and details. */
+const callbackPhone = (d: Described): string | undefined =>
+  [d.title, ...d.details].find((x) => PHONE_LIKE.test(x ?? ''));
+/**
+ * A callback's day and time ("Thu 26 Nov 2026 evening"), from its details only: the title is
+ * who asked (never "Visitor · 6188 Thu 26 Nov").
+ */
+const callbackWhen = (d: Described): string =>
+  d.details.filter((x) => x && !PHONE_LIKE.test(x) && x !== d.person).join(' ');
 
 /** What the agent reads when a write waits for a yes. */
 export const askFirstMessage = (question: string): string =>

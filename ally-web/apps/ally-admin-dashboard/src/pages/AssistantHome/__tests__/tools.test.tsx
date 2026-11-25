@@ -45,6 +45,14 @@ vi.mock("@api", async importOriginal => ({
   }),
   useGetReadyMadeListsQuery: () => ({ data: null }),
   useGetHowItWorksQuery: () => ({ data: h.how }),
+  // TF1 round 2: the count is the owner's documents, never the assistant's working ones.
+  useGetChatbotDocumentsQuery: () => ({
+    data: [
+      { id: "d1", title: "Fees.pdf", status: "indexed", isGlobal: false, archived: false },
+      { id: "d2", title: "Owner notes", status: "indexed", isGlobal: false, archived: false },
+      { id: "d3", title: "What we learned", status: "indexed", isGlobal: false, archived: false },
+    ],
+  }),
   useGetListEntriesQuery: () => ({
     data: h.entries,
     isLoading: false,
@@ -150,7 +158,7 @@ describe("Tools", () => {
   it("shows what each of its own tools does, and where it's changed", () => {
     show();
     fireEvent.click(screen.getByRole("tab", { name: /Your pages/ }));
-    expect(screen.getByText("12 pages")).toBeTruthy();
+    expect(screen.getByText("1 document")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: t.tools.pagesManage }));
     expect(go).toHaveBeenCalledWith("knowledge", "knows");
 

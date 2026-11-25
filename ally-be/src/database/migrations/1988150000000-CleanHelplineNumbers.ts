@@ -12,8 +12,8 @@ import { helplineLines } from '../../chatbot/engine/phone-text';
  * then crisis replies carry the national numbers only. A value with no number at all is removed.
  * The old value is kept under `helplineNumbersBeforeClean` for the way down.
  */
-export class CleanHelplineNumbers1988100000000 implements MigrationInterface {
-  name = 'CleanHelplineNumbers1988100000000';
+export class CleanHelplineNumbers1988150000000 implements MigrationInterface {
+  name = 'CleanHelplineNumbers1988150000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const rows = (await queryRunner.query(`

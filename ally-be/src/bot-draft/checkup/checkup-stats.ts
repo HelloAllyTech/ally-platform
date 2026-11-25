@@ -69,7 +69,37 @@ export function median(values: number[]): number {
     : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
-export function checkupTotals(rows: StatInput[]): CheckupTotals {
+const WORST: CheckupResultVerdict[] = ['fail', 'needs_input', 'pass'];
+
+/**
+ * TF1 round 2 (Saathi B-8): one row per question. A must-pass question is asked 3 times, so the
+ * panel said "We asked 11 questions" and "6 of 11", beside "3 of 7 need a fix" and 7 listed.
+ * A question passes only when every try passed; it takes its worst try's result, and the median
+ * of its tries' times. It is an error only when every try errored.
+ */
+export function oneRowPerQuestion(rows: StatInput[]): StatInput[] {
+  const byCase = new Map<string, StatInput[]>();
+  for (const row of rows) {
+    byCase.set(row.caseId, [...(byCase.get(row.caseId) ?? []), row]);
+  }
+  return [...byCase.values()].map((tries) => {
+    const graded = tries.filter((t) => t.verdict !== 'error');
+    if (!graded.length) return tries[0];
+    const worst =
+      WORST.map((v) => graded.find((t) => t.verdict === v)).find(Boolean) ??
+      graded[0];
+    return {
+      ...worst,
+      hardFail: graded.some((t) => t.hardFail),
+      wrongDecline: graded.some((t) => t.wrongDecline),
+      cited: graded.every((t) => t.cited),
+      ms: median(graded.map((t) => t.ms)),
+    };
+  });
+}
+
+export function checkupTotals(allTries: StatInput[]): CheckupTotals {
+  const rows = oneRowPerQuestion(allTries);
   const graded = rows.filter((row) => row.verdict !== 'error');
   const answers = graded.filter((row) => row.outcome === 'answered');
   const unknowns = graded.filter(

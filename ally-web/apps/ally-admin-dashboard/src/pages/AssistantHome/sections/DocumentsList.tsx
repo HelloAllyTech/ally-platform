@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 
 import axios from "axios";
+import { useSelector } from "react-redux";
 
 import {
   useCreateChatbotDocumentUploadUrlMutation,
@@ -9,6 +10,7 @@ import {
 } from "@api";
 import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
+import type { RootState } from "@store";
 import { KbCorpus } from "@types";
 import type { HomeDocument } from "@types";
 
@@ -17,6 +19,7 @@ import {
   DOCUMENT_UPLOAD_FORMATS,
   FILE_SIZE_LIMITS,
 } from "../../../constants/file";
+import { Permissions } from "../../../constants/permissions";
 import { HOME, fill } from "../copy";
 import { Collapsed } from "../fields";
 import { ListError, ListRow, ListRows, ListSkeleton, RemoveButton } from "../ui/List";
@@ -43,6 +46,17 @@ const sourceOf = (file: File): FileSource | null => {
 
 const statusOf = (status: string): string =>
   status === "indexed" ? k.ready : status === "failed" ? k.failed : k.reading;
+
+/**
+ * TF1 round 2 (Saathi B-11): "From your library" only for someone who may read the library; for
+ * anyone else its request was refused, with a permission toast, on every visit.
+ */
+const LibraryEntry: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const permissions = useSelector((state: RootState) => state.user?.permissions ?? []);
+  return (permissions as string[]).includes(Permissions.VIEW_KNOWLEDGE_BASE) ? (
+    <>{children}</>
+  ) : null;
+};
 
 /** Picks library documents to add, one at a time (each saves on its own). */
 const LibraryPicker: React.FC<{
@@ -194,18 +208,20 @@ export const DocumentsList: React.FC<{ botId: string; canEdit: boolean }> = ({
               {uploading ? fill(t.uploading, { name: uploading }) : t.uploadHint}
             </span>
           </div>
-          <Collapsed summary={t.fromLibrary}>
-            <LibraryPicker
-              taken={list.items.map(doc => doc.id)}
-              disabled={list.saving}
-              onAdd={documentId =>
-                void list.change({ op: "add", item: { documentId } }, () => ({
-                  op: "remove",
-                  id: documentId,
-                }))
-              }
-            />
-          </Collapsed>
+          <LibraryEntry>
+            <Collapsed summary={t.fromLibrary} lazy>
+              <LibraryPicker
+                taken={list.items.map(doc => doc.id)}
+                disabled={list.saving}
+                onAdd={documentId =>
+                  void list.change({ op: "add", item: { documentId } }, () => ({
+                    op: "remove",
+                    id: documentId,
+                  }))
+                }
+              />
+            </Collapsed>
+          </LibraryEntry>
         </>
       )}
       <ListError error={uploadError ?? list.error} />

@@ -2,10 +2,12 @@
 `/agent/run/stream` sends the same run's live events and then that response as
 `final`. Both call `execute`, so the two can't drift.
 
-No unchecked text is streamed. The reply's `token` events are cut from the answer
-only after the run has ended, so they hold exactly what the check passed (and only
-the rewrite, when the first draft was sent back). ally-be still holds them until
-its crisis check clears, and `final` replaces whatever a client showed.
+The reply is streamed as the model writes it (`conversation.py`), before the reply
+check runs, so a `token` event can carry text the check then withdraws; `final` is
+authoritative and replaces whatever a client showed. When nothing streamed live, the
+tokens are cut from the checked answer after the run. ally-be holds every token until
+its crisis check clears, and shows none at all on a safety-pack assistant or an upset
+turn (TF1 round 2, `ally-be/src/chatbot/engine/live-reply.ts`).
 """
 
 from __future__ import annotations

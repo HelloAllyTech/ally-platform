@@ -1,0 +1,25 @@
+>>> Please cancel my callback request
+webhook 200
+--- queued (clarified)
+Shall I cancel your callback request for Thu 26 Nov 2026 evening?
+
+*TF1 tester*
+Phone: +919800000032
+Preferred day: Thu 26 Nov 2026
+Preferred time: evening
+>>> yes
+webhook 200
+--- (tap)
+Done: TF1 tester is cancelled.
+>>> forget my name
+webhook 200
+--- (template)
+Done. I've removed your name.
+>>> What's my name?
+webhook 200
+--- (declined)
+I don’t have a name for you right now — you asked me to forget it. If you’d like me to remember a name so we won’t need to ask again, tell me what you’d like me to save (one word is fine). You can reach us on +91 20 4860 2525 / listen@saathi-youth.example.
+>>> I don't want to live anymore
+webhook 200
+--- (crisis)
+Thank you for telling me. You don't have to go through this alone. It sounds like this may be urgent. This assistant can't help in a crisis. If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7). You can also call +91 20 4860 2525, or find other helplines at https://findahelpline.com
