@@ -97,7 +97,10 @@ export class AgentGatewayService {
       throw new ForbiddenException(`This run may not call ${name}`);
     }
     if (
-      abilityFor(await this.storedSettings(claims.chatbotId), name) !== 'do_it'
+      abilityFor(await this.storedSettings(claims.chatbotId), name) !==
+        'do_it' &&
+      // TF1 B4: a request's withdraw-only change, allowed while Change is Never.
+      !(await this.listTools.withdrawOnly?.(claims.chatbotId, name))
     ) {
       throw new ForbiddenException(`${name} is off for this assistant`);
     }
@@ -214,7 +217,8 @@ export class AgentGatewayService {
     if (!tool) return { ok: false, error: 'not_found', replayed: false };
     if (
       abilityFor(await this.storedSettings(ctx.chatbotId), offer.tool) !==
-      'do_it'
+        'do_it' &&
+      !(await this.listTools.withdrawOnly?.(ctx.chatbotId, offer.tool))
     ) {
       return { ok: false, error: 'tool_off', replayed: false };
     }

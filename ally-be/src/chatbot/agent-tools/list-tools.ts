@@ -582,6 +582,48 @@ export function listToolDefinitions(
   return out;
 }
 
+/**
+ * TF1 B4: a list of requests (a callback, an application, an enquiry) whose status has
+ * "withdrawn": the person may withdraw their own open one even while Change is Never.
+ */
+export function withdrawable(list: ListView): boolean {
+  if (!hasPersonField(list)) return false;
+  const status = list.fields.find(
+    (f) =>
+      !f.archived_at && f.key === 'status' && f.type === ListFieldType.SELECT,
+  );
+  return Boolean(
+    status &&
+    selectValues(status as never).some((v) => String(v) === WITHDRAWN),
+  );
+}
+
+export const WITHDRAWN = 'withdrawn';
+
+/**
+ * TF1 B4: the change tool cut down to one thing, for a request list whose Change is Never: set
+ * the person's own entry to withdrawn. Nothing else can be changed through it.
+ */
+export function withdrawOnlyDefinition(list: ListView): ListToolDefinition {
+  const listName = list.name.trim();
+  return {
+    name: listToolName('update', list.key),
+    description:
+      `Withdraw an entry in ${list.name} that belongs to the person in this chat, when they ask ` +
+      `to cancel or withdraw it; id comes from find_${list.key}. Only after they've confirmed it. ` +
+      `This can't change anything else: for any other change, offer to pass it to the team.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: text(`The id of the entry to withdraw, from find_${list.key}`),
+        status: choice('Always "withdrawn"', [WITHDRAWN]),
+      },
+    },
+    kind: 'update',
+    ...(listName ? { list_name: listName } : {}),
+  };
+}
+
 export interface OfferedListTools {
   definitions: ListToolDefinition[];
   /** Tools the bot has on but that didn't fit under the cap. */
@@ -605,8 +647,13 @@ export function offeredListTools(
     .flatMap((list) =>
       withPlaybook(
         list,
-        listToolDefinitions(list, names, dated).filter(
-          (def) => abilityFor(stored, def.name) === 'do_it',
+        listToolDefinitions(list, names, dated).flatMap((def) =>
+          abilityFor(stored, def.name) === 'do_it'
+            ? [def]
+            : // TF1 B4: Change is Never, but a request can still be withdrawn by its person.
+              def.kind === 'update' && withdrawable(list)
+              ? [withdrawOnlyDefinition(list)]
+              : [],
         ),
       ),
     );

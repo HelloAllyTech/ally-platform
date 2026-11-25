@@ -57,14 +57,15 @@ export const TEMPLATE_LISTS: ReadyMadeList[] = [
       relation('applicant', 'Applicant', 'contact', required),
       examples('service', 'Service', ['Service 1', 'Service 2'], agent),
       text('preferred_centre', 'Preferred centre', agent),
-      status(['received', 'in review', 'completed', 'closed']),
+      status(['received', 'in review', 'completed', 'closed', 'withdrawn']),
     ],
     rules: [
       perPerson('applicant', 3, ['received', 'in review']),
       moves(
         {
-          received: ['in review', 'closed'],
-          'in review': ['completed', 'closed'],
+          // TF1 B4: the person may withdraw their own open application.
+          received: ['in review', 'closed', 'withdrawn'],
+          'in review': ['completed', 'closed', 'withdrawn'],
         },
         'received',
       ),
@@ -92,12 +93,16 @@ export const TEMPLATE_LISTS: ReadyMadeList[] = [
         ['weekdays', 'weekends', 'evenings', 'any time'],
         agent,
       ),
-      status(['new', 'contacted', 'active', 'not now']),
+      status(['new', 'contacted', 'active', 'not now', 'withdrawn']),
     ],
     rules: [
       perPerson('volunteer', 1, ['new', 'contacted']),
       moves(
-        { new: ['contacted', 'not now'], contacted: ['active', 'not now'] },
+        // TF1 B4: the person may withdraw their own sign-up while it's open.
+        {
+          new: ['contacted', 'not now', 'withdrawn'],
+          contacted: ['active', 'not now', 'withdrawn'],
+        },
         'new',
       ),
     ],
@@ -149,11 +154,15 @@ export const TEMPLATE_LISTS: ReadyMadeList[] = [
         ['a receipt', 'how to give', 'a regular gift', 'something else'],
         agent,
       ),
-      status(['new', 'answered', 'closed']),
+      status(['new', 'answered', 'closed', 'withdrawn']),
     ],
     rules: [
       perPerson('donor', 3, ['new']),
-      moves({ new: ['answered', 'closed'], answered: ['closed'] }, 'new'),
+      // TF1 B4: the person may withdraw their own open enquiry.
+      moves(
+        { new: ['answered', 'closed', 'withdrawn'], answered: ['closed'] },
+        'new',
+      ),
     ],
   },
   {
@@ -178,11 +187,12 @@ export const TEMPLATE_LISTS: ReadyMadeList[] = [
       long('question', 'Question', { ...required, ...agent }),
       relation('asker', 'Asked by', 'contact', required),
       text('topic', 'Topic', agent),
-      status(['new', 'answered']),
+      status(['new', 'answered', 'withdrawn']),
     ],
     rules: [
       perPerson('asker', 5, ['new']),
-      moves({ new: ['answered'] }, 'new'),
+      // TF1 B4: the person may withdraw their own open question.
+      moves({ new: ['answered', 'withdrawn'] }, 'new'),
     ],
   },
   {

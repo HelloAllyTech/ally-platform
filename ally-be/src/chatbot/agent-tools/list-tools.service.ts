@@ -25,6 +25,7 @@ import {
   type RelatedWords,
 } from './entry-words';
 import {
+  abilityFor,
   bookedForField,
   datedLists,
   listToolDefinitions,
@@ -38,6 +39,8 @@ import {
   type ListToolDefinition,
   type OfferedListTools,
   type RecordPassage,
+  withdrawable,
+  withdrawOnlyDefinition,
 } from './list-tools';
 import type {
   AgentGatewayTool,
@@ -189,15 +192,47 @@ export class ListToolsService {
     const list = lists.find((l) => l.key === parsed.key);
     if (!list) return undefined;
     const names = new Map(lists.map((l) => [l.key, l.name]));
-    const def = listToolDefinitions(list, names, datedLists(lists)).find(
+    let def = listToolDefinitions(list, names, datedLists(lists)).find(
       (d) => d.name === name,
     );
     if (!def) return undefined;
+    // TF1 B4: with Change at Never, a request list's change tool is the withdraw-only one: its
+    // schema takes only the entry and "withdrawn", so nothing else can be changed through it.
+    if (
+      def.kind === 'update' &&
+      withdrawable(list) &&
+      abilityFor(await this.storedSettings(chatbotId), name) !== 'do_it'
+    ) {
+      def = withdrawOnlyDefinition(list);
+    }
     return {
       name,
       parse: (input) => parseListToolInput(def, input),
       run: (ctx, input) => this.run(ctx, def, list, lists, input),
     };
+  }
+
+  /**
+   * TF1 B4: whether this tool is a request list's withdraw-only change, allowed while its Change
+   * is Never. The gateway lets exactly this through; the tool's schema allows nothing else.
+   */
+  async withdrawOnly(chatbotId: string, name: string): Promise<boolean> {
+    const parsed = parseListToolName(name);
+    if (parsed?.kind !== 'update') return false;
+    const list = (await this.definitions.listLists(chatbotId)).find(
+      (l) => l.key === parsed.key,
+    );
+    return Boolean(list && withdrawable(list));
+  }
+
+  private async storedSettings(
+    chatbotId: string,
+  ): Promise<ChatbotSettingsOverride | null> {
+    const [row] = (await this.dataSource.query(
+      `SELECT settings FROM chatbots WHERE id = $1`,
+      [chatbotId],
+    )) as { settings: ChatbotSettingsOverride | null }[];
+    return row?.settings ?? null;
   }
 
   private async run(

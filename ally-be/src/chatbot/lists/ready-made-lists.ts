@@ -602,12 +602,16 @@ export const READY_MADE: ReadyMadeItem[] = [
             ['morning', 'afternoon', 'evening', 'any time'],
             agent,
           ),
-          status(['requested', 'called', 'closed']),
+          status(['requested', 'called', 'closed', 'withdrawn']),
         ],
         rules: [
           perPerson('requester', 1, ['requested']),
+          // TF1 B4: the person may withdraw their own open callback request.
           moves(
-            { requested: ['called', 'closed'], called: ['closed'] },
+            {
+              requested: ['called', 'closed', 'withdrawn'],
+              called: ['closed'],
+            },
             'requested',
           ),
         ],
