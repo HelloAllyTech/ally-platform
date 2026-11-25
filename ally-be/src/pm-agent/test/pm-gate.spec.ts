@@ -409,6 +409,47 @@ describe('lane-level candidate check', () => {
     expect(out.candidate?.payload.plan).not.toHaveProperty('size');
   });
 
+  it('moves productGoal and effort written beside opportunity into it', () => {
+    const good = recFor(0, [E1]);
+    const { productGoal, effort, ...entry } = good.opportunity;
+    const out = checkCandidate(
+      {
+        kind: 'recommendation',
+        category: 'product',
+        recommendation: {
+          ...good,
+          opportunity: entry,
+          productGoal,
+          effort: String(effort).toUpperCase(),
+        },
+      },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
+    // Local and prod 2026-11-25 (gpt-5): half the lanes spent their repair round on this.
+    expect(out.errors).toEqual([]);
+    expect(out.candidate?.payload.opportunity).toEqual(good.opportunity);
+    expect(out.candidate?.payload).not.toHaveProperty('productGoal');
+    expect(out.candidate?.payload).not.toHaveProperty('effort');
+  });
+
+  it("keeps the entry's own productGoal over a stray copy beside it", () => {
+    const good = recFor(0, [E1]);
+    const out = checkCandidate(
+      {
+        kind: 'recommendation',
+        category: 'product',
+        recommendation: { ...good, productGoal: 'Something else' },
+      },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
+    expect(out.errors).toEqual([]);
+    expect(out.candidate?.payload.opportunity.productGoal).toBe(
+      good.opportunity.productGoal,
+    );
+  });
+
   it('accepts a list sent as one string and trims an over-long supporting list', () => {
     const good = recFor(0, [E1]);
     const many = Array.from({ length: 25 }, (_, i) => `Option ${i + 1}`);

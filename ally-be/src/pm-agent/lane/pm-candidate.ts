@@ -224,10 +224,40 @@ function asList(value: unknown, trim: boolean): unknown {
  * over LIST_MAX. Meaning-bearing limits (title words, description length, enums) are untouched
  * and still go to the repair round.
  */
+/**
+ * The roadmap entry's own fields, written beside `opportunity` instead of inside it (prod and
+ * local 2026-11-25, gpt-5: half the lanes spent their repair round on this). Moved in when the
+ * entry lacks them; the stray copy is dropped when it has them. Effort is lower-cased (`M` → `m`).
+ */
+const OPPORTUNITY_SIBLING_KEYS = ['productGoal', 'effort'] as const;
+
+function nestOpportunityFields(body: Record<string, any>): Record<string, any> {
+  const entry = body.opportunity;
+  const entryIsObject =
+    entry && typeof entry === 'object' && !Array.isArray(entry);
+  // A malformed entry (a string, a list) is left for the validator to name.
+  if (entry !== undefined && !entryIsObject) return body;
+  const strays = OPPORTUNITY_SIBLING_KEYS.filter((key) => key in body);
+  if (!strays.length && !entryIsObject) return body;
+  const out = { ...body };
+  const opportunity: Record<string, any> = entryIsObject ? { ...entry } : {};
+  for (const key of strays) {
+    if (opportunity[key] === undefined) opportunity[key] = out[key];
+    delete out[key];
+  }
+  if (typeof opportunity.effort === 'string') {
+    opportunity.effort = opportunity.effort.trim().toLowerCase();
+  }
+  out.opportunity = opportunity;
+  return out;
+}
+
 export function normaliseRecommendation(
   body: Record<string, any>,
 ): Record<string, any> {
-  const out: Record<string, any> = { ...hoistMisplacedPlanFields(body) };
+  const out: Record<string, any> = nestOpportunityFields(
+    hoistMisplacedPlanFields(body),
+  );
   for (const key of TOP_LEVEL_LISTS) {
     if (key in out) out[key] = asList(out[key], TRIMMABLE_LISTS.has(key));
   }
