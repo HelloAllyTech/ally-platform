@@ -75,6 +75,16 @@ describePg('Use-case templates: install (Postgres)', () => {
       records,
       drafts as never,
       publish as never,
+      // Only the built-in templates here: the managed overlay has its own spec.
+      {
+        all: async () => TEMPLATES,
+        byId: async (id: string) => {
+          const template = TEMPLATES.find((t) => t.id === id);
+          return template
+            ? { template, source: 'code', version: null, overrides: false }
+            : undefined;
+        },
+      } as never,
     );
   });
   afterAll(async () => closeTestDataSource(ds));

@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ChatbotTemplateInstall } from './entity/chatbot-template-install.entity';
 import { TemplateController } from './templates/template.controller';
+import { TemplateAdminController } from './templates/template-admin.controller';
+import { TemplateAdminService } from './templates/template-admin.service';
+import { TemplateRegistryService } from './templates/template-registry.service';
+import { AssistantTemplate } from './entity/assistant-template.entity';
 import { TemplateService } from './templates/template.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ChatbotModule } from '../chatbot/chatbot.module';
@@ -70,6 +74,7 @@ import { BotDraftService } from './service/bot-draft.service';
       ChatbotCheckupResult,
       ChatbotMessageFeedback,
       ChatbotTemplateInstall,
+      AssistantTemplate,
     ]),
     ChatbotModule,
     BotPageModule,
@@ -91,6 +96,8 @@ import { BotDraftService } from './service/bot-draft.service';
     SafetyPackReleaseController,
     ScorecardController,
     TemplateController,
+    // Assistants admin → Templates (Ally staff).
+    TemplateAdminController,
   ],
   providers: [
     BotDraftService,
@@ -114,6 +121,8 @@ import { BotDraftService } from './service/bot-draft.service';
     SafetyPackReleaseService,
     // Use-case templates (T1).
     TemplateService,
+    TemplateRegistryService,
+    TemplateAdminService,
     // Stage 3: Create and Build.
     WorkingCopyService,
     BlankChatbotService,
