@@ -237,12 +237,20 @@ function nestOpportunityFields(body: Record<string, any>): Record<string, any> {
     entry && typeof entry === 'object' && !Array.isArray(entry);
   // A malformed entry (a string, a list) is left for the validator to name.
   if (entry !== undefined && !entryIsObject) return body;
-  const strays = OPPORTUNITY_SIBLING_KEYS.filter((key) => key in body);
+  // `productGoal` beside the entry, or a dotted `"opportunity.productGoal"` key (gpt-5 wrote
+  // both, local 2026-11-25): each names one field of the entry.
+  const strays = Object.keys(body).flatMap((key) => {
+    if ((OPPORTUNITY_SIBLING_KEYS as readonly string[]).includes(key)) {
+      return [{ key, field: key }];
+    }
+    const dotted = /^opportunity\.(\w+)$/.exec(key);
+    return dotted ? [{ key, field: dotted[1] }] : [];
+  });
   if (!strays.length && !entryIsObject) return body;
   const out = { ...body };
   const opportunity: Record<string, any> = entryIsObject ? { ...entry } : {};
-  for (const key of strays) {
-    if (opportunity[key] === undefined) opportunity[key] = out[key];
+  for (const { key, field } of strays) {
+    if (opportunity[field] === undefined) opportunity[field] = out[key];
     delete out[key];
   }
   if (typeof opportunity.effort === 'string') {
