@@ -86,9 +86,9 @@ test("a Chatbots-only custom login lands on its assistants and sees nothing else
   const itsAssistant = new RegExp(`/assistants/${BOT_ID}$`);
   await expect(page).toHaveURL(itsAssistant);
   // No Sidebar: only its email and Log out (6b, item 31).
-  // One corner menu (stage 2): the email on its button, Plan and Log out inside it.
-  await expect(page.getByTestId("assistant-only-header")).toContainText("asha@clinic.example");
+  // One corner menu: a menu icon that opens a drawer, with the email, Log out and the tabs inside.
   await page.getByTestId("corner-menu-button").click();
+  await expect(page.getByTestId("corner-menu-profile")).toContainText("asha@clinic.example");
   await expect(page.getByTestId("assistant-only-logout")).toBeVisible();
   await expect(page.getByTestId("admin-sidebar")).toHaveCount(0);
 
@@ -119,7 +119,7 @@ test("someone not on an assistant's team is told so, with the way back", async (
   await expect(page.getByTestId("assistant-no-access")).toContainText(
     "You don't have access to this assistant. Ask its owner to add you.",
   );
-  await page.getByRole("link", { name: "Go to your assistants" }).click();
+  await page.getByRole("link", { name: "Back to Your Ally Chatbots" }).click();
   // With exactly one assistant, the list opens it straight away.
   await expect(page).toHaveURL(new RegExp(`/assistants(/${BOT_ID})?$`));
 });
