@@ -1,12 +1,14 @@
 import React, { useMemo, useState } from "react";
 
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 
 import { CarbonToggle, SkeletonText, Tooltip } from "@ally-ui-mono/ui-shared";
 import { TooltipIcon } from "@assets";
 import { ChatMessage } from "@components/builder";
 import { en } from "@constants";
 import type {
+  BuilderBriefResponse,
   BuilderChatMessage,
   BuilderServerMessage,
   RoadmapItemDetail,
@@ -14,8 +16,10 @@ import type {
 } from "@types";
 
 import { CodeText } from "./CodeChip";
+import { useSendRoadmapPlanMessageMutation } from "../../../api/roadmapPlanning";
 import { mapServerMessagesToFeed } from "../../../hooks/useBuilderStream";
 import { motionTransition, useReducedMotionPreference } from "../../../motion";
+import { errorMessage, errorStatus } from "../drafts/draftUtils";
 import { useRoadmapBreakpoint } from "../hooks/useRoadmapBreakpoint";
 import { CommentBox, CommentItem } from "../session/CommentBox";
 import { PlanComposer } from "../session/PlanComposer";
@@ -130,6 +134,7 @@ export const Conversation: React.FC<ConversationProps> = ({
     [messages],
   );
   const session = useSessionAnswers(item);
+  const [sendPlanMessage, { isLoading: isAnsweringBrief }] = useSendRoadmapPlanMessageMutation();
   const isPhone = useRoadmapBreakpoint() === "phone";
   const feed = useMemo(() => mapServerMessagesToFeed(serverMessages), [serverMessages]);
   // Who wrote each human turn (builder_messages.createdBy) and when, by server row id.
@@ -189,6 +194,26 @@ export const Conversation: React.FC<ConversationProps> = ({
     return undefined;
   }, [feed]);
 
+  // The plan agent's situation brief is answered here, to the plan agent (the same door as the
+  // planner's box), by whoever works the plan. Anyone else reads it locked.
+  const canAnswerBrief = Boolean(item.can?.workPlan && item.sessionId) && !isAnsweringBrief;
+  const answerBrief = async (response: BuilderBriefResponse, summary: string) => {
+    if (!item.sessionId) return;
+    try {
+      await sendPlanMessage({
+        code: item.code,
+        sessionId: item.sessionId,
+        text: summary,
+        briefResponse: response,
+      }).unwrap();
+    } catch (error) {
+      const plan = en.roadmapV2.planGate;
+      toast.error(
+        errorStatus(error) === 409 ? plan.busy : (errorMessage(error) ?? plan.sendFailed),
+      );
+    }
+  };
+
   const toggleStep = (id: string) =>
     setExpanded(prev => {
       const next = new Set(prev);
@@ -224,13 +249,22 @@ export const Conversation: React.FC<ConversationProps> = ({
         />
       );
     }
-    const open = showAgentWork || expanded.has(message.id);
+    // A brief still waiting on the planner stays open: it is a question, not agent work.
+    const awaitingBrief = Boolean(message.brief && !message.answeredBrief);
+    const open = showAgentWork || awaitingBrief || expanded.has(message.id);
     return (
       <li key={message.id} className="py-1.5">
         {open ? (
           <div className="flex flex-col gap-1">
             <span className="text-xs font-semibold text-typography-secondary">{agentName}</span>
-            <ChatMessage message={message} index={index} onAnswer={noop} disabled />
+            <ChatMessage
+              message={message}
+              index={index}
+              onAnswer={noop}
+              onAnswerBrief={(response, summary) => void answerBrief(response, summary)}
+              disabled
+              briefDisabled={!canAnswerBrief}
+            />
             {!showAgentWork && (
               <button
                 type="button"

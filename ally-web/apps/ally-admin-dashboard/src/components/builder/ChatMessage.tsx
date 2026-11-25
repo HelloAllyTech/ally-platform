@@ -55,6 +55,8 @@ interface ChatMessageProps {
   /** The situation brief's answer, and the one line the feed shows for it. */
   onAnswerBrief?: (response: BuilderBriefResponse, summary: string) => void;
   disabled?: boolean;
+  /** Overrides `disabled` for the situation brief alone (a host that locks the rest). */
+  briefDisabled?: boolean;
 }
 
 /**
@@ -72,6 +74,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
   onAnswer,
   onAnswerBrief,
   disabled,
+  briefDisabled,
 }) => {
   const entrance = prefersReducedMotion()
     ? undefined
@@ -88,7 +91,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           brief={message.brief}
           answered={message.answeredBrief}
           onSubmit={(response, summary) => onAnswerBrief?.(response, summary)}
-          disabled={disabled || !onAnswerBrief}
+          disabled={(briefDisabled ?? disabled) || !onAnswerBrief}
         />
       </div>
     );
