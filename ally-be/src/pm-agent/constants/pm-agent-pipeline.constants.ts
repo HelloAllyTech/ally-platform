@@ -61,6 +61,12 @@ export const PM_PIPELINE = {
   TOOL_RESULT_MAX_CHARS: 12_000,
   /** Evidence snapshot kept per item (internal; never in a compiled PRD). */
   EVIDENCE_SNAPSHOT_MAX_CHARS: 6_000,
+  /**
+   * Of each cited evidence item, what the critic reads to judge "grounded". Was 600: the lane
+   * read up to 12k of an analytics result, cited a figure from further down, and the critic,
+   * shown only the head, refused the card as ungrounded (prod 2026-11-25, 2 of 4 cards).
+   */
+  CRITIC_EVIDENCE_MAX_CHARS: 4_000,
   /** Cheap-model switch: below this many estimated lane-costs of run budget left. */
   CHEAP_MODEL_BELOW_LANE_COSTS: 2,
   /** Pending feedback older than this is cancelled rather than revised. */

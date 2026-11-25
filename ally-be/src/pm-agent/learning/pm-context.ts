@@ -46,6 +46,16 @@ export function roadmapFilingRules(productGoals: readonly string[]): string {
       '"the team" alone. An idea no user group feels is not a roadmap opportunity: drop it.',
     `- opportunity.effort: the whole opportunity's size, one of ${ROADMAP_FILEABLE_EFFORTS.join(', ')}. Broad is fine; unsized is not.`,
     `- opportunity.productGoal: exactly one of ${goals}.`,
+    '',
+    // Every critic-refused card in prod 2026-11-25 failed strategic_fit and success_signal:
+    // lanes wrote goal/who/why and stopped. One fixed shape covers all items in 1000 characters.
+    'Write `opportunity.description` in this shape, every sentence present, plain prose, at most 1000 characters:',
+    '1. Goal: what we are trying to achieve, before any solution.',
+    '2. Who: the named user group, what they lose or struggle with today, and why it matters now.',
+    '3. Outcome: what changes for that group once this exists.',
+    '4. This serves <bet>: the strategy goal or current bet it advances, named in the words the Vision & strategy page uses (no quotation marks).',
+    '5. We will know it worked when <metric or observable behaviour> moves <up/down>, read in <where: the dashboard, report or event>.',
+    '6. In scope: …; out of scope: … (at least one thing deliberately left out).',
   ].join('\n');
 }
 
