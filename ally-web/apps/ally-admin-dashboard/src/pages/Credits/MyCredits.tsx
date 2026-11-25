@@ -1,5 +1,5 @@
 import "@carbon/charts/styles.css";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 
 import { Link } from "react-router-dom";
 
@@ -16,9 +16,6 @@ import { shortDay } from "../Plan/format";
 import "../AssistantHome/ui/scale.css";
 import "../Plan/plan.css";
 import "../WhatsAppBot/list-page.css";
-
-/** Where "Contact Ally for more credits" goes. COPY: needs approval */
-export const CONTACT_ALLY_HREF = "mailto:support@helloally.ai?subject=More%20credits";
 
 const Card: React.FC<{ title?: string; testId?: string; children: React.ReactNode }> = ({
   title,
@@ -180,23 +177,41 @@ export const GrantHistory: React.FC<{ grants: CreditAccountView["grants"]; title
   </Card>
 );
 
-export const ContactAlly: React.FC = () => (
-  <Card title={C.more.title} testId="credits-contact">
-    <p className="ally-small" style={{ margin: 0 }}>
-      {C.more.body}
-    </p>
-    <a
-      className="ally-btn ally-btn--secondary"
-      href={CONTACT_ALLY_HREF}
-      data-testid="credits-contact-link"
-    >
-      {C.more.action}
-    </a>
-  </Card>
-);
+export const ContactAlly: React.FC = () => {
+  const [asked, setAsked] = useState(false);
+  return (
+    <Card title={C.more.title} testId="credits-contact">
+      <p className="ally-small" style={{ margin: 0 }}>
+        {C.more.body}
+      </p>
+      <button
+        type="button"
+        className="ally-btn ally-btn--secondary"
+        aria-describedby={asked ? "credits-contact-message" : undefined}
+        data-testid="credits-contact-button"
+        onClick={() => setAsked(true)}
+      >
+        {C.more.action}
+      </button>
+      {asked && (
+        <p
+          id="credits-contact-message"
+          className="ally-plan__note"
+          role="status"
+          data-testid="credits-contact-message"
+        >
+          {C.more.reply}
+        </p>
+      )}
+    </Card>
+  );
+};
 
 /** The body, given the credits: also drawn by the tests. */
-export const MyCreditsBody: React.FC<{ credits: MyCreditsView }> = ({ credits }) => {
+export const MyCreditsBody: React.FC<{ credits: MyCreditsView; hidePlanLink?: boolean }> = ({
+  credits,
+  hidePlanLink = false,
+}) => {
   const hasAccount = credits.accountId !== null;
   const empty = hasAccount && credits.freeBalanceUsd <= 0;
   const low = hasAccount && !empty && credits.freeBalanceUsd < credits.reserveUsd;
@@ -295,35 +310,45 @@ export const MyCreditsBody: React.FC<{ credits: MyCreditsView }> = ({ credits })
       </Card>
 
       <GrantHistory grants={credits.grants} />
-      <p className="ally-small">
-        <Link to={ROUTES.MY_PLAN} data-testid="credits-plan-link">
-          {C.planLink}
-        </Link>
-      </p>
+      {!hidePlanLink && (
+        <p className="ally-small">
+          <Link to={ROUTES.MY_PLAN} data-testid="credits-plan-link">
+            {C.planLink}
+          </Link>
+        </p>
+      )}
     </div>
   );
 };
 
-/** "Plan and credits" in the corner menu opens this. `/account/plan` keeps working beside it. */
-export const MyCredits: React.FC = () => {
+/** The credits content with its loading and failed states, no page header: the page and the
+ *  corner menu's drawer both draw it. */
+export const MyCreditsPanel: React.FC<{ hidePlanLink?: boolean }> = ({ hidePlanLink }) => {
   const { data, isLoading, isError } = useGetMyCreditsQuery();
   return (
-    <div className="ally-v2 ally-list-page" data-testid="my-credits-page">
-      <header className="ally-list-page__head">
-        <div className="ally-list-page__title">
-          <h1 className="ally-display">{C.title}</h1>
-          <p className="ally-small">{C.intro}</p>
-        </div>
-      </header>
+    <>
       {isLoading && <p className="ally-small">{C.loading}</p>}
       {isError && (
         <p className="ally-error" role="alert">
           {C.loadFailed}
         </p>
       )}
-      {data && <MyCreditsBody credits={data} />}
-    </div>
+      {data && <MyCreditsBody credits={data} hidePlanLink={hidePlanLink} />}
+    </>
   );
 };
+
+/** `/account/credits`: the same content as the corner menu's Plan and credits tab, as a page. */
+export const MyCredits: React.FC = () => (
+  <div className="ally-v2 ally-list-page" data-testid="my-credits-page">
+    <header className="ally-list-page__head">
+      <div className="ally-list-page__title">
+        <h1 className="ally-display">{C.title}</h1>
+        <p className="ally-small">{C.intro}</p>
+      </div>
+    </header>
+    <MyCreditsPanel />
+  </div>
+);
 
 export default MyCredits;

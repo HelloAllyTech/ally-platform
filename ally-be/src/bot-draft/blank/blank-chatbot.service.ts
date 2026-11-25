@@ -6,6 +6,7 @@ import { LoggerService } from '../../logger/logger.service';
 import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
 import { BotDraftEntity } from '../entity/bot-draft.entity';
 import { BotDraftService } from '../service/bot-draft.service';
+import { autoNameStem, nextAutoName } from './auto-name';
 
 /**
  * Blank chatbots (stage 3, "Create and Build"): a chatbot is created at the click, before anything
@@ -19,9 +20,6 @@ export const BLANK_LIMITS = {
   /** How many the cleanup deletes per run. */
   batch: 200,
 } as const;
-
-/** The placeholder name a blank starts with (the starter bot treats it as "no name yet"). */
-export const BLANK_NAME = 'Your assistant';
 
 /**
  * The cleanup can be switched off without a deploy (build rules: kill switch per risky feature).
@@ -112,7 +110,19 @@ export class BlankChatbotService implements OnModuleInit {
           message: 'Finish or remove one of your new assistants first.',
         });
       }
-      const draft = await this.drafts.create({ name: BLANK_NAME, blank: true });
+      // Today's names this builder already holds, so the number after the date counts up.
+      const now = new Date();
+      const taken: { name: string }[] = await manager.query(
+        `SELECT name FROM chatbots WHERE created_by = $1 AND name LIKE $2`,
+        [userId, `${autoNameStem(now)}%`],
+      );
+      const draft = await this.drafts.create({
+        name: nextAutoName(
+          now,
+          taken.map((row) => row.name),
+        ),
+        blank: true,
+      });
       return { draft, reused: false };
     });
   }

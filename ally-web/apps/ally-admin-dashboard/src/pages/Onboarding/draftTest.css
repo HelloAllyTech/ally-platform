@@ -17,7 +17,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 20px 6px;
+  /* A fixed band, so the title sits at the same height as the build half's title opposite. */
+  min-height: 52px;
+  box-sizing: border-box;
+  padding: 0 20px;
 }
 .ally-dt__title {
   margin: 0;
@@ -113,14 +116,75 @@
 .ally-dt__failed p {
   margin: 0;
 }
-.ally-dt__form {
+/* The stage: the conversation and its composer, on the visitor design (see DraftTestPane). */
+.ally-dt__stage {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
-  gap: 8px;
-  padding: 12px 20px 16px;
-  border-top: 1px solid var(--ally-line);
+  flex-direction: column;
+  /* A preview inside the builder's screen, not the screen itself: inset on every side (the
+     builder's 20px gutter) and framed with the builder's own border (a literal: inside the stage
+     the border tokens are the visitor's). */
+  margin: 8px 20px 20px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
 }
-.ally-dt__form .ally-input {
-  flex: 1 1 auto;
+/* Serif only: the visitor surface's own faces are set aside here, as everywhere in the console. */
+.brand-surface.ally-dt__stage {
+  --ally-font-display: "IBM Plex Serif", serif;
+  --ally-font-ui: "IBM Plex Serif", serif;
+  --ally-font-label: "IBM Plex Serif", serif;
+  font-family: var(--ally-font-ui);
+}
+/* Builder tooling inside the stage keeps the builder's system, on the stage's own background. */
+/* Doubled class: `.ally-v2` paints its own white, and loads after this file. */
+.ally-v2.ally-dt__builder {
+  background: transparent;
+}
+.ally-dt__builder-note {
+  margin: 0;
+  padding: 0 20px 12px;
+}
+.ally-dt__composer {
+  padding: 8px 14px 14px;
+}
+.ally-dt__composer-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--brand-ink);
+  font: 400 16px/1.4 var(--ally-font-ui);
+}
+.ally-dt__composer-input::placeholder {
+  color: var(--brand-muted);
+}
+/* On the bot page the bubble is the message: the row around it carries no card of its own. */
+.ally-dt__list--page .ally-dt__msg--user,
+.ally-dt__list--page .ally-dt__msg--assistant {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.ally-dt__list--page .ally-dt__msg--user {
+  align-items: flex-end;
+}
+/* A bubble sizes to its text: the row is as wide as its widest line, so a percentage cap on the
+   bubble inside it would collapse a short message ("Hi") to one letter a line. */
+.ally-dt__list--page .bp-bubble {
+  max-width: none;
+}
+/* Who said it is for screen readers only: a visitor's chat has bubbles, not labels. */
+.ally-dt__list--page .ally-dt__who {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .ally-dt__progress {

@@ -1824,14 +1824,79 @@ export const en = {
     noAccess: "You don't have access to this assistant. Ask its owner to add you.",
     /** Someone who only has their assistant (chunk 6b): the one thing in its frame. */
     logOut: "Log out",
-    toYourAssistants: "Go to your assistants",
+    toYourAssistants: "Back to Your Ally Chatbots",
     /** Someone with other Ally admin pages, inside the assistants area (no Sidebar there). */
     toAllyAdmin: "Back to Ally admin",
     /** The corner menu (stage 2). // COPY: needs approval */
     cornerMenu: {
       label: "Account menu",
+      close: "Close menu",
+      about: "About",
+      loading: "Loading…",
+      tabsLabel: "Account sections",
       planAndCredits: "Plan and credits",
+      seatsAndPlan: "Seats and plan",
+      changeLog: "Change log",
       signedInAs: "Signed in as",
+      /** The Change log tab: the public change log, narrowed to Ally Chatbots. */
+      changeLogPanel: {
+        intro:
+          "Every release for Ally Chatbots, newest first. This list fills in by itself as updates go live: it is the public change log, filtered to this product.",
+        loading: "Loading updates…",
+        loadFailed: "Could not load the change log.",
+        retry: "Try again",
+        empty: "No updates yet. New releases for Ally Chatbots will appear here as they go live.",
+        more: "Show more",
+        kinds: { new: "New", improved: "Improved", fixed: "Fixed" } as Record<string, string>,
+        shown: (shown: number, total: number) => `Showing ${shown} of ${total}`,
+      },
+      /** The About tab: what Ally Chatbots is, how it works and who does what. */
+      aboutPanel: {
+        eyebrow: "Ally Chatbots",
+        title: "A chatbot your community can trust, built without code.",
+        intro:
+          "Ally Chatbots lets your organisation set up an assistant that answers people from your own pages, on WhatsApp or your website, and hands over to your team when a person is needed.",
+        stepsHeading: "How it works",
+        steps: [
+          {
+            title: "Set up",
+            blurb:
+              "Start from a template or from scratch, and add the pages and documents it should answer from.",
+          },
+          {
+            title: "Test",
+            blurb:
+              "Try it live as you build, and run a checkup of test questions before you share.",
+          },
+          {
+            title: "Share and learn",
+            blurb:
+              "Connect WhatsApp or your website, then read conversations and step in when someone needs a person.",
+          },
+        ],
+        featuresHeading: "What you can build and control",
+        carouselLabel: "Features",
+        previous: "Previous feature",
+        next: "Next feature",
+        position: (n: number, total: number) => `${n} of ${total}`,
+        rolesHeading: "Who does what",
+        roles: [
+          {
+            title: "Author",
+            blurb:
+              "Manages the team, seats, channels and removal, and can do everything an editor can.",
+          },
+          {
+            title: "Editor",
+            blurb:
+              "Changes what the chatbot knows and how it answers, and can take over conversations.",
+          },
+          {
+            title: "Responder",
+            blurb: "Reads conversations and takes over when someone needs a person.",
+          },
+        ],
+      },
     },
     /** The login screen a signed-out visitor sees on any /assistants page (its own wording and layout). */
     login: {
@@ -2037,7 +2102,7 @@ export const en = {
         loadFailed: "Could not load the archived assistants.",
       },
       status: { draft: "Not live yet", live: "Live", paused: "Paused" },
-      role: { viewer: "Viewer", responder: "Responder", editor: "Editor", owner: "Owner" },
+      role: { viewer: "Viewer", responder: "Responder", editor: "Editor", owner: "Author" },
       noConnector: "Not on WhatsApp yet",
       cardMessages: "{count} messages, last 30 days",
       cardPeople: "{count} people",

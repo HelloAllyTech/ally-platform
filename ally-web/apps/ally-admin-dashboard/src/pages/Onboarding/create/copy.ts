@@ -11,7 +11,7 @@ export const BUILD_COPY = {
   tooManyBlanks: "You have three new chatbots that are still empty. Finish or remove one first.",
   start: {
     heading: "How would you like to start?",
-    template: "Pick a template",
+    template: "Start from template",
     templateHint: "A ready chatbot for a common use, with its knowledge included.",
     scratch: "Start from scratch",
     scratchHint: "Build it from your website, your documents or a short interview.",
@@ -40,7 +40,7 @@ export const BUILD_COPY = {
     formHint: "Edit each setting directly",
   },
   templates: {
-    heading: "Pick a template",
+    heading: "Start from template",
     loading: "Loading templates…",
     failed: "We couldn't load the templates.",
     choose: "Use this template",
@@ -240,12 +240,11 @@ export const BUILD_COPY = {
     readTerms: "Read the safety terms",
     accept: "I accept the safety terms",
     accepted: "Accepted",
-    termsOwnerOnly: "Only an owner can accept the safety terms.",
+    termsOwnerOnly: "Only an author can accept the safety terms.",
     refused: "This can't go live yet. Finish the checklist first.",
   },
   accessPlaceholder: "Save the chatbot first, then choose who may chat.",
   archived: "This chatbot is archived, so it can't be tested.",
-  back: "Your chatbots",
   checkup: {
     crisisTitle: "Crisis check",
     crisisBody: "Sends a message from someone at risk and checks it gets the crisis reply.",

@@ -27,6 +27,9 @@ export const CREDITS_COPY = {
     title: "Need more credits?",
     body: "Contact Ally for more credits. Tell us how many you need and which chatbot they are for.",
     action: "Contact Ally for more credits",
+    /** Shown when the button is pressed: we give no address, they have their own contact. */
+    reply:
+      "Please reach out to your contact at Ally. Tell them how many credits you need and which chatbot they are for.",
   },
   paused: {
     title: "Some work is waiting for credits",

@@ -17,7 +17,7 @@ const freeSeat = (seats: PlanSeat[]): PlanSeat | undefined =>
   );
 
 const ROLE_WORD: Record<string, string> = {
-  owner: "Owner",
+  owner: "Author",
   editor: "Editor",
   viewer: "Viewer",
   invited: "Invited",

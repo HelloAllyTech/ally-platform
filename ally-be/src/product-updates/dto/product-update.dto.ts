@@ -61,6 +61,15 @@ export class GetPublicProductUpdatesDto {
   @IsOptional()
   @IsIn(UPDATE_SURFACES)
   surface?: UpdateSurface;
+
+  @ApiPropertyOptional({
+    enum: UPDATE_AREAS,
+    description:
+      'Only updates about this product area (the chatbot builder asks for "WhatsApp assistant")',
+  })
+  @IsOptional()
+  @IsIn(UPDATE_AREAS)
+  area?: UpdateArea;
 }
 
 export class PublicProductUpdateDto {

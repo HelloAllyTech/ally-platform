@@ -102,7 +102,7 @@
   display: block;
   width: 60%;
   height: 14px;
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--ally-sunken);
 }
 .ally-icon-btn {
@@ -241,7 +241,7 @@
   overflow-y: auto;
   padding: var(--ally-space-5);
   background: var(--ally-bg);
-  box-shadow: 0 30px 60px rgba(23, 23, 28, 0.18);
+  box-shadow: var(--ally-shadow-float);
   outline: none;
 }
 .ally-sheet--bottom {
@@ -251,7 +251,7 @@
   width: 100vw;
   height: auto;
   max-height: 92vh;
-  border-radius: 20px 20px 0 0;
+  border-radius: 0;
 }
 .ally-sheet--center {
   align-items: center;
@@ -321,7 +321,7 @@
   background: var(--ally-surface);
   border: 1px solid var(--ally-line);
   border-radius: var(--ally-radius-md);
-  box-shadow: 0 12px 30px rgba(23, 23, 28, 0.12);
+  box-shadow: var(--ally-shadow-float);
 }
 .ally-more__menu :is(a, button) {
   display: flex;

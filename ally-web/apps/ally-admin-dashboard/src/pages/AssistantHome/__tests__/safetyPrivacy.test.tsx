@@ -72,11 +72,13 @@ describe("Safety and privacy settings", () => {
     });
   });
 
-  it("shows the owner-only refusal plainly", async () => {
+  it("shows the author-only refusal plainly", async () => {
     h.put.mockReturnValue(reject(403));
     render(<SafetyPrivacy botId="b1" canEdit />);
     fireEvent.click(screen.getByLabelText("Adults only"));
-    expect(await screen.findByText(/Only an owner can make this setting less strict/)).toBeTruthy();
+    expect(
+      await screen.findByText(/Only an author can make this setting less strict/),
+    ).toBeTruthy();
   });
 
   it("shows the backend's validation message", async () => {
@@ -159,7 +161,7 @@ describe("Knowledge review", () => {
     await waitFor(() => expect(h.approve).toHaveBeenCalledWith({ id: "b1", documentId: "d1" }));
   });
 
-  it("only an owner can approve", () => {
+  it("only an author can approve", () => {
     h.review = [{ id: "d1", title: "Staff.pdf", status: "held", findings: [] }];
     render(<KnowledgeTools bot={{ id: "b1" } as never} canEdit canManage={false} />);
     expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
