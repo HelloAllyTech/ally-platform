@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { expectNoSeriousA11yIssues } from "./a11y";
 import { logIn, mockBilling } from "./billing.fixture";
+import CATALOGUE from "./templates.catalogue.json";
 
 /**
  * Stage 3, the Create and Build screen, from fixtures: `/assistants/new` creates a blank chatbot
@@ -92,6 +93,8 @@ async function mockBuild(page: Page, state: { creates: number; edits: unknown[] 
       copy = { ...copy, buildMode: body.mode, touched: true };
       return json(route, { mode: body.mode, touched: true });
     }
+    // "Pick a template" opens the use-case setup first (TF1 S6), which reads this catalogue.
+    if (path === "/assistant-templates") return json(route, CATALOGUE);
     if (path === "/bot-templates") {
       return json(route, {
         templates: [
@@ -187,6 +190,8 @@ for (const size of SIZES) {
       await expect(page.getByRole("separator")).toBeVisible();
 
       await page.getByTestId("start-template").click();
+      // The library of starting points sits behind the use-case setup's "More starting points".
+      await page.getByRole("button", { name: "More starting points" }).click();
       await page.getByTestId("template-lib-helpline-front-door").click();
       await page.getByLabel("Your organisation’s name").fill("Sunrise Helpline");
       await page.getByRole("button", { name: "Set it up" }).click();
