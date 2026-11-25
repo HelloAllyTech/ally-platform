@@ -86,6 +86,10 @@ describe("every offered chart has a renderer", () => {
       "TSQ-063",
       "TSQ-064",
       "TSQ-065",
+      "TSQ-049",
+      "TSQ-050",
+      "TSQ-051",
+      "TSQ-055",
       "TSQ-038",
       "TSQ-039",
       "TSQ-042",
@@ -124,6 +128,23 @@ describe("empty states say so plainly", () => {
     ["TSQ-046", { rows: [] }, "modules.timeNone"],
     ["TSQ-053", { rows: [] }, "roleplay.none"],
     ["TSQ-065", { skills: [] }, "skillTrend.none"],
+    [
+      "TSQ-049",
+      {
+        learners: 0,
+        pairs: 0,
+        familiar: null,
+        unfamiliar: null,
+        change: null,
+        up: 0,
+        down: 0,
+        same: 0,
+      },
+      "newCharacter.none",
+    ],
+    ["TSQ-050", { learners: 0, rows: [] }, "behaviours.none"],
+    ["TSQ-051", { points: [] }, "unhelpful.none"],
+    ["TSQ-055", { steps: [] }, "attempts.none"],
   ])("%s", (id, data, key) => {
     draw(id as string, data);
     expect(screen.getByText(new RegExp(`statisticsLibrary\\.${key}`))).toBeTruthy();
@@ -425,6 +446,67 @@ describe("the remaining release-set charts", () => {
     draw("TSQ-065", data);
     expect(screen.getByTestId("statistics-skill-trend")).toBeTruthy();
     expect(takeaway("TSQ-065", data)).toContain('"latest":4');
+  });
+});
+
+describe("the behaviour and attempt charts", () => {
+  it("TSQ-049 says skills dipped only when the drop is clear", () => {
+    const data = (unfamiliar: number) => ({
+      learners: 9,
+      pairs: 12,
+      familiar: 3,
+      unfamiliar,
+      change: unfamiliar - 3,
+      up: 2,
+      down: 5,
+      same: 2,
+    });
+    draw("TSQ-049", data(2.5));
+    expect(screen.getByTestId("statistics-new-character")).toBeTruthy();
+    expect(takeaway("TSQ-049", data(2.5))).toContain("newCharacterDip");
+    expect(takeaway("TSQ-049", data(2.95))).not.toContain("newCharacterDip");
+  });
+
+  it("TSQ-050 names the behaviour that became most common, or says none has", () => {
+    const row = (before: number, after: number) => ({
+      code: "verbal.b1",
+      skill: "Verbal communication",
+      text: "Uses open-ended questions",
+      beforePercent: before,
+      afterPercent: after,
+    });
+    const data = { learners: 8, rows: [row(10, 40)] };
+    draw("TSQ-050", data);
+    expect(screen.getByTestId("statistics-helpful-behaviours")).toBeTruthy();
+    expect(takeaway("TSQ-050", data)).toContain('"to":40');
+    expect(takeaway("TSQ-050", { learners: 8, rows: [row(40, 40)] })).toContain("behavioursFlat");
+  });
+
+  it("TSQ-051 says whether unhelpful responses fell, rose or stayed", () => {
+    const line = (first: number, latest: number) => ({
+      points: [
+        { slice: 1, sharePercent: first, assessments: 6 },
+        { slice: 2, sharePercent: latest, assessments: 6 },
+      ],
+    });
+    draw("TSQ-051", line(40, 20));
+    expect(screen.getByTestId("statistics-unhelpful-trend")).toBeTruthy();
+    expect(takeaway("TSQ-051", line(40, 20))).toContain("unhelpfulDown");
+    expect(takeaway("TSQ-051", line(20, 40))).toContain("unhelpfulUp");
+    expect(takeaway("TSQ-051", line(30, 31))).toContain("unhelpfulFlat");
+  });
+
+  it("TSQ-055 compares the first attempt with the latest", () => {
+    const steps = (latest: number) => ({
+      steps: [
+        { attempt: 1, learners: 8, averageScore: 60 },
+        { attempt: 2, learners: 6, averageScore: latest },
+      ],
+    });
+    draw("TSQ-055", steps(70));
+    expect(screen.getByTestId("statistics-score-by-attempt")).toBeTruthy();
+    expect(takeaway("TSQ-055", steps(70))).toContain('"latest":70');
+    expect(takeaway("TSQ-055", steps(60))).toContain("attemptsFlat");
   });
 });
 

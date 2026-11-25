@@ -79,7 +79,6 @@ import {
   EvaluateRecords,
   EvaluateRecordDetail,
   BuilderHome,
-  AssistantDefaults,
 } from "@pages";
 
 // By path, not through `@pages`: onboarding (chunk 20a) needs nothing the barrel provides.
@@ -109,6 +108,18 @@ const DEBRIEF_CONSOLE_FEATURES = [
  * `/inbox` (an owner's email from before the inbox moved): the assistants home. The Inbox tab is
  * gone (stage 2): each chatbot's Conversations section holds its chats.
  */
+/** Where the staff screens that used to have their own sidebar items now live. */
+const A = ROUTES.ASSISTANTS_ADMIN;
+const LEGACY_STAFF_PATHS: [string, string][] = [
+  [ROUTES.BILLING_MODELS, `${A}/pricing?view=models`],
+  [ROUTES.BILLING_COSTS, `${A}/pricing?view=costs`],
+  [ROUTES.BILLING_PLANS, `${A}/pricing?view=plans`],
+  [ROUTES.BILLING_CREDITS, `${A}/credits`],
+  [ROUTES.SAFETY_PACKS, `${A}/safety`],
+  [ROUTES.ASSISTANT_DEFAULTS, `${A}/content`],
+  [CHATBOT_SUPPORT_ROUTE, `${A}/support`],
+];
+
 const InboxRedirect: React.FC = () => <Navigate to={ROUTES.WHATSAPP_BOT} replace />;
 
 /**
@@ -147,26 +158,13 @@ const ContextLibrary = lazy(() =>
   })),
 );
 
-// Ally admin → Models and → Costs (CR1). Lazy-loaded (kept out of the eager @pages barrel): only
-// super admins with `manage_costs` open them, and Costs draws a Carbon chart.
-const BillingModels = lazy(() =>
-  import("../pages/Billing/Models").then(module => ({ default: module.BillingModels })),
-);
-const BillingCosts = lazy(() =>
-  import("../pages/Billing/Costs").then(module => ({ default: module.BillingCosts })),
-);
-const BillingPlans = lazy(() =>
-  import("../pages/Billing/Plans").then(module => ({ default: module.BillingPlans })),
-);
 // The owner's Plan and usage (CR1 Part C): any signed-in user, for themselves. Never dollars.
 const MyCredits = lazy(() =>
   import("../pages/Credits/MyCredits").then(module => ({ default: module.MyCredits })),
 );
-const StaffCredits = lazy(() =>
-  import("../pages/Credits/StaffCredits").then(module => ({ default: module.StaffCredits })),
-);
-const SafetyPacks = lazy(() =>
-  import("../pages/SafetyPacks/SafetyPacks").then(module => ({ default: module.SafetyPacks })),
+// Ally staff's one home for the Assistants product (credits, pricing, safety, defaults, support).
+const AssistantsAdmin = lazy(() =>
+  import("../pages/AssistantsAdmin").then(module => ({ default: module.AssistantsAdmin })),
 );
 const MyPlan = lazy(() =>
   import("../pages/Plan/MyPlan").then(module => ({ default: module.MyPlan })),
@@ -462,47 +460,23 @@ export const RouteLayout: React.FC = () => {
               </PrivateLayout>
             }
           />
+          {/* Assistants admin: Ally staff's one home for the Assistants product. Each section
+              checks its own grant inside the page; the old per-screen paths still work. */}
           <Route
-            path={ROUTES.BILLING_MODELS}
+            path={ROUTES.ASSISTANTS_ADMIN}
+            element={<Navigate to={`${ROUTES.ASSISTANTS_ADMIN}/overview`} replace />}
+          />
+          <Route
+            path={`${ROUTES.ASSISTANTS_ADMIN}/:section`}
             element={
-              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_COSTS}>
-                <BillingModels />
+              <PrivateLayout>
+                <AssistantsAdmin />
               </PrivateLayout>
             }
           />
-          <Route
-            path={ROUTES.BILLING_COSTS}
-            element={
-              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_COSTS}>
-                <BillingCosts />
-              </PrivateLayout>
-            }
-          />
-          <Route
-            path={ROUTES.BILLING_PLANS}
-            element={
-              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_COSTS}>
-                <BillingPlans />
-              </PrivateLayout>
-            }
-          />
-          <Route
-            path={ROUTES.BILLING_CREDITS}
-            element={
-              <PrivateLayout requiredFeature={FeatureToggleKey.MANAGE_COSTS}>
-                <StaffCredits />
-              </PrivateLayout>
-            }
-          />
-          {/* Assistants stage 9: safety pack releases (the curator grant). */}
-          <Route
-            path={ROUTES.SAFETY_PACKS}
-            element={
-              <PrivateLayout requiredPermissions={[Permissions.MANAGE_SAFETY_PACKS]}>
-                <SafetyPacks />
-              </PrivateLayout>
-            }
-          />
+          {LEGACY_STAFF_PATHS.map(([from, to]) => (
+            <Route key={from} path={from} element={<Navigate to={to} replace />} />
+          ))}
           <Route
             path={ROUTES.MY_CREDITS}
             element={
@@ -1117,28 +1091,15 @@ export const RouteLayout: React.FC = () => {
               </PrivateLayout>
             }
           />
-          {/* Staff only (stage 2): defaults, shared quick replies, library and numbers. The grant
-              is `system:access`, held by Ally staff and never by a tenant's own admins. */}
+          {/* Staff only (stage 8): find any chatbot and open it read-only; every read is logged. */}
           <Route
-            path={ROUTES.ASSISTANT_DEFAULTS}
+            path={`${CHATBOT_SUPPORT_ROUTE}/:botId`}
             element={
-              <PrivateLayout requiredPermissions={[Permissions.SYSTEM_ACCESS]}>
-                <AssistantDefaults />
+              <PrivateLayout fullBleed requiredPermissions={[Permissions.SYSTEM_ACCESS]}>
+                <ChatbotSupport />
               </PrivateLayout>
             }
           />
-          {/* Staff only (stage 8): find any chatbot and open it read-only; every read is logged. */}
-          {[CHATBOT_SUPPORT_ROUTE, `${CHATBOT_SUPPORT_ROUTE}/:botId`].map(path => (
-            <Route
-              key={path}
-              path={path}
-              element={
-                <PrivateLayout fullBleed requiredPermissions={[Permissions.SYSTEM_ACCESS]}>
-                  <ChatbotSupport />
-                </PrivateLayout>
-              }
-            />
-          ))}
           {/* Onboarding (chunk 20a), before `:botId` so `new` is never read as a bot id. */}
           <Route
             path={ROUTES.CHATBOT_NEW}

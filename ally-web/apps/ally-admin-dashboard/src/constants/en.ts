@@ -73,6 +73,7 @@ export const en = {
       // Ally admin → Plans (CR1 Part C): plans, seat types and renewals due.
       billingPlans: "Plans",
       billingCredits: "Credits",
+      assistantsAdmin: "Assistants admin",
       voices: "Voices",
       aiTasks: "AI Tasks",
       languages: "Languages",

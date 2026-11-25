@@ -12,7 +12,10 @@ import {
   TenantChartEntry,
   filtersOf,
 } from '../constants/tenant-chart-library.constants';
-import { STATISTICS_VIEWS } from '../constants/tenant-statistics-views.constants';
+import {
+  STATISTICS_DEFAULT_PINS,
+  STATISTICS_VIEWS,
+} from '../constants/tenant-statistics-views.constants';
 import {
   SCOPE_AWARE_CHARTS,
   TENANT_CHART_SPECS,
@@ -38,6 +41,10 @@ import {
   MeasuresData,
   TenantScopeSummaryRepository,
 } from '../repository/tenant-scope-summary.repository';
+import { TenantBehaviourRepository } from '../repository/tenant-behaviour.repository';
+import { FoundationalSkillsTransferRepository } from '../repository/foundational-skills-transfer.repository';
+import { FHS_RUBRIC_VERSION } from 'src/foundational-skills/constants/helping-skills-rubric.constants';
+import { buildTransfer } from '../util/foundational-skills-transfer.util';
 import { TenantOutcomesRepository } from '../repository/tenant-outcomes.repository';
 import {
   SESSION_LENGTH_BOUNDS_MINUTES,
@@ -124,6 +131,23 @@ export interface RegularityData {
   bursty: number;
   total: number;
   weeks: number;
+}
+
+/** Learners needed before the new-character comparison is shown. */
+const NEW_CHARACTER_MIN_LEARNERS = 5;
+
+export interface NewCharacterData {
+  /** Learners with a before-and-after (a familiar character, then a new one). */
+  learners: number;
+  pairs: number;
+  /** Average helping-skills level (1 to 4) with a familiar character; null under the floor. */
+  familiar: number | null;
+  /** The same, the first time with a new one. */
+  unfamiliar: number | null;
+  change: number | null;
+  up: number;
+  down: number;
+  same: number;
 }
 
 export interface QuizPassData {
@@ -231,6 +255,8 @@ export class TenantChartLibraryService {
     private readonly chartQueryRepo: TenantChartQueryRepository,
     private readonly scopeOptionsRepo: TenantScopeOptionsRepository,
     private readonly summaryRepo: TenantScopeSummaryRepository,
+    private readonly behaviourRepo: TenantBehaviourRepository,
+    private readonly transferRepo: FoundationalSkillsTransferRepository,
   ) {
     this.handlers = {
       // Headline numbers: the summary block of organization-metrics, plus the
@@ -330,6 +356,22 @@ export class TenantChartLibraryService {
       // Each roleplay in a course: finishers, tries and session length.
       'TSQ-053': (tenantId, p, code) =>
         this.summaryRepo.getRoleplayAttempts(tenantId, code, p.courseId),
+      // Which helpful behaviours learners show more of now than at the start.
+      'TSQ-050': (tenantId, p, code) =>
+        this.behaviourRepo.getHelpfulBehaviours(tenantId, code, {
+          courseId: p.courseId,
+        }),
+      // Share of scored practice with an unhelpful behaviour, slice by slice.
+      'TSQ-051': (tenantId, p, code) =>
+        this.behaviourRepo.getUnhelpfulTrend(tenantId, code, {
+          courseId: p.courseId,
+          learnerId: p.learnerId,
+        }),
+      // Average score at the first, second, third and later attempt at a roleplay.
+      'TSQ-055': (tenantId, _p, code) =>
+        this.behaviourRepo.getScoreByAttempt(tenantId, code),
+      // Do learners bring their skills to a character they have not played?
+      'TSQ-049': (tenantId) => this.newCharacter(tenantId),
       // One learner's level in each skill over time.
       'TSQ-065': (tenantId, p, code) =>
         this.summaryRepo.getSkillTrend(tenantId, code, p.learnerId),
@@ -420,7 +462,12 @@ export class TenantChartLibraryService {
         reason: availability.reason,
       };
     });
-    return { enabled: true, charts, views: STATISTICS_VIEWS.map(cloneView) };
+    return {
+      enabled: true,
+      charts,
+      views: STATISTICS_VIEWS.map(cloneView),
+      defaultPins: [...STATISTICS_DEFAULT_PINS],
+    };
   }
 
   async getCapabilities(tenantId: string): Promise<TenantCapabilities> {
@@ -672,6 +719,24 @@ export class TenantChartLibraryService {
         QUIZ_LIMIT,
         this.selectionOf(p),
       ),
+    };
+  }
+
+  private async newCharacter(tenantId: string): Promise<NewCharacterData> {
+    const rows = await this.transferRepo.getCutScenarios(
+      FHS_RUBRIC_VERSION,
+      tenantId,
+    );
+    const t = buildTransfer(rows, { floor: NEW_CHARACTER_MIN_LEARNERS });
+    return {
+      learners: t.comparison.n,
+      pairs: t.pairs,
+      familiar: t.comparison.beforeAvg,
+      unfamiliar: t.comparison.afterAvg,
+      change: t.comparison.change,
+      up: t.comparison.up,
+      down: t.comparison.down,
+      same: t.comparison.tied,
     };
   }
 

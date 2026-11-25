@@ -158,7 +158,7 @@ export class PmCritic {
               'tool_data',
               { evidence_id: ref.id, source: ref.source, label: ref.label },
               ref.excerpt,
-              800,
+              PM_PIPELINE.CRITIC_EVIDENCE_MAX_CHARS,
             ),
           )
           .join('\n');

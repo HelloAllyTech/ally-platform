@@ -41,6 +41,9 @@ export enum UserRole {
   SUPER_ADMIN = "SUPER_ADMIN",
   SUPER_DUPER_ADMIN = "SUPER_DUPER_ADMIN",
   MULTI_TENANT_ADMIN = "MULTI_TENANT_ADMIN",
+  // The one Ally-staff role that replaced the three above. It arrives on `roles` like them; the
+  // Customers tab on Statistics is offered to it (the server decides what it may see).
+  PLATFORM_ADMIN = "PLATFORM_ADMIN",
   // Text helpline groups (ally-be docs/text-helpline.md §2). A LISTENER-only or
   // HELPLINE_SUPERVISOR-only account has nothing in the app but the Helpline
   // workspace, so the landing page must send it there.

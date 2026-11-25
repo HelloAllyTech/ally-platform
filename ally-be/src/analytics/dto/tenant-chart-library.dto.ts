@@ -116,6 +116,13 @@ export class TenantChartLibraryResponseDto {
   })
   views?: TenantStatisticsViewDto[];
 
+  @ApiProperty({
+    type: [String],
+    required: false,
+    description: 'Chart ids pinned to For you until the person pins their own',
+  })
+  defaultPins?: string[];
+
   @ApiProperty({ type: [TenantChartLibraryEntryDto] })
   charts!: TenantChartLibraryEntryDto[];
 }

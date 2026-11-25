@@ -16,6 +16,7 @@ import { PmRunPipeline } from '../pipeline/pm-run-pipeline';
 import { PmAgentPipelineStore } from '../pipeline/pm-agent-pipeline.store';
 import { PmAgentRunSchedulerService } from '../service/pm-agent-run.service';
 import { cardVersionHash } from '../util/card-hash.util';
+import { roadmapFilingRules } from '../learning/pm-context';
 import {
   callTool,
   evidenceIdsIn,
@@ -569,6 +570,23 @@ describe('filing to the roadmap: what a card must be before an admin sees it', (
     expect(
       h.store.cards.filter((c) => c.kind === PmCardKind.RECOMMENDATION),
     ).toHaveLength(0);
+  });
+
+  it('the critic reads a cited figure that sits past the first few hundred characters of its evidence', async () => {
+    // prod 2026-11-25: the critic saw 600 characters of an analytics result the lane had read in
+    // full, and refused "116 of 298" as unsupported.
+    const h = harness(oneRec({ pass: true, reasons: [] }));
+    h.toolbox.payloadText = `${'x'.repeat(3000)} activated 116 of 298 ${'y'.repeat(500)}`;
+    await h.run();
+    const critic = h.llm.calls.find((call) => call.kind === 'critic');
+    expect(JSON.stringify(critic?.messages)).toContain('activated 116 of 298');
+  });
+
+  it('lanes are told the description shape that meets strategic fit and the success signal', () => {
+    const rules = roadmapFilingRules(['Engagement']);
+    expect(rules).toMatch(/This serves <bet>/);
+    expect(rules).toMatch(/We will know it worked when/);
+    expect(rules).toMatch(/out of scope/);
   });
 
   it('a missing readiness answer fails closed', async () => {

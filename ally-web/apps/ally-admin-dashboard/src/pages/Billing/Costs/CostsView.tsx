@@ -32,7 +32,7 @@ const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({
  * Ally admin → Costs (CR1 §A4): totals, the daily trend, breakdowns with an assistant drill-down,
  * cost per customer, alerts, fixed costs, the alert settings and an export. Dollars only here.
  */
-export const CostsView: React.FC = () => {
+export const CostsView: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const { data: overview, isLoading, isError } = useGetCostOverviewQuery();
   const { data: trend = [] } = useGetCostTrendQuery(30);
   const [preset, setPreset] = useState<PeriodPreset>("month");
@@ -62,8 +62,8 @@ export const CostsView: React.FC = () => {
     >
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-secondary text-2xl text-typography-900">{C.title}</h1>
-          <p className="max-w-3xl pt-1 text-sm text-typography-700">{C.intro}</p>
+          {!embedded && <h1 className="font-secondary text-2xl text-typography-900">{C.title}</h1>}
+          {!embedded && <p className="max-w-3xl pt-1 text-sm text-typography-700">{C.intro}</p>}
         </div>
         <Button
           variant={ButtonVariant.TERTIARY}

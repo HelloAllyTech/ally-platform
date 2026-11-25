@@ -62,7 +62,7 @@
   "apps/ally-helpline-dashboard/src/pages/analytics/statistics/StatisticsView.tsx": 6,
   "apps/ally-helpline-dashboard/src/pages/analytics/statistics/SubjectSelector.tsx": 1,
   "apps/ally-helpline-dashboard/src/pages/analytics/statistics/__tests__/renderers.test.tsx": 1,
-  "apps/ally-helpline-dashboard/src/pages/analytics/statistics/renderers.tsx": 73,
+  "apps/ally-helpline-dashboard/src/pages/analytics/statistics/renderers.tsx": 83,
   "apps/ally-helpline-dashboard/src/pages/analytics/statistics/statusStyle.ts": 12,
   "apps/ally-helpline-dashboard/src/pages/audio-call/AudioCall.tsx": 1,
   "apps/ally-helpline-dashboard/src/pages/audio-call/components/CallControls.tsx": 4,

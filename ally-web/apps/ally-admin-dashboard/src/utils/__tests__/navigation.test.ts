@@ -219,33 +219,28 @@ describe("deriveNavigationItems", () => {
     expect(ids).toContain(SIDEBAR_ITEMS.BUG_HUNTER_V2);
   });
 
-  // CR1: Models and Costs are the only screens with dollars; `manage_costs` alone opens them.
-  it("shows Models, Costs and Plans, next to Language Models, only with manage_costs", () => {
+  // The cost screens (Models, Costs, Plans, Credits) are sections of Assistants admin now: the
+  // costs toggle alone opens the tab, and without any grant the tab is gone.
+  it("shows one Assistants admin item, not the old Models, Costs, Plans and Credits items", () => {
+    // Permission-gated items need a loaded permission list, so give the staff member one.
     const withCosts = deriveNavigationItems({
-      permissions: [],
+      permissions: [Permissions.VIEW_USERS],
       features: [FeatureToggleKey.MANAGE_LLM_MODEL_CATALOG, FeatureToggleKey.MANAGE_COSTS],
       savedOrder: undefined,
     });
-    expect(withCosts.map(i => i.id)).toEqual([
-      SIDEBAR_ITEMS.LLM_MODEL_CATALOG,
-      SIDEBAR_ITEMS.BILLING_MODELS,
-      SIDEBAR_ITEMS.BILLING_COSTS,
-      SIDEBAR_ITEMS.BILLING_PLANS,
-      SIDEBAR_ITEMS.BILLING_CREDITS,
-    ]);
-    expect(withCosts[1].path).toBe(ROUTES.BILLING_MODELS);
-    expect(withCosts[2].path).toBe(ROUTES.BILLING_COSTS);
-    expect(withCosts[3].path).toBe(ROUTES.BILLING_PLANS);
+    const costIds = withCosts.map(i => i.id);
+    expect(costIds).toContain(SIDEBAR_ITEMS.ASSISTANTS_ADMIN);
+    expect(costIds.filter(id => id.startsWith("billing-"))).toEqual([]);
+    expect(withCosts.find(i => i.id === SIDEBAR_ITEMS.ASSISTANTS_ADMIN)?.path).toBe(
+      ROUTES.ASSISTANTS_ADMIN,
+    );
 
     const ids = deriveNavigationItems({
       permissions: [Permissions.EDIT_SCENARIO, Permissions.VIEW_USERS],
       features: ALL_FEATURE_GATED_KEYS.filter(key => key !== FeatureToggleKey.MANAGE_COSTS),
       savedOrder: undefined,
     }).map(i => i.id);
-    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_MODELS);
-    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_COSTS);
-    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_PLANS);
-    expect(ids).not.toContain(SIDEBAR_ITEMS.BILLING_CREDITS);
+    expect(ids).not.toContain(SIDEBAR_ITEMS.ASSISTANTS_ADMIN);
   });
 
   describe("org-toggle tier (a tenant's own admins)", () => {
@@ -411,41 +406,45 @@ describe("deriveNavigationItems", () => {
     expect(ids).toContain(SIDEBAR_ITEMS.ANALYTICS);
   });
 
-  // Stage 2: the Defaults, Library and Connectors screens moved off the builder's home to a staff
-  // page; the sidebar entry needs system:access AND Chatbots, so a tenant's own admin never sees it.
-  describe("Chatbot defaults (staff only)", () => {
+  // Assistants admin is Ally staff's one home for the Assistants product. Any one of its sections'
+  // grants opens the tab (costs toggle, safety-pack curator grant, system access); each section
+  // re-checks its own grant inside the page. A tenant's own admin never sees it.
+  describe("Assistants admin (staff only)", () => {
     const ids = (permissions: Permissions[], features: string[]) =>
       deriveNavigationItems({ permissions, features, savedOrder: undefined }).map(i => i.id);
 
-    it("shows for staff with the system grant and Chatbots on, linking the staff route", () => {
+    it("links the staff route", () => {
       const result = deriveNavigationItems({
         permissions: [Permissions.SYSTEM_ACCESS],
         features: [FeatureToggleKey.WHATSAPP_BOT, FeatureToggleKey.ANALYTICS],
         savedOrder: undefined,
       });
-      const item = result.find(i => i.id === SIDEBAR_ITEMS.ASSISTANT_DEFAULTS);
-      expect(item?.path).toBe(ROUTES.ASSISTANT_DEFAULTS);
+      expect(result.find(i => i.id === SIDEBAR_ITEMS.ASSISTANTS_ADMIN)?.path).toBe(
+        ROUTES.ASSISTANTS_ADMIN,
+      );
     });
 
-    it("is hidden without the system grant, and shown with it even when Chatbots is off", () => {
+    it.each([
+      ["the system grant", [Permissions.SYSTEM_ACCESS], [FeatureToggleKey.ANALYTICS]],
+      ["the curator grant", [Permissions.MANAGE_SAFETY_PACKS], [FeatureToggleKey.ANALYTICS]],
+      ["the costs toggle", [Permissions.VIEW_USERS], [FeatureToggleKey.MANAGE_COSTS]],
+    ])("shows on %s alone, without the Chatbots toggle", (_label, permissions, features) => {
+      expect(ids(permissions, features)).toContain(SIDEBAR_ITEMS.ASSISTANTS_ADMIN);
+    });
+
+    it("shows on the costs toggle before any permission has loaded", () => {
+      expect(ids([], [FeatureToggleKey.MANAGE_COSTS])).toContain(SIDEBAR_ITEMS.ASSISTANTS_ADMIN);
+    });
+
+    it("is hidden without any of those grants, even for a Chatbots builder", () => {
       expect(ids([Permissions.EDIT_WHATSAPP_BOT], [FeatureToggleKey.WHATSAPP_BOT])).not.toContain(
-        SIDEBAR_ITEMS.ASSISTANT_DEFAULTS,
+        SIDEBAR_ITEMS.ASSISTANTS_ADMIN,
       );
-      expect(ids([Permissions.SYSTEM_ACCESS], [FeatureToggleKey.ANALYTICS])).toContain(
-        SIDEBAR_ITEMS.ASSISTANT_DEFAULTS,
-      );
-    });
-
-    it("shows Safety packs on the curator grant alone, without the Chatbots toggle", () => {
-      expect(ids([Permissions.MANAGE_SAFETY_PACKS], [FeatureToggleKey.ANALYTICS])).toContain(
-        SIDEBAR_ITEMS.SAFETY_PACKS,
-      );
-      expect(ids([], [FeatureToggleKey.WHATSAPP_BOT])).not.toContain(SIDEBAR_ITEMS.SAFETY_PACKS);
     });
 
     it("never shows to a Chatbots-only login, even one holding every permission", () => {
       expect(ids(Object.values(Permissions), [FeatureToggleKey.WHATSAPP_BOT])).not.toContain(
-        SIDEBAR_ITEMS.ASSISTANT_DEFAULTS,
+        SIDEBAR_ITEMS.ASSISTANTS_ADMIN,
       );
     });
   });

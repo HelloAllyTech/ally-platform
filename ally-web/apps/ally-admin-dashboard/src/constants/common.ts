@@ -1520,6 +1520,8 @@ export const ROUTES = {
   INBOX: "/inbox",
   /** Staff only: the defaults every chatbot inherits, shared quick replies, library, numbers. */
   ASSISTANT_DEFAULTS: "/admin/assistants-defaults",
+  /** Ally staff's one home for running the Assistants product (`/assistants-admin/<section>`). */
+  ASSISTANTS_ADMIN: "/assistants-admin",
   CHATBOT_NEW_SESSION: (draftId: string) => `/assistants/new/${draftId}`,
   /** There is no sign-up (A1): these redirect to the login screen. */
   SIGN_UP: "/signup",

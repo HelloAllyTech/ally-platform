@@ -92,6 +92,8 @@ export interface StatisticsChartLibrary {
   charts: StatisticsChartEntry[];
   /** The tabs that show charts. Absent from a backend older than the tabs. */
   views?: StatisticsViewConfig[];
+  /** Chart ids pinned to For you until the person pins their own. */
+  defaultPins?: string[];
 }
 
 export interface StatisticsChartResponse<T = unknown> {
@@ -338,6 +340,41 @@ export interface SkillTrendData {
   skills: Array<{ skill: string; points: Array<{ slice: number; level: number }> }>;
 }
 
+/** TSQ-049 */
+export interface NewCharacterData {
+  learners: number;
+  pairs: number;
+  /** Helping-skills level (1 to 4) with a familiar character; null while under the floor. */
+  familiar: number | null;
+  unfamiliar: number | null;
+  change: number | null;
+  up: number;
+  down: number;
+  same: number;
+}
+
+/** TSQ-050 */
+export interface HelpfulBehavioursData {
+  learners: number;
+  rows: Array<{
+    code: string;
+    skill: string;
+    text: string;
+    beforePercent: number;
+    afterPercent: number;
+  }>;
+}
+
+/** TSQ-051 */
+export interface UnhelpfulTrendData {
+  points: Array<{ slice: number; sharePercent: number; assessments: number }>;
+}
+
+/** TSQ-055 */
+export interface ScoreByAttemptData {
+  steps: Array<{ attempt: number; learners: number; averageScore: number }>;
+}
+
 /** One finding on For you: what a rule found in the organisation's own charts. */
 export interface StatisticsInsight {
   /** Names the finding and the week it was found in; used to put it away. */
@@ -377,4 +414,68 @@ export interface LearnerCoursesData {
     status: "completed" | "inProgress" | "notStarted";
     lastActivityAt: string | null;
   }>;
+}
+
+/** Why Ally staff might get in touch with an organisation (Customers tab). */
+export type CustomerReasonId =
+  | "neverActive"
+  | "quiet"
+  | "neverStarted"
+  | "activityDown"
+  | "reviewsBehind"
+  | "creditsNearLimit"
+  | "lowRating"
+  | "activityUp";
+
+export interface CustomerReason {
+  id: CustomerReasonId;
+  polarity: "attention" | "celebrate";
+  severity: number;
+  /** The numbers the sentence is written from. */
+  params: Record<string, number>;
+}
+
+export interface CustomerOrgRow {
+  tenantId: string;
+  name: string;
+  code: string | null;
+  learners: number;
+  activeLearners28d: number;
+  completedLast28d: number;
+  completedPrev28d: number;
+  lastCompletedAt: string | null;
+  daysSinceLastCompleted: number | null;
+  /** Completed sessions per week, on the shared axis. */
+  trend: number[];
+  creditUtilisationPct: number | null;
+  ratingsAverage90d: number | null;
+  ratingsCount90d: number;
+  reviewSharePercent: number | null;
+  neverStartedLearners: number;
+  belowFloor: boolean;
+  reasons: CustomerReason[];
+  score: number;
+  contactedAt: string | null;
+  contactNote: string | null;
+  recentlyContacted: boolean;
+}
+
+export interface CustomerMover {
+  tenantId: string;
+  name: string;
+  from: number;
+  to: number;
+}
+
+export interface CustomerOverview {
+  generatedAt: string;
+  trendBuckets: string[];
+  summary: { orgs: number; activeOrgs: number; quietOrgs: number; needsOutreach: number };
+  orgs: CustomerOrgRow[];
+  movers: { up: CustomerMover[]; down: CustomerMover[] };
+}
+
+export interface RecordCustomerOutreachRequest {
+  tenantId: string;
+  note?: string;
 }

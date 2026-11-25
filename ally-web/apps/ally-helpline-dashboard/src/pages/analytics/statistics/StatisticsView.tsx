@@ -148,6 +148,8 @@ export const StatisticsView: FunctionComponent<StatisticsViewProps> = ({
 
   const subjectKind = view.subject;
   const needsSubject = !!subjectKind && !subjectId;
+  // Each section is its own grid, so "dense" packing can fill a gap with a card of the
+  // same section only: a card can never jump up past another section's heading.
   const gridClass = "grid grid-cols-1 xl:grid-cols-2 gap-4 grid-flow-row-dense";
   const spanClass = (entry: StatisticsChartEntry) => (entry.size === "wide" ? "xl:col-span-2" : "");
 
@@ -185,12 +187,16 @@ export const StatisticsView: FunctionComponent<StatisticsViewProps> = ({
   );
 
   const content = (
-    <div className={gridClass} data-testid="statistics-grid">
+    <div className="flex flex-col gap-4" data-testid="statistics-grid">
       {runs.map((run, index) => {
         const showCards = !run.subject || !needsSubject || editing;
         const firstSubjectRun = run.subject && !runs.slice(0, index).some(r => r.subject);
         return (
-          <div key={`${run.section}-${index}`} className="contents">
+          <div
+            key={`${run.section}-${index}`}
+            className={gridClass}
+            data-testid={`statistics-run-${run.section}`}
+          >
             {firstSubjectRun && subjectKind && runs.slice(0, index).some(r => !r.subject) && (
               <h2
                 className="col-span-full mt-2 border-t border-[#cfc9bb] pt-4 font-secondary text-2xl font-medium text-typography-900 xl:col-span-2"

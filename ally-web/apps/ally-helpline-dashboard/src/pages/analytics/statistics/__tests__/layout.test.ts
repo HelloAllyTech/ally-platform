@@ -178,6 +178,17 @@ describe("resolvePins", () => {
     expect(resolvePins(undefined, offered, canPin)).toEqual([]);
   });
 
+  it("starts from the defaults for a person who never saved a list, and only those that can be filled", () => {
+    const withUnavailable = [chart("TSQ-001"), chart("TSQ-002", "unavailable")];
+    expect(resolvePins(undefined, withUnavailable, canPin, ["TSQ-001", "TSQ-002"])).toEqual([
+      "TSQ-001",
+    ]);
+  });
+
+  it("keeps an emptied list empty instead of bringing the defaults back", () => {
+    expect(resolvePins([], offered, canPin, ["TSQ-001"])).toEqual([]);
+  });
+
   it("keeps pinned charts in order, with their filters, once each", () => {
     expect(resolvePins(["TSQ-002", "TSQ-001?course=abc", "TSQ-002"], offered, canPin)).toEqual([
       "TSQ-002",

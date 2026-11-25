@@ -7,7 +7,11 @@ import {
   PmEvidenceRef,
 } from '../pipeline/pm-pipeline.types';
 import { looksLikeInjection } from '../util/fence.util';
-import { scrubForPublic } from '../util/scrub.util';
+import {
+  LEAK_SCRUB_RULES,
+  PUBLIC_SCRUB_RULES,
+  scrubHits,
+} from '../util/scrub.util';
 import { similarity } from '../util/text-similarity.util';
 
 export interface PmGateVerdict {
@@ -44,8 +48,9 @@ export function candidateText(candidate: Pick<PmCandidate, 'payload'>): string {
  *    measurable-metric catalog entry with that entry's params — impact/metric-catalog.ts);
  *  - every cited evidence id exists AND was fetched in this run;
  *  - the roadmap entry names a product goal that exists on the roadmap right now;
- *  - nothing a public-repo scrubber would redact (tenant names, contact details, secrets,
- *    internal hosts, long quoted user content): an accepted card is filed to the roadmap,
+ *  - in the roadmap entry (`opportunity.*`, the only part filed and published), nothing a
+ *    public-repo scrubber would redact; in the admin-only rest of the card, no real leak
+ *    (tenant names, emails, secrets, internal URLs). An accepted card is filed to the roadmap,
  *    which is published, so a candidate that needs redacting is dropped, not silently edited;
  *  - nothing instruction-shaped (a card becomes a roadmap entry other agents read).
  *
@@ -85,8 +90,19 @@ export function deterministicGate(
   }
 
   for (const { path, text } of strings(p)) {
-    if (scrubForPublic(text, { tenantNames }) !== text) {
-      reasons.push(`${path}: contains text a public PRD must not carry`);
+    // Only the roadmap entry (opportunity.*) is published; every other field stays on the
+    // admin-only card, where code-like text (ids, migration timestamps) is normal. Those keep
+    // the real-leak rules only (prod 2026-11-24: a gpt-5 card died on plan.defaultsChosen).
+    const published = path.startsWith('opportunity.');
+    const hits = scrubHits(
+      text,
+      { tenantNames },
+      published ? PUBLIC_SCRUB_RULES : LEAK_SCRUB_RULES,
+    );
+    if (hits.length) {
+      reasons.push(
+        `${path}: contains text a public PRD must not carry (${hits.join(', ')})`,
+      );
     }
     if (looksLikeInjection(text)) {
       reasons.push(`${path}: instruction-shaped text`);

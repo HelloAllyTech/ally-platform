@@ -51,7 +51,11 @@ export const SCOPE_AWARE_CHARTS: ReadonlySet<string> = new Set([
   'TSQ-042', // Course performance since launch
   'TSQ-045', // Module funnel
   'TSQ-046', // Time per module
+  'TSQ-049', // Score with a new character
+  'TSQ-050', // Helpful behaviours before and after
+  'TSQ-051', // Unhelpful responses over time
   'TSQ-053', // Roleplay length and attempts
+  'TSQ-055', // Score by attempt number
   'TSQ-065', // Skill trend
   'TSQ-063', // Practice rhythm
   'TSQ-064', // Progress in each course

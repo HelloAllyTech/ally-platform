@@ -4029,7 +4029,16 @@
       "skillTrendFlat": "No skill has risen yet across these slices.",
       "courseFacts": "{{completed}} of {{enrolled}} learners have finished this course.",
       "courseFactsNone": "No learner has been enrolled in this course yet.",
-      "learnerCourses": "{{done}} of {{total}} courses finished."
+      "learnerCourses": "{{done}} of {{total}} courses finished.",
+      "newCharacter": "Skills held up with a new character: {{familiar}} with a familiar one, {{unfamiliar}} with a new one (out of 4).",
+      "newCharacterDip": "Skills dipped with a new character: {{familiar}} with a familiar one, {{unfamiliar}} with a new one (out of 4).",
+      "behaviours": "“{{text}}” rose from {{from}}% to {{to}}% of learners.",
+      "behavioursFlat": "No helpful behaviour has become clearly more common yet.",
+      "unhelpfulDown": "Unhelpful responses fell from {{first}}% to {{latest}}% of practices.",
+      "unhelpfulUp": "Unhelpful responses rose from {{first}}% to {{latest}}% of practices.",
+      "unhelpfulFlat": "Unhelpful responses stayed at about {{latest}}% of practices.",
+      "attempts": "Learners who tried a roleplay again scored {{first}} the first time and {{latest}} by the latest attempt.",
+      "attemptsFlat": "Scores did not rise with repeat attempts: {{first}} the first time, {{latest}} by the latest."
     },
     "table": {
       "learner": "Learner",
@@ -4278,7 +4287,8 @@
       "roleplays": "Roleplays",
       "learning": "Learning",
       "progress": "Progress",
-      "allLearners": "All learners"
+      "allLearners": "All learners",
+      "acrossCourses": "Across courses"
     },
     "subject": {
       "label": {
@@ -4308,6 +4318,22 @@
         "morning": "Good morning.",
         "afternoon": "Good afternoon.",
         "evening": "Good evening."
+      },
+      "summary": {
+        "activity_one": "In the last 30 days, {{active}} of {{registered}} learners practised and {{count}} session was completed.",
+        "activity_other": "In the last 30 days, {{active}} of {{registered}} learners practised and {{count}} sessions were completed.",
+        "needsLook_one": "{{count}} thing needs a look today. It is listed below.",
+        "needsLook_other": "{{count}} things need a look today. They are listed below.",
+        "nothingNeedsLook": "Nothing needs a look today.",
+        "celebrateOnly": "Nothing needs a look today, and there is good news below.",
+        "since": {
+          "changed_one": "Since {{date}}: {{added}} new and {{resolved}} resolved. {{count}} still needs a look.",
+          "changed_other": "Since {{date}}: {{added}} new and {{resolved}} resolved. {{count}} still need a look.",
+          "allClear": "Since {{date}}: {{resolved}} resolved. Nothing needs a look now.",
+          "same_one": "Nothing new since {{date}}. {{count}} still needs a look.",
+          "same_other": "Nothing new since {{date}}. {{count}} still need a look.",
+          "sameClear": "Nothing new since {{date}}, and nothing needs a look."
+        }
       }
     },
     "pins": {
@@ -4423,6 +4449,122 @@
         "completed": "Completed",
         "inProgress": "In progress",
         "notStarted": "Not started"
+      }
+    },
+    "newCharacter": {
+      "none": "Not enough learners have moved from a familiar character to a new one yet.",
+      "familiar": "With a familiar character",
+      "unfamiliar": "The first time with a new character",
+      "value": "{{value}} of 4",
+      "learners_one": "Based on {{count}} learner",
+      "learners_other": "Based on {{count}} learners"
+    },
+    "behaviours": {
+      "none": "Not enough learners have two scored practices to compare yet.",
+      "first": "First practice",
+      "latest": "Latest practice",
+      "learners_one": "Share of {{count}} learner seen doing it",
+      "learners_other": "Share of {{count}} learners seen doing it"
+    },
+    "unhelpful": {
+      "none": "Not enough scored practice yet to draw a trend.",
+      "share": "Practices with an unhelpful response (%)",
+      "slice": "Practice slice"
+    },
+    "attempts": {
+      "none": "Not enough repeat attempts to compare yet.",
+      "step1": "1st attempt",
+      "step2": "2nd attempt",
+      "step3": "3rd attempt",
+      "step4": "4th attempt or later",
+      "score": "Average score {{score}}",
+      "learners_one": "{{count}} learner",
+      "learners_other": "{{count}} learners"
+    },
+    "customers": {
+      "strip": {
+        "orgs": "Organisations",
+        "active": "Active in the last 28 days",
+        "quiet": "Gone quiet",
+        "needs": "Need a message"
+      },
+      "heading": {
+        "reach": "Who to reach out to",
+        "up": "Biggest rises",
+        "down": "Biggest falls",
+        "all": "All organisations"
+      },
+      "reachNone": "No organisation needs a message today.",
+      "learnersLine_one": "{{count}} learner, {{active}} active in the last 28 days",
+      "learnersLine_other": "{{count}} learners, {{active}} active in the last 28 days",
+      "reasons": {
+        "neverActive_one": "{{count}} learner has signed up and none has completed a session.",
+        "neverActive_other": "{{count}} learners have signed up and none has completed a session.",
+        "quiet": "No completed session for {{days}} days.",
+        "neverStarted_one": "{{count}} learner ({{percent}}%) has never completed a session.",
+        "neverStarted_other": "{{count}} learners ({{percent}}%) have never completed a session.",
+        "activityDown": "Sessions fell from {{from}} to {{to}} against the 28 days before.",
+        "reviewsBehind": "Only {{percent}}% of the last 28 days' sessions were reviewed.",
+        "creditsNearLimit": "{{percent}}% of the credits are used.",
+        "lowRating_one": "Average rating {{average}} from {{count}} rating.",
+        "lowRating_other": "Average rating {{average}} from {{count}} ratings.",
+        "activityUp": "Sessions rose from {{from}} to {{to}}: worth a word of thanks."
+      },
+      "contactedOn": "Contacted {{date}}",
+      "draft": "Draft message",
+      "hideDraft": "Hide draft",
+      "markContacted": "Mark as contacted",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Could not copy. Select the text and copy it yourself.",
+      "noteLabel": "A note for the team (optional)",
+      "save": "Save",
+      "saveFailed": "Could not save. Try again.",
+      "cancel": "Cancel",
+      "moverLine": "{{from}} → {{to}} sessions",
+      "columns": {
+        "name": "Organisation",
+        "learners": "Learners",
+        "active": "Active (28 days)",
+        "sessions": "Sessions (28 days)",
+        "lastActive": "Last session",
+        "credits": "Credits used",
+        "rating": "Rating",
+        "trend": "12 weeks"
+      },
+      "never": "Never",
+      "daysAgo_one": "{{count}} day ago",
+      "daysAgo_other": "{{count}} days ago",
+      "updated": "Updated at {{time}}",
+      "cards": {
+        "strip": "Organisations at a glance",
+        "reach": "Who to reach out to",
+        "up": "Biggest rises",
+        "down": "Biggest falls",
+        "table": "All organisations",
+        "quiet": "Gone quiet",
+        "credits": "Credits near the limit",
+        "lowRating": "Low ratings and reviews falling behind"
+      },
+      "listNone": "Nothing here today.",
+      "empty": "No cards. Choose Customise to add some.",
+      "library": "Cards you can add",
+      "libraryNone": "Every card is on your page.",
+      "removeAria": "Remove {{title}}",
+      "summary": {
+        "activity_one": "{{active}} of {{count}} organisation had learners practising in the last 28 days.",
+        "activity_other": "{{active}} of {{count}} organisations had learners practising in the last 28 days.",
+        "needs_one": "{{count}} organisation needs a message today. It is listed below.",
+        "needs_other": "{{count}} organisations need a message today. They are listed below.",
+        "none": "No organisation needs a message today.",
+        "since": {
+          "changed_one": "Since {{date}}: {{added}} new and {{resolved}} resolved. {{count}} still needs a message.",
+          "changed_other": "Since {{date}}: {{added}} new and {{resolved}} resolved. {{count}} still need a message.",
+          "allClear": "Since {{date}}: {{resolved}} resolved. No organisation needs a message now.",
+          "same_one": "Nothing new since {{date}}. {{count}} still needs a message.",
+          "same_other": "Nothing new since {{date}}. {{count}} still need a message.",
+          "sameClear": "Nothing new since {{date}}, and no organisation needs a message."
+        }
       }
     }
   }

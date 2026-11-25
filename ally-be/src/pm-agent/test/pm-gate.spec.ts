@@ -60,6 +60,44 @@ describe('gate layer 1 — deterministic', () => {
     expect(gate(rec())).toEqual({ pass: true, reasons: [] });
   });
 
+  describe('privacy: full public filter on the roadmap entry, leak rules elsewhere', () => {
+    const codeLike =
+      'Add migration 1988000000000-FirstPracticeTile keyed by toggle 0b7e7c1e-2f7a-4a43-9a6b-2a6d1f1c0042';
+    const withDefault = (line: string) =>
+      rec({
+        plan: {
+          ...recFor(0, [E1]).plan,
+          defaultsChosen: ['Keep the API shape: nothing depends on it', line],
+        },
+      });
+
+    it('lets code-like text through in an admin-only field', () => {
+      // Prod 2026-11-24: a gpt-5 card died on one plan.defaultsChosen line.
+      expect(gate(withDefault(codeLike))).toEqual({ pass: true, reasons: [] });
+    });
+
+    it('still refuses the same text in the published description, naming the rule', () => {
+      const published = rec({
+        opportunity: {
+          ...recFor(0, [E1]).opportunity,
+          description: `${recFor(0, [E1]).opportunity.description} ${codeLike}`,
+        },
+      });
+      const reasons = gate(published).reasons.join(' ');
+      expect(reasons).toContain('opportunity.description');
+      expect(reasons).toMatch(/\((?:phone|id)(?:, (?:phone|id))*\)/);
+    });
+
+    it('still refuses a real leak in an admin-only field', () => {
+      const tenant = gate(withDefault('Pilot it with Acme Health first'));
+      expect(tenant.reasons.join()).toContain(
+        'plan.defaultsChosen[1]: contains text a public PRD must not carry (tenant_name)',
+      );
+      const email = gate(withDefault('Ask ops@example.com to enable it'));
+      expect(email.reasons.join()).toContain('(email)');
+    });
+  });
+
   it("never treats the platform's own organisation as a customer to redact", () => {
     // Prod 2026-11-24: Ally's own org is a `tenants` row, so `ally-be` and every repo path
     // were redacted and every recommendation failed. The real customer name still is.
@@ -364,9 +402,118 @@ describe('lane-level candidate check', () => {
       PmLane.STRATEGY_CONTENT,
       new Set([E1]),
     );
-    // The top-level size stays; the stray one is left in plan, where validation refuses it.
+    // Prod 2026-11-24: `size` beside AND inside plan. The top-level value wins; the copy in
+    // plan is dropped (never merged), so the card is no longer discarded for it.
+    expect(out.errors).toEqual([]);
+    expect(out.candidate?.payload.size).toBe(good.size);
+    expect(out.candidate?.payload.plan).not.toHaveProperty('size');
+  });
+
+  it('moves productGoal and effort written beside opportunity into it', () => {
+    const good = recFor(0, [E1]);
+    const { productGoal, effort, ...entry } = good.opportunity;
+    const out = checkCandidate(
+      {
+        kind: 'recommendation',
+        category: 'product',
+        recommendation: {
+          ...good,
+          opportunity: entry,
+          productGoal,
+          effort: String(effort).toUpperCase(),
+        },
+      },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
+    // Local and prod 2026-11-25 (gpt-5): half the lanes spent their repair round on this.
+    expect(out.errors).toEqual([]);
+    expect(out.candidate?.payload.opportunity).toEqual(good.opportunity);
+    expect(out.candidate?.payload).not.toHaveProperty('productGoal');
+    expect(out.candidate?.payload).not.toHaveProperty('effort');
+  });
+
+  it('moves dotted "opportunity.<field>" keys into the entry', () => {
+    const good = recFor(0, [E1]);
+    const { productGoal, effort, description } = good.opportunity;
+    const out = checkCandidate(
+      {
+        kind: 'recommendation',
+        category: 'product',
+        recommendation: {
+          ...good,
+          opportunity: undefined,
+          'opportunity.description': description,
+          'opportunity.productGoal': productGoal,
+          'opportunity.effort': effort,
+        },
+      },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
+    expect(out.errors).toEqual([]);
+    expect(out.candidate?.payload.opportunity).toEqual(good.opportunity);
+  });
+
+  it("keeps the entry's own productGoal over a stray copy beside it", () => {
+    const good = recFor(0, [E1]);
+    const out = checkCandidate(
+      {
+        kind: 'recommendation',
+        category: 'product',
+        recommendation: { ...good, productGoal: 'Something else' },
+      },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
+    expect(out.errors).toEqual([]);
+    expect(out.candidate?.payload.opportunity.productGoal).toBe(
+      good.opportunity.productGoal,
+    );
+  });
+
+  it('accepts a list sent as one string and trims an over-long supporting list', () => {
+    const good = recFor(0, [E1]);
+    const many = Array.from({ length: 25 }, (_, i) => `Option ${i + 1}`);
+    const out = checkCandidate(
+      {
+        kind: 'recommendation',
+        category: 'product',
+        recommendation: {
+          ...good,
+          alternativesDropped: 'A larger redesign',
+          plan: { ...good.plan, steps: many },
+        },
+      },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
+    expect(out.errors).toEqual([]);
+    expect(out.candidate?.payload.alternativesDropped).toEqual([
+      'A larger redesign',
+    ]);
+    expect(out.candidate?.payload.plan.steps).toHaveLength(20);
+  });
+
+  it('still refuses meaning-bearing slips: too many change bullets, an over-long description', () => {
+    const good = recFor(0, [E1]);
+    const out = checkCandidate(
+      {
+        kind: 'recommendation',
+        category: 'product',
+        recommendation: {
+          ...good,
+          change: ['One', 'Two', 'Three', 'Four'],
+          opportunity: { ...good.opportunity, description: 'x'.repeat(1001) },
+        },
+      },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
     expect(out.candidate).toBeUndefined();
-    expect(out.errors.join(' ')).toContain('plan.size');
+    const errors = out.errors.join(' ');
+    expect(errors).toContain('change');
+    expect(errors).toContain('opportunity.description');
   });
 
   it('forces the original category on a revision', () => {
