@@ -1,7 +1,8 @@
 # TF1: new wording, for one approval
 
 Every new line a person or an owner can see, from the TF1 fixes. In code each one is marked
-`// COPY: needs approval`. Nothing here ships to customers until you approve it.
+`// COPY: needs approval`. **Approved on 25 Nov**, with one change in F19 (a fire or someone
+trapped no longer says "highest place"; only a flood does), applied in round 2.
 
 | Issue | Where | Text |
 |---|---|---|
@@ -26,9 +27,10 @@ Every new line a person or an owner can see, from the TF1 fixes. In code each on
 | S5 | the same, its link | Open their latest chat |
 | S5 | Inbox badge for a chat the crisis check flagged (was "Needs a person · undefined") | Needs a person · May be at risk |
 | F4 | Create → Sources, a file held for personal details (was a raw "needs_review") | Waiting for you: check it for personal details below |
-| F19 | emergency reply, a rescue (flood, fire, trapped), India | This sounds like an emergency. Call 112 now and ask for rescue. Move to the safest, highest place you can and stay there until help reaches you. |
+| F19 | emergency reply, a flood or rising water, India | This sounds like an emergency. Call 112 now and ask for rescue. Move to the safest, highest place you can and stay there until help reaches you. |
+| F19 | emergency reply, a fire or someone trapped, India (changed on approval, 25 Nov) | This sounds like an emergency. Call 112 now and ask for rescue. Get to the safest place you can and stay there until help reaches you. |
+| F19 | the same three outside India | "…Call your local emergency number now and ask for rescue…" (flood: "the safest, highest place"; fire or trapped: "the safest place") / "…Call your local emergency number now for an ambulance…" |
 | F19 | emergency reply, someone collapsed or not breathing, India | This sounds like an emergency. Call 112 or 108 now for an ambulance, and stay with them. The person on the call will tell you what to do until help arrives. |
-| F19 | the same two outside India | "…Call your local emergency number now and ask for rescue…" / "…Call your local emergency number now for an ambulance…" |
 | F19 | the same in Hindi and Hinglish | in `ally-be/src/bot-draft/safety-pack/safety-packs.ts` (`KIND_FIRST`) |
 | F19 | holding line after an emergency (was the self-harm help line), India | Someone from the team will reply to you. If anyone is in danger, call 112 now. |
 | F19 | the same outside India, Hindi and Hinglish | in `ally-be/src/chatbot/safety/crisis-copy.ts` (`EMERGENCY_HOLDING_COPY`) |
