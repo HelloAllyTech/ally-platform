@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -50,6 +51,17 @@ export class EnhanceScenarioFieldDto {
   @IsString()
   @IsNotEmpty()
   currentValue!: string;
+
+  @ApiProperty({
+    description:
+      'What the field is, in words: required for the generic `text` field and the `settings` ' +
+      'object (which lists each setting and its allowed values); ignored for the named fields.',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(4000)
+  fieldLabel?: string;
 
   @ApiProperty({
     description:

@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -229,6 +229,12 @@ export class AskAnalyticsAgentResponseDto {
 
   @ApiProperty({ description: 'Suggested next questions', type: [String] })
   followUps!: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'True when `answer` is the agent asking the user to confirm something before it can answer. The turn is saved as `clarify`, and the audit treats it as part of the exchange behind the next answer rather than as an answer.',
+  })
+  needsUserInput?: boolean;
 
   @ApiProperty({
     description: 'Query execution time in milliseconds (0 if it never ran)',

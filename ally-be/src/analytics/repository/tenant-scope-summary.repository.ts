@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { inModuleOrder } from '../util/module-order.util';
 import { sessionDurationMsExpr } from '../util/session-eligibility.util';
 
 /** One number on a facts card. `format` tells the page how to write it. */
@@ -445,12 +446,14 @@ export class TenantScopeSummaryRepository {
       [tenantId, tenantCode, courseId],
     );
     return {
-      rows: rows.map((r) => ({
-        sectionId: r.section_id,
-        title: r.title,
-        reached: Number(r.reached),
-        completed: Number(r.completed),
-      })),
+      rows: inModuleOrder(
+        rows.map((r) => ({
+          sectionId: r.section_id,
+          title: r.title,
+          reached: Number(r.reached),
+          completed: Number(r.completed),
+        })),
+      ),
     };
   }
 
@@ -493,12 +496,14 @@ export class TenantScopeSummaryRepository {
       [tenantId, tenantCode, courseId],
     );
     return {
-      rows: rows.map((r) => ({
-        sectionId: r.section_id,
-        title: r.title,
-        medianMinutes: Math.round(Number(r.median_minutes)),
-        learners: Number(r.learners),
-      })),
+      rows: inModuleOrder(
+        rows.map((r) => ({
+          sectionId: r.section_id,
+          title: r.title,
+          medianMinutes: Math.round(Number(r.median_minutes)),
+          learners: Number(r.learners),
+        })),
+      ),
     };
   }
 

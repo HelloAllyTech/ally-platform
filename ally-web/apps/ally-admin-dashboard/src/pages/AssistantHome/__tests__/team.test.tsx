@@ -103,7 +103,7 @@ describe("role checkboxes", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Keep at least one role");
   });
 
-  it("explains a refused change as the last owner", async () => {
+  it("explains a refused change as the last author", async () => {
     members = [
       { ...(members[0] as object), role: "owner", roles: ["owner", "editor"] },
       members[1],
@@ -114,14 +114,14 @@ describe("role checkboxes", () => {
     await act(async () => fireEvent.click(within(owner).getAllByRole("checkbox")[0]));
     expect(setMembers).toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "This is the only owner. Make someone else an owner first.",
+      "This is the only author. Make someone else an author first.",
     );
   });
 
   it("is read-only for someone who can't manage", () => {
     render(<TeamList botId="bot-1" canManage={false} myUserId={8} />);
     expect(screen.queryByRole("checkbox")).toBeNull();
-    expect(screen.getByText("Only an owner can change the team.")).toBeInTheDocument();
+    expect(screen.getByText("Only an author can change the team.")).toBeInTheDocument();
     expect(screen.queryByTestId("team-invites")).toBeNull();
   });
 });
@@ -133,7 +133,7 @@ describe("remove, leave and hand over", () => {
     fireEvent.click(screen.getByRole("button", { name: "Leave this chatbot" }));
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Leave" })));
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "You created this chatbot. Hand it over to another owner before you leave.",
+      "You created this chatbot. Hand it over to another author before you leave.",
     );
   });
 
@@ -154,7 +154,7 @@ describe("remove, leave and hand over", () => {
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Remove" })));
     expect(removeMember).toHaveBeenCalledWith({ id: "bot-1", userId: 7 });
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "This person created the chatbot. They need to hand it over to another owner first.",
+      "This person created the chatbot. They need to hand it over to another author first.",
     );
   });
 
@@ -165,7 +165,7 @@ describe("remove, leave and hand over", () => {
     unmount();
     render(<TeamList botId="bot-1" canManage myUserId={7} />);
     fireEvent.change(screen.getByLabelText("Who takes over"), { target: { value: "8" } });
-    fireEvent.click(screen.getByRole("button", { name: "Hand over ownership" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hand over authorship" }));
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Hand over" })));
     expect(transfer).toHaveBeenCalledWith({ id: "bot-1", userId: 8 });
     expect(screen.getByText("Handed over to Meera.")).toBeInTheDocument();

@@ -32,7 +32,7 @@ export const USER_LISTS = {
     handoverAbility: "Can your assistant hand a chat to your team?",
     handoverAbilityHint:
       "On: when someone asks for a person, it hands the chat to your team. Off: it keeps answering itself.",
-    handoverAbilityOwners: "Only this assistant's owners can change this.",
+    handoverAbilityOwners: "Only this assistant's authors can change this.",
     handoverAbilityFailed: "That didn't save. Try again.",
   },
 

@@ -26,12 +26,25 @@ export interface AnalyticsAuditResult {
  * `audit` is null (with `error` set) when the auditor itself failed on this
  * message, so one bad run never discards the other messages' findings.
  */
+/** One line of the clarifying exchange: the agent asking, or the user replying. */
+export interface AnalyticsAuditExchangeTurn {
+  from: 'agent' | 'user';
+  text: string;
+}
+
 export interface AnalyticsAuditedMessage {
   /** `analytics_agent_messages.id` this entry audits. No FK — it is a snapshot. */
   messageId: string;
   /** When the question was asked (ISO), so a number can be judged as of then. */
   askedAt: string;
+  /** The question the set began with: the first thing the user asked. */
   question: string;
+  /**
+   * What was said between that question and the answer, oldest first: the agent's
+   * clarifying questions and the user's replies. Absent when the answer came straight away.
+   */
+  exchange?: AnalyticsAuditExchangeTurn[];
+  /** The final answer, the one the audit judges. */
   answer: string;
   audit: AnalyticsAuditResult | null;
   error?: string;

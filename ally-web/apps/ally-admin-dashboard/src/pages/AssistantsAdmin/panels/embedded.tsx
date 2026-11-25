@@ -12,6 +12,7 @@ import { BillingPlans } from "../../Billing/Plans";
 import { ChatbotSupportSearch } from "../../ChatbotSupport/ChatbotSupport";
 import { StaffCredits } from "../../Credits/StaffCredits";
 import { SafetyPacks } from "../../SafetyPacks/SafetyPacks";
+import { TemplatesAdminPanel } from "../../TemplatesAdmin";
 import {
   ChannelsPanel,
   KnowledgeLibraryPanel,
@@ -29,4 +30,5 @@ export const StartingSettingsView = StartingSettingsPanel;
 export const QuickRepliesView = QuickRepliesPanel;
 export const KnowledgeLibraryView = KnowledgeLibraryPanel;
 export const ChannelsView = ChannelsPanel;
+export const TemplatesView: React.FC = () => <TemplatesAdminPanel />;
 export const SupportPanel: React.FC = () => <ChatbotSupportSearch embedded />;

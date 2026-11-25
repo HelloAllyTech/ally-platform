@@ -18,6 +18,7 @@ import {
   RoleplayInterviewSessionView,
   RoleplayInterviewStatus,
 } from '../type/roleplay-interview.type';
+import { RoleplayInterviewCharacterService } from './roleplay-interview-character.service';
 import {
   composeGeneration,
   stillNeeded,
@@ -33,6 +34,7 @@ export class RoleplayInterviewSessionService {
   constructor(
     private readonly sessionRepository: RoleplayInterviewSessionRepository,
     private readonly messageRepository: RoleplayInterviewMessageRepository,
+    private readonly characterService: RoleplayInterviewCharacterService,
   ) {}
 
   /** The caller's open interview for this roleplay (or unsaved one), else a new one. */
@@ -189,6 +191,29 @@ export class RoleplayInterviewSessionService {
   ): Promise<RoleplayInterviewSessionView> {
     const session = await this.getSession(sessionId, userId);
     session.scenarioId = scenarioId;
+    return this.view(await this.sessionRepository.save(session));
+  }
+
+  /**
+   * The roleplay's new character into the Character Library (see
+   * RoleplayInterviewCharacterService): made once the roleplay is generated, brought up to date
+   * after a change to the character. Only for an approved plan; the view's brief.savedCharacter
+   * names the library character.
+   */
+  async saveCharacter(
+    sessionId: string,
+    userId: number,
+    values: Record<string, unknown>,
+  ): Promise<RoleplayInterviewSessionView> {
+    const session = await this.getSession(sessionId, userId);
+    if (session.status !== RoleplayInterviewStatus.APPROVED) {
+      throw new ConflictException(
+        'The character is added to the library once the plan is approved.',
+      );
+    }
+    const saved = await this.characterService.saveCharacter(session, values);
+    if (!saved) return this.view(session);
+    session.brief = { ...(session.brief ?? {}), savedCharacter: saved };
     return this.view(await this.sessionRepository.save(session));
   }
 

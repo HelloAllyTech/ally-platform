@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Brackets, DataSource, IsNull, Repository } from 'typeorm';
 
 import {
+  UpdateArea,
   UpdateAudience,
   UpdateSurface,
 } from '../constants/product-update.constants';
@@ -32,6 +33,7 @@ export class ProductUpdateRepository extends Repository<ProductUpdate> {
     limit: number;
     offset: number;
     surface?: UpdateSurface;
+    area?: UpdateArea;
   }): Promise<{ updates: ProductUpdate[]; count: number }> {
     const qb = this.createQueryBuilder('u')
       .where('u.audience = :audience', { audience: 'public' })
@@ -39,6 +41,9 @@ export class ProductUpdateRepository extends Repository<ProductUpdate> {
       .andWhere('u.liveAt IS NOT NULL');
     if (params.surface) {
       qb.andWhere(':surface = ANY(u.surfaces)', { surface: params.surface });
+    }
+    if (params.area) {
+      qb.andWhere('u.area = :area', { area: params.area });
     }
     const [updates, count] = await qb
       .orderBy('u.liveAt', 'DESC')

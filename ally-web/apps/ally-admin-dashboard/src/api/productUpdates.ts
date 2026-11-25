@@ -65,6 +65,34 @@ export interface GetProductUpdatesResponse {
   count: number;
 }
 
+/** One entry of the public change log: what the page at /blog/changelog lists. */
+export interface PublicProductUpdate {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  kind: ProductUpdateKind;
+  surfaces: ProductUpdateSurface[];
+  area: string;
+  /** When it reached production (ISO). */
+  liveAt: string;
+}
+
+export interface GetPublicProductUpdatesParams {
+  limit?: number;
+  offset?: number;
+  surface?: ProductUpdateSurface;
+  area?: string;
+}
+
+export interface GetPublicProductUpdatesResponse {
+  updates: PublicProductUpdate[];
+  count: number;
+}
+
+/** The product area Ally Chatbots updates are filed under in the public change log. */
+export const CHATBOT_UPDATE_AREA = "WhatsApp assistant";
+
 export interface ProductUpdatesRunBatch {
   [key: string]: unknown;
 }
@@ -122,6 +150,17 @@ export const productUpdatesAPI = baseAPI.injectEndpoints({
     getProductUpdates: builder.query<GetProductUpdatesResponse, GetProductUpdatesParams>({
       query: params => ({
         url: ApiEndpoints.PRODUCT_UPDATES.LIST,
+        method: HttpMethod.GET,
+        params,
+      }),
+      providesTags: [TAG_TYPES.PRODUCT_UPDATES],
+    }),
+    getPublicProductUpdates: builder.query<
+      GetPublicProductUpdatesResponse,
+      GetPublicProductUpdatesParams
+    >({
+      query: params => ({
+        url: ApiEndpoints.PRODUCT_UPDATES.PUBLIC,
         method: HttpMethod.GET,
         params,
       }),
@@ -216,6 +255,7 @@ export const productUpdatesAPI = baseAPI.injectEndpoints({
 
 export const {
   useGetProductUpdatesQuery,
+  useGetPublicProductUpdatesQuery,
   useGetProductUpdatesStatusQuery,
   useGetProductUpdateQuery,
   useGetDigestRecipientsQuery,

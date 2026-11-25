@@ -23,6 +23,7 @@ import { RoleplayFitCheckSpecialist } from '../../service/specialists/roleplay-f
 import { StructuredRoleplayBrief } from '../../type/roleplay-brief.type';
 import { RoleplayInterviewSession } from '../../entity/roleplay-interview-session.entity';
 import { RoleplayInterviewSessionRepository } from '../repository/roleplay-interview.repository';
+import { NEW_CHARACTER_VALUE } from '../constants/roleplay-interview.constants';
 import {
   RoleplayInterviewBrief,
   RoleplayInterviewStatus,
@@ -94,7 +95,9 @@ const ASK_TRAINER: AgentToolDefinition = {
         enum: [...QUESTION_BRIEF_FIELDS],
         description:
           'When the answer fills one brief field, name it and give every option a value: the ' +
-          'trainer’s pick is then recorded for you, and you never need update_brief for it.',
+          'trainer’s pick is then recorded for you, and you never need update_brief for it. ' +
+          `For characterId the values are library character ids, plus "${NEW_CHARACTER_VALUE}" for ` +
+          '"Create a new character".',
       },
     },
     required: ['prompt', 'kind'],
@@ -135,7 +138,10 @@ const UPDATE_BRIEF: AgentToolDefinition = {
           'Who the learner talks to: a description, and/or a Character Library characterId.',
         properties: {
           description: { type: 'string' },
-          characterId: { type: 'string' },
+          characterId: {
+            type: 'string',
+            description: `A library character's id, or "${NEW_CHARACTER_VALUE}" when the trainer chose to create a new character.`,
+          },
         },
       },
       setting: { type: 'string' },
@@ -553,10 +559,19 @@ export class RoleplayInterviewToolsService {
       }
     }
     if (shaped.characterId !== undefined) {
-      if (shaped.characterId === null) {
+      if (
+        shaped.characterId === null ||
+        shaped.characterId === NEW_CHARACTER_VALUE
+      ) {
         if (fields.client) {
           delete fields.client.characterId;
           delete fields.client.characterName;
+        }
+        if (shaped.characterId === NEW_CHARACTER_VALUE) {
+          fields.characterChoice = {
+            ...(current.characterChoice ?? { searched: false, matches: 0 }),
+            decision: 'new',
+          };
         }
       } else {
         const [character] = await this.library.characterProfiles([
@@ -571,6 +586,10 @@ export class RoleplayInterviewToolsService {
             ...(fields.client ?? {}),
             characterId: character.id,
             characterName: character.name,
+          };
+          fields.characterChoice = {
+            ...(current.characterChoice ?? { searched: true, matches: 1 }),
+            decision: 'library',
           };
         }
       }
@@ -621,7 +640,10 @@ export class RoleplayInterviewToolsService {
     }
 
     const changedKeys = [...Object.keys(fields), ...shaped.clear].filter(
-      (key) => key !== 'competencyNames' && key !== 'learnerProfileName',
+      (key) =>
+        key !== 'competencyNames' &&
+        key !== 'learnerProfileName' &&
+        key !== 'characterChoice',
     );
     if (!changedKeys.length) {
       return {
@@ -692,6 +714,17 @@ export class RoleplayInterviewToolsService {
           stillNeeded: needed,
         },
         summary: 'Plan not proposed: the brief is incomplete',
+      };
+    }
+    const characterProblem = characterChoiceProblem(brief);
+    if (characterProblem) {
+      return {
+        modelResult: {
+          ok: false,
+          error: characterProblem.error,
+          message: characterProblem.message,
+        },
+        summary: 'Plan not proposed: the character is not chosen yet',
       };
     }
     const version = (context.session.planVersion ?? 0) + 1;
@@ -775,12 +808,19 @@ export class RoleplayInterviewToolsService {
         hasVoices: c.hasVoices,
         profileExcerpt: c.profileText.slice(0, 280),
       }));
+      await this.recordSearch(
+        context,
+        result.searchFailed ? 0 : characters.length,
+      );
       return {
         modelResult: {
           ok: true,
           characters,
           recommendedId: result.recommendedId,
           reason: result.reason,
+          ...(characters.length && !result.searchFailed
+            ? { next: CHOOSE_CHARACTER_NEXT }
+            : {}),
           ...(result.searchFailed
             ? {
                 searchFailed: true,
@@ -797,6 +837,7 @@ export class RoleplayInterviewToolsService {
       };
     } catch (error) {
       // A failed search never fails the turn: the trainer can describe a new character.
+      await this.recordSearch(context, 0).catch(() => undefined);
       this.logger.warn(
         `[ROLEPLAY_INTERVIEW] character search failed for ${context.session.id}: ${
           error instanceof Error ? error.message : String(error)
@@ -817,4 +858,59 @@ export class RoleplayInterviewToolsService {
       };
     }
   }
+
+  /** The search ran: the plan's character rule reads this (see characterChoiceProblem). */
+  private async recordSearch(
+    context: RoleplayInterviewToolContext,
+    matches: number,
+  ): Promise<void> {
+    const current = context.session.brief ?? {};
+    const brief: RoleplayInterviewBrief = {
+      ...current,
+      characterChoice: {
+        ...(current.characterChoice ?? {}),
+        searched: true,
+        matches,
+      },
+    };
+    await this.sessionRepository.update({ id: context.session.id }, {
+      brief,
+    } as any);
+    context.session.brief = brief;
+  }
+}
+
+/** What search_characters asks of the agent when the library holds possible matches. */
+const CHOOSE_CHARACTER_NEXT =
+  'Before writing a new character, ask the trainer: ask_trainer with field characterId, one ' +
+  'option per character above who could play this client (value = its id; mark the ' +
+  `recommendedId recommended, with its reason) and a last option "Create a new character" (value = "${NEW_CHARACTER_VALUE}"). ` +
+  'Write a new character only if the trainer picks that.';
+
+/**
+ * The plan's character rule, in code: a roleplay played by a new character needs the Character
+ * Library searched first, and when the search found characters who could play the client, the
+ * trainer's choice of a new one over them. Null when the plan may go ahead.
+ */
+export function characterChoiceProblem(
+  brief: RoleplayInterviewBrief,
+): { error: string; message: string } | null {
+  if (brief.client?.characterId) return null;
+  const choice = brief.characterChoice;
+  if (!choice?.searched) {
+    return {
+      error: 'character_not_searched',
+      message:
+        'Not proposed: search the Character Library first (search_characters with the ' +
+        'client description). If it finds characters who could play this client, ask the ' +
+        'trainer whether to use one of them or create a new character.',
+    };
+  }
+  if (choice.matches > 0 && choice.decision !== 'new') {
+    return {
+      error: 'character_not_chosen',
+      message: `Not proposed: the Character Library has characters who could play this client. ${CHOOSE_CHARACTER_NEXT}`,
+    };
+  }
+  return null;
 }

@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useGetArchivedChatbotsQuery, useGetChatbotsQuery, useGetMyPlanQuery } from "@api";
+import { Plus } from "@assets";
 import { EmptyState } from "@components";
+import { ASSISTANT_HEADER_SLOT_ID } from "@components/assistant-only/headerSlot";
 import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
 import { en, ROUTES } from "@constants";
@@ -11,6 +14,7 @@ import { Chatbot, ChatbotStatus } from "@types";
 
 import { isBlankDraft } from "./blank";
 import { BUILDER_HOME, CREATE_MIN_WIDTH } from "./copy";
+import { EmptyChatbotsArt } from "./EmptyChatbotsArt";
 import { chatbotAccess } from "../AssistantHome/access";
 import { HOME } from "../AssistantHome/copy";
 import { TF1_COPY } from "../AssistantHome/copy/tf1";
@@ -36,9 +40,11 @@ export const botTarget = (bot: Chatbot): string =>
     : ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id);
 
 /**
- * The builder's home (stage 2; replaces the old tabbed page): exactly two choices, Create a
- * chatbot and Open a chatbot. Open is the card grid, with "Show archived" folded in, and a count
- * of conversations waiting for a person on the cards of people who can respond, edit or own.
+ * The builder's home (stage 2; replaces the old tabbed page): the chatbots to open, in All /
+ * Active / Archived views, and a count of conversations waiting for a person on the cards of
+ * people who can respond, edit or own. The title is drawn in the shell's slim top bar
+ * (`ASSISTANT_HEADER_SLOT_ID`), or inline when there is none; the Create new chatbot button sits at
+ * the right end of the tab row.
  * Inbox, Connectors, Defaults and Library are gone from here (Defaults, Library and Connectors
  * are the staff page, `ROUTES.ASSISTANT_DEFAULTS`).
  *
@@ -49,7 +55,7 @@ export const BuilderHome: React.FC = () => {
   const { data, isLoading, isError, refetch } = useGetChatbotsQuery();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
-  const showArchived = params.get("archived") === "1";
+  const view = viewFromParams(params);
   const canCreate = Boolean(data?.canCreate);
   const roomy = useMedia(`(min-width: ${CREATE_MIN_WIDTH}px)`);
   const [narrowNote, setNarrowNote] = useState(false);
@@ -61,10 +67,19 @@ export const BuilderHome: React.FC = () => {
 
   // On exactly one chatbot with no right to create another: open it straight (here, not in
   // DefaultRedirect, and with `replace`, so Back never bounces off this page into it again).
-  const openStraight = !isLoading && !isError && !canCreate && !showArchived && bots.length === 1;
+  const openStraight =
+    !isLoading && !isError && !canCreate && !params.has("view") && !params.has("archived")
+      ? bots.length === 1
+      : false;
   useEffect(() => {
     if (openStraight) navigate(botTarget(bots[0]), { replace: true });
   }, [openStraight]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The title lives in the shell's slim top bar when it has a slot for it.
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    setHeaderSlot(document.getElementById(ASSISTANT_HEADER_SLOT_ID));
+  }, []);
 
   const create = () => {
     // Below the build screen's width nothing is created: no blank that can't be built.
@@ -75,16 +90,44 @@ export const BuilderHome: React.FC = () => {
     navigate(ROUTES.CHATBOT_NEW);
   };
 
-  const setArchived = (on: boolean) => setParams(on ? { archived: "1" } : {}, { replace: true });
+  // The tabs are filtered views of one list: All (the default, so no param), Active, Archived.
+  const setView = (next: BuilderView) =>
+    setParams(next === "all" ? {} : { view: next }, { replace: true });
+  // Archived chatbots are fetched only for the views that show them.
+  const archived = useGetArchivedChatbotsQuery(undefined, { skip: view === "active" });
+  const archivedBots = archived.data?.chatbots ?? [];
+
+  const createButton = canCreate ? (
+    <Button
+      variant={ButtonVariant.PRIMARY}
+      size="sm"
+      className="shrink-0"
+      type="button"
+      onClick={create}
+    >
+      <Plus className="h-4 w-4" aria-hidden="true" />
+      {c.create.button}
+    </Button>
+  ) : null;
 
   return (
     <div className="ally-v2 ally-list-page" data-testid="builder-home">
-      <header className="ally-list-page__head">
-        <div className="ally-list-page__title">
-          <h1 className="ally-display">{c.title}</h1>
-          <p className="ally-small">{c.subtitle}</p>
-        </div>
-      </header>
+      {headerSlot ? (
+        createPortal(
+          <>
+            <h1 className="mr-auto min-w-0 truncate text-xl font-normal text-typography-900">
+              {c.title}
+            </h1>
+          </>,
+          headerSlot,
+        )
+      ) : (
+        <header className="ally-list-page__head">
+          <div className="ally-list-page__title">
+            <h1 className="ally-display">{c.title}</h1>
+          </div>
+        </header>
+      )}
       <div className="ally-list-page__body">
         {myPlan?.alerts?.length ? (
           <div style={{ marginBottom: 16 }}>
@@ -92,75 +135,169 @@ export const BuilderHome: React.FC = () => {
           </div>
         ) : null}
 
-        {canCreate && (
-          <section className="ally-card ally-list-page__choice" data-testid="choice-create">
-            <div>
-              <h2 className="ally-heading">{c.create.title}</h2>
-              <p className="ally-small">{c.create.body}</p>
-            </div>
-            <Button variant={ButtonVariant.PRIMARY} type="button" onClick={create}>
-              {c.create.button}
-            </Button>
-            {narrowNote && (
-              <p className="ally-note ally-note--warn" role="status" data-testid="narrow-note">
-                <strong>{c.narrow.title}.</strong> {c.narrow.body}
-              </p>
-            )}
-          </section>
+        {canCreate && narrowNote && (
+          <p
+            className="ally-note ally-note--warn"
+            role="status"
+            data-testid="narrow-note"
+            style={{ marginBottom: 16 }}
+          >
+            <strong>{c.narrow.title}.</strong> {c.narrow.body}
+          </p>
         )}
 
-        <section aria-labelledby="open-heading" data-testid="choice-open">
-          <div className="ally-list-page__open-head">
-            <h2 className="ally-heading" id="open-heading">
-              {c.open.title}
-            </h2>
-            <label className="ally-list-page__toggle ally-small">
-              <input
-                type="checkbox"
-                checked={showArchived}
-                onChange={event => setArchived(event.target.checked)}
-              />
-              {c.showArchived}
-            </label>
+        <section data-testid="choice-open">
+          <div className="ally-list-page__tabbar">
+            <ViewTabs view={view} onChange={setView} />
+            {createButton}
           </div>
-          {isLoading || openStraight ? (
-            <div className="ally-list-page__grid" aria-busy="true">
-              {[0, 1, 2].map(n => (
-                <span
-                  key={n}
-                  className="ally-card ally-list-page__card ally-list-page__card--skeleton"
-                />
-              ))}
-            </div>
-          ) : isError ? (
-            <LoadError title={c.open.loadFailed} onRetry={() => void refetch()} />
-          ) : (
-            <>
-              <ChatbotGrid bots={bots} canCreate={canCreate} onCreate={create} />
-              {showArchived && <ArchivedGrid />}
-            </>
-          )}
+          <div role="tabpanel" id={VIEW_PANEL_ID} aria-labelledby={`${VIEW_TAB_ID}-${view}`}>
+            <ChatbotList
+              view={view}
+              loading={
+                view === "archived"
+                  ? archived.isLoading
+                  : isLoading || openStraight || (view === "all" && archived.isLoading)
+              }
+              error={view !== "archived" && isError}
+              onRetry={() => void refetch()}
+              bots={bots}
+              archivedBots={archivedBots}
+              archivedError={archived.isError}
+              onRetryArchived={() => void archived.refetch()}
+              canCreate={canCreate}
+              onCreate={create}
+            />
+          </div>
         </section>
       </div>
     </div>
   );
 };
 
-/** Removed chatbots, most recent first. Opening one shows its page read-only. */
-const ArchivedGrid: React.FC = () => {
-  const { data, isLoading, isError, refetch } = useGetArchivedChatbotsQuery();
-  const navigate = useNavigate();
-  const { restore, restoring } = useRestoreAssistant();
-  if (isLoading) return <div className="ally-list-page__grid" aria-busy="true" />;
-  if (isError) return <LoadError title={c.archivedLoadFailed} onRetry={() => void refetch()} />;
-  const bots = data?.chatbots ?? [];
-  if (!bots.length) {
+type BuilderView = "all" | "active" | "archived";
+
+const VIEWS: BuilderView[] = ["all", "active", "archived"];
+const VIEW_TAB_ID = "builder-view-tab";
+const VIEW_PANEL_ID = "builder-view-panel";
+
+/** `?view=` picks the tab; the old `?archived=1` link (from a chatbot's page) lands on Archived. */
+const viewFromParams = (params: URLSearchParams): BuilderView => {
+  const view = params.get("view");
+  if (view === "active" || view === "archived") return view;
+  return params.get("archived") === "1" ? "archived" : "all";
+};
+
+/** All / Active / Archived: filtered views of the same chatbots, with arrow-key movement. */
+const ViewTabs: React.FC<{ view: BuilderView; onChange: (view: BuilderView) => void }> = ({
+  view,
+  onChange,
+}) => {
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    const next = VIEWS[(VIEWS.indexOf(view) + step + VIEWS.length) % VIEWS.length];
+    onChange(next);
+    document.getElementById(`${VIEW_TAB_ID}-${next}`)?.focus();
+  };
+  return (
+    <div
+      className="ally-list-page__tabs"
+      role="tablist"
+      aria-label={c.tabs.label}
+      onKeyDown={onKeyDown}
+    >
+      {VIEWS.map(id => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          id={`${VIEW_TAB_ID}-${id}`}
+          aria-selected={view === id}
+          aria-controls={VIEW_PANEL_ID}
+          tabIndex={view === id ? 0 : -1}
+          className="ally-list-page__tab"
+          onClick={() => onChange(id)}
+        >
+          {c.tabs[id]}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+/** What the open tab shows. Archived chatbots follow the active ones on All. */
+const ChatbotList: React.FC<{
+  view: BuilderView;
+  loading: boolean;
+  error: boolean;
+  onRetry: () => void;
+  bots: Chatbot[];
+  archivedBots: Chatbot[];
+  archivedError: boolean;
+  onRetryArchived: () => void;
+  canCreate: boolean;
+  onCreate: () => void;
+}> = ({
+  view,
+  loading,
+  error,
+  onRetry,
+  bots,
+  archivedBots,
+  archivedError,
+  onRetryArchived,
+  canCreate,
+  onCreate,
+}) => {
+  if (loading) {
     return (
+      <div className="ally-list-page__grid" aria-busy="true">
+        {[0, 1, 2].map(n => (
+          <span key={n} className="ally-card ally-list-page__card ally-list-page__card--skeleton" />
+        ))}
+      </div>
+    );
+  }
+  if (error) return <LoadError title={c.open.loadFailed} onRetry={onRetry} />;
+
+  const archivedPart = archivedError ? (
+    <LoadError title={c.archivedLoadFailed} onRetry={onRetryArchived} />
+  ) : (
+    <ArchivedCards bots={archivedBots} />
+  );
+
+  if (view === "active") {
+    return <ChatbotGrid bots={bots} canCreate={canCreate} onCreate={onCreate} />;
+  }
+  if (view === "archived") {
+    return archivedBots.length || archivedError ? (
+      archivedPart
+    ) : (
       <p className="ally-small" data-testid="archived-empty">
         {t.archived.empty}. {t.archived.emptyHint}
       </p>
     );
   }
+  // All: one empty state when there is nothing at all, else the active grid then the archived one.
+  if (!bots.length && !archivedBots.length && !archivedError) {
+    return <ChatbotGrid bots={bots} canCreate={canCreate} onCreate={onCreate} />;
+  }
+  return (
+    <>
+      {bots.length > 0 && <ChatbotGrid bots={bots} canCreate={canCreate} onCreate={onCreate} />}
+      {(archivedBots.length > 0 || archivedError) && (
+        <div style={bots.length ? { marginTop: 16 } : undefined}>{archivedPart}</div>
+      )}
+    </>
+  );
+};
+
+/** Removed chatbots, most recent first. Opening one shows its page read-only. */
+const ArchivedCards: React.FC<{ bots: Chatbot[] }> = ({ bots }) => {
+  const navigate = useNavigate();
+  const { restore, restoring } = useRestoreAssistant();
   return (
     <div className="ally-list-page__grid" data-testid="archived-grid">
       {bots.map(bot => {
@@ -227,6 +364,7 @@ const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () 
         subtitle={canCreate ? c.open.emptyCreate : c.open.emptyMember}
         actionLabel={c.create.button}
         onAction={onCreate}
+        illustration={<EmptyChatbotsArt />}
         hideActionButton
       />
     );

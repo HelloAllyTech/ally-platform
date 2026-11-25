@@ -51,6 +51,7 @@ import { SseWriter } from './sse';
 import { templateById } from '../../chatbot/templates/templates';
 import { answersOf, templateDescription } from '../templates/template-answers';
 import { TemplateService } from '../templates/template.service';
+import { TemplateRegistryService } from '../templates/template-registry.service';
 import { AssistantScope } from '../../chatbot/access/chatbot-role.decorator';
 import { BlankChatbotService } from '../blank/blank-chatbot.service';
 import { WorkingCopyService } from '../working-copy/working-copy.service';
@@ -89,6 +90,8 @@ export class BotDraftController {
     @Optional() private readonly workingCopy?: WorkingCopyService,
     // Stage 4: while the go-live gate is on it is the readiness check, not the old Check-up run.
     @Optional() private readonly goLive?: GoLiveGateService,
+    // Staff-published templates; without it only the built-in ones are found.
+    @Optional() private readonly registry?: TemplateRegistryService,
   ) {}
 
   @Post()
@@ -109,7 +112,11 @@ export class BotDraftController {
     }
     const website = dto.website?.trim();
     // T1: a template start reads a description written from the owner's answers.
-    const template = dto.template ? templateById(dto.template) : undefined;
+    const template = dto.template
+      ? this.registry
+        ? (await this.registry.byId(dto.template))?.template
+        : templateById(dto.template)
+      : undefined;
     if (dto.template && !template) {
       throw new BadRequestException({
         errorCode: 'unknown_template',

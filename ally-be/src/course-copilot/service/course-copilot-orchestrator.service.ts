@@ -173,7 +173,7 @@ const FALLBACK_SYSTEM_PROMPT =
  */
 const PLATFORM_RULES = [
   'PLATFORM RULES (enforced by the tools — knowing them saves you a refusal):',
-  `- A course has at most ${COURSE_COPILOT_LIMITS.sections} sections and ${COURSE_COPILOT_LIMITS.items} items; at most ${COURSE_COPILOT_LIMITS.newRoleplays} NEW roleplays and ${COURSE_COPILOT_LIMITS.newCases} new cases; at most ${COURSE_COPILOT_LIMITS.images} generated images; a new roleplay speaks at most ${COURSE_COPILOT_LIMITS.languagesPerRoleplay} languages.`,
+  `- A course has at most ${COURSE_COPILOT_LIMITS.sections} sections and ${COURSE_COPILOT_LIMITS.items} items; at most ${COURSE_COPILOT_LIMITS.newCases} new cases (new roleplays have no separate limit); at most ${COURSE_COPILOT_LIMITS.images} generated images; a new roleplay speaks at most ${COURSE_COPILOT_LIMITS.languagesPerRoleplay} languages.`,
   '- Item types: ROLEPLAY, CASE, QUIZ, ARTICLE, VIDEO, JOURNAL, ANNOTATED_ARTIFACT, BRANCHING_SCENARIO (a scenario quiz), BUCKET_SORT, GAME. There are no others.',
   '- You cannot make video. A VIDEO item needs a link from the trainer; without one it is skipped.',
   '- Games never gate progress and are never the last item.',

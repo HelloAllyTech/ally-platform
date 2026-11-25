@@ -82,19 +82,16 @@ export class CourseCopilotBlueprintService {
     const example = new CourseCopilotExampleCourseService().closestTo(
       session.brief?.shape?.durationMinutes,
     );
-    const planned = await this.planner.plan(
-      {
-        sessionId: session.id,
-        brief: session.brief ?? {},
-        notes,
-        libraryPicks,
-        games: courseCopilotGameOptions(),
-        referenceMaterial: reference?.text ?? null,
-        designGuidance: guidance.text || null,
-        usageMetadata: { courseCopilotSessionId: session.id },
-      },
-      { maxNewRoleplays: this.configService.courseCopilot.maxNewRoleplays },
-    );
+    const planned = await this.planner.plan({
+      sessionId: session.id,
+      brief: session.brief ?? {},
+      notes,
+      libraryPicks,
+      games: courseCopilotGameOptions(),
+      referenceMaterial: reference?.text ?? null,
+      designGuidance: guidance.text || null,
+      usageMetadata: { courseCopilotSessionId: session.id },
+    });
     const response = await this.store(session, planned, {
       status: CourseCopilotSessionStatus.AWAITING_BLUEPRINT,
     });
@@ -187,9 +184,7 @@ export class CourseCopilotBlueprintService {
     const brief = session.brief ?? {};
     const blueprint = normaliseBlueprint(raw, brief);
     blueprint.estimate = this.costService.estimate(blueprint, brief);
-    const problems = validateBlueprint(blueprint, brief, {
-      maxNewRoleplays: this.configService.courseCopilot.maxNewRoleplays,
-    });
+    const problems = validateBlueprint(blueprint, brief);
     // Library picks must still be live: a roleplay archived since the
     // interview cannot be referenced by a course.
     problems.push(...(await this.staleLibraryProblems(blueprint)));

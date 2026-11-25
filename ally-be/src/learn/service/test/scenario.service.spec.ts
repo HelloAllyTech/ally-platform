@@ -7137,6 +7137,79 @@ describe('ScenarioService', () => {
       expect(call[3]).toBe(true); // expectJson
     });
 
+    it('improves any other text field by its label', async () => {
+      autofillService.enhanceFieldContent.mockResolvedValue('Better context.');
+      const result = await service.enhanceField({
+        fieldName: EnhanceableField.TEXT,
+        fieldLabel: 'Context — where the call happens.',
+        currentValue: 'A call.',
+        guidance: 'make it vivid',
+      } as any);
+      const call = autofillService.enhanceFieldContent.mock.calls[0];
+      expect(call[1]).toBe('enhance_field');
+      expect(call[2].fieldLabel).toBe('Context — where the call happens.');
+      expect(result.content).toBe('Better context.');
+    });
+
+    it('refuses the generic text field without a label', async () => {
+      await expect(
+        service.enhanceField({
+          fieldName: EnhanceableField.TEXT,
+          currentValue: 'A call.',
+        } as any),
+      ).rejects.toThrow('fieldLabel is required');
+    });
+
+    it('changes the settings as one JSON object of the same types', async () => {
+      autofillService.enhanceFieldContent.mockResolvedValue(
+        '{"difficultyLevel":"HARD","showScoreMeter":false}',
+      );
+      const result = await service.enhanceField({
+        fieldName: EnhanceableField.SETTINGS,
+        fieldLabel:
+          'difficultyLevel: EASY, MEDIUM or HARD; showScoreMeter: true/false',
+        currentValue: JSON.stringify({
+          difficultyLevel: 'MEDIUM',
+          showScoreMeter: true,
+        }),
+        guidance: 'make it hard and hide the score',
+      } as any);
+      expect(autofillService.enhanceFieldContent.mock.calls[0][3]).toBe(true);
+      expect(JSON.parse(result.content)).toEqual({
+        difficultyLevel: 'HARD',
+        showScoreMeter: false,
+      });
+    });
+
+    it('rewrites the character details as one JSON object held to the form values', async () => {
+      autofillService.enhanceFieldContent.mockResolvedValue(
+        '{"name":"Ananya","age":22,"gender":"Female","genderIdentity":"Female/Woman","sexualOrientation":"Heterosexual (straight)","profession":"Student","currentLocation":"Pune"}',
+      );
+
+      const result = await service.enhanceField({
+        fieldName: EnhanceableField.CHARACTER_DETAILS,
+        currentValue: JSON.stringify({
+          name: 'Arjun',
+          age: 22,
+          gender: 'male',
+          genderIdentity: 'Male/Man',
+          sexualOrientation: 'Heterosexual (straight)',
+          profession: 'Student',
+          currentLocation: 'Pune',
+        }),
+        guidance: 'make the client a girl',
+      } as any);
+
+      const call = autofillService.enhanceFieldContent.mock.calls[0];
+      expect(call[1]).toBe('enhance_field');
+      expect(call[3]).toBe(true); // expectJson
+      expect(JSON.parse(result.content)).toMatchObject({
+        name: 'Ananya',
+        gender: 'female',
+        genderIdentity: 'Female/Woman',
+      });
+    });
+
     it('normalises prose-wrapped JSON from the model into clean state JSON', async () => {
       autofillService.enhanceFieldContent.mockResolvedValue(
         'Sure!\n{"name":"Reserved","guidelines":"Quiet and brief."}\nHope that helps.',

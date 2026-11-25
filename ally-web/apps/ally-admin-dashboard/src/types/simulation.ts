@@ -893,6 +893,11 @@ export interface EnhanceFieldRequest {
   currentValue: string;
   /** Custom guidance; omit/empty for auto-improve. */
   guidance?: string;
+  /**
+   * What the field is, in words: required for the generic `text` field and the `settings`
+   * object (each setting and its allowed values); the named fields ignore it.
+   */
+  fieldLabel?: string;
   model?: string;
   provider?: "openai" | "anthropic";
   /**

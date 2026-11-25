@@ -1,0 +1,376 @@
+/*
+ * The Plan and credits tab of the corner drawer, drawn in IBM Carbon (white theme) and IBM Plex
+ * Serif. The credits content is shared with the /account/credits page, which keeps its own Ally
+ * look; here the same markup is re-skinned by scope, so nothing outside the drawer changes.
+ *
+ * Colours come from the `.ally-v2` tokens, which already hold Carbon's white-theme values (see
+ * components/v2/core/tokens.css): --ally-surface-2 = layer-01, --ally-line = border-subtle,
+ * --ally-muted = text-secondary, --ally-accent = interactive. The type below follows Carbon's
+ * productive type set: label-01, helper-text-01, body-01, heading-03 and a 32px light figure.
+ * Spacing is Carbon's 8px grid (8 / 16 / 24 / 32); there are no radii and no shadows.
+ */
+
+.corner-drawer__plan .ally-plan {
+  gap: 16px;
+  max-width: none;
+}
+
+/* Tile (layer-01): flat, no border, 16px padding. */
+.corner-drawer__plan .ally-plan__card {
+  gap: 16px;
+  padding: 16px;
+  border: 0;
+  border-radius: 0;
+  background: var(--ally-surface-2);
+}
+.corner-drawer__plan .ally-plan__card h2 {
+  font: 400 20px/28px var(--ally-font-ui);
+  letter-spacing: 0;
+  color: var(--ally-ink);
+}
+.corner-drawer__plan .ally-plan__card h3 {
+  margin: 0;
+  font: 600 14px/18px var(--ally-font-ui);
+  letter-spacing: 0.16px;
+  color: var(--ally-ink);
+}
+
+/* Label (label-01) and helper text (helper-text-01): 12/16, text-secondary. */
+.corner-drawer__plan .ally-small {
+  font: 400 12px/16px var(--ally-font-ui);
+  letter-spacing: 0.32px;
+  color: var(--ally-muted);
+}
+
+/* A figure: the label, then the number at 32/40 light, then its helper text. */
+.corner-drawer__plan .ally-display {
+  font: 300 32px/40px var(--ally-font-display);
+  letter-spacing: 0;
+  color: var(--ally-ink);
+}
+
+/* Body (body-01) for running text and table cells. */
+.corner-drawer__plan p,
+.corner-drawer__plan li,
+.corner-drawer__plan td,
+.corner-drawer__plan th {
+  font-family: var(--ally-font-ui);
+}
+.corner-drawer__plan li,
+.corner-drawer__plan td {
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0.16px;
+}
+
+/* Inline notification: info by default, warning for "running low". 3px accent on the left. */
+.corner-drawer__plan .ally-plan__note {
+  padding: 12px 16px;
+  border: 0;
+  border-left: 3px solid var(--ally-info);
+  border-radius: 0;
+  background: var(--ally-info-bg);
+  color: var(--ally-ink);
+  font: 400 14px/20px var(--ally-font-ui);
+  letter-spacing: 0.16px;
+}
+.corner-drawer__plan .ally-plan__note[data-testid="credits-low"] {
+  border-left-color: #f1c21b;
+  background: #fcf4d6;
+}
+
+/* Button (tertiary, 40px): transparent, 1px interactive border, text left-aligned, hugs its text. */
+.corner-drawer__plan .ally-btn,
+.corner-changelog .ally-btn {
+  align-self: flex-start;
+  justify-content: flex-start;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--ally-accent);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ally-accent);
+  font: 400 14px/18px var(--ally-font-ui);
+  letter-spacing: 0.16px;
+  text-decoration: none;
+}
+.corner-drawer__plan .ally-btn:hover:not(:disabled),
+.corner-changelog .ally-btn:hover:not(:disabled) {
+  background: var(--ally-accent);
+  color: var(--ally-on-accent);
+}
+.corner-drawer__plan .ally-btn:focus-visible,
+.corner-changelog .ally-btn:focus-visible {
+  outline: 2px solid var(--ally-accent);
+  outline-offset: -2px;
+}
+
+/* Link (body-compact-01, interactive); underline on hover. */
+.corner-drawer__plan a:not(.ally-btn) {
+  color: var(--ally-accent);
+  text-decoration: none;
+}
+.corner-drawer__plan a:not(.ally-btn):hover {
+  text-decoration: underline;
+}
+
+/* Data table: header on border-subtle, 40px rows, 1px row rules, cells on the white layer. */
+.corner-drawer__plan .ally-table {
+  border-collapse: collapse;
+}
+.corner-drawer__plan .ally-table th {
+  height: 40px;
+  padding: 0 16px;
+  background: var(--ally-line);
+  color: var(--ally-ink);
+  font: 600 14px/18px var(--ally-font-ui);
+  letter-spacing: 0.16px;
+}
+.corner-drawer__plan .ally-table td {
+  height: 40px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--ally-line);
+  background: var(--ally-surface);
+  color: var(--ally-ink-2);
+}
+
+/*
+ * The About tab: the same Carbon tokens. A hero on the layer-01 tile, three numbered steps, a
+ * two-column grid of feature tiles, and a plain list of roles with 1px rules.
+ */
+.corner-about {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding-bottom: 16px;
+}
+.corner-about__hero {
+  padding: 24px;
+  background: var(--ally-surface-2);
+  border-left: 3px solid var(--ally-accent);
+}
+.corner-about__eyebrow {
+  margin: 0 0 8px;
+  font: 400 12px/16px var(--ally-font-ui);
+  letter-spacing: 0.32px;
+  color: var(--ally-muted);
+}
+.corner-about__title {
+  margin: 0 0 12px;
+  font: 300 28px/36px var(--ally-font-display);
+  color: var(--ally-ink);
+}
+.corner-about__intro {
+  margin: 0;
+  font: 400 14px/20px var(--ally-font-ui);
+  letter-spacing: 0.16px;
+  color: var(--ally-ink-2);
+}
+.corner-about__heading {
+  margin: 0 0 16px;
+  font: 400 20px/28px var(--ally-font-ui);
+  color: var(--ally-ink);
+}
+.corner-about__steps,
+.corner-about__track,
+.corner-about__roles {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.corner-about__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--ally-line);
+}
+@media (max-width: 480px) {
+  .corner-about__steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.corner-about__tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--ally-surface-2);
+  font: 400 12px/16px var(--ally-font-ui);
+  letter-spacing: 0.32px;
+  color: var(--ally-muted);
+}
+.corner-about__tile strong {
+  font: 600 14px/18px var(--ally-font-ui);
+  letter-spacing: 0.16px;
+  color: var(--ally-ink);
+}
+.corner-about__num {
+  font: 300 32px/40px var(--ally-font-display);
+  color: var(--ally-accent);
+}
+/* Carousel: one layer-01 slide per view on a scroll-snap track; count and arrows underneath. */
+.corner-about__track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.corner-about__track::-webkit-scrollbar {
+  display: none;
+}
+.corner-about__slide {
+  flex: 0 0 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 144px;
+  padding: 24px;
+  scroll-snap-align: start;
+  background: var(--ally-surface-2);
+  font: 400 14px/20px var(--ally-font-ui);
+  letter-spacing: 0.16px;
+  color: var(--ally-ink-2);
+}
+.corner-about__slide strong {
+  font: 400 20px/28px var(--ally-font-ui);
+  letter-spacing: 0;
+  color: var(--ally-ink);
+}
+.corner-about__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+.corner-about__count {
+  font: 400 12px/16px var(--ally-font-ui);
+  letter-spacing: 0.32px;
+  color: var(--ally-muted);
+}
+.corner-about__arrows {
+  display: flex;
+  gap: 1px;
+}
+.corner-about__arrows button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  background: var(--ally-surface-2);
+  color: var(--ally-ink);
+  cursor: pointer;
+}
+.corner-about__arrows button:hover:not(:disabled) {
+  background: var(--ally-sunken);
+}
+.corner-about__arrows button:focus-visible {
+  outline: 2px solid var(--ally-accent);
+  outline-offset: -2px;
+}
+.corner-about__arrows button:disabled {
+  color: var(--ally-line-strong);
+  cursor: not-allowed;
+}
+.corner-about__roles li {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ally-line);
+  font: 400 14px/20px var(--ally-font-ui);
+  letter-spacing: 0.16px;
+  color: var(--ally-ink-2);
+}
+.corner-about__roles li:first-child {
+  border-top: 1px solid var(--ally-line);
+}
+.corner-about__roles strong {
+  font-weight: 600;
+  color: var(--ally-ink);
+}
+
+/* The Change log tab: months as small headings, each update a layer-01 tile with a Carbon tag. */
+.corner-changelog {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 16px;
+}
+.corner-changelog__intro {
+  margin: 0;
+  font: 400 14px/20px var(--ally-font-ui);
+  letter-spacing: 0.16px;
+  color: var(--ally-ink-2);
+}
+.corner-changelog__month {
+  margin: 0 0 8px;
+  font: 400 12px/16px var(--ally-font-ui);
+  letter-spacing: 0.32px;
+  color: var(--ally-muted);
+}
+.corner-changelog__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--ally-line);
+}
+.corner-changelog__item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background: var(--ally-surface-2);
+  font: 400 14px/20px var(--ally-font-ui);
+  letter-spacing: 0.16px;
+  color: var(--ally-ink-2);
+}
+.corner-changelog__item strong {
+  font: 600 16px/22px var(--ally-font-ui);
+  letter-spacing: 0;
+  color: var(--ally-ink);
+}
+.corner-changelog__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 400 12px/16px var(--ally-font-ui);
+  letter-spacing: 0.32px;
+  color: var(--ally-muted);
+}
+/* Tag: pill, 12/16, on a tinted background (blue for new, green for improved, red for fixed). */
+.corner-changelog__tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ally-info-bg);
+  color: var(--ally-info);
+  font-weight: 600;
+}
+.corner-changelog__tag--improved {
+  background: var(--ally-good-bg);
+  color: var(--ally-good);
+}
+.corner-changelog__tag--fixed {
+  background: #fff1f1;
+  color: var(--ally-danger);
+}
+.corner-changelog__more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.corner-changelog__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ally-accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

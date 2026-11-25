@@ -16,7 +16,10 @@ export class ChatbotTemplateInstall {
   @Column({ name: 'template_id', type: 'varchar', length: 40 })
   templateId!: string;
 
-  /** An Ally library template's version (stage 3); null for the code templates (T1). */
+  /**
+   * An Ally library template's version (stage 3), or the version of a staff-managed use-case
+   * template (`assistant_templates`); null for a built-in code template (T1).
+   */
   @Column({ name: 'template_version', type: 'int', nullable: true })
   templateVersion?: number | null;
 

@@ -68,7 +68,7 @@ export const PLAN = {
     holder: "Who has it",
     holderLabel: (seat: string) => `Who has seat ${seat}`,
     nobody: "Nobody",
-    ownerOnly: "Only the assistant's owners can give or move seats.",
+    ownerOnly: "Only the assistant's authors can give or move seats.",
     saved: "Seat updated.",
     failed: "That seat didn't change. Try again.",
     noSeatBadge: "No seat",

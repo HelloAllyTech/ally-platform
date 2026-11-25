@@ -63,6 +63,7 @@ const QuickReplies = lazy(() =>
 const Library = lazy(() =>
   import("./panels/embedded").then(m => ({ default: m.KnowledgeLibraryView })),
 );
+const Templates = lazy(() => import("./panels/embedded").then(m => ({ default: m.TemplatesView })));
 const Channels = lazy(() => import("./panels/embedded").then(m => ({ default: m.ChannelsView })));
 const Support = lazy(() => import("./panels/embedded").then(m => ({ default: m.SupportPanel })));
 const Switches = lazy(() => import("./LaunchPanels").then(m => ({ default: m.SwitchesPanel })));
@@ -122,6 +123,7 @@ export const buildSections = (): AdminSection[] => [
       { id: "settings", ...S.content.views.settings, Panel: StartingSettings },
       { id: "replies", ...S.content.views.replies, Panel: QuickReplies },
       { id: "library", ...S.content.views.library, Panel: Library },
+      { id: "templates", ...S.content.views.templates, Panel: Templates },
       { id: "channels", ...S.content.views.channels, Panel: Channels },
     ],
   },

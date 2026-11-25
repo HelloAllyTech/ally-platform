@@ -1,23 +1,24 @@
 /**
- * The builder's home (stage 2): two choices, Create and Open. All new wording. // COPY: needs approval
+ * The builder's home (stage 2): the chatbots to open, and a Create button in the header. All new wording. // COPY: needs approval
  */
 export const BUILDER_HOME = {
-  title: "Your chatbots",
-  subtitle: "Create a new chatbot, or open one you already work on.",
+  title: "Your Ally Chatbots",
   create: {
-    title: "Create a chatbot",
-    body: "Start from a template or from scratch, and test it as you build.",
-    button: "Create a chatbot",
+    button: "Create new chatbot",
     openLink: "Back to your chatbots",
   },
+  tabs: {
+    label: "Show chatbots",
+    all: "All",
+    active: "Active",
+    archived: "Archived",
+  },
   open: {
-    title: "Open a chatbot",
-    emptyTitle: "No chatbots to open yet",
-    emptyMember: "You haven't been added to a chatbot yet. Ask its owner to add you.",
-    emptyCreate: "Create your first chatbot above.",
+    emptyTitle: "No Ally Chatbots here 😮",
+    emptyMember: "You haven't been added to a chatbot yet. Ask its author to add you.",
+    emptyCreate: "Create your first Ally chatbot and change the world 🚀",
     loadFailed: "Could not load your chatbots.",
   },
-  showArchived: "Show archived",
   archivedLoadFailed: "Could not load the archived chatbots.",
   waiting: "{count} waiting for a person",
   narrow: {

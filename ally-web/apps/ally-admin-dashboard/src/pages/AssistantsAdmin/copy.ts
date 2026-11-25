@@ -77,6 +77,10 @@ export const ASSISTANTS_ADMIN_COPY = {
           label: "Knowledge library",
           hint: "Shared documents any chatbot can draw on, including the curated pool.",
         },
+        templates: {
+          label: "Templates",
+          hint: "The use-case templates owners start from. Edit a built-in, copy one, or build a new one, then publish it when it passes the checks.",
+        },
         channels: {
           label: "Channels & numbers",
           hint: "Every WhatsApp number and which chatbot answers it.",
@@ -170,6 +174,12 @@ export const ASSISTANTS_ADMIN_COPY = {
       label: "Add to the shared knowledge library",
       section: "content",
       view: "library",
+    },
+    {
+      id: "templates",
+      label: "Build or publish a use-case template",
+      section: "content",
+      view: "templates",
     },
     {
       id: "number",

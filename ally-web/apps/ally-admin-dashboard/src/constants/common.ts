@@ -186,6 +186,8 @@ export const ApiEndpoints = {
       `/v1/learn/roleplay-interview/sessions/${id}/approve`,
     ROLEPLAY_INTERVIEW_ABANDON: (id: string) =>
       `/v1/learn/roleplay-interview/sessions/${id}/abandon`,
+    ROLEPLAY_INTERVIEW_CHARACTER: (id: string) =>
+      `/v1/learn/roleplay-interview/sessions/${id}/character`,
     COMPETENCIES: "/v1/learn/competencies",
     COMPETENCY_BY_ID: (id: string) => `/v1/learn/competencies/${id}`,
     COMPETENCY_BEHAVIOURS: (id: string) => `/v1/learn/competencies/${id}/behaviours`,
@@ -387,6 +389,8 @@ export const ApiEndpoints = {
       `/v1/blog-review/posts/${encodeURIComponent(id)}/suggestions/${encodeURIComponent(suggestionId)}`,
   },
   PRODUCT_UPDATES: {
+    /** Open to everyone: the live, public updates. The corner drawer's Change log reads it. */
+    PUBLIC: "/v1/product-updates/public",
     LIST: "/v1/product-updates",
     STATUS: "/v1/product-updates/status",
     RUN: "/v1/product-updates/run",
@@ -1711,6 +1715,8 @@ export const TAG_TYPES = {
   WHATSAPP_BOT_DOCUMENTS: "whatsAppBotDocuments",
   WHATSAPP_BOT_STATS: "whatsAppBotStats",
   WHATSAPP_BOT_TEMPLATES: "whatsAppBotTemplates",
+  /** Staff-managed use-case templates (Assistants admin → Templates). */
+  ASSISTANT_TEMPLATES_ADMIN: "assistantTemplatesAdmin",
   WHATSAPP_BOT_SETTINGS: "whatsAppBotSettings",
   WHATSAPP_BOT_CONVERSATIONS: "whatsAppBotConversations",
   WHATSAPP_BOT_UNANSWERED: "whatsAppBotUnanswered",

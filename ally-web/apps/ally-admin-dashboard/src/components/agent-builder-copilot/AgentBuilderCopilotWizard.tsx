@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 
-import { CheckCircle, FailIcon } from "@icons";
 import { UseFormReturn, useWatch } from "react-hook-form";
 
 import { AutoExpandableTextarea } from "@ally-ui-mono/ui-shared";
@@ -14,22 +13,24 @@ import {
   useLazyGetCharacterByIdQuery,
   useLazyGetRoleplayDesignQuery,
   useLinkRoleplayInterviewMutation,
+  useSaveRoleplayInterviewCharacterMutation,
   useSuggestAgentBuilderCharactersMutation,
 } from "@api";
 import { en } from "@constants";
-import { applyCharacterToForm } from "@utils/characterApply";
-import { layOutPlanStates } from "@utils/roleplayStates";
+import { CheckCircle, FailIcon } from "@icons";
 import { RoleplayInterviewGeneration } from "@types";
-
-import { RoleplayInterviewPanel } from "../roleplay-interview";
 import {
   ModeRecommendation,
   recommendMode,
   suggestNextSteps,
 } from "@utils/agentBuilderSuggestions";
+import { applyCharacterToForm } from "@utils/characterApply";
+import { LIBRARY_CHARACTER_FIELDS } from "@utils/roleplayAgentFields";
+import { layOutPlanStates } from "@utils/roleplayStates";
 
 import { Button } from "../button";
 import { Competency } from "../competency";
+import { RoleplayInterviewPanel } from "../roleplay-interview";
 import { ButtonVariant } from "../types";
 import {
   GenerationTask,
@@ -260,6 +261,7 @@ const RevisionBlock = ({ revision }: { revision: Revision }) => (
                   {row.label}
                 </span>
                 {row.error && <span className="text-xs text-typography-500">· {row.error}</span>}
+                {row.detail && <span className="text-xs text-typography-600">· {row.detail}</span>}
               </li>
             ))}
           </ul>
@@ -383,6 +385,65 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
     busy: revising,
     resetRevisions,
   } = useAgentBuilderRevision(formMethods);
+
+  // A new character the roleplay agent wrote goes into the Character Library once the roleplay is
+  // generated, and is updated there after a change to the character, so the next roleplay can
+  // reuse it. A roleplay played by a library character adds nothing.
+  const [saveInterviewCharacter] = useSaveRoleplayInterviewCharacterMutation();
+  const librarySavedRef = useRef(false);
+  const syncLibraryCharacter = async () => {
+    if (!interviewSessionId || character) return;
+    const v = formMethods.getValues() as Record<string, unknown>;
+    const fields = LIBRARY_CHARACTER_FIELDS;
+    try {
+      const session = await saveInterviewCharacter({
+        id: interviewSessionId,
+        character: Object.fromEntries(fields.map(field => [field, v[field]])),
+      }).unwrap();
+      const saved = session?.brief?.savedCharacter;
+      if (!saved) return;
+      const first = !librarySavedRef.current;
+      librarySavedRef.current = true;
+      setHistory(previous => [
+        ...previous,
+        {
+          question: interviewStrings.libraryQuestion,
+          answer: first
+            ? interviewStrings.addedToLibrary(saved.name)
+            : interviewStrings.updatedInLibrary(saved.name),
+        },
+      ]);
+    } catch {
+      /* the roleplay is unaffected; the trainer can add the character from the form */
+    }
+  };
+  const syncRef = useRef(syncLibraryCharacter);
+  useEffect(() => {
+    syncRef.current = syncLibraryCharacter;
+  });
+
+  // Once the generation finishes.
+  const libraryPhaseRef = useRef<string>("idle");
+  useEffect(() => {
+    if (phase === libraryPhaseRef.current) return;
+    libraryPhaseRef.current = phase;
+    if (phase === "done") void syncRef.current();
+  }, [phase]);
+
+  // And after a change that touched who the character is.
+  const librarySeenRevisionsRef = useRef(0);
+  useEffect(() => {
+    const last = revisions[revisions.length - 1];
+    if (!last || last.status !== "done") return;
+    if (librarySeenRevisionsRef.current >= revisions.length) return;
+    librarySeenRevisionsRef.current = revisions.length;
+    const touchedCharacter = last.rows.some(
+      row =>
+        row.status === "done" &&
+        ["characterDetails", "characterProfileText", "voices"].includes(row.id),
+    );
+    if (touchedCharacter && librarySavedRef.current) void syncRef.current();
+  }, [revisions]);
 
   // Reopening a roleplay: the saved conversation arrives with the form's values (after the
   // fetch), so restore it the first time it appears, unless the trainer has already started.
@@ -754,6 +815,7 @@ export const AgentBuilderCopilotWizard: React.FC<AgentBuilderCopilotWizardProps>
 
   const handleStartOver = () => {
     reset();
+    librarySavedRef.current = false;
     setHistory([]);
     // From a saved conversation, keep its description to edit rather than retype.
     setDescription(restored?.description ?? "");

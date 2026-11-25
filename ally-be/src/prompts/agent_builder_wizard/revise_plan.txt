@@ -8,6 +8,7 @@ The roleplay's fields now (field id, what it is, then its current text):
 
 Rules:
 - Choose only fields whose text must change for the request to be true. A request about how the client talks ("more guarded", "shorter answers") usually changes the role instruction and the opening lines; a request about who they are changes the backstory and often the role instruction; a request about the situation changes the challenge description.
+- A request about who the client is (their gender, name or age, e.g. "make him a girl") changes the character details field (characterDetails); every field that names or describes the client is then updated to match.
 - A request about a state names a state field by its id (state:<id>).
 - If nothing needs to change, or the request is not about this roleplay, choose no fields and say why.
 - For each field, write the instruction for rewriting it: what to change in that field to meet the request, in one or two sentences.

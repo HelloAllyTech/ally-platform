@@ -8,6 +8,8 @@ export const COMPLETE_BRIEF: RoleplayInterviewBrief = {
   mode: 'practice',
   difficulty: 'MEDIUM',
   client: { description: 'A student who hints at not wanting to wake up' },
+  // The library was searched and nothing fits: a new character may be written.
+  characterChoice: { searched: true, matches: 0 },
   setting: 'A late-night helpline call',
   languages: [{ languageId: 'l-1', label: 'English', code: 'en-US' }],
   notes: ['Keep it under ten minutes'],

@@ -54,6 +54,19 @@ export interface RoleplayInterviewBrief {
     characterId?: string;
     characterName?: string;
   };
+  /**
+   * How the client was chosen, kept by the server (never from the model's update_brief): the
+   * Character Library was searched, how many characters could play the client, and whether the
+   * trainer chose one of them or a new character. A plan with no library character needs a
+   * search, and when the search found any, the trainer's choice of a new one.
+   */
+  characterChoice?: {
+    searched: boolean;
+    matches: number;
+    decision?: 'library' | 'new';
+  };
+  /** The library character made from this roleplay's new character, once it was saved. */
+  savedCharacter?: { id: string; name: string };
   setting?: string;
   languages?: RoleplayInterviewLanguage[];
   behaviours?: { helpful: string[]; unhelpful: string[] };

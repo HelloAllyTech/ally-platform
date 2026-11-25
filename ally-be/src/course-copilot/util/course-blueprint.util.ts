@@ -725,11 +725,6 @@ export function countImages(
 
 // ── Validation ──────────────────────────────────────────────────────────────
 
-export interface ValidateBlueprintOptions {
-  /** `config.courseCopilot.maxNewRoleplays`; COURSE_COPILOT_LIMITS.newRoleplays by default. */
-  maxNewRoleplays: number;
-}
-
 /**
  * Problems that block approval, phrased for the trainer who has to fix them
  * in the tree or in chat — not for a developer. Empty means approvable.
@@ -741,7 +736,6 @@ export interface ValidateBlueprintOptions {
 export function validateBlueprint(
   blueprint: CourseBlueprint,
   brief: CourseBrief,
-  opts: ValidateBlueprintOptions,
 ): string[] {
   const limits = COURSE_COPILOT_LIMITS;
   const problems: string[] = [];
@@ -855,12 +849,8 @@ export function validateBlueprint(
     );
   }
 
-  const newRoleplays = countNewRoleplays(blueprint);
-  if (newRoleplays > opts.maxNewRoleplays) {
-    problems.push(
-      `The course would create ${newRoleplays} new roleplays; one course can create at most ${opts.maxNewRoleplays}. Use library roleplays for some of them, or remove one.`,
-    );
-  }
+  // New roleplays have no limit of their own: the course's item limits and the
+  // session budget bound them.
   const newCases = countNewCases(blueprint);
   if (newCases > limits.newCases) {
     problems.push(

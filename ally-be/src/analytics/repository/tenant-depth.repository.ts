@@ -4,6 +4,7 @@ import {
   FHS_RUBRIC,
   FHS_RUBRIC_VERSION,
 } from 'src/foundational-skills/constants/helping-skills-rubric.constants';
+import { inModuleOrder } from '../util/module-order.util';
 import type { MeasureRow } from './tenant-scope-summary.repository';
 
 /** A cell needs this many learners behind it before it is drawn. */
@@ -263,15 +264,16 @@ export class TenantDepthRepository {
       });
       byLearner.set(r.uid, entry);
     });
+    const moduleList = inModuleOrder(modules);
     const ordered = [...byLearner.entries()].sort(
       (a, b) => b[1].last - a[1].last,
     );
     return {
-      modules: modules.slice(0, MODULE_LIMIT),
+      modules: moduleList.slice(0, MODULE_LIMIT),
       learners: ordered.slice(0, LEARNER_ROWS).map(([learnerId, l]) => ({
         learnerId,
         name: l.name,
-        cells: modules.slice(0, MODULE_LIMIT).map(
+        cells: moduleList.slice(0, MODULE_LIMIT).map(
           (m) =>
             l.cells.get(m.sectionId) ?? {
               status: 'notStarted',
@@ -368,7 +370,7 @@ export class TenantDepthRepository {
     });
     const rank = (d: Difficulty | null) =>
       d === 'easy' ? 1 : d === 'medium' ? 2 : d === 'hard' ? 3 : 4;
-    const ranked = [...modules].sort(
+    const ranked = [...inModuleOrder(modules)].sort(
       (a, b) => rank(a.difficulty) - rank(b.difficulty),
     );
 

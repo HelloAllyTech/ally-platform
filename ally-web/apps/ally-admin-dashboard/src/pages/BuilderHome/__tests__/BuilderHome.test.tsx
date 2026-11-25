@@ -1,11 +1,13 @@
 import React from "react";
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // `@constants` first: the admin app's barrel does module-load-time work.
 import "@constants";
+
+import { ASSISTANT_HEADER_SLOT_ID } from "@components/assistant-only/headerSlot";
 
 import {
   ChatbotAccessMode,
@@ -58,9 +60,14 @@ vi.mock("@api", async importOriginal => ({
   useGetMyPlanQuery: () => ({ data: undefined }),
   useArchiveChatbotMutation: () => [mockArchive, { isLoading: false }],
   useRestoreChatbotMutation: () => [mockRestore, { isLoading: false }],
-  useGetArchivedChatbotsQuery: () => {
-    archivedCalls();
-    return { data: mockArchived, isLoading: false, isError: false, refetch: vi.fn() };
+  useGetArchivedChatbotsQuery: (_arg: unknown, options?: { skip?: boolean }) => {
+    if (!options?.skip) archivedCalls();
+    return {
+      data: options?.skip ? undefined : mockArchived,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
   },
 }));
 const { BuilderHome } = await import("../BuilderHome");
@@ -106,18 +113,51 @@ describe("BuilderHome", () => {
     delete window.matchMedia;
   });
 
-  it("offers exactly two choices: Create a chatbot and Open a chatbot", () => {
+  it("offers Create new chatbot as one button at the right end of the tab row, above the chatbots to open", () => {
     renderHome();
-    expect(screen.getByTestId("choice-create")).toBeTruthy();
+    const create = screen.getByRole("button", { name: "Create new chatbot" });
+    const bar = screen.getByTestId("builder-home").querySelector(".ally-list-page__tabbar");
+    expect(bar?.contains(create)).toBe(true);
+    expect(bar?.lastElementChild).toBe(create);
+    expect(screen.getByRole("tablist").contains(create)).toBe(false);
+    expect(screen.queryByRole("heading", { name: "Create new chatbot" })).toBeNull();
     expect(screen.getByTestId("choice-open")).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Open a chatbot" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Create a chatbot" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Open a chatbot" })).toBeNull();
   });
 
-  it("has no tabs: Inbox, Connectors, Defaults and Library are gone, and ?tab= is ignored", () => {
+  it("draws its title in the shell's top bar when there is one, and Create stays in the tab row", () => {
+    const slot = document.createElement("div");
+    slot.id = ASSISTANT_HEADER_SLOT_ID;
+    document.body.appendChild(slot);
+    try {
+      renderHome();
+      expect(slot.querySelector("h1")?.textContent).toBe("Your Ally Chatbots");
+      expect(within(slot).queryByRole("button", { name: "Create new chatbot" })).toBeNull();
+      const page = screen.getByTestId("builder-home");
+      expect(page.querySelector("h1")).toBeNull();
+      expect(within(page).getByRole("button", { name: "Create new chatbot" })).toBeTruthy();
+    } finally {
+      slot.remove();
+    }
+  });
+
+  it("shows an illustration when there is no chatbot to open, and not when there are some", () => {
+    mockList = { chatbots: [], canCreate: true };
+    renderHome();
+    expect(screen.getByTestId("empty-chatbots-art")).toBeTruthy();
+    cleanup();
+    mockList = { chatbots: [bot()], canCreate: true };
+    renderHome();
+    expect(screen.queryByTestId("empty-chatbots-art")).toBeNull();
+  });
+
+  it("has only the All / Active / Archived views: Inbox, Connectors, Defaults and Library are gone, and ?tab= is ignored", () => {
     renderHome("/assistants?tab=defaults");
-    expect(screen.queryByRole("tablist")).toBeNull();
-    expect(screen.queryByTestId("tabs")).toBeNull();
+    expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual([
+      "All",
+      "Active",
+      "Archived",
+    ]);
     for (const name of ["Inbox", "Connectors", "Channels", "Defaults", "Knowledge library"]) {
       expect(screen.queryByRole("tab", { name })).toBeNull();
     }
@@ -134,8 +174,7 @@ describe("BuilderHome", () => {
   it("hides Create from someone who cannot create", () => {
     mockList = { chatbots: [bot(), bot({ id: "bot-2", name: "Second" })], canCreate: false };
     renderHome();
-    expect(screen.queryByTestId("choice-create")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Create a chatbot" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Create new chatbot" })).toBeNull();
     expect(screen.getByText("Second")).toBeTruthy();
   });
 
@@ -275,29 +314,62 @@ describe("BuilderHome", () => {
     });
   });
 
-  describe("Show archived", () => {
-    it("is off by default and does not load archived chatbots", () => {
+  describe("All / Active / Archived views", () => {
+    const old = () => bot({ id: "bot-9", name: "Old helper", archivedAt: "2026-11-10T09:00:00Z" });
+    const selected = () =>
+      screen.getAllByRole("tab").find(tab => tab.getAttribute("aria-selected") === "true")
+        ?.textContent;
+
+    it("opens on All: the active chatbots, then the archived ones", () => {
+      mockArchived = { chatbots: [old()] };
       renderHome();
-      expect(screen.queryByTestId("archived-grid")).toBeNull();
+      expect(selected()).toBe("All");
+      expect(screen.getByText("Policy helper")).toBeTruthy();
+      expect(screen.getByText("Old helper")).toBeTruthy();
+      expect(screen.getByText(/^Removed /)).toBeTruthy();
+    });
+
+    it("Active shows only the active chatbots and does not load the archived ones", () => {
+      mockArchived = { chatbots: [old()] };
+      renderHome();
+      archivedCalls.mockClear();
+      fireEvent.click(screen.getByRole("tab", { name: "Active" }));
+      expect(selected()).toBe("Active");
+      expect(screen.getByText("Policy helper")).toBeTruthy();
+      expect(screen.queryByText("Old helper")).toBeNull();
       expect(archivedCalls).not.toHaveBeenCalled();
     });
 
-    it("folds the archived tab in: on, it shows removed chatbots to open and read", () => {
-      mockArchived = {
-        chatbots: [bot({ id: "bot-9", name: "Old helper", archivedAt: "2026-11-10T09:00:00Z" })],
-      };
+    it("Archived shows only the removed chatbots, to open and read", () => {
+      mockArchived = { chatbots: [old()] };
       renderHome();
-      fireEvent.click(screen.getByLabelText("Show archived"));
+      fireEvent.click(screen.getByRole("tab", { name: "Archived" }));
+      expect(selected()).toBe("Archived");
       expect(screen.getByText("Old helper")).toBeTruthy();
-      expect(screen.getByText(/^Removed /)).toBeTruthy();
+      expect(screen.queryByText("Policy helper")).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "More for Old helper" }));
       expect(screen.queryByRole("menuitem", { name: "Remove assistant" })).toBeNull();
     });
 
-    it("lets an owner restore, and gives no menu to someone who does not own it", async () => {
+    it("moves between the tabs with the arrow keys", () => {
+      renderHome();
+      fireEvent.keyDown(screen.getByRole("tab", { name: "All" }), { key: "ArrowRight" });
+      expect(selected()).toBe("Active");
+      fireEvent.keyDown(screen.getByRole("tab", { name: "Active" }), { key: "ArrowLeft" });
+      expect(selected()).toBe("All");
+    });
+
+    it("keeps the old ?archived=1 link working: it opens on Archived", () => {
+      mockArchived = { chatbots: [old()] };
+      renderHome("/assistants?archived=1");
+      expect(selected()).toBe("Archived");
+      expect(screen.getByText("Old helper")).toBeTruthy();
+    });
+
+    it("lets an author restore, and gives no menu to someone who does not own it", async () => {
       mockArchived = {
         chatbots: [
-          bot({ id: "bot-9", name: "Old helper", archivedAt: "2026-11-10T09:00:00Z" }),
+          old(),
           bot({
             id: "bot-8",
             name: "Not mine",
@@ -307,7 +379,7 @@ describe("BuilderHome", () => {
         ],
       };
       mockRestore.mockClear();
-      renderHome("/assistants?archived=1");
+      renderHome("/assistants?view=archived");
       expect(screen.queryByRole("button", { name: "More for Not mine" })).toBeNull();
       fireEvent.click(screen.getByRole("button", { name: "More for Old helper" }));
       fireEvent.click(screen.getByRole("menuitem", { name: "Restore assistant" }));
@@ -315,28 +387,35 @@ describe("BuilderHome", () => {
     });
 
     it("says when nothing has been archived", () => {
-      renderHome("/assistants?archived=1");
+      renderHome("/assistants?view=archived");
       expect(screen.getByTestId("archived-empty").textContent).toContain("Nothing archived");
+    });
+
+    it("shows one empty state on All when there is nothing at all", () => {
+      mockList = { chatbots: [], canCreate: true };
+      renderHome();
+      expect(screen.getByText("No Ally Chatbots here 😮")).toBeTruthy();
+      expect(screen.queryByTestId("archived-empty")).toBeNull();
     });
   });
 
   describe("Create", () => {
     it("goes to the create screen on a wide screen", () => {
       renderHome();
-      fireEvent.click(screen.getByRole("button", { name: "Create a chatbot" }));
+      fireEvent.click(screen.getByRole("button", { name: "Create new chatbot" }));
       expect(screen.getByTestId("where").textContent).toBe("/assistants/new");
     });
 
     it("below 1280px creates nothing and says to open it on a laptop", () => {
       setWidth(1100);
       renderHome();
-      fireEvent.click(screen.getByRole("button", { name: "Create a chatbot" }));
+      fireEvent.click(screen.getByRole("button", { name: "Create new chatbot" }));
       expect(screen.getByTestId("where").textContent).toBe("/assistants");
       expect(screen.getByTestId("narrow-note").textContent).toContain("laptop");
     });
   });
 
-  it("lets an owner remove a chatbot from its menu", async () => {
+  it("lets an author remove a chatbot from its menu", async () => {
     mockArchive.mockClear();
     renderHome();
     fireEvent.click(screen.getByRole("button", { name: "More for Policy helper" }));
@@ -358,6 +437,6 @@ describe("BuilderHome", () => {
   it("tells a member with nothing to open who to ask", () => {
     mockList = { chatbots: [], canCreate: false };
     renderHome();
-    expect(screen.getByText(/Ask its owner/)).toBeTruthy();
+    expect(screen.getByText(/Ask its author/)).toBeTruthy();
   });
 });

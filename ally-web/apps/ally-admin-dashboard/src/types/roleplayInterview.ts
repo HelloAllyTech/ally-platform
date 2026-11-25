@@ -15,6 +15,10 @@ export interface RoleplayInterviewBrief {
   mode?: RoleplayMode;
   difficulty?: "EASY" | "MEDIUM" | "HARD";
   client?: { description?: string; characterId?: string; characterName?: string };
+  /** Server-kept: the library search, its matches and the trainer's choice of character. */
+  characterChoice?: { searched: boolean; matches: number; decision?: "library" | "new" };
+  /** The library character made from this roleplay's new character. */
+  savedCharacter?: { id: string; name: string };
   setting?: string;
   languages?: { languageId: string; label: string; code: string }[];
   behaviours?: { helpful: string[]; unhelpful: string[] };

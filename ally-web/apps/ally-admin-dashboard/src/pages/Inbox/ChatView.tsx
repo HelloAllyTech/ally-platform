@@ -237,7 +237,7 @@ export const ChatView: React.FC<{
                   variant={ButtonVariant.TEXT}
                   size="sm"
                   type="button"
-                  className="ally-link"
+                  className="ally-link ally-link--inline"
                   onClick={() => onOpenConversation?.(other.id)}
                 >
                   {time(other.lastMessageAt)}
@@ -352,7 +352,7 @@ export const ChatView: React.FC<{
             variant={ButtonVariant.TEXT}
             size="sm"
             type="button"
-            className="ally-link"
+            className="ally-link ally-link--inline"
             onClick={() => onOpenConversation?.(thread.newerChatId!)}
           >
             {TF1_COPY.inbox.openNewer}

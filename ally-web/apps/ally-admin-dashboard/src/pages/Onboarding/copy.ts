@@ -474,14 +474,22 @@ export const SPLIT_COPY = {
     group: "Build and test",
     build: "Build",
     test: "Test",
-    presets: "Layout",
-    half: "Half and half",
-    more: "More room for the assistant",
-    only: "Assistant only",
     divider: "Resize the build and test areas",
   },
+  /** The Create and Build screen's top bar: the way back, and the chatbot's name, edited in place. */
+  breadcrumb: {
+    label: "Breadcrumb",
+    back: "Back to Ally Chatbots",
+    rename: "Rename this chatbot",
+    saving: "Saving…",
+    failed: "Could not save the name. Try again.",
+  },
+  /** The two halves of the Create screen are headed alike: "Configure…" here, "Try…" opposite. */
+  build: {
+    title: "Configure your chatbot",
+  },
   pane: {
-    title: "Try your assistant",
+    title: "Try your chatbot",
     placeholder: "Your assistant will appear here",
     newChat: "New chat",
     inputLabel: "Ask your assistant something",

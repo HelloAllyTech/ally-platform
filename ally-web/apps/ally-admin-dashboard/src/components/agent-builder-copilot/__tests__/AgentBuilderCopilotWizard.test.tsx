@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
   revisePlan: vi.fn(),
   generation_: null as any,
   enhance: vi.fn(),
+  saveCharacter: vi.fn(() => ({
+    unwrap: () => Promise.resolve({ brief: { savedCharacter: { id: "c-1", name: "Arjun" } } }),
+  })),
   catalog: [
     {
       language_id: 1,
@@ -62,7 +65,7 @@ vi.mock("../../roleplay-interview", () => ({
   RoleplayInterviewPanel: ({ onApproved, onUseSteps }: any) => (
     <div data-testid="interview-panel">
       <button onClick={onUseSteps}>use steps</button>
-      <button onClick={() => onApproved(mocks.generation_)}>approve plan</button>
+      <button onClick={() => onApproved(mocks.generation_, "sess-1")}>approve plan</button>
     </div>
   ),
 }));
@@ -75,6 +78,7 @@ vi.mock("@api", () => ({
   useSuggestAgentBuilderCharactersMutation: () => [mocks.suggest, { isLoading: false }],
   useLazyGetCharacterByIdQuery: () => [mocks.fetchCharacter, { isFetching: false }],
   useLinkRoleplayInterviewMutation: () => [vi.fn(() => ({ unwrap: () => Promise.resolve({}) }))],
+  useSaveRoleplayInterviewCharacterMutation: () => [mocks.saveCharacter],
   useRevisePlanMutation: () => [mocks.revisePlan],
   useEnhanceFieldMutation: () => [mocks.enhance],
 }));
@@ -652,5 +656,49 @@ describe("AgentBuilderCopilotWizard interview", () => {
       languages: [{ languageId: "1", label: "English (India)", code: "en-IN" }],
     });
     expect(onGenerationStart).toHaveBeenCalled();
+  });
+
+  it("adds the new character to the Character Library once the roleplay is generated", async () => {
+    mocks.generation_ = {
+      actorDescription: "Arjun, 22, low after a breakup.",
+      competencyId: "c1",
+      competencyIds: ["c1"],
+      competencyName: "Assessment of Harm",
+      mode: "practice",
+      agentTestCases: "",
+      states: [],
+    };
+    mocks.formValues = {
+      ...mocks.formValues,
+      name: "Arjun",
+      age: 22,
+      gender: "male",
+      characterProfileText: "Final-year student…",
+      languageVoices: { "1": "v-1" },
+      prompt: "not sent",
+    };
+    const { rerender } = render(<AgentBuilderCopilotWizard formMethods={form()} />);
+    await act(async () => {
+      fireEvent.click(screen.getByText("approve plan"));
+    });
+    expect(mocks.saveCharacter).not.toHaveBeenCalled();
+
+    mocks.generation = { ...mocks.generation, phase: "done" };
+    await act(async () => {
+      rerender(<AgentBuilderCopilotWizard formMethods={form()} />);
+    });
+
+    expect(mocks.saveCharacter).toHaveBeenCalledTimes(1);
+    const [{ id, character }] = (mocks.saveCharacter.mock.calls as any[])[0];
+    expect(id).toBe("sess-1");
+    expect(character).toMatchObject({
+      name: "Arjun",
+      age: 22,
+      gender: "male",
+      characterProfileText: "Final-year student…",
+      languageVoices: { "1": "v-1" },
+    });
+    expect(character).not.toHaveProperty("prompt");
+    expect(await screen.findByText(en.roleplayInterview.addedToLibrary("Arjun"))).toBeTruthy();
   });
 });

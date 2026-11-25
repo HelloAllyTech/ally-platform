@@ -34,6 +34,12 @@ const logger = new Logger('AnalyticalAgent');
 const outputSchema = z.object({
   response: z.string(),
   followUps: z.array(z.string()).optional(),
+  needsUserInput: z
+    .boolean()
+    .optional()
+    .describe(
+      'true only when `response` is questions for the user that must be answered before the analysis can go on; leave it out when `response` is an answer',
+    ),
 });
 
 // Nothing below runs at import: the model, the Google/GitHub auth and the MCP client are built on
@@ -510,6 +516,7 @@ function parseStructuredText(text: string) {
       return {
         response: parsed.data.response,
         followUps: parsed.data.followUps ?? [],
+        needsUserInput: parsed.data.needsUserInput,
       };
   } catch {
     // not JSON - plain prose answer
