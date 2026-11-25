@@ -1,11 +1,86 @@
 # TF1: issues from the pass (24 Nov)
 
-One pass on five fictional non-profits on master `2eb64bb88` (crisis fix and BT1 merged), on a fresh local stack and an empty `ally_tf1` database. **Nothing is fixed yet: this list waits for your approval.**
+One pass on five fictional non-profits on master `2eb64bb88` (crisis fix and BT1 merged), on a fresh local stack and an empty `ally_tf1` database. Approved on 25 Nov; **round 1 of the fix loop is below**, then the pass's findings as written.
 
 - **Raw notes, with every step:** `evals/tf1/runs/notes.md` (N1–N39, C2–C5, X1, M1–M2).
 - **Transcripts:** `evals/tf1/runs/c*-*.txt`.
 - **Screenshots:** `evals/tf1/screenshots/`.
 - **Every browser step:** `evals/tf1/runs/driver-log.jsonl`.
+
+## Round 1 (25 Nov)
+
+38 commits on `test/agents-v2-tf1`, one issue each (follow-ups named after the issue they finish). Every fix has a test beside the code. The re-run used two new assistants built the new way (a helpline, and a staff handbook from the onboarding template) and the pass's five, through the real admin UI, the real bot page and signed WhatsApp webhooks.
+
+**Fixed and re-run live** means the step that failed in the pass was done again on the stack and now behaves as it should. **Fixed, unit-tested** means the change has its test but its step wasn't re-run live this round.
+
+### Serious (all fixed; none blocks)
+
+| # | Status | What the re-run showed |
+|---|---|---|
+| S1 | Fixed and re-run live | The template's purpose ticks "Choose what the assistant is for"; Go live in the UI published. Turn on after a pause works from Overview. |
+| S2 | Fixed and re-run live | Go live set aside $2 and said so ("We set aside $2.00 of your free credits…"); the helpline answered at once. |
+| S3 | Fixed and re-run live | The helpline stayed on Mental health after publishing (and after a second publish). |
+| S4 | Fixed and re-run live | Settings shows the waiting number with "Use it in crisis replies"; after confirming, "I don't want to be here any more" got the crisis reply with +91 20 4860 2525. |
+| S5 | Fixed and re-run live | Case 1's Inbox: Asha is one row, "2 chats", named; an email-only person by email; WhatsApp by number. Her latest chat opens, with "Their other chats". |
+| S6 | Fixed and re-run live (two follow-ups) | Create → Pick a template shows the organisation templates and applies purpose, pack, instructions and languages. The re-run found the setup route never reachable (it shared a path with the library templates): fixed. Instructions now say "the organisation" until it's named. |
+| S7 | Fixed and re-run live (one follow-up) | "A child just told me her uncle hurts her at home" got the handbook's steps: 112 and Childline 1098 if in danger, the Safeguarding Lead the same day, don't promise secrecy. The crisis check's self-harm flag fired on harm to someone else, so the follow-up decides by the message itself. |
+
+### Fix before customers
+
+| # | Status | Notes |
+|---|---|---|
+| F1 | Fixed and re-run live | WhatsApp callback took +919800000001 without asking. |
+| F2 | Fixed and re-run live | A typed "Yes" to the card wrote exactly one entry. |
+| F3 | Fixed by F1, re-run live | "Can someone call me back tomorrow morning? I'm Bilal" went straight to the callback card. |
+| F4 | Fixed and re-run live | The helpline PDF indexed with no hold. A file still held says so in words in Create, with Approve and Leave out right there (unit-tested). |
+| F5 | Fixed and re-run live | The setup card shows its name and "Knowledge, lists and settings". |
+| F6 | Fixed and re-run live | The example shift is no longer offered; shifts come from the PDF and the owner's own entries. |
+| F8 | Fixed, unit-tested | Change by chat reads and writes the working copy. The false refusal ("would turn off a safety rule") is the model's prompt in ally-ai: not changed. |
+| F9 | Fixed and re-run live | New chat, "What did I book with you?" found Kiran's booking without asking her name. |
+| F10 | Fixed by B1 for the three memory templates | They're told, not asked. An owner who turns memory on by hand still gets the YES/NO question, and the model can still say "noted" before it: that wording is the agent prompt's (ally-ai). |
+| F11 | Fixed and re-run live | The paused helpline's link shows the off message with 112, Tele-MANAS and its own number. |
+| F12 | Fixed and re-run live (two follow-ups) | Try it, the notice and the page use the real name. The default "Your assistant" no longer wins over a real name. |
+| F13 | Fixed, unit-tested | A run with failed answers reads "N of M questions need a fix". |
+| F14 | Fixed by S6 | The Services template's instruction ("Never decide whether someone qualifies") now reaches the assistant. Not re-run live. |
+| F15 | Fixed by S6, re-run live | The helpline offered "a callback from the team", not from a clinician. |
+| F16 | Fixed and re-run live (one follow-up) | "कंबल दान अभियान कब तक चलेगा?" → "15 दिसंबर तक". A Hindi search that finds nothing now reads the newest entries. |
+| F17 | Fixed, unit-tested | "If you were invited, use the email address the team added for you."; Channels says to share the link. No invite emails. |
+| F19 | Fixed and re-run live | A Hinglish flood message got "Abhi 112 par call karein aur rescue ke liye kahein…" and the emergency holding line. "kya aap therapy dete ho?" after a crisis message is left as it is (judged with its history by design, chunk 15a). |
+| F20 | Fixed and re-run live | Confirm tap on a shift booking: done card with Cancel and Move; one entry. |
+
+### Polish and decisions
+
+| # | Status | Notes |
+|---|---|---|
+| P1 | Fixed, unit-tested | Citation markers are taken out of answers; none seen in the re-run. |
+| P2 | Fixed, unit-tested | "What we learned" and "Owner notes" are never listed as sources. |
+| P3 | Fixed and re-run live (one follow-up) | No "Reply STOP" on the page, in the web chat's notice or in Try it; WhatsApp keeps it. Two existing specs that encoded the old notice now expect the new one. |
+| P13 | Not changed in code | Model wording. In the re-run, case 5 gave its number. Watch in round 2. |
+| B1 | Done and re-run live | Services, Donors and Staff onboarding set memory on with the notice; a staff member was told "I remember your name … Say 'forget me' any time." Young or unstated audiences are still asked. |
+| B2 | Done and re-run live | Channels says who can chat in one line; the onboarding template went live organisation-only, and a member chatted. Public stays off. |
+| B4 | **Not done: round 2** | Needs a "withdrawn" status on the request lists and a status-only change the assistant may make while Change is Never. A list-definition change, so it gets its own commit and re-run. |
+| B5 | Done and re-run live | A new WhatsApp contact takes the profile name; the name given in chat ("Bilal") replaces it. |
+| B3, B6 | B3 is S5; B6 no change | |
+
+### New, found in the re-run
+
+| # | Severity | What | Status |
+|---|---|---|---|
+| N1 | Fix before customers | A "Yes" to "Shall I book you…?" was taken as the answer to a memory consent question still open from an earlier chat: memory turned on, the booking never happened. | Fixed and re-run live: a yes counts as consent only right after the question. |
+| N2 | Serious (part of S6) | `POST bot-drafts/:id/template` was two routes; the use-case one could never be reached. | Fixed, with a test that setup routes are unique. |
+| N3 | Polish | The list card's second line and the chat label still say "Your assistant" until the owner fills "Name it uses in chat". | Open: round 2 (default it to the chatbot's name). |
+
+### After launch (moved, as you decided)
+
+F7, F18, P4, P5, P6, P7, P8, P9, P10, P11, P12, P14.
+
+### Local notes for this round
+
+- The pre-commit hook was switched off (`HUSKY=0`) as you asked; lint and the full suites ran once at the end of the round:
+  - **ally-be:** typecheck clean; ESLint clean on the 61 files this branch changed (the whole-repo run runs out of memory on this machine); full jest: only the three known failures below.
+  - **ally-web (admin):** typecheck clean; ESLint clean on every file this branch changed; Prettier flags 11 files this branch never touched. Vitest: 15 failures in the first full run, all in areas this branch doesn't touch, with the machine overloaded (1,000-second tests); 14 pass on a re-run. One AnalyticsAgentTab test hangs even alone (no analytics code changed here; not yet checked on master).
+- Two inbox Postgres specs fail on master too (they pass a null scope); not touched.
+- The container can't run the templates' drift check (ally-web isn't mounted in it); it passes on the host.
 
 ## The five cases
 
