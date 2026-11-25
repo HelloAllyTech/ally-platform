@@ -139,6 +139,20 @@ describe("health", () => {
     expect(screen.getByText("50%")).toBeInTheDocument();
     expect(screen.getByText("Lessons waiting for you")).toBeInTheDocument();
   });
+
+  it("lists spend by lane from the backend's list shape", () => {
+    h.health.current = {
+      spendByLane: [
+        { lane: "code_health", costUsd: 0.4321 },
+        { lane: "ux_friction", costUsd: 0.1 },
+      ],
+    };
+    render(<AgentView initialSection="health" />);
+    expect(screen.getByText("Spend by area")).toBeInTheDocument();
+    expect(screen.getByText("code health")).toBeInTheDocument();
+    expect(screen.getByText("$0.43")).toBeInTheDocument();
+    expect(screen.getByText("ux friction")).toBeInTheDocument();
+  });
 });
 
 describe("settings", () => {

@@ -319,7 +319,8 @@ export interface PmHealth {
   acceptRate30d?: number | null;
   shippedRate?: number | null;
   costPerAcceptedCardUsd?: number | null;
-  spendByLane?: Record<string, number> | null;
+  /** ally-be sends a list ordered by cost (pm-agent.dto.ts PmAgentHealthDto). */
+  spendByLane?: { lane: string; costUsd: number }[] | null;
   repeatedRejectionRate?: number | null;
   impactMeasuredCount?: number | null;
   impactImprovedRate?: number | null;
