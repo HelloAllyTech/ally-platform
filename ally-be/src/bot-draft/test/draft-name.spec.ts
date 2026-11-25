@@ -51,7 +51,7 @@ describe('the name typed in setup names the not-yet-live assistant', () => {
     await h.service.update(h.draft('Saathi Youth Helpline'), {});
     expect(h.query).toHaveBeenCalledWith(
       expect.stringMatching(
-        /UPDATE chatbots SET name = \$2,[\s\S]*WHERE id = \$1 AND status = 'draft'/,
+        /UPDATE chatbots SET name = \$2::text,[\s\S]*WHERE id = \$1 AND status = 'draft'/,
       ),
       ['bot-1', 'Saathi Youth Helpline'],
     );

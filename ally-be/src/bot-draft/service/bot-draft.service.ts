@@ -1043,9 +1043,9 @@ export class BotDraftService {
     ) {
       await this.drafts.manager
         ?.query(
-          `UPDATE chatbots SET name = $2,
+          `UPDATE chatbots SET name = $2::text,
                   persona = CASE WHEN COALESCE(persona->>'displayName', '') ~* '^(your assistant)?$'
-                                 THEN jsonb_set(COALESCE(persona, '{}'::jsonb), '{displayName}', to_jsonb(left($2, 60)))
+                                 THEN jsonb_set(COALESCE(persona, '{}'::jsonb), '{displayName}', to_jsonb(left($2::text, 60)))
                                  ELSE persona END
             WHERE id = $1 AND status = 'draft'`,
           [next.chatbotId, typedName.slice(0, 120)],
