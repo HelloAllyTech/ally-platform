@@ -22,12 +22,6 @@ export const BLANK_LIMITS = {
 } as const;
 
 /**
- * The placeholder name blanks used to start with. New blanks are named by `nextAutoName` instead
- * ("Your new Ally Chatbot DDMMYY1"); existing ones keep this, and both count as "no name yet".
- */
-export const BLANK_NAME = 'Your assistant';
-
-/**
  * The cleanup can be switched off without a deploy (build rules: kill switch per risky feature).
  * Read lazily so a test can flip it.
  */
