@@ -1,3 +1,4 @@
+import { phoneIn } from './phone-text';
 import type { ReplyLanguage } from './reply-language';
 
 /**
@@ -33,18 +34,10 @@ export function runFailedReply(
     .replace('{contact}', contact);
 }
 
-/** A phone number: an optional +, then at least 8 digits with spaces, dashes or brackets. */
-const PHONE = /\+?\d[\d\s\-()]{6,}\d/g;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 
-/** The first real phone number in a text, or null. Years and prices have too few digits. */
-export function phoneIn(text: string): string | null {
-  for (const match of text.match(PHONE) ?? []) {
-    const digits = match.replace(/\D/g, '');
-    if (digits.length >= 8 && digits.length <= 13) return match.trim();
-  }
-  return null;
-}
+/** The first real phone number in a text (one rule for every reply: `phone-text.ts`). */
+export { phoneIn };
 
 export function emailIn(text: string): string | null {
   return text.match(EMAIL)?.[0] ?? null;

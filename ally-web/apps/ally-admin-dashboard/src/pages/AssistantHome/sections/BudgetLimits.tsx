@@ -159,6 +159,14 @@ const BudgetForm: React.FC<SectionProps & { data: BudgetData }> = ({ bot, canMan
           <dt>{C.current.used}</dt>
           <dd data-testid="budget-used">{money(data.spentUsd)}</dd>
         </div>
+        {/* TF1 round 2, N-12: Left is what is set aside less what is used and what replies
+            in progress hold, so the line adds up. */}
+        {data.reservedUsd >= 0.005 && (
+          <div>
+            <dt>{C.current.held}</dt>
+            <dd data-testid="budget-held">{money(data.reservedUsd)}</dd>
+          </div>
+        )}
         <div>
           <dt>{C.current.left}</dt>
           <dd data-testid="budget-left">{money(data.remainingUsd)}</dd>

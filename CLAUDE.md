@@ -18,7 +18,7 @@ Ally is a HIPAA-compliant platform for training mental health counselors through
 | `ally-be` | NestJS + TypeScript + PostgreSQL + Redis | Core backend API, auth, multi-tenant, RBAC, WebSocket gateways | 8001 |
 | `ally-ai` | FastAPI + Python + Weaviate | AI service: conversation analysis, nudges, summaries, transcription, chatbot knowledge answers | 8000 in the container; 3001 on the host in the local Docker stack (`docker-compose.local.yml`) |
 | `ally-ai-learn` | FastAPI + LiveKit + LangGraph + Python | Voice-based training agent: simulated client conversations with real-time event detection | 8000 (API) + LiveKit worker |
-| `ally-web` | Nx monorepo: 2x Vite+React apps | Helpline dashboard (8080), Admin dashboard (8081, also hosts the public bot page at `/b/<slug>`) | 8080/8081 |
+| `ally-web` | Nx monorepo: 2x Vite+React apps | Helpline dashboard (8080), Admin dashboard (8081, also hosts the public bot page at `/chat/<id>`, a non-guessable id; old `/b/<slug>` links redirect) | 8080/8081 |
 | `ally-mobile` | Flutter + Dart | iOS/Android app for counselors: live sessions, reviews, simulations | N/A |
 | `infra` *(standalone repo)* | Ansible + Terraform + Docker | Infrastructure: Hetzner baremetal, AWS (ECR/SQS/S3/CloudWatch), Incus containers (`HelloAllyTech/infra`, kept outside `ally-platform` monorepo to isolate Ansible Vault secrets; `/infra/` is `.gitignore`d) | N/A |
 | `helloallytech.github.io` | Jekyll | Developer hub / docs site on GitHub Pages | 4000 |

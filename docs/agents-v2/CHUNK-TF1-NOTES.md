@@ -118,3 +118,41 @@ Until then, internal launch only. Turning it back to the question is one setting
 - `ally_tf1` is a schema-only copy of `ally_local` plus the migration-seeded rows; migrations can't run from an empty database (`1700000000000` needs `scenarios`). `ally_local` was never touched.
 - ally-be ran as build then `node dist/main` with a compose override (`DB_DATABASE=ally_tf1`, dummy SES, a local WhatsApp app secret, no send token). Sign-in codes came from the log; WhatsApp replies were read from `wa_messages`.
 - The pre-commit hook was off (`HUSKY=0`), as asked; lint and the suites ran at the end of each round.
+
+## Saathi manual pass (25 Nov): prompts to push at release
+
+Published to the **local** Skills Store only (`publish-local-prompts.js`). Neither adds or removes a variable, so order relative to the deploy doesn't matter for the contract; **push them after the ally-be deploy** anyway, because the code rules (flood and trapped as emergencies, distress as upset, the one-line decline) are what the texts assume.
+
+| Prompt code | Local version | What changed | Production |
+|---|---|---|---|
+| `ally_ai_knowledge_crisis_classify` | v6 | `emergency` covers disasters (flood, water coming in, fire, collapse, being trapped, an attack); relief questions are not emergencies; `at_risk` no longer includes "someone is in danger" in general; "I'm so stressed and tired of everything" is `upset` unless there's a sign of wanting to die | Push at release, after the ally-be deploy |
+| `ally_ai_agent_system` | v7 | Rule 2: a request to ignore or change the rules gets one short sentence that declines and says what it can help with, nothing else | Push at release, after the ally-be deploy |
+
+Defaults updated in the same change: `ally-ai/app/prompts/knowledge/crisis_classify.txt`, `ally-ai/app/prompts/agent/system.txt`.
+
+## Rules checked in code on every reply (TF1 round 2, Saathi and Sahyog passes)
+
+Safety and correctness rules that don't depend on the model following its prompt. Each runs in ally-be's engine (before or after the run) or in ally-ai's reply check (`ally-ai/app/core/agent_runtime/check/`), and each has a test.
+
+| Rule | Where | What happens | Test |
+|---|---|---|---|
+| Only a phone number (with a short label) ever reaches a crisis reply | ally-be `engine/phone-text.ts` `helplineLines`, read by `crisisHelplines()` | Hours, notes and sentences are dropped; text with no number is refused on save | `engine/test/phone-text.spec.ts`, `crisis-helplines.spec.ts` |
+| A flood, water coming in or being trapped is an emergency; distress is upset, never decided by keywords alone | ally-be `engine/emergency-keywords.ts` | Emergency reply at once; distress gets the warm reply with 112 and 14416, the classifier can raise it | `disaster-keywords.spec.ts`, `emergency-keywords.spec.ts`, `saathi-round2-safety.spec.ts` |
+| At a spend limit, a message the keyword rules mark at risk still flags the chat and alerts | ally-be engine `keywordCrisisOnly` | Crisis reply, flag and alert, no model call | `saathi-round2-safety.spec.ts` (budget at zero) |
+| A request to drop the rules gets one fixed line, after the crisis check | ally-be `engine/visitor-override.ts` | Fixed decline in the voice, no run | `visitor-override.spec.ts`, `saathi-round2-safety.spec.ts` |
+| A request to be diagnosed (mental-health packs) gets the fixed reply, after the crisis check | ally-be engine, `caring-decline.ts` | Fixed reply, no run | live `tf1-round2-saathi.json` (`r2-b5-diagnosis*`) |
+| Never a national number as the organisation's own | ally-ai `check/fixes.py` `_no_national_number_as_own`; `mood.py` gives only the confirmed own line | The sentence is removed; national numbers are given as themselves | `test_round2_rules.py` |
+| No eligibility verdict (Services template, Legal and financial pack) | ally-ai `check/eligibility.py`, `_no_eligibility_verdict` | Sent back once, then the verdict sentence is removed | `test_round2_rules.py` (35%, ₹30,000, 17) |
+| No offer the list's abilities don't allow | ally-ai `_no_change_offer_without_the_ability` (and the older `_trim_false_offers`, `_no_false_lookups`) | The offer sentence is removed | `test_round2_rules.py` |
+| No action pitch, email or coping tips on an upset turn; no memory or name notice on it | ally-ai `_quiet_on_upset`, `add_fallback_contact`; ally-be `decision.upset` in `chat-privacy.service.ts` | Removed; the crisis numbers stay | `test_round2_rules.py` |
+| A rule keeps its condition ("unless", "only if", "except", "until") | ally-ai `check/conditions.py`, `_keep_conditions` | Sent back once, then the rule's own sentence is added | `test_conditions.py` |
+| No citation debris or in-text "Sources:" | ally-ai `check/text.py` `without_citation_marks`; ally-be `reply-composer.ts` | Removed: `[n]`, `[]`, `[…]`, "(see citations)", "(cite: …)", a "Sources:" block | `test_round2_rules.py` |
+| No promise to message or pass on later | ally-ai `_trim_pass_on_promises` (earlier) | Removed | existing `test_agent_check.py` |
+| No "not a crisis service" in replies on the bot page (the page shows it) | ally-ai `_trim_repeated_crisis_wording` | Removed | live |
+| A greeting or self-introduction stays small talk | ally-ai `greeting.py`, `check/pipeline.py` `_relabel` | Never the fixed decline | `test_greeting.py`, `test_agent_check.py` |
+| No draft text on safety-pack assistants or upset turns; text waits for the crisis verdict everywhere | ally-be `engine/live-reply.ts` | Only status lines and the checked final reply | `live-reply.spec.ts`, `web-channel-crisis.spec.ts` |
+| A reply gets at most one rewrite | ally-ai `nodes/agent_check.py` (`MAX_REVISIONS = 1`) | After one, the fixes are applied to the text | existing |
+
+## Search (TF1 round 2)
+
+Hybrid search (`KNOWLEDGE_AGENT__HYBRID_SEARCH`, alpha 0.5, neighbour chunks) was already on by default in this branch and in the running stack, so "turning it on" changed nothing to measure. "Will you tell my parents?" scored 0.27 against the Policies passage with hybrid on. The fix that holds is at the source: setup's fact extraction (`ally_ai_builder_extract` v2) now keeps a rule's conditions in the same fact, and keeps "who decides" rules (Sahyog N-5); and the conditions check above.

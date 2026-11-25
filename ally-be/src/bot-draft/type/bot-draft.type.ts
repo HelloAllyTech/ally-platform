@@ -176,7 +176,12 @@ type DraftEventKind =
   /** A field saved by hand on the assistant home (chunk 20d-2), with its before and after. */
   | 'edit'
   /** Set up from a use-case template (T1); not undone by Undo, like a step. */
-  | 'template';
+  | 'template'
+  /**
+   * TF1 round 2: a change made outside the home's fields (go live, pause, access-list removal,
+   * helpline confirmed), for the History only: never undone from there.
+   */
+  | 'activity';
 
 /** One entry of the append-only log; patches carry their inverse for undo. */
 export interface DraftEvent {

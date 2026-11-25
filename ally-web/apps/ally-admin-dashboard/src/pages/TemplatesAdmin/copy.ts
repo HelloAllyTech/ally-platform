@@ -178,6 +178,7 @@ export const TEMPLATES_ADMIN_COPY = {
       long_text: "Long text",
       yes_no: "Yes or no",
       choices: "Pick from choices",
+      phone: "Phone number",
     },
     choices: "Choices",
     choicesHint: "One per line.",

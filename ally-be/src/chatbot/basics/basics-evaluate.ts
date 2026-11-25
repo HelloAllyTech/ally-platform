@@ -16,7 +16,8 @@ export function failuresOf(
   gatewaySteps: { summary: string }[] = [],
 ): string[] {
   const failures: string[] = [];
-  const body = decision.body ?? '';
+  // Typographic apostrophes read as plain ones, so a case's "can't" matches a model's "can’t".
+  const body = (decision.body ?? '').replace(/[’‘]/g, "'");
   const isCrisis = decision.handledBy === WaHandledBy.CRISIS;
   const isHandover =
     decision.handledBy === WaHandledBy.HANDOVER ||

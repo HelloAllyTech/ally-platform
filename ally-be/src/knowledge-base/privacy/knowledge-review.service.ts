@@ -20,6 +20,7 @@ import {
 import { KbIngestProducer } from '../producer/kb-ingest.producer';
 import {
   contactValuesIn,
+  inPublicRole,
   maskValue,
   onlyOrganisationContacts,
   PiiFinding,
@@ -180,7 +181,8 @@ export class KnowledgeReviewService {
         system:
           'You check documents a business uploads for its customer assistant. List the full names of private individuals ' +
           '(customers, patients, students, staff personal details) that appear in the text. Do NOT list the organisation, ' +
-          'its brands, public figures, authors of cited works, or staff named only in a public role (e.g. "Dr Rao, our dentist"). ' +
+          'its brands, public figures, authors of cited works, or staff named only in a public role (e.g. "Dr Rao, our dentist", ' +
+          '"write to the centre manager, Ms. Kavita Meena"). ' +
           'Answer JSON only: {"names": ["..."]}, at most 20, an empty list when there are none.',
         prompt: text.slice(0, NAMES_SCAN_CHARS),
         maxTokens: 400,
@@ -188,9 +190,14 @@ export class KnowledgeReviewService {
         timeoutMs: 20_000,
       });
       const parsed = JSON.parse(result.text || '{}') as { names?: unknown };
+      // TF1 round 2, N-3: a person named in their public role ("the centre manager, Ms.
+      // Kavita Meena") is the organisation's contact, not a private individual.
       const names = Array.isArray(parsed.names)
         ? parsed.names.filter(
-            (n): n is string => typeof n === 'string' && n.trim().length > 2,
+            (n): n is string =>
+              typeof n === 'string' &&
+              n.trim().length > 2 &&
+              !inPublicRole(text, n),
           )
         : [];
       return names.length

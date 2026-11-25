@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Literal
 
+from app.core.agent_runtime.greeting import is_greeting_or_intro
 from app.core.agent_runtime.nodes.agent import first_step_keys
 from app.core.agent_runtime.nodes.tools import make_tools_node
 from app.core.agent_runtime.state import AgentState
@@ -64,6 +65,11 @@ def presearch_wanted(state: AgentState) -> bool:
         return False
     question = (state.get("question") or "").strip()
     if not question or is_plain_yes(question):
+        return False
+    # TF1 round 2 (Saathi B-1): "Hi, I'm Asha" found passages, and the check then
+    # declined the greeting as an uncited answer. A whole-message greeting or
+    # introduction needs no search.
+    if is_greeting_or_intro(question):
         return False
     # Q4: the documents are searched with an English query (the tool's contract). A
     # message in Hindi, Tamil or Bengali searched as written found nothing above the

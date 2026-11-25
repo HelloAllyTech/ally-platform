@@ -84,6 +84,26 @@ describe('ChangeService (change by chat)', () => {
     expect(h.home.saveField).not.toHaveBeenCalled();
   });
 
+  it('keeps the suggested questions unless the request mentions them (TF1 round 2)', async () => {
+    const h = build();
+    const changes = [
+      { field: 'tone', before: 'warm', after: 'formal' },
+      { field: 'suggested_questions', before: ['a'], after: ['b'] },
+    ];
+    h.ai.proposeChange.mockResolvedValue({
+      reply: 'ok',
+      refused: false,
+      changes,
+    });
+    expect(
+      (await h.service.propose('bot', 'make it more formal')).changes,
+    ).toEqual([{ field: 'tone', before: 'warm', after: 'formal' }]);
+    expect(
+      (await h.service.propose('bot', 'add a suggested question about fees'))
+        .changes,
+    ).toEqual(changes);
+  });
+
   it("sends ally_ai_builder_change's live text from the Skills Store", async () => {
     const h = build();
     const live = { ally_ai_builder_change: { prompt: 'End with: Done.' } };

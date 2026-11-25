@@ -12,8 +12,9 @@ import { COPY } from "../Onboarding/copy";
 
 const t = HOME.changeControls;
 
-const show = (value: unknown): string => {
+const show = (value: unknown, field?: string): string => {
   if (value === undefined || value === null || value === "") return "—";
+  if (field === "status" && typeof value === "string") return t.statuses[value] ?? value;
   if (Array.isArray(value))
     return value.map(v => (typeof v === "string" ? v : JSON.stringify(v))).join(" · ") || "—";
   if (typeof value === "object") return JSON.stringify(value);
@@ -76,7 +77,11 @@ export const ChangeHistory: React.FC<{
                 <span className="ally-list__title">
                   {entry.fields.map(f => fieldName(f.field)).join(", ")}
                   <span className="ally-badge ally-badge--muted">
-                    {entry.origin === "panel" ? t.fromPanel : t.byHand}
+                    {entry.kind === "activity"
+                      ? t.activity
+                      : entry.origin === "panel"
+                        ? t.fromPanel
+                        : t.byHand}
                   </span>
                   {entry.undone && <span className="ally-badge ally-badge--warn">{t.undone}</span>}
                 </span>
@@ -87,14 +92,14 @@ export const ChangeHistory: React.FC<{
                 </span>
                 {entry.fields.map(f => (
                   <p key={f.field} className="ally-small ally-history__diff">
-                    <span className="ally-history__before">{show(f.before)}</span>
+                    <span className="ally-history__before">{show(f.before, f.field)}</span>
                     <span aria-hidden="true"> → </span>
                     <span className="ally-sr-only">{COPY.change.after}: </span>
-                    <span>{show(f.after)}</span>
+                    <span>{show(f.after, f.field)}</span>
                   </p>
                 ))}
               </div>
-              {canEdit && !entry.undone && !rules && (
+              {canEdit && !entry.undone && !rules && entry.kind !== "activity" && (
                 <div className="ally-list__actions">
                   {entry.kind === "change" ? (
                     <Button

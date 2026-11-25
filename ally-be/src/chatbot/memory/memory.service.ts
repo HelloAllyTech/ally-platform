@@ -24,6 +24,7 @@ import {
 } from '../bot-page/bot-page-intake';
 import { memorySettingsOf } from './memory-settings';
 import { matchesNeverStore, neverStoreList } from './never-store';
+import { nameFromIntro } from './name-from-intro';
 import { MemoryConsentService } from '../privacy/memory-consent.service';
 import { safetySettingsOf } from '../safety/safety-settings';
 
@@ -277,6 +278,73 @@ export class MemoryService {
   }
 
   // ──────────────────────────────────────────────────── after the reply
+
+  /**
+   * The person's name, saved before the reply goes out (TF1 round 2, Saathi B-2), so the reply
+   * that learns it can say so once. From a name they stated outright ("my name is Asha", "mera
+   * naam Asha hai"), else from the run's own `remember` name op when the name is in this message
+   * ("Hi, I'm Asha"). Only when they have no name yet; after "forget my name", only a name they
+   * give again in this message. Returns the name saved, or null. Never throws.
+   */
+  async nameNow(input: {
+    chatbot: Pick<Chatbot, 'id' | 'settings' | 'safetyPack'>;
+    contactId: string | null | undefined;
+    pending?: PendingMemory;
+    text: string;
+  }): Promise<string | null> {
+    const { chatbot, contactId, text } = input;
+    if (!contactId || !UUID.test(contactId)) return null;
+    const stated = nameFromIntro(text);
+    const fromRun = clean(
+      input.pending?.writes.find((w) => w.op === 'name')?.text ?? '',
+    );
+    const candidate = stated ?? (fromRun || null);
+    if (!candidate || candidate.length > MAX_NAME_CHARS) return null;
+    if (
+      matchesNeverStore(
+        candidate,
+        chatbot.safetyPack,
+        memorySettingsOf(chatbot).neverStore,
+      )
+    ) {
+      return null;
+    }
+    const saidNow =
+      stated !== null || text.toLowerCase().includes(candidate.toLowerCase());
+    if (!saidNow) return null;
+    try {
+      const rows = (await this.dataSource.query(
+        `WITH named AS (
+           UPDATE chatbot_contacts
+              SET display_name = $3, name_forgotten_at = NULL, "updatedAt" = now()
+            WHERE id = $1 AND chatbot_id = $2
+              AND (display_name IS NULL OR btrim(display_name) = '')
+           RETURNING id)
+         SELECT id FROM named`,
+        [contactId, chatbot.id, candidate],
+      )) as { id: string }[];
+      return rows.length ? candidate : null;
+    } catch (error) {
+      this.logger.warn(
+        `Name not saved for chatbot ${chatbot.id}: ${error instanceof Error ? error.message : 'unknown error'}`,
+      );
+      return null;
+    }
+  }
+
+  /** "Forget my name" (TF1 round 2, Saathi B-2): the name goes, and nothing fills it back. */
+  async forgetName(chatbotId: string, contactId: string): Promise<boolean> {
+    const rows = (await this.dataSource.query(
+      `WITH forgot AS (
+         UPDATE chatbot_contacts
+            SET display_name = NULL, name_forgotten_at = now(), "updatedAt" = now()
+          WHERE id = $1 AND chatbot_id = $2
+         RETURNING id)
+       SELECT id FROM forgot`,
+      [contactId, chatbotId],
+    )) as { id: string }[];
+    return rows.length > 0;
+  }
 
   /**
    * After the reply has been sent: apply what the run asked to remember. Decided from what was
@@ -559,14 +627,21 @@ export class MemoryService {
     await this.dataSource.transaction(async (m) => {
       // One writer per person at a time, so the limit and renewals can't race.
       const [contact] = (await m.query(
-        `SELECT id, display_name FROM chatbot_contacts
+        `SELECT id, display_name, name_forgotten_at FROM chatbot_contacts
           WHERE id = $1 AND chatbot_id = $2 FOR UPDATE`,
         [run.contactId, chatbot.id],
-      )) as { id: string; display_name: string | null }[];
+      )) as {
+        id: string;
+        display_name: string | null;
+        name_forgotten_at: Date | null;
+      }[];
       if (!contact) return;
       for (const write of allowed) {
         if (write.op === 'name') {
-          if (contact.display_name?.trim()) continue;
+          // TF1 round 2: a name they asked to forget is only given back by them (`nameNow`).
+          if (contact.display_name?.trim() || contact.name_forgotten_at) {
+            continue;
+          }
           await m.query(
             `UPDATE chatbot_contacts SET display_name = $3, "updatedAt" = now()
               WHERE id = $1 AND chatbot_id = $2

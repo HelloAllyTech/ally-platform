@@ -6,6 +6,7 @@ import {
   useApplyBotTemplateMutation,
   useApplyDraftTemplateMutation,
   useGetBotDraftQuery,
+  useGetChatbotDocumentsQuery,
   usePatchBotDraftMutation,
   useSetBuildModeMutation,
 } from "@api";
@@ -85,6 +86,9 @@ export const BuildScreen: React.FC<{
   const wc = copy.wc;
   const draft = useGetBotDraftQuery(draftId);
   const [narration, setNarration] = useState<Narration[]>([]);
+  // TF1 round 2 (Saathi B-7): after Go live the section stays, with "It's live", the link and the
+  // budget set aside, instead of vanishing with no confirmation.
+  const [wentLive, setWentLive] = useState(false);
   const [mode, setMode] = useState<BuildMode | null>(null);
   const [startedPath, setStartedPath] = useState<StartPath | null>(null);
   const [startBusy, setStartBusy] = useState(false);
@@ -124,6 +128,28 @@ export const BuildScreen: React.FC<{
     onNarration: n => setNarration(list => [...list, n]),
     onChanged: refreshAll,
   });
+
+  // TF1 round 2: "Reading <document>…" gets its ending in Copilot once the document is ready
+  // (the server narrates a site's end, not a file's), so Copilot agrees with the form's "Ready".
+  const reading = narration.filter(n => n.stage === "document").map(n => n.text);
+  const documents = useGetChatbotDocumentsQuery(wc?.chatbotId ?? "", {
+    skip: !wc?.chatbotId || reading.length === 0,
+    pollingInterval: 8000,
+  });
+  useEffect(() => {
+    const done = new Set(narration.filter(n => n.stage === "document-read").map(n => n.text));
+    const fresh = (documents.data ?? [])
+      .filter(d => (d.status === "indexed" || d.status === "failed") && d.title)
+      .filter(d => reading.some(text => text.startsWith(`Reading ${d.title}`)))
+      .map(d => ({
+        stage: "document-read",
+        text: fill(d.status === "indexed" ? B.copilot.documentRead : B.copilot.documentFailed, {
+          title: d.title,
+        }),
+      }))
+      .filter(n => !done.has(n.text));
+    if (fresh.length) setNarration(list => [...list, ...fresh]);
+  }, [documents.data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const chooseMode = (next: BuildMode, path?: StartPath) => {
     setMode(next);
@@ -388,7 +414,8 @@ export const BuildScreen: React.FC<{
               suggestions={suggestions}
               addAddress={sources.addAddress}
               addFiles={sources.addFiles}
-              goLive={surface === "create" || !copy.live}
+              goLive={surface === "create" || !copy.live || wentLive}
+              onWentLive={() => setWentLive(true)}
               accessMode={draft.data?.draft?.access?.mode}
             />
           </div>

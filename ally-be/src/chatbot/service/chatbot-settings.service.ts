@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  CHATBOT_ACTIVITY,
+  type ChatbotActivityEvent,
+} from '../type/chatbot-activity';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GlobalSettingsRepository } from '../../settings/repository/global-settings.repository';
@@ -36,8 +41,16 @@ import {
  */
 import {
   crisisHelplines,
+  helplineLines,
   ownerHelplineFields,
 } from '../engine/crisis-helplines';
+
+import { voiceText } from '../voice/voice-text';
+
+/** COPY: needs approval (TF1 round 2, S-1). */
+export const HELPLINE_NO_NUMBER =
+  'Add the phone number crisis replies should give, like +91 20 4860 2525. Put opening hours in your notes instead.';
+
 @Injectable()
 export class ChatbotSettingsService {
   private readonly logger = LoggerService.getInstance(
@@ -48,6 +61,8 @@ export class ChatbotSettingsService {
     private readonly globalSettingsRepository: GlobalSettingsRepository,
     @InjectRepository(Chatbot)
     private readonly chatbotRepository: Repository<Chatbot>,
+    // TF1 round 2: the owner confirming the helpline numbers, for the assistant's History.
+    @Optional() private readonly emitter?: EventEmitter2,
   ) {}
   /**
    * Read the settings, filling any missing field from defaults.
@@ -74,9 +89,32 @@ export class ChatbotSettingsService {
       | null,
   ): Promise<WhatsAppBotSettings> {
     const defaults = await this.get();
-    return chatbot
-      ? this.applyOverride(defaults, chatbot.settings, chatbot.safetyPack)
-      : defaults;
+    if (!chatbot) return defaults;
+    const effective = this.applyOverride(
+      defaults,
+      chatbot.settings,
+      chatbot.safetyPack,
+    );
+    // TF1 round 2 (Saathi B-1): an assistant never inherits the staff number's decline ("My
+    // reference material does not cover that. A colleague or supervisor…"). Without the owner's
+    // own wording it gets its voice's, else the neutral default. The fixed decline picks the
+    // person's language at send time (`withDeclineContact`).
+    if (!chatbot.settings?.declineText?.trim()) {
+      effective.declineText = voiceText(chatbot.settings, 'decline', 'en');
+    }
+    // Nor its start notice's "answers from our reference material": with no wording of the
+    // owner's own, the fixed "You are chatting with an AI assistant…" line is the whole notice.
+    if (!chatbot.settings?.disclaimerText?.trim()) {
+      effective.disclaimerText = '';
+    }
+    // TF1 round 2 (Sahyog N-1): nor the staff number's helpline ("Tele-MANAS 14416", stored with
+    // no source, so it read as owner-confirmed). An assistant's own line is only ever its owner's;
+    // without one, crisis replies carry the pack's national numbers as themselves.
+    effective.helplineNumbers = chatbot.settings?.helplineNumbers ?? '';
+    effective.helplineSource = chatbot.settings?.helplineSource ?? null;
+    effective.helplineConfirmedAt =
+      chatbot.settings?.helplineConfirmedAt ?? null;
+    return effective;
   }
 
   /** Defaults, this bot's changes, and the result — what the settings screen shows. */
@@ -158,6 +196,23 @@ export class ChatbotSettingsService {
     // Q4 G7: whose the helpline is. Only the owner's own save can make it theirs (a changed number,
     // or "Use this number in crisis replies"); a client never sets the source itself.
     const { helplineConfirm, ...rest } = overrides ?? {};
+    // TF1 round 2, S-1: only the numbers are stored, so what Settings shows is what a crisis reply
+    // says. Text with no number at all is refused rather than saved and silently dropped.
+    if (typeof rest.helplineNumbers === 'string') {
+      const typed = rest.helplineNumbers.trim();
+      const numbers = helplineLines(typed);
+      // A screen sends every stored key back: only a value the owner changed is refused.
+      const changed =
+        typed !== (chatbot.settings?.helplineNumbers ?? '').trim();
+      if (typed && !numbers && changed) {
+        throw new BadRequestException({
+          errorCode: 'helpline_no_number',
+          message: HELPLINE_NO_NUMBER,
+          details: { field: 'helplineNumbers' },
+        });
+      }
+      rest.helplineNumbers = numbers;
+    }
     const helpline = options.byOwner
       ? ownerHelplineFields(
           chatbot.settings,
@@ -181,6 +236,17 @@ export class ChatbotSettingsService {
       { settings, updatedBy: userId },
     );
     this.logger.info(`Chatbot ${chatbot.id} settings updated`);
+    const confirmedAt = (helpline as { helplineConfirmedAt?: string | null })
+      .helplineConfirmedAt;
+    if (confirmedAt && confirmedAt !== chatbot.settings?.helplineConfirmedAt) {
+      this.emitter?.emit(CHATBOT_ACTIVITY, {
+        chatbotId: chatbot.id,
+        field: 'helpline',
+        before: chatbot.settings?.helplineNumbers ?? null,
+        after: settings.helplineNumbers ?? null,
+        userId: userId || null,
+      } satisfies ChatbotActivityEvent);
+    }
     return this.getChatbotView({
       id: chatbot.id,
       settings,

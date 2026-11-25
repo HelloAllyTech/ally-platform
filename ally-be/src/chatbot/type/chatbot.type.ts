@@ -1,3 +1,4 @@
+import type { ChatbotVoice } from '../voice/voice-text';
 import type {
   AlertPolicy,
   AudienceAge,
@@ -113,6 +114,12 @@ export type ChatbotSettingsOverride = Partial<
   archivedMessage?: string;
   /** Stage 4: how a customer reaches a person (go-live requires one); `safety/safety-terms.ts`. */
   humanContact?: { phone?: string; email?: string; url?: string };
+  /**
+   * TF1 round 2 (Saathi B-13): the template's voice for the fixed texts a person sees
+   * (`chatbot/voice/voice-text.ts`). Written on install and by the voice backfill; keys the
+   * owner changed are listed in `ownerKeys` and never overwritten.
+   */
+  voice?: ChatbotVoice;
   /**
    * Sent by the owner's Safety screen, never stored (Q4 G7): "Use this number in crisis replies".
    * Saving a changed number confirms it too.

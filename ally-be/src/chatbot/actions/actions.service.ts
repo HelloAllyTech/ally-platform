@@ -19,7 +19,14 @@ import type {
   TapTurn,
 } from '../engine/chatbot-engine.types';
 import { typedNumber } from './whatsapp-parts';
-import { DONE_LINE, TAP_REPLY, fillCopy } from './action-copy';
+import { headlineFor } from '../agent-tools/entry-words';
+import {
+  CALLBACK_CANCELLED_LINE,
+  DONE_LINE,
+  NEXT_STEP,
+  TAP_REPLY,
+  fillCopy,
+} from './action-copy';
 import type { ReplyParts } from './action-parts.service';
 import { ActionTokenService } from './action-token.service';
 
@@ -204,6 +211,7 @@ export class ActionsService {
             passage.record_id,
             contactId,
             runId,
+            card.action,
           )
         : null;
       const shown = stored ?? card;
@@ -215,9 +223,20 @@ export class ActionsService {
       };
       return {
         handledBy: WaHandledBy.TAP,
-        body: fillCopy(DONE_LINE[language][headline], {
-          what: whatOf(shown),
-        }),
+        body:
+          // A cancel card's own headline is "cancelled", so the list says it was a callback.
+          headline === 'cancelled' &&
+          headlineFor({ key: card.list, name: card.list }, 'create', false) ===
+            'callback'
+            ? CALLBACK_CANCELLED_LINE[language]
+            : [
+                fillCopy(DONE_LINE[language][headline], {
+                  what: whatOf(shown),
+                }),
+                NEXT_STEP[language][headline],
+              ]
+                .filter(Boolean)
+                .join(' '),
         agent: {
           runtime: AgentRuntimeUsed.V2,
           runId,

@@ -20,7 +20,7 @@ const card = (id: string, group: "organisations" | "businesses", extra = {}) => 
   memory: false,
   lists: [{ key: "callback_requests", name: "Callback requests", optional: false, has: false }],
   setup: [
-    { key: "helpline", ask: "What’s your helpline number?", kind: "text" as const },
+    { key: "helpline", ask: "What’s your helpline number?", kind: "phone" as const },
     { key: "benefits", ask: "Benefits?", kind: "yes_no" as const },
     {
       key: "languages",
@@ -96,9 +96,10 @@ describe("TemplateSetup", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "What's it called?" }), {
       target: { value: "Hope Line" },
     });
-    fireEvent.change(screen.getByRole("textbox", { name: "What’s your helpline number?" }), {
-      target: { value: "1800-123-4567" },
-    });
+    // TF1 round 2, S-1: the helpline is a phone field of its own.
+    const phone = screen.getByRole("textbox", { name: "What’s your helpline number?" });
+    expect(phone.getAttribute("type")).toBe("tel");
+    fireEvent.change(phone, { target: { value: "1800-123-4567" } });
     fireEvent.click(screen.getByRole("radio", { name: "Yes" }));
     fireEvent.click(screen.getByRole("button", { name: "Hindi" }));
     fireEvent.click(screen.getByTestId("template-set-up"));

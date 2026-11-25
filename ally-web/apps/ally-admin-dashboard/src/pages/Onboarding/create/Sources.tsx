@@ -5,7 +5,7 @@ import type { PendingChange } from "@api";
 import { Button } from "@components/v2";
 
 import { BUILD_COPY, PAUSED_REASON_COPY, PausedKind, pausedKindOf } from "./copy";
-import { crawlFailureText, isCreditsRequired, codeOf, messageOf } from "./logic";
+import { crawlFailureText, isCreditsRequired, codeOf, messageOf, isInternalSource } from "./logic";
 import { SOURCE_ACCEPT, filesOk } from "./useSources";
 import { TF1_COPY } from "../../AssistantHome/copy/tf1";
 import { Review as KnowledgeReview } from "../../AssistantHome/sections/KnowledgeTools";
@@ -59,8 +59,15 @@ export const SourcesSection: React.FC<{
   const fileRef = useRef<HTMLInputElement>(null);
   const off = Boolean(disabled) || creditsOut;
   const staged = stagedOf(pending);
-  const attached = (documents.data ?? []).filter(d => !d.archived && !d.isGlobal);
+  // TF1 round 2: the setup's own working documents are not sources the owner added.
+  const attached = (documents.data ?? []).filter(
+    d => !d.archived && !d.isGlobal && !isInternalSource(d.title),
+  );
   const crawl = sources.data?.crawl;
+  const heldIds = attached
+    .filter(d => d.status === "needs_review")
+    .map(d => d.id)
+    .join(",");
 
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -148,8 +155,13 @@ export const SourcesSection: React.FC<{
         ))}
       </ul>
       {/* TF1 F4: a file held for personal details is approved here, where it was added. */}
-      {chatbotId && attached.some(d => d.status === "needs_review") && (
-        <KnowledgeReview botId={chatbotId} canEdit={!disabled} canManage={!disabled} />
+      {chatbotId && heldIds && (
+        <KnowledgeReview
+          botId={chatbotId}
+          canEdit={!disabled}
+          canManage={!disabled}
+          heldIds={heldIds}
+        />
       )}
       {creditsOut && <p className="ally-small">{BUILD_COPY.credits.field}</p>}
       {pausedNotes.length > 0 && (

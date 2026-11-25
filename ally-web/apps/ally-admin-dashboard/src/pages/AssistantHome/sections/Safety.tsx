@@ -142,13 +142,15 @@ export const PackChoices: React.FC<{
   onChange: (pack: string, reason?: string) => Promise<void>;
 }> = ({ choices, currentId, busy, onChange }) => {
   const [open, setOpen] = useState(false);
-  const [choice, setChoice] = useState<string | null>(null);
+  // TF1 round 2 (Sahyog P2): the chooser opened with nothing selected. It opens on the pack in
+  // use, listed with the others, and changes only when another one is picked.
+  const [choice, setChoice] = useState<string | null>(currentId);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const groupId = useId();
   const reasonId = useId();
-  const options = choices.filter(option => option.id !== currentId);
-  const picked = options.find(option => option.id === choice);
+  const options = choices;
+  const picked = options.find(option => option.id === choice && option.id !== currentId);
   const needsReason = Boolean(picked?.lessStrict);
   const tooShort = needsReason && reason.trim().length < MIN_REASON;
 
@@ -158,7 +160,10 @@ export const PackChoices: React.FC<{
         type="button"
         className="ally-link"
         data-testid="pack-not-right"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setChoice(currentId);
+          setOpen(true);
+        }}
       >
         {t.notRight}
       </button>
@@ -175,7 +180,6 @@ export const PackChoices: React.FC<{
         try {
           await onChange(picked.id, needsReason ? reason.trim() : undefined);
           setOpen(false);
-          setChoice(null);
           setReason("");
         } catch (failure) {
           setError(message(failure) ?? HOME.saving.failed);
@@ -194,7 +198,13 @@ export const PackChoices: React.FC<{
             key={option.id}
             id={`${groupId}-${option.id}`}
             value={option.id}
-            labelText={`${option.name}${option.lessStrict ? ` · ${t.lessStrict}` : ""} — ${option.summary}`}
+            labelText={`${option.name}${
+              option.id === currentId
+                ? ` · ${t.inUse}`
+                : option.lessStrict
+                  ? ` · ${t.lessStrict}`
+                  : ""
+            } — ${option.summary}`}
           />
         ))}
       </RadioButtonGroup>
@@ -396,6 +406,8 @@ export const HelplineConfirm: React.FC<{ botId: string; canEdit: boolean }> = ({
 }) => {
   const settings = useSafetySettings(botId);
   const [note, setNote] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string | null>(null);
+  const fieldId = useId();
   const values = settings.values as unknown as {
     helplineNumbers?: string | null;
     helplineSource?: string | null;
@@ -415,22 +427,45 @@ export const HelplineConfirm: React.FC<{ botId: string; canEdit: boolean }> = ({
       </p>
     ) : null;
   }
+  // TF1 round 2, S-1: what the owner confirms is exactly what crisis replies will insert, and they
+  // can correct it first. ally-be keeps only the numbers and refuses text with none.
+  const shown = (draft ?? numbers).trim();
   return (
     <div data-testid="helpline-unconfirmed" className="ally-home__row">
       <p className="ally-small">{fill(t1.waiting, { numbers })}</p>
       {canEdit && (
-        <Button
-          variant={ButtonVariant.PRIMARY}
-          type="button"
-          disabled={settings.saving}
-          onClick={() =>
-            void settings
-              .save({ helplineConfirm: true } as never)
-              .then(reason => setNote(reason ? t1.failed : fill(t1.confirmed, { numbers })))
-          }
-        >
-          {t1.confirm}
-        </Button>
+        <>
+          <label className="ally-field__label" htmlFor={fieldId}>
+            {t1.field}
+          </label>
+          <input
+            id={fieldId}
+            className="ally-input"
+            type="tel"
+            inputMode="tel"
+            maxLength={200}
+            value={draft ?? numbers}
+            onChange={event => setDraft(event.target.value)}
+            data-testid="helpline-field"
+          />
+          {shown && (
+            <p className="ally-small" data-testid="helpline-preview">
+              {fill(t1.preview, { numbers: shown })}
+            </p>
+          )}
+          <Button
+            variant={ButtonVariant.PRIMARY}
+            type="button"
+            disabled={settings.saving || !shown}
+            onClick={() =>
+              void settings
+                .save({ helplineNumbers: shown, helplineConfirm: true } as never)
+                .then(reason => setNote(reason ?? fill(t1.confirmed, { numbers: shown })))
+            }
+          >
+            {t1.confirm}
+          </Button>
+        </>
       )}
       {note && (
         <p className="ally-small" role="alert">

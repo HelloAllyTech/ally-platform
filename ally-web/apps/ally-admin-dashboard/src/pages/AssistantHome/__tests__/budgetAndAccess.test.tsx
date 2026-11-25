@@ -75,6 +75,20 @@ describe("Budget and limits", () => {
     expect(screen.queryByTestId("budget-out")).toBeNull();
   });
 
+  it("TF1 round 2, N-12: shows what replies in progress hold, so the line adds up", () => {
+    h.budget = { ...BUDGET, setAsideUsd: 2, spentUsd: 0.05, reservedUsd: 0.29, remainingUsd: 1.66 };
+    render(<BudgetLimits {...props()} />);
+    expect(screen.getByText("Held for replies in progress")).toBeInTheDocument();
+    expect(screen.getByTestId("budget-held")).toHaveTextContent("$0.29");
+    expect(screen.getByTestId("budget-left")).toHaveTextContent("$1.66");
+  });
+
+  it("shows no held line when nothing is held", () => {
+    h.budget = { ...BUDGET, reservedUsd: 0 };
+    render(<BudgetLimits {...props()} />);
+    expect(screen.queryByTestId("budget-held")).toBeNull();
+  });
+
   it("explains 'no budget yet' with the fixed crisis notification", () => {
     h.budget = {
       ...BUDGET,
@@ -186,7 +200,7 @@ describe("Who may chat", () => {
     expect(h.add).not.toHaveBeenCalled();
   });
 
-  it("lists entries, notes phone-only invitees need the chatbot's own WhatsApp number, and removes at once", async () => {
+  it("lists entries, notes phone-only invitees need the chatbot's own WhatsApp number, and removes after a confirm", async () => {
     h.remove.mockReturnValue(ok());
     h.entries = [
       { id: "e1", chatbotId: "b1", kind: "phone", value: "+919812345678" },
@@ -195,8 +209,14 @@ describe("Who may chat", () => {
     render(<WhoMayChat {...props()} />);
     expect(screen.getAllByTestId("access-entry")).toHaveLength(2);
     expect(screen.getByTestId("access-whatsapp-note")).toHaveTextContent("own WhatsApp number");
-    expect(screen.getByText("Never matched")).toBeInTheDocument();
+    expect(screen.getByText("Invited")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Remove +919812345678" }));
+    // Nobody goes on one click: a Remove / Cancel asks first.
+    expect(h.remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(h.remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Remove +919812345678" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(h.remove).toHaveBeenCalledWith({ id: "b1", entryId: "e1" }));
   });
 

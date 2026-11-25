@@ -33,7 +33,12 @@ vi.mock("@api", () => ({
   useCreateChatbotDocumentUploadUrlMutation: () => [vi.fn()],
   useCreatePrivateChatbotDocumentMutation: () => [vi.fn()],
 }));
-vi.mock("react-redux", () => ({ useDispatch: () => vi.fn() }));
+vi.mock("react-redux", () => ({
+  useDispatch: () => vi.fn(),
+  // TF1 round 2 (Saathi B-11): the library picker shows for someone who may read the library.
+  useSelector: (pick: (state: unknown) => unknown) =>
+    pick({ user: { permissions: ["view:knowledge-base"] } }),
+}));
 vi.mock("../../WhatsAppBot/NumberTab", () => ({
   ConnectWhatsAppFlow: () => null,
   useWaNumbers: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),

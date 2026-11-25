@@ -17,6 +17,10 @@ export const USER_LISTS = {
     add: "Add a tool",
     pages: "Your pages",
     pagesCount: "{n} pages",
+    // COPY: needs approval (TF1 round 2)
+    documentsCount: "{n} documents",
+    // COPY: needs approval (TF1 round 2)
+    documentsCountOne: "1 document",
     pagesBody:
       "Your assistant searches your pages to answer questions, and says where each answer came from.",
     pagesManage: "Manage in What it knows",

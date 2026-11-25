@@ -353,6 +353,12 @@ export class ActionPartsService {
   /** Up to 3 of the page's starter questions this chat hasn't asked. */
   private async suggestions(input: PartsInput): Promise<TapButton[]> {
     const asked = new Set((input.asked ?? []).map(norm));
+    // TF1 round 2: not the same chips under every reply. They follow the chat's first answer,
+    // and later ones only while the person keeps tapping them; once they ask their own
+    // question (the current message aside), the starters stop.
+    const starters = new Set((input.starters ?? []).map(norm));
+    const earlier = (input.asked ?? []).slice(0, -1);
+    if (earlier.some((q) => !starters.has(norm(q)))) return [];
     const out: TapButton[] = [];
     for (const q of input.starters ?? []) {
       if (out.length >= MAX_SUGGESTIONS) break;

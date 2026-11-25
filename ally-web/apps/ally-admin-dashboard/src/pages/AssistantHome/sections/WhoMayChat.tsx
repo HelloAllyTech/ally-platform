@@ -15,6 +15,7 @@ import { ChatbotAccessMode } from "@types";
 import { ACCESS_COPY as C } from "../../Credits/copy";
 import { TF1_COPY } from "../copy/tf1";
 import { Group } from "../fields";
+import { InlineConfirm } from "../ui/List";
 import { useHomeField } from "../useHomeField";
 
 import type { SectionProps } from "./props";
@@ -58,6 +59,8 @@ export const WhoMayChat: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
   const [update] = useUpdateChatbotMutation();
   const [text, setText] = useState("");
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  // The entry waiting for "Remove? Remove / Cancel" (TF1 round 2): nobody is removed on one click.
+  const [confirming, setConfirming] = useState<string | null>(null);
   // TF1: the page's own access decides who can open the link (public needs no sign-in).
   const pageAccess = home?.fields?.pageAccess?.value ?? "invite";
   const inviteListed = () => {
@@ -81,6 +84,7 @@ export const WhoMayChat: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
   };
 
   const removeEntry = async (entryId: string) => {
+    setConfirming(null);
     try {
       await remove({ id: bot.id, entryId }).unwrap();
       setMessage(null);
@@ -93,7 +97,8 @@ export const WhoMayChat: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
 
   return (
     <Group title={C.title} hint={C.hint} testId="who-may-chat">
-      {pageAccess === "public" && home?.fields?.pageAccess ? (
+      {/* TF1 round 2: an organisation-only page (the onboarding template) switches the same way. */}
+      {pageAccess !== "invite" && home?.fields?.pageAccess ? (
         <PublicPageSwitch
           bot={bot}
           canEdit={canEdit}
@@ -169,7 +174,7 @@ export const WhoMayChat: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
                 <td>{entry.label ? `${entry.label} (${entry.value})` : entry.value}</td>
                 <td>{C.list.kinds[entry.kind] ?? entry.kind}</td>
                 <td>
-                  {/* TODO(stage 6, ally-be): the list route has no per-entry match flag yet. */}
+                  {/* Phone and email entries only: users and organisations have nothing to prove. */}
                   {entry.everMatched === undefined
                     ? "—"
                     : entry.everMatched
@@ -177,16 +182,25 @@ export const WhoMayChat: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
                       : C.list.never}
                 </td>
                 <td>
-                  {canEdit && (
-                    <Button
-                      variant={ButtonVariant.TEXT}
-                      type="button"
-                      aria-label={C.list.remove(entry.value)}
-                      onClick={() => removeEntry(entry.id)}
-                    >
-                      ×
-                    </Button>
-                  )}
+                  {canEdit &&
+                    (confirming === entry.id ? (
+                      <InlineConfirm
+                        question={C.list.removeConfirm(entry.label || entry.value)}
+                        confirmLabel={C.list.removeYes}
+                        cancelLabel={C.list.removeCancel}
+                        onConfirm={() => void removeEntry(entry.id)}
+                        onCancel={() => setConfirming(null)}
+                      />
+                    ) : (
+                      <Button
+                        variant={ButtonVariant.TEXT}
+                        type="button"
+                        aria-label={C.list.remove(entry.value)}
+                        onClick={() => setConfirming(entry.id)}
+                      >
+                        ×
+                      </Button>
+                    ))}
                 </td>
               </tr>
             ))}
@@ -206,11 +220,31 @@ const AccessChoices: React.FC<{
   canEdit: boolean;
   pageAccess: string;
   onInvite: () => void;
+  /** TF1 round 2: shown, and selectable, while the page is organisation-only. */
+  onOrganisation?: () => void;
   error?: string | null;
-}> = ({ botId, canEdit, pageAccess, onInvite, error }) => (
+}> = ({ botId, canEdit, pageAccess, onInvite, onOrganisation, error }) => (
   <>
     <fieldset className="ally-home__choices" disabled={!canEdit}>
       <legend className="ally-sr-only">{C.mode.label}</legend>
+      {onOrganisation && (
+        <label
+          className={`ally-home__choice${pageAccess === "organisation" ? " is-on" : ""}`}
+          data-testid="access-organisation"
+        >
+          <Input
+            className="!h-4 !w-4"
+            type="radio"
+            name={`access-mode-${botId}`}
+            checked={pageAccess === "organisation"}
+            onChange={onOrganisation}
+          />
+          <span>
+            <span className="ally-home__strong">{TF1_COPY.access.organisationChoice}</span>
+            <span className="ally-field__hint">{TF1_COPY.access.organisationChoiceHint}</span>
+          </span>
+        </label>
+      )}
       <label className={`ally-home__choice${pageAccess === "invite" ? " is-on" : ""}`}>
         <Input
           className="!h-4 !w-4"
@@ -264,7 +298,10 @@ const AccessChoices: React.FC<{
   </>
 );
 
-/** A page that is public now: choosing Invite only saves the page's access. */
+/**
+ * A page that is public or organisation-only now: choosing Invite only (or Organisation only)
+ * saves the page's own access, which decides who can open the link.
+ */
 const PublicPageSwitch: React.FC<{
   bot: SectionProps["bot"];
   canEdit: boolean;
@@ -282,6 +319,11 @@ const PublicPageSwitch: React.FC<{
         access.set("invite", { now: true });
         onInvite();
       }}
+      onOrganisation={
+        field.value === "organisation" || access.value === "organisation"
+          ? () => access.set("organisation", { now: true })
+          : undefined
+      }
     />
   );
 };

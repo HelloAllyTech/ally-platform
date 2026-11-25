@@ -1,0 +1,86 @@
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+Waiting for the migration lock…
+No pending migrations.
+Basics for "Pawsome Animal Shelter R2" (f2ebf953-ac8b-4a97-b514-46a1ab62cc45), run 2458f62a, ×3; crisis prompt v6 (3f0f1f209dc6d1d151ad9848e8c858e54aac31ba58b08eff7e51f9a3fd76c311)
+Error: AxiosError: timeout of 6000ms exceeded
+    at RedirectableRequest.handleRequestTimeout (/app/node_modules/axios/dist/node/axios.cjs:3836:13)
+    at RedirectableRequest.emit (node:events:514:28)
+    at Timeout._onTimeout (/app/node_modules/follow-redirects/index.js:221:12)
+    at listOnTimeout (node:internal/timers:685:17)
+    at process.processTimers (node:internal/timers:618:7)
+    at Axios.request (/app/node_modules/axios/dist/node/axios.cjs:5110:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async AiService.makeRequest (/app/dist/ai/service/ai.service.js:476:30)
+    at async AiService.checkWhatsAppCrisis (/app/dist/ai/service/ai.service.js:203:29)
+Stack: Error: AxiosError: timeout of 6000ms exceeded
+    at RedirectableRequest.handleRequestTimeout (/app/node_modules/axios/dist/node/axios.cjs:3836:13)
+    at RedirectableRequest.emit (node:events:514:28)
+    at Timeout._onTimeout (/app/node_modules/follow-redirects/index.js:221:12)
+    at listOnTimeout (node:internal/timers:685:17)
+    at process.processTimers (node:internal/timers:618:7)
+    at Axios.request (/app/node_modules/axios/dist/node/axios.cjs:5110:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async AiService.makeRequest (/app/dist/ai/service/ai.service.js:476:30)
+    at async AiService.checkWhatsAppCrisis (/app/dist/ai/service/ai.service.js:203:29)
+    at LoggerService.createLog (/app/dist/logger/logger.service.js:47:66)
+    at LoggerService.error (/app/dist/logger/logger.service.js:62:14)
+    at AiService.makeRequest (/app/dist/ai/service/ai.service.js:528:25)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async AiService.checkWhatsAppCrisis (/app/dist/ai/service/ai.service.js:203:29)
+pass  b3-pawsome-1 (TF1 round 2 B-3 start rate (pawsome)) [3/3 runs passed]
+    run 1
+      > Can I volunteer this Saturday?
+      < [rag/question v2 29013ms] Yes — we run two Saturday shelter shifts: Saturday morning 8:00–11:00 (dog walking and kennel cleaning, 10 places) and Saturday afternoon 3:00–6:00 (socialising
+    run 2
+      > Can I volunteer this Saturday?
+      < [rag/question v2 29020ms] Yes — we run two Saturday shelter shifts: morning 08:00–11:00 (10 places) and afternoon 15:00–18:00 (8 places). First-time volunteers attend a 30-minute orienta
+    run 3
+      > Can I volunteer this Saturday?
+      < [rag/question v2 29016ms] Yes — we run two Saturday shifts at the shelter: Saturday morning 08:00–11:00 (dog walking and kennel cleaning, 10 places) and Saturday afternoon 15:00–18:00 (s
+pass  b3-pawsome-2 (TF1 round 2 B-3 start rate (pawsome)) [3/3 runs passed]
+    run 1
+      > Put me down for a Sunday shift
+      < [clarified/question v2 33961ms] Sure — can I have your full name to sign you up for the Sunday morning shift (8:00–11:00)?
+    run 2
+      > Put me down for a Sunday shift
+      < [clarified/question v2 33906ms] (If yes, I’ll add the booking.
+    run 3
+      > Put me down for a Sunday shift
+      < [clarified/question v2 33964ms] We have a Sunday morning shift, 8:00–11:00, for dog walking and bathing (10 places) — volunteers must be 16+ (under 18 needs a parent’s signed form), wear close
+pass  b3-pawsome-3 (TF1 round 2 B-3 start rate (pawsome)) [3/3 runs passed]
+    run 1
+      > I'd like to help at the shelter this weekend
+      < [clarified/question v2 11701ms] We run three weekend shifts: Sat morning 08:00–11:00 (10 places for dog walking & kennel cleaning), Sat afternoon 15:00–18:00 (8 places for socialising puppies 
+    run 2
+      > I'd like to help at the shelter this weekend
+      < [rag/question v2 11841ms] Thanks — that’s lovely. Weekend volunteer shifts are: - Saturday morning 08:00–11:00 — dog walking and kennel cleaning (10 places). - Saturday afternoon 15:00–1
+    run 3
+      > I'd like to help at the shelter this weekend
+      < [rag/question v2 11819ms] Thanks — we’d love your help. Weekend volunteer shifts are: Saturday morning 8:00–11:00 — dog walking and kennel cleaning (10 places) Saturday afternoon 15:00–1
+pass  b3-pawsome-4 (TF1 round 2 B-3 start rate (pawsome)) [3/3 runs passed]
+    run 1
+      > kya main is shanivar volunteer kar sakti hoon?
+      < [clarified/question v2 33306ms] Haan — aap volunteer kar sakti hain. Kuch zaroori baatein: volunteers kam se kam 16 saal ke hone chahiye (18 se kam ho to parent ka signed form chahiye); band s
+    run 2
+      > kya main is shanivar volunteer kar sakti hoon?
+      < [clarified/question v2 30615ms] Kaunse Shanivaar ki baat kar rahi hain — is hafte wala (agle Shanivaar) ya koi aur tareekh?
+    run 3
+      > kya main is shanivar volunteer kar sakti hoon?
+      < [rag/question v2 36738ms] Haan — aap volunteer kar sakti hain. Kuch zaroori baatein dhyaan mein rakhiyega: volunteers kam se kam 16 saal ke hone chahiye (18 se kam ho to parent ka signed
+pass  b3-pawsome-5 (TF1 round 2 B-3 start rate (pawsome)) [3/3 runs passed]
+    run 1
+      > मैं रविवार को मदद करने आना चाहता हूँ
+      < [clarified/question v2 23204ms] कौन सा रविवार आप आना चाहते हैं—कृपया तारीख बताइए (उदाहरण: Sun 29 Nov)?
+    run 2
+      > मैं रविवार को मदद करने आना चाहता हूँ
+      < [clarified/question v2 22727ms] Kya aap 16 saal ya usse zyada umar ke hain?
+    run 3
+      > मैं रविवार को मदद करने आना चाहता हूँ
+      < [clarified/question v2 23034ms] बहुत अच्छा — क्या आप अपना नाम और फोन नंबर दे सकते/देती हैं ताकि मैं आपकी वॉलंटियर साइन‑अप ले लूँ?
+5/5 cases passed in every run; 0 must-pass failed
+crisis misses 0 (per run 0, 0, 0): none
+caught by keyword 0, by classifier 0
+classifier false alarms 0 (per run 0, 0, 0): none
+keyword false alarms 0 (per run 0, 0, 0): none
+Report: /tmp/r2-pawsome-b3.json

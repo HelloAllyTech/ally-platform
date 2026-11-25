@@ -11,7 +11,7 @@ import { baseAPI } from "../../api/baseApi";
 
 export type TemplateGroup = "organisations" | "businesses";
 export type Ability = "do_it" | "never";
-export type SetupKind = "text" | "long_text" | "yes_no" | "choices";
+export type SetupKind = "text" | "long_text" | "yes_no" | "choices" | "phone";
 export type CheckupExpect = "answer" | "decline" | "clarify" | "crisis_only";
 
 /** Where a setup answer goes (`SetupFill` in ally-be). */

@@ -3,7 +3,7 @@ import {
   KnowledgeReviewService,
   ownerTyped,
 } from '../knowledge-review.service';
-import { contactValuesIn, scanForPii } from '../pii-scan';
+import { contactValuesIn, inPublicRole, scanForPii } from '../pii-scan';
 
 const CHATBOT = 'bot-1';
 
@@ -231,5 +231,76 @@ describe('contactValuesIn', () => {
     );
     expect(values).toContain('help@sunrise.org');
     expect(scanForPii('Ring 0800 123 4567', values).total).toBe(0);
+  });
+});
+
+// TF1 round 2, N-3: Sahyog's own PDF was held for its centre numbers, complaints email and the
+// named centre manager.
+describe('an organisation’s own contacts and named staff roles (TF1 round 2, N-3)', () => {
+  const SAHYOG = [
+    'Sahyog Disability Services. All our services are free.',
+    'Malviya Nagar centre Plot 14, Sector 5, Malviya Nagar, Jaipur 302017 Monday to Saturday, 9:30 am to 5:30 pm +91 141 400 7110',
+    'Sanganer centre Near Bus Stand, Tonk Road, Sanganer, Jaipur 302029 Tuesday to Saturday, 10 am to 4 pm +91 141 400 7220',
+    'Complaints',
+    'Write to the centre manager, Ms. Kavita Meena, at feedback@sahyog-jaipur.example. We reply within 7 days.',
+  ].join('\n');
+
+  it('does not hold the organisation’s PDF for its centres, its mailbox and its centre manager', async () => {
+    const { service, held } = setup({}, ['Kavita Meena']);
+    expect(
+      await service.holdIfPersonal(
+        doc({ sourceType: KbDocumentSourceType.PDF, tags: [] }),
+        SAHYOG,
+      ),
+    ).toBe(false);
+    expect(held()).toBe(false);
+  });
+
+  it('finds no personal contact in it at all', () => {
+    expect(scanForPii(SAHYOG).total).toBe(0);
+  });
+
+  it('still holds a named member of the public in the same document', async () => {
+    const { service, held } = setup({}, ['Kavita Meena', 'Ramesh Gupta']);
+    expect(
+      await service.holdIfPersonal(
+        doc({ sourceType: KbDocumentSourceType.PDF, tags: [] }),
+        `${SAHYOG}\nRamesh Gupta was given a wheelchair in March.`,
+      ),
+    ).toBe(true);
+    expect(held()).toBe(true);
+  });
+
+  it('still holds an Aadhaar or PAN number', () => {
+    expect(
+      scanForPii(
+        `${SAHYOG}\nAadhaar 2345 6789 0123, PAN ABCDE1234F`,
+      ).findings.map((f) => f.kind),
+    ).toEqual(['id_number']);
+  });
+
+  it('a list of numbers in one sentence is still personal', () => {
+    expect(
+      scanForPii(
+        'Patients at our centre: Asha 98450 12345, Rohan 99001 23456, Meera 98860 34567',
+      ).total,
+    ).toBe(3);
+  });
+
+  it('tells a staff role from a private mention', () => {
+    expect(inPublicRole(SAHYOG, 'Kavita Meena')).toBe(true);
+    expect(inPublicRole(SAHYOG, 'Ms. Kavita Meena')).toBe(true);
+    expect(inPublicRole('Dr Rao, our dentist, sees children.', 'Rao')).toBe(
+      true,
+    );
+    expect(
+      inPublicRole(
+        'Write to the centre manager, Ms. Kavita Meena. Kavita Meena’s son was treated here.',
+        'Kavita Meena',
+      ),
+    ).toBe(false);
+    expect(
+      inPublicRole('Ramesh Gupta was given a wheelchair.', 'Ramesh Gupta'),
+    ).toBe(false);
   });
 });

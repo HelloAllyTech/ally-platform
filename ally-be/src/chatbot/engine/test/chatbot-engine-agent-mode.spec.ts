@@ -388,7 +388,9 @@ describe('ChatbotEngineService in Agent mode', () => {
       });
       const decision = await engine.respond(turn({ text: 'refund policy?' }));
       expect(decision.handledBy).toBe(WaHandledBy.DECLINED);
-      expect(decision.body).toBe(DEFAULT_WHATSAPP_SETTINGS.declineText);
+      // TF1 round 2 (Saathi B-1): an assistant's decline is never the staff wording ("My
+      // reference material… A colleague or supervisor…"); without its own, the neutral one.
+      expect(decision.body).toBe("I don't have that information.");
       expect(decision.unanswered?.reason).toBe(
         WaUnansweredReason.BELOW_THRESHOLD,
       );

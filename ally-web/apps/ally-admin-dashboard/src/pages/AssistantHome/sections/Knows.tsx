@@ -221,6 +221,18 @@ const Notes: React.FC<{ botId: string; canEdit: boolean }> = ({ botId, canEdit }
 };
 
 /**
+ * TF1 round 2: the learned facts' heading names where they came from: a document's facts are
+ * sourced `document:<id>…`, a page's to its web address; the owner's own answers don't count.
+ */
+export const factsHeading = (facts: Pick<HomeFact, "sourceUrl" | "byOwner">[]): string => {
+  const read = facts.filter(f => !f.byOwner && f.sourceUrl !== "owner");
+  const fromDocuments = read.some(f => f.sourceUrl.startsWith("document:"));
+  const fromWebsite = read.some(f => /^https?:\/\//.test(f.sourceUrl));
+  if (fromDocuments && fromWebsite) return t.fromBoth;
+  return fromDocuments ? t.fromDocuments : t.website;
+};
+
+/**
  * What the assistant answers from (chunk 20d): the facts read from the website (each correctable),
  * the owner's notes, the documents, and the questions it couldn't answer.
  */
@@ -245,7 +257,7 @@ export const KnowsSection: React.FC<SectionProps> = ({ bot, home, canEdit }) => 
         help={HOME.help.knows}
       />
 
-      <Group title={t.website} testId="knows-website">
+      <Group title={factsHeading(home.facts)} testId="knows-website">
         {groups.length === 0 ? (
           <p className="ally-empty">{t.noFacts}</p>
         ) : (

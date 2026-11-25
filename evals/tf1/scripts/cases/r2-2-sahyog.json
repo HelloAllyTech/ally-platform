@@ -1,0 +1,16 @@
+{
+  "tag": "sahyog",
+  "name": "Sahyog Disability Services R2",
+  "pdf": "pdfs/2-sahyog-disability-services.pdf",
+  "template": "Services and eligibility",
+  "answers": [
+    { "kind": "textarea", "value": "Help with a disability certificate (UDID card) - anyone with a disability of 40% or more, any age\nAids and appliances (wheelchairs, hearing aids, crutches, white canes) - people with a UDID card and family income under ₹22,500 a month\nHelp applying for the disability pension - adults 18+ with 40% or more disability\nPhysiotherapy for children - children under 14 with cerebral palsy or a movement disability" },
+    { "kind": "textarea", "value": "Disability certificate: Aadhaar card, two passport photos, any doctor's reports. Aids and appliances: UDID card, income certificate, Aadhaar card. Disability pension: UDID card, bank passbook, Aadhaar card. Physiotherapy: any doctor's reports." },
+    { "kind": "textarea", "value": "Malviya Nagar centre - Plot 14, Sector 5, Malviya Nagar, Jaipur 302017 - Mon–Sat 9:30–5:30 - +91 141 400 7110\nSanganer centre - Near Bus Stand, Tonk Road, Sanganer, Jaipur 302029 - Tue–Sat 10–4 - +91 141 400 7220" },
+    { "kind": "yesno", "value": "Yes" }
+  ],
+  "audience": "Adults only",
+  "contact": "+91 141 400 7110",
+  "knowsChecks": ["medical board", "40%"],
+  "invite": ["shehbaz.sayed+a@helloally.ai", "shehbaz.sayed+b@helloally.ai", "+919800000032"]
+}

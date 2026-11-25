@@ -47,6 +47,12 @@ export const en = {
     sources: "Sources",
     you: "You",
     signedInAs: "Signed in as {email}",
+    /** TF1 round 2 (Saathi B-2). COPY: needs approval. */
+    yourName: "Your name: {name}",
+    removeName: "Remove",
+    /** TF1 round 2 (Sahyog N-14): a message that didn't reach us. COPY: needs approval (TF1 round 2). */
+    notSent: "Not sent",
+    sendAgain: "Send again",
     tooLong: "{count} of {max} characters",
     headerIdle: "Answers from {name}'s own information",
     typing: "Typing…",
@@ -142,6 +148,8 @@ export const en = {
     linkLabel: "findahelpline.com",
     linkUrl: "https://findahelpline.com",
     numbers: "You can call {numbers}.",
+    // COPY: needs approval (TF1 round 2, Saathi B-9): where no assistant is known.
+    emergency: "If you're in danger, call your local emergency number (112 in India).",
     // COPY: needs approval (TF1 F17): no invitation email is sent; the owner shares the link.
     invited: "If you were invited, use the email address the team added for you.",
   },

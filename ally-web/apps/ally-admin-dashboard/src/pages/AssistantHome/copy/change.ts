@@ -26,6 +26,10 @@ export const CHANGE_CONTROLS = {
   historyEmpty: "Nothing has changed yet.",
   fromPanel: "From the Change panel",
   byHand: "Edited by hand",
+  // COPY: needs approval (TF1 round 2)
+  activity: "Done elsewhere",
+  // COPY: needs approval (TF1 round 2): a status as the History shows it.
+  statuses: { live: "Live", paused: "Paused", draft: "Not live yet" } as Record<string, string>,
   undo: "Undo",
   restore: "Restore",
   undone: "Undone",
@@ -53,5 +57,9 @@ export const CHANGE_CONTROLS = {
     unknownNumberText: "What it says to a number it doesn't know",
     unsupportedMediaText: "What it says when it can't read a message",
     rules: "Your own rules",
+    // COPY: needs approval (TF1 round 2): changes made outside these fields.
+    status: "Live or paused",
+    audience: "Removed from who may chat",
+    helpline: "Helpline numbers confirmed",
   },
 } as const;

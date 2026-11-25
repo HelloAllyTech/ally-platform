@@ -214,6 +214,12 @@ def offers_create(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
     return any((d or {}).get("kind") == "create" for d in definitions or [])
 
 
+def offers_change(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
+    """Whether this run can change or withdraw an entry (TF1 round 2, Sahyog N-8):
+    any update tool, which ally-be sends only when the list's Change ability allows."""
+    return any((d or {}).get("kind") == "update" for d in definitions or [])
+
+
 def books_into(definitions: Optional[List[Mapping[str, Any]]]) -> bool:
     """Whether this run has a list it books into (Q4 H9): a create tool whose list's
     playbook is booking (Slots and Appointments, Classes, Tables, Events)."""

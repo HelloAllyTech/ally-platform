@@ -23,9 +23,12 @@ const RESEND_AFTER_SECONDS = 30;
 export function CrisisInfo({
   copy,
   crisis,
+  invited = true,
 }: {
   copy: BotPageCopy;
   crisis?: PublicBotPage["crisis"];
+  /** The "if you were invited…" line: sign-in screens only. */
+  invited?: boolean;
 }) {
   const numbers = crisis?.numbers?.trim();
   const url = crisis?.helplineUrl?.trim() || copy.crisis.linkUrl;
@@ -34,9 +37,15 @@ export function CrisisInfo({
       <p id="bp-crisis-title" className="ally-body" style={{ margin: 0, fontWeight: 600 }}>
         {copy.crisis.title}
       </p>
-      {numbers && (
+      {numbers ? (
         <p className="ally-body" style={{ margin: 0 }} data-testid="bp-crisis-numbers">
           {fill(copy.crisis.numbers, { numbers })}
+        </p>
+      ) : (
+        // TF1 round 2 (Saathi B-9): with no assistant to name (a link that doesn't exist), the
+        // general line, so no screen is ever without a number to call.
+        <p className="ally-body" style={{ margin: 0 }} data-testid="bp-crisis-emergency">
+          {copy.crisis.emergency}
         </p>
       )}
       <p className="ally-body" style={{ margin: 0 }}>
@@ -44,9 +53,11 @@ export function CrisisInfo({
           {copy.crisis.link}
         </a>
       </p>
-      <p className="bp-small bp-muted" style={{ margin: 0 }} data-testid="bp-invited-line">
-        {copy.crisis.invited}
-      </p>
+      {invited && (
+        <p className="bp-small bp-muted" style={{ margin: 0 }} data-testid="bp-invited-line">
+          {copy.crisis.invited}
+        </p>
+      )}
     </aside>
   );
 }
@@ -127,9 +138,12 @@ export function AccessCode({
   onChangeEmail,
   busy = false,
   error,
+  crisis,
 }: {
   branding: BotPageBranding;
   copy: BotPageCopy;
+  /** TF1 round 2 (Saathi B-9): the crisis information stays on the code screen too. */
+  crisis?: PublicBotPage["crisis"];
   email: string;
   onSubmit(code: string): void;
   onResend(): void;
@@ -192,6 +206,7 @@ export function AccessCode({
           </TextButton>
         </div>
       </form>
+      <CrisisInfo copy={copy} crisis={crisis} />
     </div>
   );
 }

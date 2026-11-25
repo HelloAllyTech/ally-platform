@@ -14,8 +14,11 @@ jest.mock('src/common/execution/execution-manager', () => ({
   },
 }));
 
+// Each row its own question unless a test says otherwise (TF1 round 2: tries of one question
+// count once).
+let nextCase = 0;
 const row = (over: Partial<StatInput>): StatInput => ({
-  caseId: 'c',
+  caseId: `c${++nextCase}`,
   expect: 'answer',
   hardFailCase: false,
   tier: 'must_pass',
@@ -29,6 +32,18 @@ const row = (over: Partial<StatInput>): StatInput => ({
 });
 
 describe('checkupTotals', () => {
+  it('TF1 round 2 (Saathi B-8): counts questions, not tries; a question passes only if every try did', () => {
+    const totals = checkupTotals([
+      row({ caseId: 'must', verdict: 'pass' }),
+      row({ caseId: 'must', verdict: 'fail' }),
+      row({ caseId: 'must', verdict: 'pass' }),
+      row({ caseId: 'other', verdict: 'pass' }),
+    ]);
+    expect(totals.questions).toBe(2);
+    expect(totals.accuracy).toEqual({ passed: 1, total: 2 });
+    expect(totals.failed).toBe(1);
+  });
+
   it('counts the deck §17 measures the way the screenshot reads them', () => {
     const rows = [
       ...Array.from({ length: 12 }, () => row({})),

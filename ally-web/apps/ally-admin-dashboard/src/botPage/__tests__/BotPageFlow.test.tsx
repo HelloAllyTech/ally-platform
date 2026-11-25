@@ -352,6 +352,49 @@ describe("parseSse", () => {
         ...over,
       });
 
+    it("a reply sent back to be rewritten never shows twice: the draft goes at once, the final takes its place", async () => {
+      const user = userEvent.setup();
+      let release: (() => void) | undefined;
+      let handlers: { onStatus(c: string): void; onToken(t: string): void } | undefined;
+      const api = inChat({
+        send: vi.fn(
+          (
+            _slug: string,
+            _text: string,
+            h: { onStatus(c: string): void; onToken(t: string): void },
+          ) =>
+            new Promise(resolve => {
+              handlers = h;
+              h.onToken("Draft that the check sends back.");
+              release = () =>
+                resolve({
+                  reply: "The checked reply.",
+                  citations: [],
+                  messageId: "m2",
+                  conversationId: "c1",
+                });
+            }),
+        ),
+      });
+      render(<BotPageApp slug="sunrise-mind" api={api} />);
+      await screen.findByText("Hi");
+      await user.type(screen.getByLabelText("Your message"), "When do you open?{Enter}");
+      expect(await screen.findByText("Draft that the check sends back.")).toBeInTheDocument();
+      act(() => handlers!.onStatus("rewriting"));
+      // The draft leaves as the rewrite starts, with the status in its place: never frozen on screen.
+      await waitFor(() =>
+        expect(screen.queryByText("Draft that the check sends back.")).not.toBeInTheDocument(),
+      );
+      expect(screen.getByText("Improving the answer…")).toBeInTheDocument();
+      act(() => handlers!.onToken("The checked reply."));
+      await act(async () => release!());
+      // It replaces the streamed bubble rather than rising in as a second message.
+      expect(await screen.findByTestId("bp-reply-in-place")).toHaveTextContent(
+        "The checked reply.",
+      );
+      expect(screen.getAllByText("The checked reply.")).toHaveLength(1);
+    });
+
     it("Talk to a person asks the team and shows what the visitor is told", async () => {
       const user = userEvent.setup();
       const api = inChat();
@@ -402,11 +445,81 @@ describe("parseSse", () => {
         }),
       );
       expect(await screen.findByText("Hi, I'm here to help.")).toBeInTheDocument();
-      expect(screen.getByText("Asha from Sunrise Mind has joined the chat.")).toBeInTheDocument();
+      // TF1 round 2 (Saathi): the server stores the one "has joined" notice; the page adds none.
+      expect(
+        screen.queryByText("Asha from Sunrise Mind has joined the chat."),
+      ).not.toBeInTheDocument();
       act(() => push!({ type: "state", by: "assistant" }));
       expect(
         await screen.findByText("You're chatting with the assistant again."),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("after a reload (TF1 round 2, Sahyog N-11 and N-14)", () => {
+    const resumed = (messages: unknown[]) =>
+      fakeApi({
+        conversation: vi.fn().mockResolvedValue({ conversationId: "c1", messages }),
+        session: vi.fn().mockResolvedValue({ ...READY, intakeDone: true }),
+      });
+    const HI = { id: "m1", role: "user", text: "Hi", citations: [], createdAt: "" };
+
+    beforeEach(() => window.sessionStorage.clear());
+
+    it("a reply's card is drawn again from the history", async () => {
+      const api = resumed([
+        HI,
+        {
+          id: "m2",
+          role: "assistant",
+          text: "Done: your application is sent (Ravi Test).",
+          citations: [],
+          createdAt: "",
+          confirmation: {
+            action: "create",
+            list: "Applications",
+            title: "Ravi Test",
+            headline: "application",
+            details: [{ label: "Service", value: "Aids and appliances" }],
+          },
+        },
+      ]);
+      render(<BotPageApp slug="sunrise-mind" api={api} />);
+      expect(await screen.findByText("Aids and appliances")).toBeInTheDocument();
+    });
+
+    it("a message that didn't reach us stays as not sent, survives a reload, and sends again", async () => {
+      const user = userEvent.setup();
+      const send = vi.fn().mockRejectedValueOnce(new BotPageApiError("NETWORK")).mockResolvedValue({
+        reply: "It's in review.",
+        citations: [],
+        messageId: "m3",
+        conversationId: "c1",
+      });
+      const api = resumed([HI]);
+      api.send = send as never;
+      const first = render(<BotPageApp slug="sunrise-mind" api={api} />);
+      await screen.findByText("Hi");
+      await user.type(screen.getByLabelText("Your message"), "Status of my pension?{Enter}");
+      expect(await screen.findByTestId("bp-unsent")).toHaveTextContent("Not sent");
+      expect(screen.getByLabelText("Your message")).toHaveValue("Status of my pension?");
+      first.unmount();
+
+      // The reload: the server never got it, the page still has it.
+      render(<BotPageApp slug="sunrise-mind" api={api} />);
+      await screen.findByText("Hi");
+      expect(screen.getByText("Status of my pension?")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Send again" }));
+      expect(await screen.findByText("It's in review.")).toBeInTheDocument();
+      expect(send).toHaveBeenLastCalledWith(
+        "sunrise-mind",
+        "Status of my pension?",
+        expect.anything(),
+        expect.anything(),
+        undefined,
+      );
+      expect(screen.queryByTestId("bp-unsent")).not.toBeInTheDocument();
+      expect(window.sessionStorage.getItem("ally-bp-unsent:sunrise-mind")).toBeNull();
     });
   });
 });

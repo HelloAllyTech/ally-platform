@@ -1,0 +1,310 @@
+[
+  {
+    "id": "b3-saathi-1",
+    "kind": "TF1 round 2 B-3 start rate (saathi)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "Can someone call me back tomorrow evening?",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-saathi-2",
+    "kind": "TF1 round 2 B-3 start rate (saathi)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "can someone call me",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-saathi-3",
+    "kind": "TF1 round 2 B-3 start rate (saathi)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "I can't talk now, call me later",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-saathi-4",
+    "kind": "TF1 round 2 B-3 start rate (saathi)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "I want to talk to a listener tonight",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-saathi-5",
+    "kind": "TF1 round 2 B-3 start rate (saathi)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "mujhe call karo kal shaam",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-saathi-6",
+    "kind": "TF1 round 2 B-3 start rate (saathi)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "kya koi mujhe call kar sakta hai?",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-saathi-7",
+    "kind": "TF1 round 2 B-3 start rate (saathi)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "मुझे कल शाम कॉल करो",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-sahyog-1",
+    "kind": "TF1 round 2 B-3 start rate (sahyog)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "I want to apply for a disability certificate",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-sahyog-2",
+    "kind": "TF1 round 2 B-3 start rate (sahyog)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "Can you put my name down for a wheelchair?",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-sahyog-3",
+    "kind": "TF1 round 2 B-3 start rate (sahyog)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "mere bete ke liye certificate banwana hai",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-sahyog-4",
+    "kind": "TF1 round 2 B-3 start rate (sahyog)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "Please register me for the aids and appliances camp",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-sahyog-5",
+    "kind": "TF1 round 2 B-3 start rate (sahyog)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "मुझे उपकरण के लिए आवेदन करना है",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-pawsome-1",
+    "kind": "TF1 round 2 B-3 start rate (pawsome)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "Can I volunteer this Saturday?",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-pawsome-2",
+    "kind": "TF1 round 2 B-3 start rate (pawsome)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "Put me down for a Sunday shift",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-pawsome-3",
+    "kind": "TF1 round 2 B-3 start rate (pawsome)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "I'd like to help at the shelter this weekend",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-pawsome-4",
+    "kind": "TF1 round 2 B-3 start rate (pawsome)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "kya main is shanivar volunteer kar sakti hoon?",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-pawsome-5",
+    "kind": "TF1 round 2 B-3 start rate (pawsome)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "मैं रविवार को मदद करने आना चाहता हूँ",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-akshar-1",
+    "kind": "TF1 round 2 B-3 start rate (akshar)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "Can I ask the coordinator something?",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-akshar-2",
+    "kind": "TF1 round 2 B-3 start rate (akshar)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "I need to ask someone about my police verification",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-akshar-3",
+    "kind": "TF1 round 2 B-3 start rate (akshar)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "Please tell the team I'll miss Thursday's session",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-akshar-4",
+    "kind": "TF1 round 2 B-3 start rate (akshar)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "kisi se training ke baare mein baat karni hai",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  },
+  {
+    "id": "b3-akshar-5",
+    "kind": "TF1 round 2 B-3 start rate (akshar)",
+    "lang": "en",
+    "mustPass": false,
+    "turns": [
+      {
+        "user": "टीम से पूछना है कि अगला सत्र कब है",
+        "expect": {
+          "crisis": false
+        }
+      }
+    ]
+  }
+]

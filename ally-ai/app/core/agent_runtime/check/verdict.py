@@ -37,6 +37,10 @@ class CheckContext:
     avoid_topics: Sequence[str] = ()
     #: What the assistant is for (chunk 20a-2): answer, enquiries, training, guide.
     purpose: Optional[str] = None
+    #: TF1 round 2 (Sahyog N-8): it may change or withdraw an entry (an update tool).
+    can_change: bool = True
+    #: TF1 round 2 (Sahyog N-2): the use-case template it was built from.
+    template: Optional[str] = None
     #: The run offers a create tool (chunk 6): the assistant can book, so it may
     #: offer to and name free times, as long as a find showed them.
     can_book: bool = False

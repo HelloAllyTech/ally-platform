@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Optional,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -11,6 +12,7 @@ import {
   Put,
   Res,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Response } from 'express';
 import {
   ApiBearerAuth,
@@ -37,6 +39,11 @@ import { ChatbotMemberRole } from '../enum/chatbot.enum';
 import { CHATBOT_SECTIONS } from '../sections/chatbot-sections';
 import { ChatbotAccessService } from '../service/chatbot-access.service';
 import { ChatbotAudienceService } from '../service/chatbot-audience.service';
+import {
+  CHATBOT_ACTIVITY,
+  type ChatbotActivityEvent,
+} from '../type/chatbot-activity';
+import { ExecutionManager } from '../../common/execution/execution-manager';
 import {
   changesAdminOnlySetting,
   ChatbotSettingsService,
@@ -67,6 +74,8 @@ export class ChatbotController {
     private readonly access: ChatbotAccessService,
     private readonly audience: ChatbotAudienceService,
     private readonly settings: ChatbotSettingsService,
+    // TF1 round 2: a removal from the access list, for the assistant's History.
+    @Optional() private readonly emitter?: EventEmitter2,
   ) {}
 
   @Get('sections')
@@ -343,7 +352,19 @@ export class ChatbotController {
     @Param('entryId', ParseUUIDPipe) entryId: string,
   ) {
     await this.access.assert(id, ChatbotMemberRole.EDITOR);
+    const entry = this.emitter
+      ? (await this.audience.list(id)).find((e) => e.id === entryId)
+      : undefined;
     await this.audience.remove(id, entryId);
+    if (entry) {
+      this.emitter?.emit(CHATBOT_ACTIVITY, {
+        chatbotId: id,
+        field: 'audience',
+        before: entry.label || entry.value,
+        after: null,
+        userId: Number(ExecutionManager.getUserId() ?? 0) || null,
+      } satisfies ChatbotActivityEvent);
+    }
   }
 
   // ── test ──────────────────────────────────────────────────────────────

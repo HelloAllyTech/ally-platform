@@ -11,6 +11,13 @@ import {
 /** The outcome of one matching pass. */
 export interface TemplateMatch {
   template: WaKeywordTemplate;
+  /**
+   * TF1 round 2: the reply's wording is this chatbot's own. False for a copy whose wording is
+   * still its global's (every chatbot gets a locked copy of the crisis reply): the global's staff
+   * wording ("answers from reference material… contact a supervisor") must never go out as if a
+   * builder wrote it.
+   */
+  ownWording: boolean;
   /** True when nothing else may run — crisis and opt-out. */
   terminal: boolean;
   /** True when retrieval must be skipped. */
@@ -83,7 +90,8 @@ export class ChatbotReplyService {
     const normalised = ChatbotReplyService.normalise(text);
     if (!normalised) return null;
 
-    const templates = (await this.effective(chatbotId)).filter((t) => t.active);
+    const { resolved, sameAsGlobal } = await this.load(chatbotId);
+    const templates = resolved.filter((t) => t.active);
 
     for (const template of templates) {
       // A language-scoped rule only applies to that language; an unscoped rule applies to all.
@@ -99,6 +107,8 @@ export class ChatbotReplyService {
           template,
           terminal: template.terminal,
           bypassRag: template.bypassRag,
+          ownWording:
+            Boolean(template.chatbotId) && !sameAsGlobal.has(template.id),
         };
       }
     }
@@ -174,6 +184,14 @@ export class ChatbotReplyService {
    * write: the crisis reply cannot be lost to a bad row, however it got there.
    */
   async effective(chatbotId: string | null): Promise<WaKeywordTemplate[]> {
+    return (await this.load(chatbotId)).resolved;
+  }
+
+  /** `effective`, and the ids of this chatbot's copies whose wording is still their global's. */
+  private async load(chatbotId: string | null): Promise<{
+    resolved: WaKeywordTemplate[];
+    sameAsGlobal: Set<string>;
+  }> {
     const rows = await this.templateRepository.find({
       where: chatbotId
         ? [
@@ -184,11 +202,44 @@ export class ChatbotReplyService {
       order: { priority: 'ASC', createdAt: 'ASC' },
     });
     const resolved = ChatbotReplyService.resolve(rows, chatbotId);
-    if (!chatbotId || (await this.globalFallback())) return resolved;
+    const sameAsGlobal = ChatbotReplyService.unchangedCopies(rows, chatbotId);
+    if (!chatbotId || (await this.globalFallback())) {
+      return { resolved, sameAsGlobal };
+    }
     // Stage 5 (D6): once every chatbot has its own copies, a builder's chatbot answers from its
     // copies alone. A mandatory global (crisis, STOP, START) is never dropped, so a reply added
     // after the copy still protects every chatbot until it is copied too.
-    return resolved.filter((row) => Boolean(row.chatbotId) || row.mandatory);
+    return {
+      resolved: resolved.filter(
+        (row) => Boolean(row.chatbotId) || row.mandatory,
+      ),
+      sameAsGlobal,
+    };
+  }
+
+  /** This chatbot's copies whose wording is still their global's, by id (TF1 round 2). */
+  static unchangedCopies(
+    rows: WaKeywordTemplate[],
+    chatbotId: string | null,
+  ): Set<string> {
+    const words = (text: string | null | undefined) =>
+      (text ?? '').replace(/\s+/g, ' ').trim();
+    const globals = new Map(
+      rows
+        .filter((r) => !r.chatbotId)
+        .map((r) => [r.id, words(r.responseText)]),
+    );
+    return new Set(
+      rows
+        .filter(
+          (r) =>
+            chatbotId &&
+            r.chatbotId === chatbotId &&
+            r.overridesTemplateId &&
+            globals.get(r.overridesTemplateId) === words(r.responseText),
+        )
+        .map((r) => r.id),
+    );
   }
 
   private fallbackCache: { value: boolean; at: number } | null = null;

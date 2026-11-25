@@ -14,6 +14,11 @@ import { crisisHelplines } from '../../chatbot/engine/crisis-helplines';
 import { ListToolsService } from '../../chatbot/agent-tools/list-tools.service';
 import type { ListPlaybook } from '../../chatbot/agent-tools/list-tools';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { OnEvent } from '@nestjs/event-emitter';
+import {
+  CHATBOT_ACTIVITY,
+  type ChatbotActivityEvent,
+} from '../../chatbot/type/chatbot-activity';
 import { createHash, randomUUID } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import { AiService } from '../../ai/service/ai.service';
@@ -130,7 +135,9 @@ export class AssistantHomeService {
       fields: readAll(state),
       safety: {
         ...safetyView(
-          chatbot.safetyPack,
+          // TF1 round 2 (Saathi B-6): before go-live the pack is only on the working copy, so
+          // Settings showed no pack at all; it names the pack the assistant will go live with.
+          chatbot.safetyPack ?? draft?.safetyPack ?? null,
           chatbot.rules?.never ?? [],
           chatbot.rules?.packChange ?? null,
         ),
@@ -261,12 +268,30 @@ export class AssistantHomeService {
     return check.warning ? OVERRIDE_WARNING : null;
   }
 
+  /**
+   * TF1 round 2: going live, pausing, an access-list removal and a helpline confirmation, made
+   * elsewhere, are listed in the History too (as `activity`, never undone).
+   */
+  @OnEvent(CHATBOT_ACTIVITY, { async: true })
+  async onActivity(event: ChatbotActivityEvent): Promise<void> {
+    await this.record(
+      event.chatbotId,
+      event.field,
+      event.before ?? null,
+      event.after ?? null,
+      'activity',
+      event.userId,
+    );
+  }
+
   /** One edit by hand, for the History: who, when, the field, its before and after. */
   private async record(
     chatbotId: string,
     field: string,
     before: unknown,
     after: unknown,
+    kind: 'edit' | 'activity' = 'edit',
+    by?: number | null,
   ): Promise<void> {
     try {
       const draft = await this.drafts.findByChatbot(chatbotId);
@@ -276,8 +301,8 @@ export class AssistantHomeService {
           id: randomUUID(),
           at: new Date().toISOString(),
           actor: BotDraftActor.OWNER,
-          kind: 'edit',
-          userId: userId(),
+          kind,
+          userId: by ?? userId(),
           origin: 'hand',
           field,
           before,
@@ -301,7 +326,10 @@ export class AssistantHomeService {
     await this.access.assert(chatbotId);
     const draft = await this.drafts.findByChatbot(chatbotId);
     const events = (draft?.events ?? [])
-      .filter((e) => e.kind === 'edit' || e.kind === 'change')
+      .filter(
+        (e) =>
+          e.kind === 'edit' || e.kind === 'change' || e.kind === 'activity',
+      )
       .slice(-HISTORY_SHOWN)
       .reverse();
     const ids = [
@@ -326,7 +354,7 @@ export class AssistantHomeService {
         origin: e.origin ?? (e.kind === 'change' ? 'panel' : 'hand'),
         who: e.userId ? (names.get(e.userId) ?? null) : null,
         fields:
-          e.kind === 'edit'
+          e.kind === 'edit' || e.kind === 'activity'
             ? [{ field: e.field ?? '', before: e.before, after: e.after }]
             : (e.ops ?? []).map((op) => op.value as never),
         undone: Boolean(e.undoneBy),

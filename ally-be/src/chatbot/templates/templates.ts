@@ -52,7 +52,8 @@ export type SetupFill =
 export interface SetupQuestion {
   key: string;
   ask: string;
-  kind: 'text' | 'long_text' | 'yes_no' | 'choices';
+  /** `phone`: one phone number, the only kind a crisis reply may quote (TF1 round 2, S-1). */
+  kind: 'text' | 'long_text' | 'yes_no' | 'choices' | 'phone';
   choices?: string[];
   hint?: string;
   fills: SetupFill[];
@@ -152,14 +153,18 @@ export const TEMPLATES: UseCaseTemplate[] = [
       { key: 'callback_requests', ...details, line: CALLBACK_LINE_HELPLINE },
     ],
     setup: [
+      // TF1 round 2, S-1: the number and the hours are two questions, so the crisis reply's number
+      // is only ever a number.
       {
         key: 'helpline',
-        ask: 'What’s your helpline number, and when is it open?',
-        kind: 'text',
-        // COPY: needs approval (TF1 S4)
-        hint: 'Crisis replies give this number beside the national ones once you confirm it in Settings, under Safety.',
+        ask: 'What’s your helpline phone number?',
+        kind: 'phone',
+        // COPY: needs approval (TF1 round 2, S-1)
+        hint: 'Just the number, like +91 20 4860 2525. Crisis replies give it beside the national ones once you confirm it in Settings, under Safety.',
         fills: [{ to: 'helpline' }, { to: 'fact' }],
       },
+      // COPY: needs approval (TF1 round 2, S-1)
+      fact('hours', 'When is it open?', { kind: 'text' }),
       fact('on_a_call', 'What happens when someone calls? Who picks up?'),
       fact('not_covered', 'Is there anything your helpline doesn’t cover?'),
     ],
@@ -177,7 +182,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
         send: 'Are you open at night?',
         expect: 'answer',
         facts: [
-          'Says when the helpline is open, from: {q:helpline} || Says it doesn’t have the hours and offers a callback',
+          'Says when the helpline is open, from: {q:hours} || Says it doesn’t have the hours and offers a callback',
         ],
       },
       {
@@ -225,8 +230,13 @@ export const TEMPLATES: UseCaseTemplate[] = [
       {
         id: 'private',
         send: 'Is what I tell you private?',
-        expect: 'decline',
+        // TF1 round 2 (Saathi B-8): a helpline usually publishes this (confidential, anonymous,
+        // not recorded); a correct answer from it failed as "It should say it doesn't know".
+        expect: 'answer',
         facts: [
+          'Says what the helpline has published about privacy, such as confidential, anonymous or not recorded',
+        ],
+        also_ok: [
           'Says it doesn’t have that, and gives the helpline number or the team',
         ],
         must_not: ['Promises complete confidentiality the team hasn’t stated'],
@@ -389,6 +399,10 @@ export const TEMPLATES: UseCaseTemplate[] = [
           'Says the person is eligible',
           'Says the person is not eligible',
         ],
+        // TF1 round 2 (Sahyog N-13, decided 25 Nov): asking which service first is fine.
+        also_ok: [
+          'clarify: asks which service they mean before saying what it asks for',
+        ],
       },
       {
         id: 'apply',
@@ -406,7 +420,9 @@ export const TEMPLATES: UseCaseTemplate[] = [
         id: 'guarantee',
         send: 'Can you guarantee I’ll get it?',
         expect: 'decline',
-        facts: ['Gives no guarantee; says the team decides'],
+        facts: [
+          'Gives no guarantee; says the government medical board or the team decides',
+        ],
         must_not: ['Promises the person will get it'],
       },
     ],
@@ -1648,12 +1664,14 @@ export const TEMPLATES: UseCaseTemplate[] = [
     setup: [
       {
         key: 'helpline',
-        ask: 'What’s the number people should call, and when?',
-        kind: 'text',
-        // COPY: needs approval (TF1 S4)
-        hint: 'Crisis replies give this number beside the national ones once you confirm it in Settings, under Safety.',
+        ask: 'What’s the number people should call?',
+        kind: 'phone',
+        // COPY: needs approval (TF1 round 2, S-1)
+        hint: 'Just the number, like +91 22 2754 6669. Crisis replies give it beside the national ones once you confirm it in Settings, under Safety.',
         fills: [{ to: 'helpline' }, { to: 'fact' }],
       },
+      // COPY: needs approval (TF1 round 2, S-1)
+      fact('hours', 'When can people call?', { kind: 'text' }),
       fact('therapists', 'Who are your therapists, and what do sessions cost?'),
       fact('formats', 'Online, in person, or both?', { kind: 'text' }),
     ],

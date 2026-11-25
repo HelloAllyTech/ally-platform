@@ -139,7 +139,12 @@ export const botPageApi = {
     }),
 
   conversation: (slug: string) =>
-    call<{ conversationId: string | null; messages: PublicMessage[] }>(url(slug, "/conversation")),
+    call<{ conversationId: string | null; messages: PublicMessage[]; name?: string | null }>(
+      url(slug, "/conversation"),
+    ),
+  /** TF1 round 2 (Saathi B-2): remove the name the assistant keeps for this visitor. */
+  forgetName: (slug: string) =>
+    call<{ ok: true }>(url(slug, "/me/forget-name"), { method: "POST", body: "{}" }),
 
   /** "Was this helpful?" on one answer; rating again changes it (chunk Q2a). */
   feedback: (slug: string, messageId: string, body: AnswerFeedback) =>

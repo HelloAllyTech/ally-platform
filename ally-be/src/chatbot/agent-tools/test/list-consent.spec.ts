@@ -8,6 +8,8 @@ import {
   isPlainYes,
   namesEntry,
   offerFor,
+  shortPlace,
+  shortService,
   questionIn,
   questionShown,
 } from '../list-consent';
@@ -513,7 +515,7 @@ describe('missingChoice (chunk H1)', () => {
 
       const callback = ask(as('callback_requests', 'Callback requests'));
       expect(callback.en).toMatch(
-        /^Shall I request a callback for Sana Shaikh about /,
+        /^Shall I request a callback for Sana Shaikh\b/,
       );
       expect(callback.hi).toMatch(
         /^क्या मैं Sana Shaikh के लिए कॉलबैक का अनुरोध भेज दूँ/,
@@ -521,9 +523,11 @@ describe('missingChoice (chunk H1)', () => {
 
       const application = ask(as('applications', 'Volunteer applications'));
       expect(application.en).toMatch(
-        /^Shall I send your application for .*\(Sana Shaikh\)\?$/,
+        /^Shall I send an application for .* for Sana Shaikh\?$/,
       );
-      expect(application.hi).toMatch(/के लिए आपका आवेदन भेज दूँ/);
+      expect(application.hi).toMatch(
+        /^क्या मैं Sana Shaikh के लिए .*आवेदन भेज दूँ\?$/,
+      );
 
       const booking = ask(as('appointments', 'Appointments'));
       expect(booking.en).toMatch(/^Shall I book .* for Sana Shaikh\?$/);
@@ -538,6 +542,65 @@ describe('missingChoice (chunk H1)', () => {
       ).questions;
       expect(other.en).toMatch(/^Shall I add this to Enquiries: /);
       expect(other.hi).toMatch(/^क्या मैं इसे Enquiries में जोड़ दूँ: /);
+    });
+
+    it('an application names the short service, the centre, the person, then the phone (N-11)', () => {
+      const applications = {
+        key: 'applications',
+        name: 'Applications',
+        settings: { title_field: 'name', person_field: 'applicant' },
+        fields: [
+          { key: 'name', label: 'Name', type: ListFieldType.TEXT },
+          { key: 'phone', label: 'Phone', type: ListFieldType.PHONE },
+          {
+            key: 'applicant',
+            label: 'Applicant',
+            type: ListFieldType.RELATION,
+            options: { to: 'contact' },
+          },
+          { key: 'service', label: 'Service', type: ListFieldType.SELECT },
+          {
+            key: 'preferred_centre',
+            label: 'Preferred centre',
+            type: ListFieldType.TEXT,
+          },
+          { key: 'status', label: 'Status', type: ListFieldType.SELECT },
+        ],
+      } as unknown as ListDefinitionView;
+      const record = {
+        id: 'app-1',
+        title: 'Ravi Test',
+        data: {},
+        display: {
+          name: 'Ravi Test',
+          phone: '9800000011',
+          applicant: 'Ravi Test',
+          service:
+            'Aids and appliances (wheelchairs, hearing aids, crutches, white canes)',
+          preferred_centre: 'Malviya Nagar centre',
+          status: 'received',
+        },
+        contact_id: 'c1',
+      } as unknown as ListRecordView;
+      const { questions } = offerFor(
+        applications,
+        'create',
+        record,
+        null,
+        false,
+      );
+      expect(questions.en).toBe(
+        'Shall I send an application for aids and appliances at Malviya Nagar for Ravi Test (9800000011)?',
+      );
+      expect(questions.hi).toBe(
+        'क्या मैं Ravi Test के लिए Malviya Nagar में Aids and appliances का आवेदन भेज दूँ (9800000011)?',
+      );
+      expect(
+        shortService('Help with a disability certificate (UDID card)'),
+      ).toBe('a disability certificate');
+      expect(shortService('UDID card')).toBe('UDID card');
+      expect(shortPlace('the Malviya Nagar centre')).toBe('Malviya Nagar');
+      expect(shortPlace('Centre')).toBe('Centre');
     });
 
     it("never names Try it's test visitor", () => {

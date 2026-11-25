@@ -18,6 +18,9 @@ describe('the emergency reply fits the emergency', () => {
     ],
     ['Paani ghar mein aa gaya, hum chhat par phanse hain, baadh hai', 'flood'],
     ['बाढ़ में फँस गए हैं', 'flood'],
+    // TF1 round 2, S-2: water coming in wins over "trapped".
+    ['Water is entering our house and we are trapped', 'flood'],
+    ['पानी घर में घुस गया है, हम फँस गए हैं', 'flood'],
     ['Our house is on fire and my father is trapped upstairs', 'rescue'],
     ['Lift mein phanse hain, bahar nahi nikal pa rahe', 'rescue'],
     ['Someone collapsed in the waiting room and is not breathing', 'collapse'],

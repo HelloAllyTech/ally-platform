@@ -43,14 +43,17 @@ def test_any_time_only_for_a_24x7_number():
     assert "reach Cloudnine on 99724 99724 (24x7) any time." in text
 
 
-def test_tele_manas_only_on_mental_health_assistants():
+def test_tele_manas_is_never_the_organisations_own_line():
+    """TF1 round 2 (Sahyog N-1): with no confirmed line of its own, the support line
+    ("you can reach {organisation} on …") is left out; Tele-MANAS is given as itself."""
     mental = mood_section(
         {
             "mood": "upset",
             "persona": {"safety_pack": "mental_health", "display_name": "Mpower"},
         }
     )
-    assert "Tele-MANAS on 14416" in mental and "any time" in mental
+    assert "reach Mpower on Tele-MANAS" not in mental
+    assert "Tele-MANAS on 14416" in mental
     eye_hospital = mood_section(
         {
             "mood": "upset",

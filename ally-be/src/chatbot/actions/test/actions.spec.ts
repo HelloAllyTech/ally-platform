@@ -141,7 +141,7 @@ describe('AgentGatewayService.confirmOffer (BT1: the tap is the yes, written onc
 });
 
 describe('ActionsService (BT1: taps answered in code)', () => {
-  const turn = (tap: unknown, text = 'Confirmed: Sun 29 Nov 2026, 11:00') =>
+  const turn = (tap: unknown, text = 'Confirm') =>
     ({
       chatbot: { id: BOT_A },
       conversationId: CONV_A,
@@ -196,6 +196,64 @@ describe('ActionsService (BT1: taps answered in code)', () => {
         activity: [{ kind: 'create', record_id: 'r-1' }],
       },
     });
+  });
+
+  it('an application says what happens next, with a fixed line (N-11)', async () => {
+    const shown = offer({
+      card: {
+        action: 'create',
+        list: 'Applications',
+        title: 'Ravi Test',
+        headline: 'application',
+        details: [],
+      },
+    });
+    const { service, listTools } = setup({
+      ok: true,
+      replayed: false,
+      result: { passages: [{ record_id: 'r-1' }] },
+    });
+    listTools.confirmation.mockResolvedValue({
+      list: 'Applications',
+      title: 'Ravi Test',
+      headline: 'application',
+      details: [],
+    });
+    const decision = await service.perform(
+      turn({
+        ok: true,
+        firstUse: true,
+        claims: { kind: 'confirm', text: '', offer: shown, ...where },
+      }),
+    );
+    expect(decision?.body).toBe(
+      'Done: your application is sent (Ravi Test). The team will be in touch.',
+    );
+  });
+
+  it('a cancelled callback request is said as one, never "Asha is cancelled" (B-4)', async () => {
+    const shown = offer({
+      card: {
+        action: 'cancel',
+        list: 'Callback requests',
+        title: 'Asha',
+        headline: 'cancelled',
+        details: [],
+      },
+    });
+    const { service } = setup({
+      ok: true,
+      replayed: false,
+      result: { passages: [{ record_id: 'r-1' }] },
+    });
+    const decision = await service.perform(
+      turn({
+        ok: true,
+        firstUse: true,
+        claims: { kind: 'confirm', text: '', offer: shown, ...where },
+      }),
+    );
+    expect(decision?.body).toBe('Done: your callback request is cancelled.');
   });
 
   it('a slot taken in the meantime is said plainly; its free times come back as chips', async () => {
@@ -401,7 +459,8 @@ describe('ActionPartsService (BT1: chips and cards from tool results, never from
     const redeemed = await tokens.redeem(out.offer!.buttons[0].token, where);
     expect(redeemed).toMatchObject({
       ok: true,
-      claims: { kind: 'confirm', text: 'Confirmed: Sun 29 Nov 2026, 11:00' },
+      // N-11: the tap is stored as the button's words, as the page showed it.
+      claims: { kind: 'confirm', text: 'Confirm' },
     });
   });
 
@@ -546,6 +605,17 @@ describe('ActionPartsService (BT1: chips and cards from tool results, never from
       'Is it free?',
       'Which languages?',
     ]);
+  });
+
+  it('no starter chips once the person has asked their own question', async () => {
+    const out = await setup([]).parts.partsFor(
+      input({
+        runId: null,
+        starters: ['Is it free?', 'Which languages?'],
+        asked: ['where are you based', 'what are your hours'],
+      }),
+    );
+    expect(out.suggestions).toBeUndefined();
   });
 
   it('a crisis, blocked or fixed reply carries nothing', async () => {

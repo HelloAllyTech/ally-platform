@@ -57,6 +57,23 @@ export interface Proposal {
 
 const REFUSAL = new SafetyLockedError('change by chat').message;
 
+/** A request that is about the suggested questions (the chips under the chat). */
+const ABOUT_QUESTIONS = /\b(suggest\w*|questions?|starters?|chips?|faqs?)\b/i;
+
+/**
+ * TF1 round 2: the model sometimes rewrites the suggested questions when asked for something
+ * else. They change only when the request mentions them; every other proposed change stays.
+ */
+export function onlyAskedFor(
+  request: string,
+  changes: ProposedChange[],
+): ProposedChange[] {
+  if (ABOUT_QUESTIONS.test(request)) return changes;
+  return changes.filter(
+    (c) => (FIELDS[c.field] ?? c.field) !== 'suggestedQuestions',
+  );
+}
+
 /** Sent with each proposal, so an edit in Manage Prompts takes effect (chunk H0). */
 const CHANGE_PROMPT_CODES = ['ally_ai_builder_change'] as const;
 
@@ -112,7 +129,11 @@ export class ChangeService {
       ...(prompts ? { prompts } : {}),
     });
     if (out.refused) return { refused: true, message: REFUSAL, changes: [] };
-    return { refused: false, message: out.reply, changes: out.changes };
+    return {
+      refused: false,
+      message: out.reply,
+      changes: onlyAskedFor(request, out.changes),
+    };
   }
 
   private async prompts(): Promise<Record<string, unknown> | undefined> {

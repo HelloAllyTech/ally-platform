@@ -180,23 +180,73 @@ _STRAY = [
         re.IGNORECASE,
     ),
 ]
+#: TF1 round 2 (Saathi B-3, B-5): anything in square brackets (an empty "[]", a quoted
+#: source "[Our policies: …]") and worded markers ("(see citations)", "(see below)").
+_WORDED_MARKS = re.compile(
+    r"\s*\[[^\[\]\n]{0,160}\]|\s*\(\s*(?:see|per|from)\s+(?:the\s+)?"
+    r"(?:citations?|sources?|references?|passages?|below|above)\s*\)",
+    re.IGNORECASE,
+)
 #: Any other unclosed bracket loses only the bracket: "(Please bring originals…".
 _UNCLOSED = re.compile(r"\((?![^()\n]*\))\s*")
 
 
+#: TF1 round 2 (Sahyog N-7): "(cite: 11, 12, 13)", closed or not, and an in-text
+#: "Sources:" block with its "— title" lines.
+_CITE_ASIDE = re.compile(
+    # TF1 round 2: Hindi replies wrote "(सूत्र: …)" and "(स्रोत: …)".
+    r"\s*\(\s*(?:cite|cites|citations?|sources?|सूत्र|स्रोत|स्त्रोत)\s*:[^()\n]*\)?",
+    re.IGNORECASE,
+)
+_SOURCES_BLOCK = re.compile(
+    r"\s*(?:^|\n)[ \t]*(?:sources?|citations?)[ \t]*:[ \t]*(?:\n[ \t]*[—–\-•*][^\n]*)+",
+    re.IGNORECASE,
+)
+
+
+def _without_stray_closes(text: str) -> str:
+    """A ")" after a full stop goes only when nothing before it is still open
+    (TF1 round 2: "(…no address is provided.)" lost its own bracket)."""
+    out, depth, last = [], 0, 0
+    for match in re.finditer(r"[()]", text):
+        if match.group() == "(":
+            depth += 1
+            continue
+        if depth:
+            depth -= 1
+        elif _STRAY_CLOSE.match(text, match.start()):
+            out.append(text[last : match.start()])
+            last = match.end()
+    out.append(text[last:])
+    return "".join(out)
+
+
+def without_unclosed_brackets(text: str) -> str:
+    """A bracket opened and never closed loses only the bracket (TF1 round 2)."""
+    if not text or text.count("(") <= text.count(")"):
+        return text or ""
+    tidy = _UNCLOSED.sub("", text)
+    return re.sub(r"[ \t]{2,}", " ", tidy).strip()
+
+
 def without_citation_marks(text: str) -> str:
     """A reply as it is sent: no citation numbers or "Sources:" lists in the text."""
+    text = _SOURCES_BLOCK.sub("", text or "")
+    text = _CITE_ASIDE.sub("", text)
     text = _SOURCE_LIST.sub(
         lambda m: "" if re.search(r"\[\d|:\s*\)?\.?$", m.group(0)) else m.group(0),
-        text or "",
+        text,
     )
     text = _MARKS.sub("", text)
+    text = _WORDED_MARKS.sub("", text)
     for stray in _STRAY:
         text = stray.sub("", text)
     text = _UNCLOSED.sub("", text)
     text = _EMPTY_PARENS.sub("", text)
-    text = _STRAY_CLOSE.sub("", text)
+    text = _without_stray_closes(text)
     text = re.sub(r"[ \t]+([.,;:!?])", r"\1", text)
+    # A mark removed between two full stops leaves "..": one, never a real "...".
+    text = re.sub(r"(?<!\.)\.\.(?!\.)", ".", text)
     text = re.sub(r"[ \t]{2,}", " ", text)
     return re.sub(r"[ \t]+\n", "\n", text).strip()
 

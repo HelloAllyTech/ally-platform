@@ -76,6 +76,14 @@ class PersonaSelector(BaseModel):
         max_length=600,
         description='The owner\'s own description, for "Something else".',
     )
+    template: Optional[str] = Field(
+        None,
+        max_length=40,
+        description=(
+            "The use-case template it was built from (TF1 round 2): the Services "
+            "template never says whether someone qualifies."
+        ),
+    )
     avoid_topics: List[str] = Field(
         default_factory=list,
         max_length=10,

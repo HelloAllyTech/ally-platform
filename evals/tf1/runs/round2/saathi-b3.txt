@@ -1,0 +1,81 @@
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  override existing env vars with { override: true }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+Waiting for the migration lock…
+No pending migrations.
+Basics for "Saathi Youth Helpline R2" (82abe913-c2d0-41ab-a4ac-b0c61bf5f61f), run 7738d9c6, ×3; crisis prompt v6 (3f0f1f209dc6d1d151ad9848e8c858e54aac31ba58b08eff7e51f9a3fd76c311)
+pass  b3-saathi-1 (TF1 round 2 B-3 start rate (saathi)) [3/3 runs passed]
+    run 1
+      > Can someone call me back tomorrow evening?
+      < [clarified/question v2 19218ms] We can arrange a callback.
+    run 2
+      > Can someone call me back tomorrow evening?
+      < [clarified/question v2 18018ms] Sure — we can arrange a callback tomorrow evening (Thursday 26 Nov).
+    run 3
+      > Can someone call me back tomorrow evening?
+      < [clarified/question v2 19312ms] I can arrange a callback — please send your first name, a phone number, and which time tomorrow evening between 10:00 and 22:00 you'd prefer (e.g. 18:30–19:00).
+pass  b3-saathi-2 (TF1 round 2 B-3 start rate (saathi)) [3/3 runs passed]
+    run 1
+      > can someone call me
+      < [rag/question v2 15389ms] Yes — we can call you. A listener will call back within 4 hours during opening hours (requests after 21:00 are called back the next morning from 10:00). We will
+    run 2
+      > can someone call me
+      < [clarified/question v2 18124ms] I can arrange a callback.
+    run 3
+      > can someone call me
+      < [clarified/question v2 17021ms] Yes — we can arrange a callback.
+pass  b3-saathi-3 (TF1 round 2 B-3 start rate (saathi)) [3/3 runs passed]
+    run 1
+      > I can't talk now, call me later
+      < [clarified/question v2 8167ms] We can call you back.
+    run 2
+      > I can't talk now, call me later
+      < [clarified/question v2 10278ms] We can call you back.
+    run 3
+      > I can't talk now, call me later
+      < [clarified/question v2 14022ms] Sure — we can call you back. A listener calls back within 4 hours during opening hours; requests made after 21:00 are called back the next morning from 10:00. (
+pass  b3-saathi-4 (TF1 round 2 B-3 start rate (saathi)) [3/3 runs passed]
+    run 1
+      > I want to talk to a listener tonight
+      < [clarified/question v2 5991ms] Do you want the helpline number to call now, or shall I arrange a callback for tonight?
+    run 2
+      > I want to talk to a listener tonight
+      < [rag/question v2 18009ms] You can call a listener now on +91 20 4860 2525 — we’re open every day 10:00–22:00 (including today). Trained volunteer listeners pick up (they give only a firs
+    run 3
+      > I want to talk to a listener tonight
+      < [rag/question v2 14057ms] You can talk to a trained volunteer tonight — our helpline is open 10:00–22:00 daily and the number is +91 20 4860 2525. A volunteer answers by first name, call
+pass  b3-saathi-5 (TF1 round 2 B-3 start rate (saathi)) [3/3 runs passed]
+    run 1
+      > mujhe call karo kal shaam
+      < [clarified/question v2 5732ms] Theek hai — kal shaam ke liye callback rakhna chaahte hain. कृपया woh phone number bata dijiye jisse hum aapko कॉल कर सकें?
+    run 2
+      > mujhe call karo kal shaam
+      < [clarified/question v2 4779ms] Thik hai — kya aap apna phone number de sakte ho taaki hum kal shaam aapko call kar saken? (sirf number bhejein)
+    run 3
+      > mujhe call karo kal shaam
+      < [clarified/question v2 10865ms] Thik hai — hum callback arrange kar sakte hain. Kripya ek hi sandesh mein apna pehla naam, phone number aur kal shaam ka aisa waqt bataiye jo 10:00 se 22:00 ke 
+pass  b3-saathi-6 (TF1 round 2 B-3 start rate (saathi)) [3/3 runs passed]
+    run 1
+      > kya koi mujhe call kar sakta hai?
+      < [clarified/question v2 4566ms] Haan — hum callback arrange kar sakte hain. Kya aap apna phone number bhejenge? (Agar abhi call ke liye theek nahin hai to ek munasib din/waqt bhi bata sakte ha
+    run 2
+      > kya koi mujhe call kar sakta hai?
+      < [handover/question v2 29085ms] Haan — hamare trained listeners se baat karne ke liye aap khud call kar sakte hain: +91 20 4860 2525. Hamari timing roz 10:00 se 22:00 tak hoti hai. Agar aap ab
+    run 3
+      > kya koi mujhe call kar sakta hai?
+      < [clarified/question v2 3656ms] Hamare listeners aapko call kar sakte hain. Kya aap apna phone number aur jo din/waqt (subah/dupahar/sham) theek rahega, bata sakte hain?
+pass  b3-saathi-7 (TF1 round 2 B-3 start rate (saathi)) [3/3 runs passed]
+    run 1
+      > मुझे कल शाम कॉल करो
+      < [clarified/question v2 15837ms] ठीक है — क्या मैं कल (26 नवम्बर) शाम को कॉल करने के लिए आपका फोन नंबर ले सकता/सकती हूँ? "शाम" में कोई खास समय ठीक है (उदाहरण: 6–8 बजे)? कृपया सिर्फ फोन नंबर और 
+    run 2
+      > मुझे कल शाम कॉल करो
+      < [handover/question v2 23159ms] ठीक है — मैं कॉल का अनुरोध कर दूँ? कृपया अपना फ़ोन नंबर दे दें (एक लाइन में)। मैंने टीम से इस बातचीत में जुड़ने के लिए कह दिया है। वे आमतौर पर कुछ घंटों में जवा
+    run 3
+      > मुझे कल शाम कॉल करो
+      < [rag/question v2 10471ms] हम कल शाम आपको कॉल करवा सकते हैं। कृपया अपना फोन नंबर बताइए ताकि हम आपका callback अनुरोध दर्ज कर सकें। (अगर आप अभी कॉल करना चाहें तो हमारी हेल्पलाइन +91 20 4860
+7/7 cases passed in every run; 0 must-pass failed
+crisis misses 0 (per run 0, 0, 0): none
+caught by keyword 0, by classifier 0
+classifier false alarms 0 (per run 0, 0, 0): none
+keyword false alarms 0 (per run 0, 0, 0): none
+Report: /tmp/r2-saathi-b3.json

@@ -52,6 +52,15 @@ export const isCreditsRequired = (error: unknown): boolean =>
 export const crawlFailureText = (code: string | null | undefined, fallback?: string | null) =>
   (code && BUILD_COPY.crawlFailure[code]) || fallback || BUILD_COPY.crawlFailure.crawl_failed;
 
+/**
+ * The setup's own working documents ("What we learned", "Owner notes"): the assistant reads them,
+ * but they are not sources the owner added, so the Sources list leaves them out. The same titles
+ * ally-be never shows as a source (`INTERNAL_TITLES` in reply-composer.ts).
+ */
+export const INTERNAL_SOURCE_TITLES = /^(what we learned|owner notes)\b/i;
+export const isInternalSource = (title: string | null | undefined): boolean =>
+  INTERNAL_SOURCE_TITLES.test((title ?? "").trim());
+
 /** `sunrise.org`, `www.x.com/a` and `https://x.com` are web addresses; text with spaces is not. */
 const WEB_ADDRESS = /^(https?:\/\/)?[^\s/.]+(\.[^\s/.]+)*\.[a-z]{2,}(:\d+)?([/?#]\S*)?$/i;
 export const looksLikeAddress = (text: string): boolean => WEB_ADDRESS.test(text.trim());

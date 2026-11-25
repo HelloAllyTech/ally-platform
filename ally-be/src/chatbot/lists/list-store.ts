@@ -174,10 +174,9 @@ export class TitleResolver {
       for (const id of newContacts) this.contacts.set(id, null);
       for (const row of found) {
         // People read the inbox's label (chunk 5b); the agent keeps the name alone.
-        this.contacts.set(
-          row.id,
-          this.agent ? (row.display_name ?? 'A contact') : contactLabel(row),
-        );
+        // TF1 round 2 (Saathi B-4): the agent and the person's card read the same label as the
+        // owner (never "A contact" for someone with a name, email or number).
+        this.contacts.set(row.id, contactLabel(row));
       }
     }
   }
@@ -259,8 +258,10 @@ export class TitleResolver {
 export interface ContactRow {
   id: string;
   display_name: string | null;
-  /** The WhatsApp number, if the contact has one: only its last 4 are ever shown. */
+  /** The WhatsApp number, if the contact has one. */
   whatsapp: string | null;
+  /** Their verified email (the bot page's sign-in), if any. */
+  email?: string | null;
   channel: string | null;
 }
 
@@ -268,6 +269,9 @@ export interface ContactRow {
 export const CONTACT_SELECT = `SELECT c.id, c.display_name,
     (SELECT i.external_id FROM chatbot_contact_identities i
       WHERE i.contact_id = c.id AND i.channel = 'whatsapp' ORDER BY i."createdAt" LIMIT 1) AS whatsapp,
+    (SELECT i.external_id FROM chatbot_contact_identities i
+      WHERE i.contact_id = c.id AND i.channel = 'email' AND i.verified
+      ORDER BY i."createdAt" LIMIT 1) AS email,
     (SELECT i.channel FROM chatbot_contact_identities i
       WHERE i.contact_id = c.id ORDER BY i."createdAt" LIMIT 1) AS channel
   FROM chatbot_contacts c`;
@@ -280,13 +284,16 @@ function tag(id: string): string {
 }
 
 /**
- * The inbox's label for a person (20d-2): their name, else "Visitor · 4821" with a WhatsApp
- * number's last 4, else 4 digits from the contact's id. Never a whole number or email.
+ * Who a person is, as the Inbox says it (TF1 S5; lists and cards since TF1 round 2, Saathi B-4):
+ * their name, else their verified email, else their WhatsApp number. "Visitor · 4821" only for
+ * someone with none of those (never for a signed-in person).
  */
 export function contactLabel(row: ContactRow): string {
   if (row.display_name?.trim()) return row.display_name.trim();
-  const phone = String(row.whatsapp ?? '');
-  return `Visitor · ${/\d{4}$/.test(phone) ? phone.slice(-4) : tag(row.id)}`;
+  if (row.email?.trim()) return row.email.trim();
+  const phone = String(row.whatsapp ?? '').replace(/\D/g, '');
+  if (/^\d{8,15}$/.test(phone)) return `+${phone}`;
+  return `Visitor · ${tag(row.id)}`;
 }
 
 /** The channel a contact came from, in the owner's words. */

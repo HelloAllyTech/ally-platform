@@ -487,3 +487,21 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* TF1 round 2: Take over / Hand back stay in reach in a long chat. The head sticks to the top of
+   the scrolling chat, with the pane's background behind it so messages pass under it. */
+.ally-inbox__chat-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -16px -24px 0;
+  padding: 16px 24px 8px;
+  background: var(--ally-bg);
+  border-bottom: 1px solid var(--ally-line);
+}
+@media (max-width: 959px) {
+  .ally-inbox__chat-head {
+    margin: -12px -16px 0;
+    padding: 12px 16px 8px;
+  }
+}

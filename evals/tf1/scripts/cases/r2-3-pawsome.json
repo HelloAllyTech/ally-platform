@@ -1,0 +1,35 @@
+{
+  "tag": "pawsome",
+  "pdf": "pdfs/3-pawsome-animal-shelter.pdf",
+  "template": "Donors and volunteers",
+  "answers": [
+    {
+      "kind": "textarea",
+      "value": "Bank transfer: Pawsome Animal Trust, account 50200011223344, IFSC HDFC0001234\nUPI: pawsome@upi-example\nCheque payable to Pawsome Animal Trust\nIn kind: dry dog food, old bedsheets and newspapers at the shelter gate"
+    },
+    {
+      "kind": "textarea",
+      "value": "Money donations get 50% deduction under Section 80G (registration AABTP1234Q24BL01). Email name, PAN, amount and transaction reference to donate@pawsome-blr.example within 30 days. Cash above Rs 2,000 and in-kind gifts are not eligible."
+    },
+    {
+      "kind": "textarea",
+      "value": "Dog walking and kennel cleaning\nSocialising puppies and cats\nBathing dogs"
+    },
+    {
+      "kind": "textarea",
+      "value": "Saturday morning 8 am to 11 am - 10 places\nSaturday afternoon 3 pm to 6 pm - 8 places\nSunday morning 8 am to 11 am - 10 places"
+    }
+  ],
+  "audience": "People who may be under 18",
+  "contact": "+91 80 4567 8800",
+  "invite": [
+    "shehbaz.sayed+a@helloally.ai",
+    "shehbaz.sayed+b@helloally.ai",
+    "+919800000032"
+  ],
+  "name": "Pawsome Animal Shelter R2",
+  "knowsChecks": [
+    "80G",
+    "Saturday"
+  ]
+}
