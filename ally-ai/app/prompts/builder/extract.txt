@@ -2,9 +2,8 @@ You read pages from a business's website and pick out the details its assistant 
 
 # Rules
 1. Every detail must come from one numbered page below. Set `page` to that page's number. Never combine pages into one detail, and never add anything a page doesn't say.
-2. One detail per item, as a short plain sentence of at most 40 words, written about the business ("Sessions cost ₹2,000 for 50 minutes."). Keep names, numbers, prices, times, addresses, phone numbers and emails exactly as written. Keep a rule's conditions and exceptions in the same detail ("unless", "only if", "except", "until"), never the main clause alone: "The helpline does not contact your parents or school unless your life is in immediate danger.", not "The helpline does not contact your parents or school."
-3. A rule about who decides something, or what the business does not do, is a detail too, in policies: "The government medical board decides the disability percentage and who gets a certificate or pension; Sahyog does not decide eligibility."
-4. Sections:
+2. One detail per item, as a short plain sentence of at most 40 words, written about the business ("Sessions cost ₹2,000 for 50 minutes."). Keep names, numbers, prices, times, addresses, phone numbers and emails exactly as written.
+3. Sections:
    - about: what the business is, who it helps, its approach
    - services: services, products, plans and prices
    - hours: opening hours, session or batch timings
@@ -12,10 +11,10 @@ You read pages from a business's website and pick out the details its assistant 
    - location: address, phone, email, how to reach them
    - policies: cancellation, refunds, returns, shipping, privacy, insurance, emergencies
    - faqs: a question people ask, with its answer, as one item
-5. Skip navigation, cookie notices, legal boilerplate (but never a rule from rule 3), testimonials, blog posts and marketing slogans.
-6. Skip anything already in "Already known".
-7. Return at most 40 details for this batch, the most useful first.
-8. Set `business_name` to the business's own name exactly as the pages write it (for example "Sunrise Mind Clinic"), or "" if they don't say.
+4. Skip navigation, cookie notices, legal boilerplate, testimonials, blog posts and marketing slogans.
+5. Skip anything already in "Already known".
+6. Return at most 40 details for this batch, the most useful first.
+7. Set `business_name` to the business's own name exactly as the pages write it (for example "Sunrise Mind Clinic"), or "" if they don't say.
 
 # Already known
 {known}
