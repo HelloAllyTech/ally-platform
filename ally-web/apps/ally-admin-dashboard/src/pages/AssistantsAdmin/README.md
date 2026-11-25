@@ -11,15 +11,15 @@ The person is Ally staff, rarely in a hurry except in an incident. They arrive w
 ("give this builder more credits", "why did spend jump", "release a safety pack"), not a feature name.
 So the tab is organised by job, and the first screen says what needs doing.
 
-| Section            | The job                                   | Screens inside                                                          |
-| ------------------ | ----------------------------------------- | ----------------------------------------------------------------------- |
-| Overview           | What needs me today? Where do I go for X? | Attention cards (live), month so far, a shortcut per common job         |
-| Builders & credits | Money builders hold                       | Accounts, grant or adjust, move a budget, starting-credits cutover      |
-| Pricing & costs    | What it costs Ally, and what we charge    | Costs, Model prices, WhatsApp rates, Plans & seats                      |
-| Safety             | How every chatbot handles risk            | Safety packs (draft, test, release, roll back)                          |
-| Defaults & library | What every chatbot starts from            | Starting settings, Quick replies, Knowledge library, Channels & numbers |
-| Support            | Look inside a builder's chatbot           | Search, then open read-only (logged)                                    |
-| Launch & data      | The jobs that run outside this screen     | Kill switches, Launch checklist, Data clean-up                          |
+| Section            | The job                                   | Screens inside                                                                     |
+| ------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| Overview           | What needs me today? Where do I go for X? | Attention cards (live), month so far, a shortcut per common job                    |
+| Builders & credits | Money builders hold                       | Accounts, grant or adjust, move a budget, starting-credits cutover                 |
+| Pricing & costs    | What it costs Ally, and what we charge    | Costs, Model prices, WhatsApp rates, Plans & seats                                 |
+| Safety             | How every chatbot handles risk            | Safety packs (draft, test, release, roll back)                                     |
+| Defaults & library | What every chatbot starts from            | Starting settings, Quick replies, Knowledge library, Templates, Channels & numbers |
+| Support            | Look inside a builder's chatbot           | Search, then open read-only (logged)                                               |
+| Launch & data      | The jobs that run outside this screen     | Kill switches, Launch checklist, Data clean-up                                     |
 
 Order follows a working day: look, then money, then safety, then content, then support, then the rare
 launch jobs.
