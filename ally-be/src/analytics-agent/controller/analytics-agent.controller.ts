@@ -122,6 +122,7 @@ export class AnalyticsAgentController {
       chart: null,
       caveats: [],
       followUps: response.followUps ?? [],
+      ...(response.needsUserInput ? { needsUserInput: true } : {}),
       durationMs: fields.durationMs,
       provenance: fields.provenance,
     };

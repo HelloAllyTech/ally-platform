@@ -304,6 +304,94 @@ describe('AnalyticsAuditAgentService', () => {
       });
     });
 
+    describe('an answer the agent reached after asking the user questions', () => {
+      /** A turn where the agent asked instead of answering: `question` is what the user typed. */
+      const clarify = (id: string, question: string, asked: string) =>
+        ({
+          ...(row(id, question, asked) as object),
+          outcome: 'clarify',
+        }) as never;
+
+      /** Runs the audit of `answered`, with `earlier` (newest first) as the turns before it. */
+      const auditWith = async (answered: unknown, earlier: unknown[]) => {
+        const { service, messages, appended } = build([answered]);
+        messages.find
+          .mockResolvedValueOnce([answered])
+          .mockResolvedValueOnce(earlier);
+        await (
+          await service.startAudit()
+        )?.done;
+        const input = (
+          invoke.mock.calls[0][0] as { messages: { content: string }[] }
+        ).messages[0].content;
+        return { input, entry: appended()[0] as Record<string, unknown> };
+      };
+
+      it('audits the first question, the whole exchange and the final answer as one set', async () => {
+        const { input, entry } = await auditWith(
+          row('m3', 'By signup date', 'There were 42.', 'SELECT 42'),
+          [
+            clarify('c2', 'Last 30 days', 'Count by signup or first session?'),
+            clarify('c1', 'How is onboarding doing?', 'Which period?'),
+          ],
+        );
+
+        expect(input).toContain(
+          '<question>\nHow is onboarding doing?\n</question>',
+        );
+        expect(input).toContain(
+          [
+            '<clarifying_exchange>',
+            'Agent: Which period?',
+            'User: Last 30 days',
+            'Agent: Count by signup or first session?',
+            'User: By signup date',
+            '</clarifying_exchange>',
+          ].join('\n'),
+        );
+        expect(input).toContain('There were 42.');
+        expect(input).toContain('SELECT 42');
+        expect(entry).toMatchObject({
+          messageId: 'm3',
+          question: 'How is onboarding doing?',
+          answer: 'There were 42.',
+          exchange: [
+            { from: 'agent', text: 'Which period?' },
+            { from: 'user', text: 'Last 30 days' },
+            { from: 'agent', text: 'Count by signup or first session?' },
+            { from: 'user', text: 'By signup date' },
+          ],
+        });
+      });
+
+      it('stops at the previous answer, so a new question starts a new set', async () => {
+        const { input, entry } = await auditWith(
+          row('m3', 'Last 7 days', 'Seven.'),
+          [
+            clarify('c2', 'And for orgs?', 'Which period?'),
+            row('m1', 'How many learners?', 'Nine.'),
+            clarify('c0', 'Something older', 'Older question?'),
+          ],
+        );
+
+        expect(entry.question).toBe('And for orgs?');
+        expect(input).toContain('Agent: Which period?\nUser: Last 7 days');
+        expect(input).not.toContain('Older question?');
+        expect(input).not.toContain('How many learners?');
+      });
+
+      it('leaves the exchange out when the agent answered at once', async () => {
+        const { input, entry } = await auditWith(
+          row('m1', 'How many?', 'Forty.'),
+          [row('m0', 'An earlier question', 'Earlier.')],
+        );
+
+        expect(input).not.toContain('clarifying_exchange');
+        expect(entry).not.toHaveProperty('exchange');
+        expect(entry.question).toBe('How many?');
+      });
+    });
+
     it('keeps going and records the error when one audit fails, still completing the run', async () => {
       const { service, audits, appended } = build([
         row('m2', 'Second?', 'Two.'),
