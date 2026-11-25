@@ -38,7 +38,9 @@ const REVEAL_MAX_MS = 4000;
 const MIN_CHARS_PER_TICK = 2;
 
 const prefersReducedMotion = () =>
-  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  // `?.matches`: a stubbed or partial matchMedia (tests, old embeds) can return nothing.
+  typeof window !== "undefined" &&
+  window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
 
 const toItem = (m: PublicMessage): ChatItem => ({
   id: m.id,
