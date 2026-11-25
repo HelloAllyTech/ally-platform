@@ -361,49 +361,58 @@ export class PmRunPipeline {
         if (outcome.result?.outcome === 'timeout') timedOut = true;
       }
 
-      // ── selected lanes ────────────────────────────────────────────────────
-      for (const choice of lanes) {
-        if (this.now().getTime() >= deadline) {
-          timedOut = true;
-          break;
-        }
-        if (ledger.laneRemainingUsd < PM_PIPELINE.MIN_RUN_BUDGET_USD / 2) {
-          budgetHit = true;
-          break;
-        }
-        const definition = PM_LANES[choice.lane];
-        const target = await this.deps.llm.resolveTarget(
-          definition.taskId,
-          definition.promptCode,
-          plan.cheapModel,
-        );
-        const { prompt, system } = await laneSystem(choice.lane);
-        const result = await runner.run({
-          runId: run.id,
-          definition,
-          target,
-          promptVersion: prompt.version,
-          system,
-          userMessage: this.laneBrief(
-            choice.lane,
-            plan.candidatesPerLane,
-            freeAtStart,
-            facts.length,
-          ),
-          maxCandidates: plan.candidatesPerLane,
-          ledger,
-          deadline: Math.min(
-            deadline,
-            this.now().getTime() + PM_PIPELINE.LANE_TIMEOUT_MS,
-          ),
-          runEvidence,
-        });
+      // ── selected lanes, in parallel ───────────────────────────────────────
+      // Run one after another, a gpt-5 run took the SUM of its lanes (14–20+ min) and hit
+      // RUN_TIMEOUT_MS before the critic (local 2026-11-25). Each lane has its own deadline and
+      // reserves per call from the ledger (synchronous, so concurrent lanes cannot overspend);
+      // results are collected in lane order, so the batch dedupe's "keep the first" is unchanged.
+      const runnable: typeof lanes = [];
+      if (this.now().getTime() >= deadline) {
+        timedOut = lanes.length > 0;
+      } else if (ledger.laneRemainingUsd < PM_PIPELINE.MIN_RUN_BUDGET_USD / 2) {
+        budgetHit = lanes.length > 0;
+      } else {
+        runnable.push(...lanes);
+      }
+      const laneResults = await Promise.all(
+        runnable.map(async (choice) => {
+          const definition = PM_LANES[choice.lane];
+          const target = await this.deps.llm.resolveTarget(
+            definition.taskId,
+            definition.promptCode,
+            plan.cheapModel,
+          );
+          const { prompt, system } = await laneSystem(choice.lane);
+          return runner.run({
+            runId: run.id,
+            definition,
+            target,
+            promptVersion: prompt.version,
+            system,
+            userMessage: this.laneBrief(
+              choice.lane,
+              plan.candidatesPerLane,
+              freeAtStart,
+              facts.length,
+            ),
+            maxCandidates: plan.candidatesPerLane,
+            ledger,
+            deadline: Math.min(
+              deadline,
+              this.now().getTime() + PM_PIPELINE.LANE_TIMEOUT_MS,
+            ),
+            runEvidence,
+          });
+        }),
+      );
+      runnable.forEach((choice, index) => {
+        const result = laneResults[index];
         log.lanes[choice.lane] = this.laneLog(result, ledger, choice.lane);
         candidates.push(...result.candidates);
         if (result.outcome === 'budget') budgetHit = true;
         if (result.outcome === 'timeout') timedOut = true;
-        await store.updateRunSpend(run.id, ledger.spent).catch(() => undefined);
-      }
+      });
+      await store.updateRunSpend(run.id, ledger.spent).catch(() => undefined);
 
       // ── gate, critic, rank, persist ───────────────────────────────────────
       const created = await this.gateAndPersist({

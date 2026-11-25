@@ -57,8 +57,11 @@ export const PM_PIPELINE = {
   CRITIC_MAX_TOKENS: 12000,
   /** Per-call SDK deadline (passed to the provider, so a hung call stops billing). */
   CALL_TIMEOUT_MS: 90_000,
-  /** Wall clock per lane and per run. */
-  LANE_TIMEOUT_MS: 4 * 60_000,
+  /**
+   * Wall clock per lane and per run. Lanes run in parallel, so a run takes its slowest lane,
+   * not their sum: 8 min gives gpt-5 room for MAX_PASSES and still leaves the critic time.
+   */
+  LANE_TIMEOUT_MS: 8 * 60_000,
   RUN_TIMEOUT_MS: 20 * 60_000,
   /**
    * A `running` row older than this is a crashed run (usually a deploy killed the task
