@@ -19,6 +19,7 @@ import {
 import {
   AnalyticsAgentAudit,
   AnalyticsAuditedMessage,
+  AnalyticsAuditExchangeTurn,
   AnalyticsAuditStatus,
   AnalyticsAuditTrigger,
 } from '../entity/analytics-agent-audit.entity';
@@ -110,18 +111,30 @@ function describeFeedback(feedback: AnalyticsAgentFeedback): string {
 function buildAuditInput(entry: {
   askedAt: string;
   question: string;
+  exchange?: AnalyticsAuditExchangeTurn[];
   answer: string;
   sql: string;
   feedback?: AnalyticsAgentFeedback | null;
 }): HumanMessage {
   return new HumanMessage(
     [
-      `Audit the following answer. It was asked at ${entry.askedAt}; the data may have changed since.`,
+      `Audit the following answer. It was given at ${entry.askedAt}; the data may have changed since.`,
       '',
       '<question>',
       entry.question,
       '</question>',
       '',
+      ...(entry.exchange?.length
+        ? [
+            '<clarifying_exchange>',
+            ...entry.exchange.map(
+              (turn) =>
+                `${turn.from === 'agent' ? 'Agent' : 'User'}: ${turn.text}`,
+            ),
+            '</clarifying_exchange>',
+            '',
+          ]
+        : []),
       '<answer>',
       entry.answer,
       '</answer>',
@@ -139,6 +152,28 @@ function buildAuditInput(entry: {
         : []),
     ].join('\n'),
   );
+}
+
+/** The text of a saved turn's reply. */
+function answerText(row: AnalyticsAgentMessage): string {
+  const answer = (row.response as { answer?: unknown }).answer;
+  return typeof answer === 'string' ? answer : '';
+}
+
+/**
+ * The lines between a set's first question and its answer, oldest first. A
+ * clarifying turn holds what the agent asked; the user's reply to it is the
+ * question of the turn after it, and for the last one, of the answered turn.
+ */
+function exchangeOf(
+  clarifying: AnalyticsAgentMessage[],
+  answered: AnalyticsAgentMessage,
+): AnalyticsAuditExchangeTurn[] {
+  const turns = [...clarifying, answered];
+  return clarifying.flatMap((turn, i): AnalyticsAuditExchangeTurn[] => [
+    { from: 'agent', text: answerText(turn) },
+    { from: 'user', text: turns[i + 1].question },
+  ]);
 }
 
 /** Runs `worker` over `items` with at most `limit` in flight. Rejects on the first failure. */
@@ -507,12 +542,38 @@ export class AnalyticsAuditAgentService {
     return new Set(found.map((row) => row.messageId));
   }
 
+  /**
+   * The turns just before `row` in its conversation where the agent asked the
+   * user something instead of answering, oldest first. They run back from `row`
+   * and stop at the first turn that was not a question to the user (the previous
+   * answer, a failure), so a conversation of several questions splits into one
+   * set per answer.
+   */
+  private async loadClarifyingTurns(
+    row: AnalyticsAgentMessage,
+  ): Promise<AnalyticsAgentMessage[]> {
+    const earlier = await this.messages.find({
+      where: {
+        conversationId: row.conversationId,
+        createdAt: LessThan(row.createdAt),
+      },
+      order: { createdAt: 'DESC' },
+      take: AUDIT_AGENT_LIMITS.MAX_EXCHANGE_TURNS,
+    });
+    const clarifying: AnalyticsAgentMessage[] = [];
+    for (const turn of earlier) {
+      if (turn.outcome !== 'clarify') break;
+      clarifying.push(turn);
+    }
+    return clarifying.reverse();
+  }
+
   private async auditMessage(
     agent: AuditAgent,
     row: AnalyticsAgentMessage,
   ): Promise<AnalyticsAuditedMessage> {
-    const response = row.response as { answer?: unknown; sql?: unknown };
-    const answer = typeof response.answer === 'string' ? response.answer : '';
+    const response = row.response as { sql?: unknown };
+    const answer = answerText(row);
     const sql = typeof response.sql === 'string' ? response.sql : '';
     const entry: AnalyticsAuditedMessage = {
       messageId: row.id,
@@ -523,6 +584,14 @@ export class AnalyticsAuditAgentService {
     };
 
     try {
+      // A set is the question, whatever was asked and replied before the agent
+      // could answer, and the answer. The set is keyed by its answer's message.
+      const clarifying = await this.loadClarifyingTurns(row);
+      if (clarifying.length > 0) {
+        entry.question = clarifying[0].question;
+        entry.exchange = exchangeOf(clarifying, row);
+      }
+
       const result = await agent.invoke(
         {
           messages: [

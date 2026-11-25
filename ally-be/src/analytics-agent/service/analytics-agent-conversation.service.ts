@@ -95,7 +95,10 @@ export class AnalyticsAgentConversationService {
         manager.create(AnalyticsAgentMessage, {
           conversationId: id,
           question,
-          outcome: response.outcome,
+          // A turn where the agent asked the user something is `clarify` in the
+          // table (the audit joins such turns to the answer they lead to), while
+          // the reader's response keeps the outcome the UI renders as an answer.
+          outcome: response.needsUserInput ? 'clarify' : response.outcome,
           response: response as unknown as Record<string, unknown>,
         }),
       );

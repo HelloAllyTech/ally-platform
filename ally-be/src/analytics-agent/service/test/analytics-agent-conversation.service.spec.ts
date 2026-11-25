@@ -108,6 +108,25 @@ describe('AnalyticsAgentConversationService', () => {
     expect(manager.save).toHaveBeenCalledTimes(1);
   });
 
+  it('saves a turn where the agent asked the user something as clarify, keeping the reader outcome in the snapshot', async () => {
+    const { service, manager } = build();
+    manager.exists.mockResolvedValue(true);
+    const asking = { ...(response as object), needsUserInput: true } as never;
+
+    await service.saveTurn(7, 'conv-1', 'How is onboarding?', asking);
+
+    expect(manager.create).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        outcome: 'clarify',
+        response: expect.objectContaining({
+          outcome: AnalyticsAgentOutcome.ANSWER,
+          needsUserInput: true,
+        }),
+      }),
+    );
+  });
+
   it("refuses to append to someone else's conversation", async () => {
     const { service, manager } = build();
     manager.exists.mockResolvedValue(false);
