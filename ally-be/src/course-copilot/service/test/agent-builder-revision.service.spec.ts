@@ -3,6 +3,7 @@ import { join } from 'path';
 import {
   AgentBuilderRevisionService,
   parseRevisionPlan,
+  withDependentFields,
 } from '../agent-builder-revision.service';
 
 const TEMPLATE = readFileSync(
@@ -79,5 +80,77 @@ describe('parseRevisionPlan', () => {
       ['title'],
     );
     expect(plan.fields).toEqual([{ id: 'title', change: 'a' }]);
+  });
+});
+
+describe('withDependentFields', () => {
+  const offered = [
+    'roleInstruction',
+    'title',
+    'characterProfileText',
+    'openingStatements',
+    'state:s1',
+    'characterDetails',
+  ];
+
+  it('rewrites every field once the character details change', () => {
+    const plan = withDependentFields(
+      {
+        fields: [
+          { id: 'characterProfileText', change: 'Make the client a girl.' },
+          { id: 'characterDetails', change: 'Make the client female.' },
+        ],
+        reply: 'I will make the client a girl.',
+      },
+      'Change the client from a boy to a girl',
+      offered,
+    );
+    expect(plan.fields.map((f) => f.id)).toEqual([
+      'characterDetails',
+      'characterProfileText',
+      'roleInstruction',
+      'title',
+      'openingStatements',
+      'state:s1',
+    ]);
+    expect(plan.fields[0].change).toBe('Make the client female.');
+    expect(plan.fields[1].change).toContain('Make the client a girl.');
+    expect(plan.fields[2].change).toContain(
+      'Keep this consistent with the change to the client (Make the client female.)',
+    );
+    expect(plan.reply).toBe('I will make the client a girl.');
+  });
+
+  it('adds the character details when the request is about gender and the planner left them out', () => {
+    const plan = withDependentFields(
+      {
+        fields: [{ id: 'characterProfileText', change: 'She is a girl now.' }],
+        reply: 'ok',
+      },
+      'make him a girl instead of a boy',
+      offered,
+    );
+    expect(plan.fields[0]).toEqual({
+      id: 'characterDetails',
+      change: 'make him a girl instead of a boy',
+    });
+    expect(plan.fields).toHaveLength(offered.length);
+  });
+
+  it('leaves a request about how the client talks alone', () => {
+    const plan = {
+      fields: [{ id: 'roleInstruction', change: 'More guarded.' }],
+      reply: 'ok',
+    };
+    expect(withDependentFields(plan, 'make her more guarded', offered)).toBe(
+      plan,
+    );
+  });
+
+  it('does nothing when the form offers no character details', () => {
+    const plan = { fields: [], reply: 'nothing' };
+    expect(
+      withDependentFields(plan, 'make him a girl', ['roleInstruction']),
+    ).toBe(plan);
   });
 });

@@ -22,6 +22,12 @@ export enum EnhanceableField {
   KNOWLEDGE_SOURCES = 'knowledgeSources',
   /** Structured: improves a simulation state's name AND guidelines together. */
   STATE = 'state',
+  /**
+   * Structured: the client's details as one JSON object (name, age, gender,
+   * gender identity, orientation, profession, location), so a change to who the
+   * client is ("make him a girl") changes every detail it implies together.
+   */
+  CHARACTER_DETAILS = 'characterDetails',
 }
 
 /**
@@ -63,6 +69,12 @@ export const ENHANCEABLE_FIELD_LABELS: Record<EnhanceableField, string> = {
   [EnhanceableField.STATE]:
     'Simulation state — a short name and the guidelines injected into the prompt ' +
     'while this state is active.',
+  [EnhanceableField.CHARACTER_DETAILS]:
+    'Character details — one JSON object describing the AI client: "name", "age" (a ' +
+    'number), "gender" (male, female or non-binary), "genderIdentity", ' +
+    '"sexualOrientation", "profession" and "currentLocation". Return ONE JSON object ' +
+    'with the same keys. When the gender changes, change the gender identity to match ' +
+    'and give a name that fits the new gender and the same culture, unless the instruction names one.',
 };
 
 /**

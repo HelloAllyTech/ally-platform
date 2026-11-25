@@ -50,6 +50,17 @@ export const roleplayInterviewAPI = baseAPI.injectEndpoints({
         body: { scenarioId },
       }),
     }),
+    /** The roleplay's new character into the Character Library, or the one added before, updated. */
+    saveRoleplayInterviewCharacter: builder.mutation<
+      RoleplayInterviewSession,
+      { id: string; character: Record<string, unknown> }
+    >({
+      query: ({ id, character }) => ({
+        url: ApiEndpoints.SIMULATION_STUDIO.ROLEPLAY_INTERVIEW_CHARACTER(id),
+        method: HttpMethod.PUT,
+        body: { character },
+      }),
+    }),
     abandonRoleplayInterview: builder.mutation<RoleplayInterviewSession, string>({
       query: id => ({
         url: ApiEndpoints.SIMULATION_STUDIO.ROLEPLAY_INTERVIEW_ABANDON(id),
@@ -64,5 +75,6 @@ export const {
   useGetRoleplayInterviewMutation,
   useApproveRoleplayInterviewMutation,
   useLinkRoleplayInterviewMutation,
+  useSaveRoleplayInterviewCharacterMutation,
   useAbandonRoleplayInterviewMutation,
 } = roleplayInterviewAPI;

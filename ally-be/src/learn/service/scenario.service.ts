@@ -27,6 +27,11 @@ async function executeInChunks<T, R>(
   return results;
 }
 import { Scenarios } from '../entity/scenarios.entity';
+import {
+  CharacterDetails,
+  normaliseCharacterDetails,
+  parseCharacterDetails,
+} from '../util/character-details-enhance.util';
 import { CreateScenariosDto } from '../dto/create-scenarios.dto';
 import { UpdateScenarioDto } from '../dto/update-scenario.dto';
 import {
@@ -3899,7 +3904,22 @@ export class ScenarioService {
     let variables: Record<string, string>;
     let expectJson = false;
     let stateInput: { name: string; guidelines: string } | null = null;
-    if (fieldName === EnhanceableField.STATE) {
+    let characterInput: CharacterDetails | null = null;
+    if (fieldName === EnhanceableField.CHARACTER_DETAILS) {
+      characterInput = parseCharacterDetails(currentValue);
+      if (!characterInput) {
+        throw new BadRequestException(
+          'currentValue for the character details must be a JSON object.',
+        );
+      }
+      promptCode = ENHANCE_FIELD_PROMPT_CODE;
+      variables = {
+        fieldLabel: ENHANCEABLE_FIELD_LABELS[fieldName],
+        currentValue: JSON.stringify(characterInput),
+        guidance: effectiveGuidance,
+      };
+      expectJson = true;
+    } else if (fieldName === EnhanceableField.STATE) {
       let parsed: { name?: string; guidelines?: string } = {};
       try {
         parsed = JSON.parse(currentValue) as {
@@ -3957,6 +3977,15 @@ export class ScenarioService {
     // has to parse free-form prose. A missing key falls back to the original
     // value; unparseable output is a hard failure (surfaced as a 500 → error
     // toast) rather than silently corrupting the field.
+    if (fieldName === EnhanceableField.CHARACTER_DETAILS && characterInput) {
+      const details = normaliseCharacterDetails(content, characterInput);
+      if (!details) {
+        throw new InternalServerErrorException(
+          'Character details enhancement returned malformed JSON.',
+        );
+      }
+      return { fieldName, content: JSON.stringify(details) };
+    }
     if (fieldName === EnhanceableField.STATE && stateInput) {
       return {
         fieldName,

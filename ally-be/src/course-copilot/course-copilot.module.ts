@@ -71,6 +71,7 @@ import {
   RoleplayInterviewSessionRepository,
 } from './roleplay-interview/repository/roleplay-interview.repository';
 import { RoleplayInterviewSessionService } from './roleplay-interview/service/roleplay-interview-session.service';
+import { RoleplayInterviewCharacterService } from './roleplay-interview/service/roleplay-interview-character.service';
 import { RoleplayInterviewToolsService } from './roleplay-interview/service/roleplay-interview-tools.service';
 import { RoleplayInterviewOrchestratorService } from './roleplay-interview/service/roleplay-interview-orchestrator.service';
 
@@ -160,6 +161,7 @@ import { RoleplayInterviewOrchestratorService } from './roleplay-interview/servi
     RoleplayInterviewSessionRepository,
     RoleplayInterviewMessageRepository,
     RoleplayInterviewSessionService,
+    RoleplayInterviewCharacterService,
     RoleplayInterviewToolsService,
     RoleplayInterviewOrchestratorService,
   ],

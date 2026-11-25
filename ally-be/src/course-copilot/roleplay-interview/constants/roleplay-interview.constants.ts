@@ -8,6 +8,9 @@ export const ROLEPLAY_INTERVIEW_SSE_PING_INTERVAL_MS = 15_000;
 /** Output cap for one pass. The largest call is propose_plan, a page of text. */
 export const ROLEPLAY_INTERVIEW_MAX_TOKENS = 8192;
 
+/** The character question's option for "write a new character" (its other options are ids). */
+export const NEW_CHARACTER_VALUE = 'new';
+
 /** Bound on each of the runner's three retries (truncated, unreadable, empty). */
 export const ROLEPLAY_INTERVIEW_MAX_RETRIES = 2;
 

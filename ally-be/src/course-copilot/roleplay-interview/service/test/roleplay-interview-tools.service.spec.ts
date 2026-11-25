@@ -215,6 +215,119 @@ describe('RoleplayInterviewToolsService', () => {
     });
   });
 
+  describe('the character rule', () => {
+    const withChoice = (characterChoice?: Record<string, any>) => ({
+      ...COMPLETE_BRIEF,
+      characterChoice,
+    });
+
+    it('refuses a plan before the Character Library was searched', async () => {
+      const outcome = await service.proposePlan(
+        PLAN_INPUT,
+        context({ brief: withChoice(undefined) }),
+      );
+      expect(outcome.modelResult).toMatchObject({
+        ok: false,
+        error: 'character_not_searched',
+      });
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('refuses a new character over library matches until the trainer chooses new', async () => {
+      const outcome = await service.proposePlan(
+        PLAN_INPUT,
+        context({ brief: withChoice({ searched: true, matches: 2 }) }),
+      );
+      expect(outcome.modelResult).toMatchObject({
+        ok: false,
+        error: 'character_not_chosen',
+      });
+      expect(String(outcome.modelResult.message)).toContain(
+        'Create a new character',
+      );
+    });
+
+    it('proposes once the trainer chose a new character', async () => {
+      const outcome = await service.proposePlan(
+        PLAN_INPUT,
+        context({
+          brief: withChoice({ searched: true, matches: 2, decision: 'new' }),
+        }),
+      );
+      expect(outcome.modelResult.ok).toBe(true);
+    });
+
+    it('needs no search for a library character', async () => {
+      const outcome = await service.proposePlan(
+        PLAN_INPUT,
+        context({
+          brief: {
+            ...withChoice(undefined),
+            client: { characterId: 'ch-1', characterName: 'Asha' },
+          },
+        }),
+      );
+      expect(outcome.modelResult.ok).toBe(true);
+    });
+
+    it('records "Create a new character" as the trainer\'s choice', async () => {
+      const ctx = context({
+        brief: withChoice({ searched: true, matches: 2 }),
+      });
+      const outcome = await service.updateBrief(
+        { client: { characterId: 'new' } },
+        ctx,
+      );
+      expect(outcome.modelResult.ok).toBe(true);
+      expect(ctx.session.brief.characterChoice).toEqual({
+        searched: true,
+        matches: 2,
+        decision: 'new',
+      });
+      expect(ctx.session.brief.client.characterId).toBeUndefined();
+      expect(ctx.session.brief.client.description).toBe(
+        COMPLETE_BRIEF.client!.description,
+      );
+    });
+
+    it('records a library pick as the choice', async () => {
+      const ctx = context({
+        brief: withChoice({ searched: true, matches: 2 }),
+      });
+      await service.updateBrief({ client: { characterId: 'ch-1' } }, ctx);
+      expect(ctx.session.brief.characterChoice.decision).toBe('library');
+      expect(ctx.session.brief.client.characterId).toBe('ch-1');
+    });
+
+    it('a search records its matches and tells the agent to ask', async () => {
+      fitCheck.suggest.mockResolvedValue({
+        characters: [
+          {
+            id: 'ch-1',
+            name: 'Asha',
+            summary: 's',
+            hasVoices: true,
+            profileText: 'p',
+          },
+        ],
+        recommendedId: 'ch-1',
+        reason: 'fits',
+      });
+      const ctx = context({ brief: withChoice(undefined) });
+      const outcome = await service.searchCharacters(
+        { description: 'a student' },
+        ctx,
+      );
+      expect(ctx.session.brief.characterChoice).toEqual({
+        searched: true,
+        matches: 1,
+      });
+      expect(String(outcome.modelResult.next)).toContain(
+        'Create a new character',
+      );
+    });
+  });
+
   describe('search_characters', () => {
     it('builds a structured brief for the fit check', async () => {
       fitCheck.suggest.mockResolvedValue({

@@ -26,6 +26,17 @@ export interface RevisionPlan {
   reply: string;
 }
 
+/** The client's details (name, age, gender…) as one JSON field; see `EnhanceableField`. */
+export const CHARACTER_DETAILS_FIELD_ID = 'characterDetails';
+
+/**
+ * A request about who the client is: their gender or age (a rename the planner sees itself, in the
+ * character details). Pronouns alone are not enough
+ * ("make her more guarded" is about how she talks, not who she is).
+ */
+const IDENTITY_CHANGE =
+  /\b(boy|girl|man|woman|male|female|non-?binary|gender|pronouns?|age|aged|older|younger|years?[ -]old|teen(ager)?|child|adult)\b/i;
+
 const MAX_FIELDS = 30;
 const MAX_FIELD_CHARS = 1500;
 const PLAN_MAX_TOKENS = 1200;
@@ -83,11 +94,65 @@ export class AgentBuilderRevisionService {
       jsonMode: true,
       usageMetadata,
     });
-    return parseRevisionPlan(
-      response.text,
+    return withDependentFields(
+      parseRevisionPlan(
+        response.text,
+        offered.map((f) => f.id),
+      ),
+      instruction,
       offered.map((f) => f.id),
     );
   }
+}
+
+/**
+ * A change to who the client is runs through the whole roleplay, not one field: a boy who
+ * becomes a girl needs a new name, gender identity and voice, and every text that names or
+ * describes him (role instruction, backstory, description, opening lines, states, reminders)
+ * rewritten to match. The planner may pick only the obvious field, so this rule is in code:
+ * a request about the client's identity always changes the character details, and once those
+ * change, every other field is rewritten for consistency (each keeps what does not depend on
+ * the change).
+ */
+export function withDependentFields(
+  plan: RevisionPlan,
+  instruction: string,
+  offeredIds: string[],
+): RevisionPlan {
+  if (!offeredIds.includes(CHARACTER_DETAILS_FIELD_ID)) return plan;
+  let fields = plan.fields;
+  let character = fields.find((f) => f.id === CHARACTER_DETAILS_FIELD_ID);
+  if (!character && IDENTITY_CHANGE.test(instruction)) {
+    character = {
+      id: CHARACTER_DETAILS_FIELD_ID,
+      change: instruction.trim().slice(0, 500),
+    };
+    fields = [character, ...fields];
+  }
+  if (!character) return plan;
+  // The character details first: the wizard reads the new details before the rest land.
+  fields = [character, ...fields.filter((f) => f !== character)];
+  const chosen = new Set(fields.map((f) => f.id));
+  const consistency =
+    `Keep this consistent with the change to the client (${character.change}): where this text ` +
+    'names or describes the client, update their name, pronouns, gendered words, age and what ' +
+    'follows from them, such as how they speak of a partner. Do not add details this text did not ' +
+    'have, and leave anything that does not depend on the client as it is.';
+  const dependents = offeredIds
+    .filter((id) => !chosen.has(id))
+    .map((id) => ({ id, change: consistency }));
+  const expanded = fields.map((f) =>
+    f === character || f.change.includes(consistency)
+      ? f
+      : { ...f, change: `${f.change} ${consistency}` },
+  );
+  return {
+    fields: [...expanded, ...dependents],
+    reply:
+      plan.fields.length && plan.reply
+        ? plan.reply
+        : 'I will change the character and update everything that describes them to match.',
+  };
 }
 
 /**

@@ -11,7 +11,10 @@ describe('RoleplayInterviewSessionService', () => {
     return result.plan;
   })();
 
-  const makeService = (session: Record<string, any> | null) => {
+  const makeService = (
+    session: Record<string, any> | null,
+    saved: { id: string; name: string } | null = null,
+  ) => {
     const sessionRepository = {
       findOne: jest.fn().mockResolvedValue(session),
       save: jest.fn().mockImplementation(async (row) => row),
@@ -20,12 +23,17 @@ describe('RoleplayInterviewSessionService', () => {
     const messageRepository = {
       listBySession: jest.fn().mockResolvedValue([]),
     };
+    const characterService = {
+      saveCharacter: jest.fn().mockResolvedValue(saved),
+    };
     return {
       service: new RoleplayInterviewSessionService(
         sessionRepository as any,
         messageRepository as any,
+        characterService as any,
       ),
       sessionRepository,
+      characterService,
     };
   };
 
@@ -36,6 +44,29 @@ describe('RoleplayInterviewSessionService', () => {
     brief: COMPLETE_BRIEF,
     plan,
     planVersion: 2,
+  });
+
+  it('adds the new character to the library once the plan is approved', async () => {
+    const session = { ...ready(), status: RoleplayInterviewStatus.APPROVED };
+    const { service, characterService } = makeService(session, {
+      id: 'c-9',
+      name: 'Arjun',
+    });
+    const values = { name: 'Arjun', age: 22, gender: 'male' };
+    const view = await service.saveCharacter('s-1', 7, values);
+    expect(characterService.saveCharacter).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 's-1' }),
+      values,
+    );
+    expect(view.brief?.savedCharacter).toEqual({ id: 'c-9', name: 'Arjun' });
+  });
+
+  it('refuses before the plan is approved', async () => {
+    const { service, characterService } = makeService(ready());
+    await expect(service.saveCharacter('s-1', 7, {})).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(characterService.saveCharacter).not.toHaveBeenCalled();
   });
 
   it('approves the current plan and returns the generation inputs', async () => {

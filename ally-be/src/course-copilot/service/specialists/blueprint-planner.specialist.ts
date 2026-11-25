@@ -21,11 +21,6 @@ import {
 } from './specialist.types';
 import { briefForPrompt, SPECIALIST_MAX_TOKENS } from './specialist.util';
 
-export interface BlueprintPlanOptions {
-  /** `config.courseCopilot.maxNewRoleplays`; COURSE_COPILOT_LIMITS.newRoleplays when omitted. */
-  maxNewRoleplays?: number;
-}
-
 /**
  * Drafts the course blueprint from the interview brief: one specialist call
  * with its own narrow prompt, not a second manager LLM (plan §2.4).
@@ -59,29 +54,24 @@ export class BlueprintPlannerSpecialist {
 
   constructor(private readonly llm: SpecialistLlmService) {}
 
-  async plan(
-    input: BlueprintPlannerInput,
-    options: BlueprintPlanOptions = {},
-  ): Promise<CourseBlueprint> {
-    const maxNewRoleplays =
-      options.maxNewRoleplays ?? COURSE_COPILOT_LIMITS.newRoleplays;
+  async plan(input: BlueprintPlannerInput): Promise<CourseBlueprint> {
     const problemsOf = (blueprint: CourseBlueprint) =>
-      validateBlueprint(blueprint, input.brief, { maxNewRoleplays });
+      validateBlueprint(blueprint, input.brief);
 
     let first: CourseBlueprint;
     try {
-      first = await this.attempt(input, maxNewRoleplays);
+      first = await this.attempt(input);
     } catch (error) {
       if (!(error instanceof SpecialistValidationError)) throw error;
       // Unparseable output: the one retry goes here instead.
-      return this.attempt(input, maxNewRoleplays, error.errors);
+      return this.attempt(input, error.errors);
     }
 
     const problems = problemsOf(first);
     if (!problems.length) return first;
 
     try {
-      const second = await this.attempt(input, maxNewRoleplays, problems);
+      const second = await this.attempt(input, problems);
       return problemsOf(second).length < problems.length ? second : first;
     } catch (error) {
       if (!(error instanceof SpecialistValidationError)) throw error;
@@ -94,7 +84,6 @@ export class BlueprintPlannerSpecialist {
 
   private async attempt(
     input: BlueprintPlannerInput,
-    maxNewRoleplays: number,
     repairErrors?: string[],
   ): Promise<CourseBlueprint> {
     const { brief } = input;
@@ -138,7 +127,6 @@ export class BlueprintPlannerSpecialist {
             sections: COURSE_COPILOT_LIMITS.sections,
             items: COURSE_COPILOT_LIMITS.items,
             itemsPerSection: COURSE_COPILOT_LIMITS.itemsPerSection,
-            newRoleplays: maxNewRoleplays,
             newCases: COURSE_COPILOT_LIMITS.newCases,
             images: COURSE_COPILOT_LIMITS.images,
             languagesPerRoleplay: COURSE_COPILOT_LIMITS.languagesPerRoleplay,
@@ -153,7 +141,9 @@ export class BlueprintPlannerSpecialist {
           brief?.shape?.durationMinutes ??
             COURSE_COPILOT_DEFAULT_DURATION_MINUTES,
         ),
-        max_new_roleplays: String(maxNewRoleplays),
+        // The stored prompt still says "at most {{max_new_roleplays}} new":
+        // new roleplays have no limit of their own, so it is the item limit.
+        max_new_roleplays: String(COURSE_COPILOT_LIMITS.items),
         max_article_questions: String(COURSE_COPILOT_LIMITS.articleQuestions),
         max_quiz_questions: String(COURSE_COPILOT_LIMITS.quizQuestions),
         max_labels: String(COURSE_COPILOT_LIMITS.annotationLabels),

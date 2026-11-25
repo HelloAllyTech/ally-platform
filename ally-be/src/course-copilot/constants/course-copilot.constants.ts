@@ -53,7 +53,6 @@ export const COURSE_COPILOT_LIMITS = {
   sections: Math.min(8, TRACK_MAX_SECTIONS),
   items: 40,
   itemsPerSection: Math.min(12, TRACK_MAX_ITEMS_PER_SECTION),
-  newRoleplays: 4,
   newCases: 2,
   images: 12,
   languagesPerRoleplay: 4,

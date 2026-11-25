@@ -16117,6 +16117,10 @@ export const en = {
     subtitle:
       "Describe the roleplay you want. I'll ask a few short questions, fill in the brief and propose a plan; approve it and I'll build the roleplay for you to review.",
     historyQuestion: "Roleplay interview",
+    addedToLibrary: (name: string) =>
+      `${name} is now in the Character Library, so other roleplays can use this character.`,
+    updatedInLibrary: (name: string) => `${name} is updated in the Character Library too.`,
+    libraryQuestion: "Character Library",
     historyAnswer: (competency: string, mode: string) =>
       `Plan approved: ${mode} roleplay for ${competency}. Building it now.`,
     startOver: "Start over",
@@ -16179,6 +16183,11 @@ export const en = {
     failed: (error: string) =>
       `That change couldn't be made${error ? ` (${error})` : ""}. Nothing was changed; try again.`,
     kept: "Everything else is kept as it was, including your edits.",
+    characterDetails: "Character details (name, age, gender)",
+    voices: "Voices to match the character",
+    noMatchingVoice: (language: string) => `no voice in ${language} fits; pick one on the form`,
+    coverImage: "Cover image",
+    coverImageStale: "still shows the previous character; make a new one on the form",
   },
 
   // Agent Builder wizard: the chat box, for anything the trainer wants the agent to know.

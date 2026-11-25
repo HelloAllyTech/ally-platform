@@ -54,7 +54,7 @@ export const LanguageVoicePicker: React.FC<LanguageVoicePickerProps> = ({
         <h4 className="font-medium text-typography-900">{strings.title}</h4>
         <p className="text-xs text-typography-600">{strings.help}</p>
       </div>
-      <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2 [&>*]:min-w-0">
         {catalog.map(language => {
           const id = String(language.language_id);
           const checked = id in value;
@@ -63,11 +63,13 @@ export const LanguageVoicePicker: React.FC<LanguageVoicePickerProps> = ({
           return (
             <div
               key={id}
-              className={`flex flex-wrap items-center gap-2 rounded border px-3 py-2 ${
+              // A card is a column: the language, then its voice row. A select is as wide as its
+              // longest option, so it is held to the card's width or it spills into the next card.
+              className={`flex min-w-0 flex-col gap-2 rounded border px-3 py-2 ${
                 checked ? "border-primary bg-primary-50" : "border-border-light"
               }`}
             >
-              <label className="flex min-w-[160px] flex-1 cursor-pointer items-center gap-2 text-typography-900">
+              <label className="flex cursor-pointer items-center gap-2 text-typography-900">
                 <input
                   type="checkbox"
                   checked={checked}
@@ -78,13 +80,13 @@ export const LanguageVoicePicker: React.FC<LanguageVoicePickerProps> = ({
                 {language.label}
               </label>
               {checked && (
-                <>
+                <div className="flex min-w-0 items-center gap-2">
                   <select
                     aria-label={strings.voiceFor(language.label)}
                     value={voiceId}
                     disabled={disabled}
                     onChange={event => onChange({ ...value, [id]: event.target.value })}
-                    className="rounded border border-border-light bg-white px-2 py-1 text-xs"
+                    className="w-full min-w-0 flex-1 truncate rounded border border-border-light bg-white px-2 py-1 text-xs"
                   >
                     <option value="">{strings.agentPicks}</option>
                     {(language.voices ?? []).map(voice => (
@@ -99,7 +101,7 @@ export const LanguageVoicePicker: React.FC<LanguageVoicePickerProps> = ({
                     <button
                       type="button"
                       onClick={() => (playing ? pause() : void play(voiceId))}
-                      className="rounded border border-border-light bg-white px-2 py-1 text-xs text-primary-700 hover:bg-primary-50"
+                      className="shrink-0 rounded border border-border-light bg-white px-2 py-1 text-xs text-primary-700 hover:bg-primary-50"
                     >
                       {playing && isLoading
                         ? strings.loading
@@ -108,7 +110,7 @@ export const LanguageVoicePicker: React.FC<LanguageVoicePickerProps> = ({
                           : strings.play}
                     </button>
                   )}
-                </>
+                </div>
               )}
             </div>
           );

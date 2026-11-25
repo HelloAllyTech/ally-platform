@@ -48,8 +48,6 @@ const rawPlan = (
 const one = (blueprint: CourseBlueprint, index = 0): CourseBlueprintItem =>
   blueprint.sections[0].items[index];
 
-const OPTS = { maxNewRoleplays: 4 };
-
 describe('normaliseBlueprint', () => {
   it('unwraps { blueprint }, replaces model ids with uuids and keeps a caller uuid', () => {
     const kept = '3f2b8c1e-5d4a-4e6f-9b7c-1a2b3c4d5e6f';
@@ -440,13 +438,13 @@ describe('validateBlueprint', () => {
       rawItem('JOURNAL'),
       rawItem('VIDEO'),
     ]);
-    expect(validateBlueprint(blueprint, brief(), OPTS)).toEqual([]);
+    expect(validateBlueprint(blueprint, brief())).toEqual([]);
   });
 
   it('flags an empty course', () => {
-    expect(
-      validateBlueprint(normaliseBlueprint({}, brief()), brief(), OPTS),
-    ).toEqual(['The course has no sections yet.']);
+    expect(validateBlueprint(normaliseBlueprint({}, brief()), brief())).toEqual(
+      ['The course has no sections yet.'],
+    );
   });
 
   it('flags section, item and per-section limits', () => {
@@ -457,7 +455,7 @@ describe('validateBlueprint', () => {
       ),
     }));
     const blueprint = normaliseBlueprint({ sections }, brief());
-    expect(validateBlueprint(blueprint, brief(), OPTS)).toEqual([
+    expect(validateBlueprint(blueprint, brief())).toEqual([
       'The course has 9 sections; a course can have at most 8. Merge or remove some.',
       'The course has 45 items; a course can have at most 40. Remove some.',
       "Section 1 · 'S0' has 13 items; a section can hold at most 12. Split it in two.",
@@ -477,7 +475,7 @@ describe('validateBlueprint', () => {
       },
       brief(),
     );
-    expect(validateBlueprint(blueprint, brief(), OPTS)).toEqual([
+    expect(validateBlueprint(blueprint, brief())).toEqual([
       'Section 1 needs a title.',
       'Section 1 · item 2 (Quiz) needs a title.',
       "Section 2 · 'Practice' has no items. Add one or remove the section.",
@@ -489,7 +487,7 @@ describe('validateBlueprint', () => {
       rawItem('ROLEPLAY', { title: 'Pick me', source: { kind: 'library' } }),
       rawItem('CASE', { title: 'Chain', source: { kind: 'library' } }),
     ]);
-    expect(validateBlueprint(blueprint, brief(), OPTS)).toEqual([
+    expect(validateBlueprint(blueprint, brief())).toEqual([
       "Section 1 · 'Pick me' is set to use a library roleplay but doesn't say which one. Pick one, or make it a new roleplay.",
       "Section 1 · 'Chain' is set to use a library case but doesn't say which one. Pick one, or build a new case from this course's roleplays.",
     ]);
@@ -506,7 +504,7 @@ describe('validateBlueprint', () => {
       }),
       rawItem('CASE', { title: 'Empty', source: { kind: 'new' }, spec: {} }),
     ]);
-    expect(validateBlueprint(blueprint, brief(), OPTS)).toEqual([
+    expect(validateBlueprint(blueprint, brief())).toEqual([
       "Section 1 · 'Lonely' is a new case but links only one roleplay; a case needs at least two roleplays from this course.",
       "Section 1 · 'Empty' is a new case but links no roleplays; a case needs at least two roleplays from this course.",
     ]);
@@ -528,7 +526,7 @@ describe('validateBlueprint', () => {
       spec: { gameKey: 'PONG' },
     });
     blueprint.sections[0].items.push({ ...one(blueprint, 1), id: 'j2' });
-    expect(validateBlueprint(blueprint, brief(), OPTS)).toEqual([
+    expect(validateBlueprint(blueprint, brief())).toEqual([
       "Section 1 · 'Babel' is set to 5 languages; a roleplay can use at most 4.",
       "Section 1 · 'Pong' uses a game that isn't available.",
     ]);
@@ -539,13 +537,13 @@ describe('validateBlueprint', () => {
       rawItem('ROLEPLAY'),
       rawItem('GAME', { title: 'Breather' }),
     ]);
-    expect(validateBlueprint(blueprint, brief(), OPTS)).toEqual([
+    expect(validateBlueprint(blueprint, brief())).toEqual([
       "The course ends on a game ('Breather'). Games are breaks between harder items — move it earlier or remove it.",
     ]);
   });
 
-  it('flags too many new roleplays, new cases and images', () => {
-    const roleplays = Array.from({ length: 3 }, (_, index) =>
+  it('flags too many new cases and images, never new roleplays', () => {
+    const roleplays = Array.from({ length: 6 }, (_, index) =>
       rawItem('ROLEPLAY', { id: `r${index}` }),
     );
     const cases = Array.from({ length: 3 }, () =>
@@ -566,10 +564,7 @@ describe('validateBlueprint', () => {
       },
       brief(),
     );
-    expect(
-      validateBlueprint(blueprint, brief(), { maxNewRoleplays: 2 }),
-    ).toEqual([
-      'The course would create 3 new roleplays; one course can create at most 2. Use library roleplays for some of them, or remove one.',
+    expect(validateBlueprint(blueprint, brief())).toEqual([
       'The course would create 3 new cases; one course can create at most 2.',
       'The course would generate 13 images; one course can have at most 12. Turn images off on some articles.',
     ]);
@@ -581,7 +576,7 @@ describe('validateBlueprint', () => {
       rawItem('QUIZ'),
     ]);
     expect(one(blueprint).source.kind).toBe('needs-input');
-    expect(validateBlueprint(blueprint, brief(), OPTS)).toEqual([]);
+    expect(validateBlueprint(blueprint, brief())).toEqual([]);
   });
 });
 

@@ -1176,9 +1176,6 @@ export class AppConfigService {
       buildConcurrency: Number(
         this.configService.get<number>('COURSE_COPILOT_BUILD_CONCURRENCY', 4),
       ),
-      maxNewRoleplays: Number(
-        this.configService.get<number>('COURSE_COPILOT_MAX_NEW_ROLEPLAYS', 4),
-      ),
     };
   }
 

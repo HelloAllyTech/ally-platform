@@ -29,6 +29,11 @@ import {
   CHARACTER_INTERVIEW_FINISH_WHEN,
   CHARACTER_INTERVIEW_TURN_VOCABULARY,
 } from '../util/character-interview-turn.util';
+import {
+  GENDER_IDENTITY_VALUES,
+  GENDER_VALUES,
+  SEXUAL_ORIENTATION_VALUES,
+} from '../constants/character-demographics.constants';
 
 /**
  * How many served insight codes a session carries.
@@ -45,25 +50,6 @@ export interface InterviewToolExecutionContext {
   userId: number;
 }
 
-// Must match the admin form's dropdown values (GENDER_OPTIONS /
-// GENDER_IDENTITY_OPTIONS / SEXUAL_ORIENTATION_OPTIONS in ally-web
-// constants/SimulationCreator.ts) or the review form shows an empty dropdown.
-const GENDER_VALUES = ['male', 'female', 'non-binary'];
-const GENDER_IDENTITY_VALUES = [
-  'Agender',
-  'Female/Woman',
-  'Genderqueer',
-  'Gender Fluid',
-  'Gender Non-Conforming',
-  'Intergender',
-  'Intersex',
-  'Male/Man',
-  'Nonbinary',
-  'Other',
-  'Transgender',
-  'Trans Man/Male',
-  'Trans Woman/Female',
-];
 /**
  * Coerce a per-language map the model sent, tolerating the shape the tool
  * schema asked for BEFORE characters went per-language.
@@ -153,17 +139,6 @@ const objectOfStringArrays = (
   }
   return out;
 };
-
-const SEXUAL_ORIENTATION_VALUES = [
-  'Asexual',
-  'Bisexual',
-  'Gay',
-  'Heterosexual (straight)',
-  'Lesbian',
-  'Pansexual',
-  'Queer',
-  'Questioning',
-];
 
 /**
  * The interview agent's tool belt (modeled on CopilotToolsService).

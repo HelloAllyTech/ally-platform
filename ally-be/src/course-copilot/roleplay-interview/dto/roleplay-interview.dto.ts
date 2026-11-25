@@ -11,6 +11,7 @@ import {
   MaxLength,
   Min,
   ValidateNested,
+  IsObject,
 } from 'class-validator';
 
 export class CreateRoleplayInterviewSessionDto {
@@ -71,4 +72,15 @@ export class LinkRoleplayInterviewScenarioDto {
   @IsInt()
   @IsPositive()
   scenarioId!: number;
+}
+
+export class SaveRoleplayInterviewCharacterDto {
+  @ApiProperty({
+    description:
+      "The roleplay form's character: name, age, gender, genderIdentity, sexualOrientation, " +
+      'profession, currentLocation, characterProfileText, coverImageUrl, languageVoices, ' +
+      'languageCharacteristics, linguisticStyleSamples, knowledgeSources.',
+  })
+  @IsObject()
+  character!: Record<string, unknown>;
 }

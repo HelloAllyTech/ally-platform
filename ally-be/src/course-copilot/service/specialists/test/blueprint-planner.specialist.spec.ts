@@ -106,7 +106,7 @@ describe('BlueprintPlannerSpecialist', () => {
     expect(prompt).toContain('Notes: Keep it to two sections.');
     expect(prompt).toContain('0: Reflect the feeling behind a message');
     expect(prompt).toContain('"key": "TREX_RUNNER"');
-    expect(prompt).toContain('Max new 4');
+    expect(prompt).toContain('Max new 40');
 
     expect(blueprint.sections[0].items.map((entry) => entry.type)).toEqual([
       'ARTICLE',
@@ -233,33 +233,26 @@ describe('BlueprintPlannerSpecialist', () => {
     expect(blueprint.sections).toHaveLength(1);
   });
 
-  it('honours a configured new-roleplay ceiling', async () => {
-    const twoNew = {
+  it('keeps a plan with many new roleplays: there is no roleplay limit', async () => {
+    const roleplay = (index: number) => ({
+      id: `r${index}`,
+      type: 'ROLEPLAY',
+      title: `Roleplay ${index}`,
+      purpose: 'p',
+      source: { kind: 'new' },
+      spec: {},
+    });
+    const sixNew = {
       ...goodPlan,
       sections: [
         {
           ...goodPlan.sections[0],
           items: [
+            ...Array.from({ length: 6 }, (_, index) => roleplay(index)),
             {
-              id: 'a',
-              type: 'ROLEPLAY',
-              title: 'One',
-              purpose: 'p',
-              source: { kind: 'new' },
-              spec: {},
-            },
-            {
-              id: 'b',
-              type: 'ROLEPLAY',
-              title: 'Two',
-              purpose: 'p',
-              source: { kind: 'new' },
-              spec: {},
-            },
-            {
-              id: 'c',
+              id: 'j',
               type: 'JOURNAL',
-              title: 'Three',
+              title: 'Reflect',
               purpose: 'p',
               source: { kind: 'new' },
               spec: {},
@@ -268,10 +261,14 @@ describe('BlueprintPlannerSpecialist', () => {
         },
       ],
     };
-    const llm = fakeLlm([twoNew, twoNew]);
-    await new BlueprintPlannerSpecialist(llm.service).plan(input(), {
-      maxNewRoleplays: 1,
-    });
-    expect(llm.promptOf(1)).toContain('one course can create at most 1');
+    const llm = fakeLlm([sixNew]);
+    const blueprint = await new BlueprintPlannerSpecialist(llm.service).plan(
+      input(),
+    );
+    // One call: nothing to repair.
+    expect(llm.complete).toHaveBeenCalledTimes(1);
+    expect(
+      blueprint.sections[0].items.filter((item) => item.type === 'ROLEPLAY'),
+    ).toHaveLength(6);
   });
 });

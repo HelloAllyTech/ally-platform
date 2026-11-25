@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Res,
 } from '@nestjs/common';
 import {
@@ -28,6 +29,7 @@ import {
   CreateRoleplayInterviewSessionDto,
   LinkRoleplayInterviewScenarioDto,
   RoleplayInterviewMessageDto,
+  SaveRoleplayInterviewCharacterDto,
 } from '../dto/roleplay-interview.dto';
 import {
   ROLEPLAY_INTERVIEW_SSE_PING_INTERVAL_MS,
@@ -98,6 +100,20 @@ export class RoleplayInterviewController {
     @CurrentUser() user: TokenUser,
   ) {
     return this.sessionService.linkScenario(id, user.id, dto.scenarioId);
+  }
+
+  @ApiOperation({
+    summary:
+      "Add the roleplay's new character to the Character Library, or bring the one added before up to date",
+  })
+  @AuthPermissions([PERMISSIONS.EDIT_SCENARIO])
+  @Put('sessions/:id/character')
+  saveCharacter(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SaveRoleplayInterviewCharacterDto,
+    @CurrentUser() user: TokenUser,
+  ) {
+    return this.sessionService.saveCharacter(id, user.id, dto.character);
   }
 
   @ApiOperation({

@@ -146,11 +146,11 @@ in AWS form, so they do not render locally — the same as the course editor's o
 | `COURSE_COPILOT_SESSION_BUDGET_USD` | 15 | Per session; 0 = uncapped |
 | `COURSE_COPILOT_IMAGE_COST_USD` | 0.10 | Flat per image |
 | `COURSE_COPILOT_BUILD_CONCURRENCY` | 4 | |
-| `COURSE_COPILOT_MAX_NEW_ROLEPLAYS` | 4 | Also capped in `COURSE_COPILOT_LIMITS` |
 | `OPENAI_IMAGE_MODEL` / `CHARACTER_IMAGE_DEFAULT_PROVIDER` + `LEARN_MEDIA_PUBLIC_S3_BUCKET` | — | Images are skipped with a reason without them |
 
-Limits (sections 8, items 40, new roleplays 4, new cases 2, images 12, languages per roleplay 4, two
-active CREATE sessions per user) are in `constants/course-copilot.constants.ts` and enforced in code.
+Limits (sections 8, items 40, new cases 2, images 12, languages per roleplay 4, two
+active CREATE sessions per user) are in `constants/course-copilot.constants.ts` and enforced in code. New roleplays
+have no limit of their own; the item limits and the session budget bound them.
 
 ## Departures from the plan (plans/course-copilot-plan.md)
 
