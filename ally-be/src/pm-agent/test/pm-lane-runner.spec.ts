@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { PmCardCategory, PmLane } from '../enum/pm-agent.enum';
+import { PM_PIPELINE } from '../constants/pm-agent-pipeline.constants';
 import { PM_LANES } from '../lane/pm-lane-definitions';
 import { PmLaneRunner } from '../lane/pm-lane-runner';
 import { PmEvidenceRef } from '../pipeline/pm-pipeline.types';
@@ -204,7 +205,23 @@ describe('PmLaneRunner', () => {
   it('stops at MAX_PASSES even if the model keeps researching', async () => {
     const { run, llm } = setup(() => callTool('analytics_section', {}));
     const result = await run();
-    expect(llm.calls.length).toBeLessThanOrEqual(6);
+    expect(llm.calls.length).toBeLessThanOrEqual(PM_PIPELINE.MAX_PASSES);
     expect(result.candidates).toHaveLength(0);
+  });
+
+  it('gives a dead-code check room: more than 5 research passes before the forced submit', () => {
+    // prod 2026-11-25: code_health was forced to submit mid-check at pass 6 and dropped it all.
+    expect(PM_PIPELINE.MAX_PASSES - 1).toBeGreaterThanOrEqual(8);
+  });
+
+  it('the submit-only pass runs at low effort with the larger output cap; research passes do not', async () => {
+    // prod 2026-11-25: analytics' submit at medium reasoning used all 12000 tokens and arrived empty.
+    const { run, llm } = setup(() => callTool('analytics_section', {}));
+    await run();
+    const last = llm.calls[llm.calls.length - 1];
+    expect(last.effort).toBe('low');
+    expect(last.maxTokens).toBe(PM_PIPELINE.SUBMIT_MAX_TOKENS);
+    expect(llm.calls[0].effort).toBeUndefined();
+    expect(llm.calls[0].maxTokens).toBe(PM_PIPELINE.LANE_MAX_TOKENS);
   });
 });

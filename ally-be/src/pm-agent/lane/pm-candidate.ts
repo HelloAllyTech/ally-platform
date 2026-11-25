@@ -246,12 +246,26 @@ function nestOpportunityFields(body: Record<string, any>): Record<string, any> {
     const dotted = /^opportunity\.(\w+)$/.exec(key);
     return dotted ? [{ key, field: dotted[1] }] : [];
   });
-  if (!strays.length && !entryIsObject) return body;
+  // The same fields written inside `plan` (local 2026-11-25): move them out of the plan too.
+  const plan = body.plan;
+  const planStrays =
+    plan && typeof plan === 'object' && !Array.isArray(plan)
+      ? OPPORTUNITY_SIBLING_KEYS.filter((key) => key in plan)
+      : [];
+  if (!strays.length && !planStrays.length && !entryIsObject) return body;
   const out = { ...body };
+  if (planStrays.length) {
+    const cleanPlan = { ...plan };
+    for (const key of planStrays) delete cleanPlan[key];
+    out.plan = cleanPlan;
+  }
   const opportunity: Record<string, any> = entryIsObject ? { ...entry } : {};
   for (const { key, field } of strays) {
     if (opportunity[field] === undefined) opportunity[field] = out[key];
     delete out[key];
+  }
+  for (const key of planStrays) {
+    if (opportunity[key] === undefined) opportunity[key] = plan[key];
   }
   if (typeof opportunity.effort === 'string') {
     opportunity.effort = opportunity.effort.trim().toLowerCase();

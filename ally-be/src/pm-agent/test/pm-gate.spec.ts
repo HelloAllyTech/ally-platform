@@ -433,6 +433,27 @@ describe('lane-level candidate check', () => {
     expect(out.candidate?.payload).not.toHaveProperty('effort');
   });
 
+  it('moves productGoal and effort written inside plan into the entry', () => {
+    const good = recFor(0, [E1]);
+    const { productGoal, effort, ...entry } = good.opportunity;
+    const out = checkCandidate(
+      {
+        kind: 'recommendation',
+        category: 'product',
+        recommendation: {
+          ...good,
+          opportunity: entry,
+          plan: { ...good.plan, productGoal, effort },
+        },
+      },
+      PmLane.STRATEGY_CONTENT,
+      new Set([E1]),
+    );
+    expect(out.errors).toEqual([]);
+    expect(out.candidate?.payload.opportunity).toEqual(good.opportunity);
+    expect(out.candidate?.payload.plan).not.toHaveProperty('productGoal');
+  });
+
   it('moves dotted "opportunity.<field>" keys into the entry', () => {
     const good = recFor(0, [E1]);
     const { productGoal, effort, description } = good.opportunity;
