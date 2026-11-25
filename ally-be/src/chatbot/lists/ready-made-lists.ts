@@ -602,7 +602,7 @@ export const READY_MADE: ReadyMadeItem[] = [
             ['morning', 'afternoon', 'evening', 'any time'],
             agent,
           ),
-          status(['requested', 'called', 'closed', 'withdrawn']),
+          status(['requested', 'called', 'closed', 'withdrawn'], agent), // TF1 B4: the withdraw-only change sets it
         ],
         rules: [
           perPerson('requester', 1, ['requested']),

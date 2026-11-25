@@ -57,7 +57,10 @@ export const TEMPLATE_LISTS: ReadyMadeList[] = [
       relation('applicant', 'Applicant', 'contact', required),
       examples('service', 'Service', ['Service 1', 'Service 2'], agent),
       text('preferred_centre', 'Preferred centre', agent),
-      status(['received', 'in review', 'completed', 'closed', 'withdrawn']),
+      status(
+        ['received', 'in review', 'completed', 'closed', 'withdrawn'],
+        agent,
+      ), // TF1 B4: the withdraw-only change sets it
     ],
     rules: [
       perPerson('applicant', 3, ['received', 'in review']),
@@ -93,7 +96,7 @@ export const TEMPLATE_LISTS: ReadyMadeList[] = [
         ['weekdays', 'weekends', 'evenings', 'any time'],
         agent,
       ),
-      status(['new', 'contacted', 'active', 'not now', 'withdrawn']),
+      status(['new', 'contacted', 'active', 'not now', 'withdrawn'], agent), // TF1 B4: the withdraw-only change sets it
     ],
     rules: [
       perPerson('volunteer', 1, ['new', 'contacted']),
@@ -154,7 +157,7 @@ export const TEMPLATE_LISTS: ReadyMadeList[] = [
         ['a receipt', 'how to give', 'a regular gift', 'something else'],
         agent,
       ),
-      status(['new', 'answered', 'closed', 'withdrawn']),
+      status(['new', 'answered', 'closed', 'withdrawn'], agent), // TF1 B4: the withdraw-only change sets it
     ],
     rules: [
       perPerson('donor', 3, ['new']),
@@ -187,7 +190,7 @@ export const TEMPLATE_LISTS: ReadyMadeList[] = [
       long('question', 'Question', { ...required, ...agent }),
       relation('asker', 'Asked by', 'contact', required),
       text('topic', 'Topic', agent),
-      status(['new', 'answered', 'withdrawn']),
+      status(['new', 'answered', 'withdrawn'], agent), // TF1 B4: the withdraw-only change sets it
     ],
     rules: [
       perPerson('asker', 5, ['new']),
