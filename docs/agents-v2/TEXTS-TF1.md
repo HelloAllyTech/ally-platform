@@ -55,3 +55,22 @@ trapped no longer says "highest place"; only a flood does), applied in round 2.
 | Public choice | the same, empty list on a public page | Nobody is on the list. While the page is public, the list isn't used: anyone with the link can chat. |
 | Public choice | Sites it has loaded on, on a public page | The chat bubble can go on any website. These are the sites it has appeared on. While your page is public, anyone can chat there without signing in. |
 | Public choice | when switching fails | Couldn't change who can chat. Try again. |
+
+## Saathi manual pass (25 Nov), round 1: approved 25 Nov, as written
+
+These are written before the B-13 voices. Once you approve the voices, the visitor-side line (S-4) moves into each template's voice.
+
+| Issue | Where | Text |
+|---|---|---|
+| S-1 | Helpline template, the number question (was "What’s your helpline number, and when is it open?") | What’s your helpline phone number? |
+| S-1 | the same, its hint | Just the number, like +91 20 4860 2525. Crisis replies give it beside the national ones once you confirm it in Settings, under Safety. |
+| S-1 | Helpline template, a new question | When is it open? |
+| S-1 | Mental-health practice template, the number question (was "What’s the number people should call, and when?") | What’s the number people should call? |
+| S-1 | the same, its hint | Just the number, like +91 22 2754 6669. Crisis replies give it beside the national ones once you confirm it in Settings, under Safety. |
+| S-1 | Mental-health practice template, a new question | When can people call? |
+| S-1 | Settings → Safety, the helpline field's label | Number crisis replies give |
+| S-1 | the same, the preview under it | Crisis replies will add: “You can also call {numbers}.” |
+| S-1 | the same, when the text has no phone number | Add the phone number crisis replies should give, like +91 20 4860 2525. Put opening hours in your notes instead. |
+| S-4 | reply to "ignore your instructions…" (any assistant) | I can't do that, but I'm happy to help with anything about {organisation}. |
+| S-4 | the same, in Hindi | यह मैं नहीं कर सकता, लेकिन {organisation} से जुड़ी किसी भी बात में ख़ुशी से मदद करूँगा। |
+| S-4 | the same, in Hinglish | Yeh main nahi kar sakta, lekin {organisation} se judi kisi bhi baat mein khushi se madad karunga. |

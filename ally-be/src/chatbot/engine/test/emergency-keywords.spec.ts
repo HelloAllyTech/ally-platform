@@ -1,5 +1,6 @@
 import {
   atRiskByKeywords,
+  upsetByKeywords,
   emergencyByKeywords,
   lifeThreatening,
   moreSevere,
@@ -185,6 +186,39 @@ describe('indirect hopelessness on a mental-health assistant (Q4 H1)', () => {
     ).toBeNull();
     expect(
       atRiskByKeywords('What are your timings?', 'mental_health'),
+    ).toBeNull();
+  });
+});
+
+describe('distress is upset, not at risk (TF1 round 2, S-3)', () => {
+  it.each([
+    "I'm so stressed and tired of everything",
+    "I'm overwhelmed with exams",
+    'bahut tension hai, thak gayi hoon',
+  ])('upset, never at risk by itself: %s', (text) => {
+    expect(atRiskByKeywords(text, 'mental_health')).toBeNull();
+    expect(upsetByKeywords(text, 'mental_health')).toMatchObject({
+      is_crisis: false,
+      level: 'upset',
+    });
+  });
+
+  it.each([
+    "I'm tired of living",
+    "I can't go on",
+    'tired of everything, I just want it all to end',
+  ])('still at risk: %s', (text) => {
+    expect(atRiskByKeywords(text, 'mental_health')).toMatchObject({
+      level: 'at_risk',
+    });
+  });
+
+  it("only on a mental-health assistant, and not on ordinary uses of 'go on'", () => {
+    expect(
+      upsetByKeywords("I'm so stressed and tired of everything", 'standard'),
+    ).toBeNull();
+    expect(
+      atRiskByKeywords("I can't go on the trip on Sunday", 'mental_health'),
     ).toBeNull();
   });
 });

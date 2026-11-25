@@ -396,6 +396,8 @@ export const HelplineConfirm: React.FC<{ botId: string; canEdit: boolean }> = ({
 }) => {
   const settings = useSafetySettings(botId);
   const [note, setNote] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string | null>(null);
+  const fieldId = useId();
   const values = settings.values as unknown as {
     helplineNumbers?: string | null;
     helplineSource?: string | null;
@@ -415,22 +417,45 @@ export const HelplineConfirm: React.FC<{ botId: string; canEdit: boolean }> = ({
       </p>
     ) : null;
   }
+  // TF1 round 2, S-1: what the owner confirms is exactly what crisis replies will insert, and they
+  // can correct it first. ally-be keeps only the numbers and refuses text with none.
+  const shown = (draft ?? numbers).trim();
   return (
     <div data-testid="helpline-unconfirmed" className="ally-home__row">
       <p className="ally-small">{fill(t1.waiting, { numbers })}</p>
       {canEdit && (
-        <Button
-          variant={ButtonVariant.PRIMARY}
-          type="button"
-          disabled={settings.saving}
-          onClick={() =>
-            void settings
-              .save({ helplineConfirm: true } as never)
-              .then(reason => setNote(reason ? t1.failed : fill(t1.confirmed, { numbers })))
-          }
-        >
-          {t1.confirm}
-        </Button>
+        <>
+          <label className="ally-field__label" htmlFor={fieldId}>
+            {t1.field}
+          </label>
+          <input
+            id={fieldId}
+            className="ally-input"
+            type="tel"
+            inputMode="tel"
+            maxLength={200}
+            value={draft ?? numbers}
+            onChange={event => setDraft(event.target.value)}
+            data-testid="helpline-field"
+          />
+          {shown && (
+            <p className="ally-small" data-testid="helpline-preview">
+              {fill(t1.preview, { numbers: shown })}
+            </p>
+          )}
+          <Button
+            variant={ButtonVariant.PRIMARY}
+            type="button"
+            disabled={settings.saving || !shown}
+            onClick={() =>
+              void settings
+                .save({ helplineNumbers: shown, helplineConfirm: true } as never)
+                .then(reason => setNote(reason ?? fill(t1.confirmed, { numbers: shown })))
+            }
+          >
+            {t1.confirm}
+          </Button>
+        </>
       )}
       {note && (
         <p className="ally-small" role="alert">

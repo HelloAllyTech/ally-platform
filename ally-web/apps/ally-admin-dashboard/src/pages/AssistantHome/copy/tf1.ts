@@ -21,6 +21,9 @@ export const TF1_COPY = {
     /** S4: a template-written helpline number waits for the owner's confirmation. */
     waiting:
       "Your helpline number ({numbers}) isn't in crisis replies yet. Check it's right, then confirm it.",
+    /** TF1 round 2, S-1: the owner sees and edits exactly what crisis replies will give. COPY: needs approval. */
+    field: "Number crisis replies give",
+    preview: "Crisis replies will add: “You can also call {numbers}.”",
     confirm: "Use it in crisis replies",
     confirmed: "Crisis replies now give {numbers} beside the national numbers.",
     failed: "Couldn't confirm it. Try again.",

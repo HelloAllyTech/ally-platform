@@ -2,6 +2,7 @@ import { SafetyPackId } from '../../bot-draft/enum/bot-draft.enum';
 import { ListFieldType } from '../enum/list.enum';
 import type { ReadyMadeList } from '../lists/ready-made-lists';
 import { listDefinition } from './template-lists';
+import { helplineLines } from '../engine/phone-text';
 import type {
   SetupQuestion,
   StarterCase,
@@ -329,7 +330,8 @@ export function planInstall(
           facts.push(`${q.ask} ${text}`);
           break;
         case 'helpline':
-          helpline = text.slice(0, 200);
+          // TF1 round 2, S-1: only the numbers, never the sentence around them.
+          helpline = helplineLines(text) || null;
           break;
         case 'entries': {
           const definition = installed.get(to.list);

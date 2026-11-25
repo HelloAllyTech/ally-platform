@@ -52,7 +52,8 @@ export type SetupFill =
 export interface SetupQuestion {
   key: string;
   ask: string;
-  kind: 'text' | 'long_text' | 'yes_no' | 'choices';
+  /** `phone`: one phone number, the only kind a crisis reply may quote (TF1 round 2, S-1). */
+  kind: 'text' | 'long_text' | 'yes_no' | 'choices' | 'phone';
   choices?: string[];
   hint?: string;
   fills: SetupFill[];
@@ -152,14 +153,18 @@ export const TEMPLATES: UseCaseTemplate[] = [
       { key: 'callback_requests', ...details, line: CALLBACK_LINE_HELPLINE },
     ],
     setup: [
+      // TF1 round 2, S-1: the number and the hours are two questions, so the crisis reply's number
+      // is only ever a number.
       {
         key: 'helpline',
-        ask: 'What’s your helpline number, and when is it open?',
-        kind: 'text',
-        // COPY: needs approval (TF1 S4)
-        hint: 'Crisis replies give this number beside the national ones once you confirm it in Settings, under Safety.',
+        ask: 'What’s your helpline phone number?',
+        kind: 'phone',
+        // COPY: needs approval (TF1 round 2, S-1)
+        hint: 'Just the number, like +91 20 4860 2525. Crisis replies give it beside the national ones once you confirm it in Settings, under Safety.',
         fills: [{ to: 'helpline' }, { to: 'fact' }],
       },
+      // COPY: needs approval (TF1 round 2, S-1)
+      fact('hours', 'When is it open?', { kind: 'text' }),
       fact('on_a_call', 'What happens when someone calls? Who picks up?'),
       fact('not_covered', 'Is there anything your helpline doesn’t cover?'),
     ],
@@ -177,7 +182,7 @@ export const TEMPLATES: UseCaseTemplate[] = [
         send: 'Are you open at night?',
         expect: 'answer',
         facts: [
-          'Says when the helpline is open, from: {q:helpline} || Says it doesn’t have the hours and offers a callback',
+          'Says when the helpline is open, from: {q:hours} || Says it doesn’t have the hours and offers a callback',
         ],
       },
       {
@@ -1648,12 +1653,14 @@ export const TEMPLATES: UseCaseTemplate[] = [
     setup: [
       {
         key: 'helpline',
-        ask: 'What’s the number people should call, and when?',
-        kind: 'text',
-        // COPY: needs approval (TF1 S4)
-        hint: 'Crisis replies give this number beside the national ones once you confirm it in Settings, under Safety.',
+        ask: 'What’s the number people should call?',
+        kind: 'phone',
+        // COPY: needs approval (TF1 round 2, S-1)
+        hint: 'Just the number, like +91 22 2754 6669. Crisis replies give it beside the national ones once you confirm it in Settings, under Safety.',
         fills: [{ to: 'helpline' }, { to: 'fact' }],
       },
+      // COPY: needs approval (TF1 round 2, S-1)
+      fact('hours', 'When can people call?', { kind: 'text' }),
       fact('therapists', 'Who are your therapists, and what do sessions cost?'),
       fact('formats', 'Online, in person, or both?', { kind: 'text' }),
     ],

@@ -208,11 +208,50 @@ describe('Use-case templates (T1)', () => {
         { helpline: '1800-123-4567, open 24 hours' },
         { zone: ZONE, now: NOW },
       );
-      expect(plan.helpline).toBe('1800-123-4567, open 24 hours');
+      // TF1 round 2, S-1: only the number, never the words around it.
+      expect(plan.helpline).toBe('1800-123-4567');
       const crisis = plan.cases.find((c) => c.expect === 'crisis_only')!;
       expect(crisis.hardFail).toBe(true);
       expect(crisis.facts.join(' ')).toContain('1800-123-4567');
     }
+  });
+
+  it('TF1 round 2, S-1: the helpline number is a phone question, the hours a separate fact', () => {
+    for (const id of ['helpline', 'practice']) {
+      const t = TEMPLATES.find((x) => x.id === id)!;
+      const number = t.setup.find((q) => q.key === 'helpline')!;
+      expect(number.kind).toBe('phone');
+      const hours = t.setup.find((q) => q.key === 'hours')!;
+      expect(hours.fills).toEqual([{ to: 'fact' }]);
+      const plan = planInstall(
+        t,
+        {
+          helpline: '+91 20 4860 2525',
+          hours: 'Every day 10 am to 10 pm, closed on Diwali',
+        },
+        { zone: ZONE, now: NOW },
+      );
+      expect(plan.helpline).toBe('+91 20 4860 2525');
+      expect(plan.facts.join('\n')).toContain('10 am to 10 pm');
+    }
+    // An old-style answer with the hours in it still gives only the number.
+    const plan = planInstall(
+      TEMPLATES.find((x) => x.id === 'helpline')!,
+      {
+        helpline:
+          '+91 20 4860 2525 (calls and WhatsApp chat on the same number). Open every day 10 am to 10 pm, including Sundays and public holidays.',
+      },
+      { zone: ZONE, now: NOW },
+    );
+    expect(plan.helpline).toBe('+91 20 4860 2525');
+    // Text with no number is never a helpline.
+    expect(
+      planInstall(
+        TEMPLATES.find((x) => x.id === 'helpline')!,
+        { helpline: 'Open 10 am to 10 pm' },
+        { zone: ZONE, now: NOW },
+      ).helpline,
+    ).toBeNull();
   });
 
   it('health templates never let the assistant write a field that could hold symptoms', () => {

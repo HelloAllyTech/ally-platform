@@ -36,8 +36,14 @@ import {
  */
 import {
   crisisHelplines,
+  helplineLines,
   ownerHelplineFields,
 } from '../engine/crisis-helplines';
+
+/** COPY: needs approval (TF1 round 2, S-1). */
+export const HELPLINE_NO_NUMBER =
+  'Add the phone number crisis replies should give, like +91 20 4860 2525. Put opening hours in your notes instead.';
+
 @Injectable()
 export class ChatbotSettingsService {
   private readonly logger = LoggerService.getInstance(
@@ -158,6 +164,23 @@ export class ChatbotSettingsService {
     // Q4 G7: whose the helpline is. Only the owner's own save can make it theirs (a changed number,
     // or "Use this number in crisis replies"); a client never sets the source itself.
     const { helplineConfirm, ...rest } = overrides ?? {};
+    // TF1 round 2, S-1: only the numbers are stored, so what Settings shows is what a crisis reply
+    // says. Text with no number at all is refused rather than saved and silently dropped.
+    if (typeof rest.helplineNumbers === 'string') {
+      const typed = rest.helplineNumbers.trim();
+      const numbers = helplineLines(typed);
+      // A screen sends every stored key back: only a value the owner changed is refused.
+      const changed =
+        typed !== (chatbot.settings?.helplineNumbers ?? '').trim();
+      if (typed && !numbers && changed) {
+        throw new BadRequestException({
+          errorCode: 'helpline_no_number',
+          message: HELPLINE_NO_NUMBER,
+          details: { field: 'helplineNumbers' },
+        });
+      }
+      rest.helplineNumbers = numbers;
+    }
     const helpline = options.byOwner
       ? ownerHelplineFields(
           chatbot.settings,

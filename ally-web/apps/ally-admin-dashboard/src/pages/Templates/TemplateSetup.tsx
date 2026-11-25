@@ -220,6 +220,17 @@ const SetupQuestion: React.FC<{
             );
           })}
         </div>
+      ) : kind === "phone" ? (
+        <input
+          className="ally-input"
+          aria-labelledby={id}
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          maxLength={40}
+          value={typeof value === "string" ? value : ""}
+          onChange={event => onChange(event.target.value)}
+        />
       ) : kind === "text" ? (
         <input
           className="ally-input"

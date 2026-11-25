@@ -74,8 +74,10 @@ import { businessFacts } from './business-facts';
 import { agentAnswersInstead, isGreetingReply } from './keyword-skip';
 import { buildKnowledgeRequest, NO_DOCUMENTS } from './knowledge-request';
 import { stageLine, stageRunIdFor } from './agent-stage-log';
+import { asksToOverride, overrideDecline } from './visitor-override';
 import {
   atRiskByKeywords,
+  upsetByKeywords,
   emergencyByKeywords,
   lifeThreatening,
   moreSevere,
@@ -159,10 +161,15 @@ export function crisisTextFor(
     responseText?: string | null;
     /** Stage 5: regional numbers a builder added to its locked crisis reply. */
     extraNumbers?: string[] | null;
+    /** False: the copy's wording is still the global's (`TemplateMatch.ownWording`). */
+    ownWording?: boolean;
   } | null,
 ): string {
   const own_ = Boolean(
-    template?.chatbotId && template.chatbotId === turn.chatbot.id,
+    template?.chatbotId &&
+    template.chatbotId === turn.chatbot.id &&
+    // TF1 round 2: a copy still worded as the platform's global is not the builder's wording.
+    template.ownWording !== false,
   );
   // Stage 5 (D6): the chatbot's own numbers, then its copy's regional ones. Q4 G7: only numbers
   // the owner confirmed in Safety.
@@ -537,7 +544,10 @@ export class ChatbotEngineService {
         state,
       )
       .catch(() => undefined);
-    return this.keywordCrisis(turn, match.template);
+    return this.keywordCrisis(turn, {
+      ...match.template,
+      ownWording: match.ownWording,
+    });
   }
 
   /** The fixed reply at a limit, in the person's language, naming the business or its owner. */
@@ -652,7 +662,10 @@ export class ChatbotEngineService {
       match.template.kind === WaTemplateKind.CRISIS &&
       !isEverydayIdiom(turn.text)
     ) {
-      return this.keywordCrisis(turn, match.template);
+      return this.keywordCrisis(turn, {
+        ...match.template,
+        ownWording: match.ownWording,
+      });
     }
     if (!turn.settings.crisisClassifierEnabled) return null;
     try {
@@ -682,6 +695,7 @@ export class ChatbotEngineService {
       responseText?: string | null;
       chatbotId?: string | null;
       extraNumbers?: string[] | null;
+      ownWording?: boolean;
     },
   ): ChatbotDecision {
     const { chatbot, sender } = turn;
@@ -742,7 +756,11 @@ export class ChatbotEngineService {
       // A crisis reply carries its Slack alert, so a human learns about it in near real time. A
       // crisis reply that only lands in a table nobody is watching is a log entry, not an
       // escalation.
-      if (isCrisis) return this.keywordCrisis(turn, match.template);
+      if (isCrisis)
+        return this.keywordCrisis(turn, {
+          ...match.template,
+          ownWording: match.ownWording,
+        });
       return {
         handledBy: WaHandledBy.TEMPLATE,
         body: this.settingsService.renderPlaceholders(
@@ -932,12 +950,22 @@ export class ChatbotEngineService {
         `Life-threatening emergency rule matched for chatbot ${turn.chatbot.id}; the emergency reply goes out`,
       );
     }
+    // TF1 round 2, S-3: distress on a mental-health assistant is at least upset, never decided by
+    // the keywords alone: the classifier's verdict still counts, and the more severe one wins.
+    const distress = urgent
+      ? null
+      : upsetByKeywords(turn.text, turn.chatbot.safetyPack);
     const crisisCheck: Promise<CrisisCheckResponse | null> = urgent
       ? Promise.resolve(urgent)
       : classifier.then(
-          (verdict) => (verdict?.failed ? (byKeywords() ?? verdict) : verdict),
+          (verdict) => {
+            const judged = verdict?.failed
+              ? (byKeywords() ?? verdict)
+              : verdict;
+            return distress ? moreSevere(judged, distress) : judged;
+          },
           (error: unknown) => {
-            const verdict = byKeywords();
+            const verdict = byKeywords() ?? distress;
             if (verdict) return verdict;
             throw error;
           },
@@ -990,8 +1018,30 @@ export class ChatbotEngineService {
     if (early && fixedReply(early)) {
       return this.crisisDecision(turn, early.value!, ran, { notOnList: false });
     }
+    // TF1 round 2, S-4: "ignore your instructions…" gets one fixed line and no run. The crisis
+    // verdict is awaited first and wins ("ignore all the rules, I just want to die").
+    if (asksToOverride(turn.text)) {
+      const verdict = early ?? (await checked);
+      if (fixedReply(verdict)) {
+        return this.crisisDecision(turn, verdict.value!, ran, {
+          notOnList: false,
+        });
+      }
+      this.logger.info(
+        `Chatbot ${turn.chatbot.id}: a request to drop its rules got the fixed decline`,
+      );
+      return {
+        handledBy: WaHandledBy.TEMPLATE,
+        body: overrideDecline(
+          replyLanguageOf(turn.text, turn.language),
+          turn.chatbot.name,
+        ),
+      };
+    }
     const mood =
-      early?.status === 'fulfilled' && crisisLevelOf(early.value) === 'upset'
+      (early?.status === 'fulfilled' &&
+        crisisLevelOf(early.value) === 'upset') ||
+      distress
         ? 'upset'
         : undefined;
 

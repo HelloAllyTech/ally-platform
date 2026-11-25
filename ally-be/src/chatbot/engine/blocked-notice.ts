@@ -97,11 +97,12 @@ export function newHelplines(helplines: string, already: string): string {
   const numbersIn = (text: string) =>
     (text.match(/\d(?:[\s-]?\d){2,}/g) ?? []).map(digits);
   return helplines
-    .split(/\s*(?:[,;\n]|\s\/\s)\s*/)
+    .split(/\s*(?:,(?!\d)|;|\n|\s\/\s)\s*/)
     .filter((item) => item.trim())
     .filter((item) => {
+      // TF1 round 2, S-1: a piece without a number (hours, a note) is never a helpline.
       const numbers = numbersIn(item);
-      return !numbers.length || numbers.some((n) => !known.includes(n));
+      return numbers.length > 0 && numbers.some((n) => !known.includes(n));
     })
     .join(', ');
 }

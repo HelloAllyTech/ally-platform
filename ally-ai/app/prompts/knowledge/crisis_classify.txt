@@ -9,16 +9,18 @@ Someone is chatting with an automated assistant for a business: a shop, a restau
 # The four levels
 Choose one `level` for the latest message, read with the earlier ones, in any language or slang.
 
-## at_risk: someone's life may be at risk from themselves, or someone is in danger
+## at_risk: someone's life may be at risk from themselves, or from another person
 At least one of these, about the sender or someone else, said directly or indirectly ("unalive"):
 - suicide, or thoughts or plans of it, including a passive wish to die ("I wish I could go to sleep and not wake up", "nobody would notice if I was gone", "there's no reason to live", "sab khatam kar doon");
 - self-harm;
 - harm to someone else;
 - abuse that is happening or has just been threatened;
-- not being able to stay safe.
+- not being able to keep themselves safe from those thoughts, or from another person.
+Danger from a flood, a fire, a collapse or being trapped is `emergency`, not `at_risk`.
 
-## emergency: a medical emergency is happening now
+## emergency: a medical emergency or a disaster is happening now
 To the sender, someone with them, or an animal in their care, now:
+- a disaster or an accident: water coming into the home or rising around them, a flood, a fire, a building collapse, being trapped (by water, fire or rubble, on a roof, in a lift or a vehicle), a road accident, being attacked ("Water is entering our house and we are trapped", "paani ghar mein ghus gaya, hum phanse hain");
 - heavy bleeding; chest pain; can't breathe; fainted or unconscious; a seizure; a stroke's signs;
 - an overdose or poisoning that has just happened, accidental or not;
 - burns;
@@ -26,11 +28,12 @@ To the sender, someone with them, or an animal in their care, now:
 - in pregnancy: heavy bleeding, the baby not moving or moving much less, waters broken or a gush or trickle of watery fluid near the end of pregnancy ("9 mahina chal raha hai aur paani jaisa discharge ho raha hai"), severe pain;
 - a pet that has eaten something poisonous (chocolate, grapes, rat poison, medicines), can't breathe, is bleeding badly, or collapsed.
 If self-harm or suicide is also present (an overdose taken on purpose), choose `emergency` and set `self_harm` true.
+Questions about relief work or about a past disaster are not an emergency: "where is the flood relief camp?", "baadh peediton ke liye daan", "is the camp still open?".
 
 Not an emergency: something that needs a doctor soon but isn't a danger right now, such as a wound or stump that is red, swollen or oozing, a mild fever, or a pain that has lasted days. Choose `upset` if they're worried, otherwise `none`. Unless it is chest pain, trouble breathing, heavy bleeding, sudden weakness or confusion, or they say it is getting rapidly worse: those stay emergency.
 
 ## upset: distress without risk to life or safety
-Sadness, crying, low mood, loneliness, grief, guilt ("I feel like a bad mother"), stress, worry, anxiety, poor sleep, exhaustion, anger or frustration with the business or the assistant, and slang that sounds dark but is about something ordinary ("I'm so depressed my tee is sold out", "this market crash has killed me"). However strong the feeling, without one of the signs above it is `upset`. The assistant answers these normally, with warmth.
+Sadness, crying, low mood, loneliness, grief, guilt ("I feel like a bad mother"), stress, worry, anxiety, poor sleep, exhaustion, anger or frustration with the business or the assistant, and slang that sounds dark but is about something ordinary ("I'm so depressed my tee is sold out", "this market crash has killed me"). However strong the feeling, without one of the signs above it is `upset`: "I'm so stressed and tired of everything", "I can't take this exam pressure", "bahut tension hai, thak gayi hoon". The assistant answers these normally, with warmth. It becomes `at_risk` only with a sign of wanting to die or to harm themselves ("tired of everything, I just want it all to end").
 
 ## none: everything else
 - Questions about the assistant itself: "what do you remember about me?", "what do you know about me?", "do you have a helpline I can call?", "are you a real person?".

@@ -233,13 +233,15 @@ export const ChatView: React.FC<{
           <ul>
             {thread.otherChats!.map(other => (
               <li key={other.id}>
-                <button
+                <Button
+                  variant={ButtonVariant.TEXT}
+                  size="sm"
                   type="button"
                   className="ally-link"
                   onClick={() => onOpenConversation?.(other.id)}
                 >
                   {time(other.lastMessageAt)}
-                </button>{" "}
+                </Button>{" "}
                 {other.preview}
               </li>
             ))}
@@ -346,13 +348,15 @@ export const ChatView: React.FC<{
       {thread.newerChatId && !readOnly && (
         <p className="ally-small" role="note" data-testid="inbox-newer-chat">
           {TF1_COPY.inbox.newerChat}{" "}
-          <button
+          <Button
+            variant={ButtonVariant.TEXT}
+            size="sm"
             type="button"
             className="ally-link"
             onClick={() => onOpenConversation?.(thread.newerChatId!)}
           >
             {TF1_COPY.inbox.openNewer}
-          </button>
+          </Button>
         </p>
       )}
       {mine && !readOnly && !thread.newerChatId && (

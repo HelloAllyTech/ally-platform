@@ -86,6 +86,59 @@ describe('ChatbotSettingsService', () => {
     expect(view.effective.declineText).toBe('Ask HR.');
   });
 
+  describe('the helpline number (TF1 round 2, S-1)', () => {
+    const SAATHI =
+      '+91 20 4860 2525 (calls and WhatsApp chat on the same number). Open every day 10 am to 10 pm, including Sundays and public holidays.';
+    const stored = () =>
+      chatbotRepository.update.mock.calls[0][1].settings as Record<
+        string,
+        unknown
+      >;
+
+    it('stores only the numbers the owner typed', async () => {
+      await service.updateChatbotSettings(
+        { id: 'bot-1' },
+        { helplineNumbers: SAATHI, helplineConfirm: true },
+        { byOwner: true },
+      );
+      expect(stored()).toMatchObject({
+        helplineNumbers: '+91 20 4860 2525',
+        helplineSource: 'owner',
+      });
+    });
+
+    it('refuses text with no number the owner just typed', async () => {
+      await expect(
+        service.updateChatbotSettings(
+          { id: 'bot-1' },
+          { helplineNumbers: 'Open 10 am to 10 pm' },
+          { byOwner: true },
+        ),
+      ).rejects.toMatchObject({
+        response: { errorCode: 'helpline_no_number' },
+      });
+      expect(chatbotRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('saving another setting cleans a stored value but never confirms it', async () => {
+      const settings = {
+        helplineNumbers: SAATHI,
+        helplineSource: 'template' as const,
+        helplineConfirmedAt: null,
+      };
+      await service.updateChatbotSettings(
+        { id: 'bot-1', settings },
+        { ...settings, retentionDays: 30 } as never,
+        { byOwner: true },
+      );
+      expect(stored()).toMatchObject({
+        helplineNumbers: '+91 20 4860 2525',
+        helplineSource: 'template',
+      });
+      expect(stored().helplineConfirmedAt ?? null).toBeNull();
+    });
+  });
+
   it('stores the cleaned changes on the bot', async () => {
     await service.updateChatbotSettings({ id: 'bot-1' }, { declineText: '' });
     expect(chatbotRepository.update).toHaveBeenCalledWith(

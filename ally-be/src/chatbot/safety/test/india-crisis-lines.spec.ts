@@ -43,6 +43,16 @@ describe('the crisis information in India', () => {
     );
   });
 
+  it('never inserts a piece without a number (TF1 round 2, S-1)', () => {
+    const text = fixedCrisisInformation(
+      '+91 20 4860 2525, Open every day 10 am to 10 pm, including Sundays',
+      'en',
+      true,
+    );
+    expect(text).toContain('You can also call +91 20 4860 2525, or find');
+    expect(text).not.toMatch(/Open every day|Sundays/);
+  });
+
   it('is unchanged outside India (R6)', () => {
     expect(fixedCrisisInformation(null, 'en')).toBe(
       `If you need support now, you can find a helpline near you at ${LINK}`,

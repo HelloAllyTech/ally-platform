@@ -118,3 +118,14 @@ Until then, internal launch only. Turning it back to the question is one setting
 - `ally_tf1` is a schema-only copy of `ally_local` plus the migration-seeded rows; migrations can't run from an empty database (`1700000000000` needs `scenarios`). `ally_local` was never touched.
 - ally-be ran as build then `node dist/main` with a compose override (`DB_DATABASE=ally_tf1`, dummy SES, a local WhatsApp app secret, no send token). Sign-in codes came from the log; WhatsApp replies were read from `wa_messages`.
 - The pre-commit hook was off (`HUSKY=0`), as asked; lint and the suites ran at the end of each round.
+
+## Saathi manual pass (25 Nov): prompts to push at release
+
+Published to the **local** Skills Store only (`publish-local-prompts.js`). Neither adds or removes a variable, so order relative to the deploy doesn't matter for the contract; **push them after the ally-be deploy** anyway, because the code rules (flood and trapped as emergencies, distress as upset, the one-line decline) are what the texts assume.
+
+| Prompt code | Local version | What changed | Production |
+|---|---|---|---|
+| `ally_ai_knowledge_crisis_classify` | v6 | `emergency` covers disasters (flood, water coming in, fire, collapse, being trapped, an attack); relief questions are not emergencies; `at_risk` no longer includes "someone is in danger" in general; "I'm so stressed and tired of everything" is `upset` unless there's a sign of wanting to die | Push at release, after the ally-be deploy |
+| `ally_ai_agent_system` | v7 | Rule 2: a request to ignore or change the rules gets one short sentence that declines and says what it can help with, nothing else | Push at release, after the ally-be deploy |
+
+Defaults updated in the same change: `ally-ai/app/prompts/knowledge/crisis_classify.txt`, `ally-ai/app/prompts/agent/system.txt`.
