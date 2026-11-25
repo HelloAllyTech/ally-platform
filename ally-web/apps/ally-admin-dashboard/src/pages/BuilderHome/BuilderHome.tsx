@@ -13,6 +13,7 @@ import { isBlankDraft } from "./blank";
 import { BUILDER_HOME, CREATE_MIN_WIDTH } from "./copy";
 import { chatbotAccess } from "../AssistantHome/access";
 import { HOME } from "../AssistantHome/copy";
+import { TF1_COPY } from "../AssistantHome/copy/tf1";
 import { day } from "../AssistantHome/dates";
 import { MoreMenu } from "../AssistantHome/ui/Menu";
 import { RemoveDialog } from "../AssistantHome/ui/RemoveDialog";
@@ -240,6 +241,10 @@ const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () 
             key={bot.id}
             className={`ally-list-page__card-wrap${
               access.manage ? " ally-list-page__card-wrap--menu" : ""
+            }${
+              bot.status === ChatbotStatus.DRAFT && bot.setupDraftId
+                ? " ally-list-page__card-wrap--home-link"
+                : ""
             }`}
           >
             <button
@@ -293,6 +298,17 @@ const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () 
                 </span>
               </span>
             </button>
+            {/* TF1 F5: before go-live, the home (Knowledge, Lists, Settings) is one click away. */}
+            {bot.status === ChatbotStatus.DRAFT && bot.setupDraftId && (
+              <button
+                type="button"
+                className="ally-link ally-small ally-list-page__home-link"
+                data-testid={`open-home-${bot.id}`}
+                onClick={() => navigate(ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id))}
+              >
+                {TF1_COPY.list.openHome}
+              </button>
+            )}
             {access.manage && (
               <div className="ally-list-page__menu">
                 <MoreMenu

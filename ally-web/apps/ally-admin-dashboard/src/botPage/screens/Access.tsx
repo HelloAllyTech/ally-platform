@@ -17,7 +17,7 @@ const RESEND_AFTER_SECONDS = 30;
 /**
  * Crisis information for every visitor, before any code is requested (stage 6): the chatbot's own
  * numbers first when the public view has them, then the findahelpline.com link. It says nothing
- * about who is on the invite list: "If you were invited, check your email" is the same line for
+ * about who is on the invite list: the invited line (TF1 F17) is the same for
  * everyone, and nothing here changes with the address typed.
  */
 export function CrisisInfo({

@@ -175,6 +175,34 @@ describe('MetaWhatsAppProvider', () => {
       expect(parsed[0].isUnsupportedMedia).toBe(false);
     });
 
+    // TF1 B5: WhatsApp contacts had no names ("Visitor · 0001" even after "I'm Bilal").
+    it("keeps the sender's WhatsApp profile name", () => {
+      const parsed = provider.parseInbound({
+        entry: [
+          {
+            changes: [
+              {
+                value: {
+                  contacts: [
+                    { wa_id: '919800000001', profile: { name: ' Bilal ' } },
+                  ],
+                  messages: [
+                    {
+                      id: 'wamid.9',
+                      from: '919800000001',
+                      type: 'text',
+                      text: { body: 'Hi' },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      });
+      expect(parsed[0].profileName).toBe('Bilal');
+    });
+
     it('flags media with no text as unsupported', () => {
       const parsed = provider.parseInbound(
         envelope([{ id: 'wamid.2', from: '91', type: 'image' }]),

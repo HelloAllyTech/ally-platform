@@ -18,7 +18,13 @@ import {
   KbDocumentStatus,
 } from '../enum/knowledge-base.enum';
 import { KbIngestProducer } from '../producer/kb-ingest.producer';
-import { contactValuesIn, maskValue, PiiFinding, scanForPii } from './pii-scan';
+import {
+  contactValuesIn,
+  maskValue,
+  onlyOrganisationContacts,
+  PiiFinding,
+  scanForPii,
+} from './pii-scan';
 
 /** Tags of the builder's own typed documents (Owner notes, What we learned). */
 const OWNER_TYPED_TAGS = ['owner-notes', 'learned-facts'];
@@ -125,7 +131,17 @@ export class KnowledgeReviewService {
       const publicValues = await this.publicContacts(document.ownerChatbotId);
       const regex = scanForPii(text, publicValues);
       const names = await this.scanNames(text);
-      const findings = [...regex.findings, ...names];
+      // TF1 F4: a few contact details are the organisation's own published ones, not held.
+      // Uploaded files only: a crawled page's contacts are checked against the owner's settings.
+      const uploaded =
+        !document.sourceUrl &&
+        document.sourceType !== KbDocumentSourceType.PASTE;
+      const findings = [
+        ...(uploaded && !names.length && onlyOrganisationContacts(regex)
+          ? []
+          : regex.findings),
+        ...names,
+      ];
       if (!findings.length) return false;
       await this.dataSource.query(
         `UPDATE kb_documents

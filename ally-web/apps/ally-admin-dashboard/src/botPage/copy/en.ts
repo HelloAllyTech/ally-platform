@@ -142,7 +142,8 @@ export const en = {
     linkLabel: "findahelpline.com",
     linkUrl: "https://findahelpline.com",
     numbers: "You can call {numbers}.",
-    invited: "If you were invited, check your email.",
+    // COPY: needs approval (TF1 F17): no invitation email is sent; the owner shares the link.
+    invited: "If you were invited, use the email address the team added for you.",
   },
   blocked: {
     OUT_OF_CREDITS: "This assistant can't reply right now.",

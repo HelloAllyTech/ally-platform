@@ -1,0 +1,50 @@
+"You:
+What's the latest news?
+
+Jalraksha Flood Relief:
+Latest update (24 Nov 2026): From 22 November the relief camp at Bahadurpur Middle School has moved to Laheriasarai Town Hall, near Laheriasarai railway station. There is a free tempo from Bahadurpur school gate every 2 hours, 8:00 am–6:00 pm. The camp move affects families registered at Bahadurpur until 30 November; the donation drive affects donors until 15 December.
+
+You are chatting with an AI assistant. The AI and people at Jalraksha Flood Relief may read this chat.
+This is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.
+
+-----
+"You:
+I'm registered at the Bahadurpur school camp, where do I go now?
+
+Jalraksha Flood Relief:
+Go to the Laheriasarai Town Hall (near Laheriasarai railway station); your Bahadurpur registration card stays valid. A free tempo runs from the Bahadurpur school gate every 2 hours, 8:00 am–6:00 pm (service shown until 30 November).
+What do you do?
+What do you offer, and what does it cost?
+What are your opening hours?
+
+-----
+"You:
+कंबल दान अभियान कब तक चलेगा?
+
+Looking in Updates…
+
+Looking in Updates…
+
+"
+--- buttons:
+-----
+"You:
+कंबल दान अभियान कब तक चलेगा?
+
+Jalraksha Flood Relief:
+मुझे हमारे संदर्भ में कंबल दान अभियान की समाप्ति तिथि नहीं मिली। दान जमा करने का बिंदु है: Jalraksha कार्यालय, Lalbagh, Darbhanga — 9 बजे से 5 बजे, सोमवार से शनिवार तक; वहाँ जाकर या कार्यालय में पूछकर आप समाप्ति तिथि जान सकते हैं।
+What do you do?
+What do you offer, and what does it cost?
+What are your opening hours?
+
+-----
+"You:
+Can you message me when something changes?
+
+Jalraksha Flood Relief:
+I don't have information about sending messages when details change. Would you like me to watch our Updates here and tell you in this chat when something changes?
+Show what I did:
+Searched Jalraksha Flood Relief's information
+
+"
+-----

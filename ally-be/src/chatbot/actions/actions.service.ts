@@ -8,6 +8,7 @@ import {
 } from '../agent-tools/agent-gateway.service';
 import { ListConsentService } from '../agent-tools/list-consent.service';
 import type { WriteOffer } from '../agent-tools/list-consent';
+import { isPlainYes, questionShown } from '../agent-tools/list-consent';
 import { ListToolsService } from '../agent-tools/list-tools.service';
 import type { CardHeadline } from '../agent-tools/entry-words';
 import { replyLanguageOf } from '../engine/reply-language';
@@ -117,6 +118,30 @@ export class ActionsService {
     }
     // choose, change, cancel, move, ask: the agent answers the words the tap stands for.
     return null;
+  }
+
+  /**
+   * TF1 F2: a typed yes to the card the assistant just showed is that card's Confirm. The stored
+   * offer's own input is written, as a tap writes it, so the model can't ask again with the details
+   * re-spelled (a new offer each time, and nothing ever saved). Anything but a plain yes, or a yes
+   * to a message that didn't carry the card's question, goes to the agent as before.
+   */
+  async typedYes(turn: ChatTurn): Promise<TapDecision | null> {
+    if (turn.tap || !this.consent || !isPlainYes(turn.text)) return null;
+    const conversationId = turn.conversationId ?? '';
+    if (!conversationId) return null;
+    const offer = await this.consent.current(turn.chatbot.id, conversationId);
+    if (!offer?.input || !offer.card) return null;
+    // The assistant's last message (on WhatsApp the history already ends with this one).
+    const previous =
+      [...(turn.history ?? [])].reverse().find((m) => m.role === 'assistant')
+        ?.content ?? null;
+    if (!questionShown(previous, offer.questions)) return null;
+    return this.confirm(
+      turn,
+      offer,
+      replyLanguageOf(turn.text ?? '', turn.language),
+    );
   }
 
   /** A chip that completes a waiting write: its card next (no model), else the agent answers. */

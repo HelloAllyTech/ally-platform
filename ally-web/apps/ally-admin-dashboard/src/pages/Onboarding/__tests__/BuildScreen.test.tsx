@@ -21,6 +21,37 @@ const h = vi.hoisted(() => ({
   applyChange: null as unknown as Fn,
   pane: null as unknown as Fn,
   templates: null as unknown,
+  useCase: null as unknown as Fn,
+}));
+
+const { USE_CASES } = vi.hoisted(() => ({
+  USE_CASES: {
+    suggested: null,
+    groups: [
+      {
+        id: "organisations",
+        name: "For organisations",
+        templates: [
+          {
+            id: "helpline",
+            group: "organisations",
+            name: "Helpline and crisis support",
+            one_liner: "Answers and callbacks",
+            for: "Helplines",
+            icon: "helpline",
+            purpose: "answer",
+            pack: "Mental health safety",
+            hand_over: true,
+            memory: false,
+            lists: [],
+            setup: [{ key: "helpline", ask: "What’s your helpline number?", kind: "text" }],
+            checkups: 7,
+            suggested: false,
+          },
+        ],
+      },
+    ],
+  },
 }));
 
 const { mutation } = vi.hoisted(() => ({
@@ -65,6 +96,8 @@ vi.mock("@api", async importOriginal => ({
   useProposeBotDraftChangeMutation: mutation(() => h.propose),
   useApplyBotDraftChangeMutation: mutation(() => h.applyChange),
   useGetBotTemplatesQuery: () => ({ data: h.templates, isLoading: false, isError: false }),
+  useGetTemplateCatalogueQuery: () => ({ data: USE_CASES, isLoading: false, isError: false }),
+  useApplyDraftTemplateMutation: mutation(() => h.useCase),
 }));
 vi.mock("../create/useDraftEvents", () => ({ useDraftEvents: () => undefined }));
 vi.mock("../DraftTestPane", () => ({
@@ -77,6 +110,7 @@ vi.mock("../DraftTestPane", () => ({
 /* eslint-disable import/first */
 import { BuildScreen } from "../create/BuildScreen";
 import { BUILD_COPY } from "../create/copy";
+import { TF1_COPY } from "../../AssistantHome/copy/tf1";
 /* eslint-enable import/first */
 
 const F = BUILD_COPY.field;
@@ -474,6 +508,7 @@ describe("Create and Build: a new, blank chatbot", () => {
     });
     renderScreen();
     fireEvent.click(screen.getByTestId("start-template"));
+    fireEvent.click(screen.getByRole("button", { name: TF1_COPY.create.moreStartingPoints }));
     fireEvent.click(screen.getByTestId("template-lib-helpline"));
     fireEvent.change(screen.getByLabelText("Your organisation's name"), {
       target: { value: "Sunrise" },
@@ -496,6 +531,7 @@ describe("Create and Build: a new, blank chatbot", () => {
     h.template.mockRejectedValue({ status: 409, data: { errorCode: "not_blank" } });
     renderScreen();
     fireEvent.click(screen.getByTestId("start-template"));
+    fireEvent.click(screen.getByRole("button", { name: TF1_COPY.create.moreStartingPoints }));
     fireEvent.click(screen.getByTestId("template-lib-helpline"));
     fireEvent.change(screen.getByLabelText("Your organisation's name"), {
       target: { value: "Sunrise" },
@@ -505,6 +541,31 @@ describe("Create and Build: a new, blank chatbot", () => {
     });
     expect(await screen.findByText(BUILD_COPY.templates.notBlank)).toBeTruthy();
     expect(screen.queryByTestId("start-template")).toBeNull();
+  });
+
+  // TF1 S6: T1's use-case templates weren't in Create, so a template only half-applied via Tools.
+  it("Pick a template offers the use-case templates, applied whole to the draft", async () => {
+    h.useCase = vi.fn().mockResolvedValue({
+      result: { template: { id: "helpline", name: "Helpline and crisis support" } },
+      draft: {},
+    });
+    renderScreen();
+    fireEvent.click(screen.getByTestId("start-template"));
+    fireEvent.click(screen.getByTestId("template-card-helpline"));
+    fireEvent.change(screen.getByRole("textbox", { name: "What’s your helpline number?" }), {
+      target: { value: "1800-200-3000" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("template-set-up"));
+    });
+    expect(h.useCase).toHaveBeenCalledWith({
+      draftId: "d1",
+      template: "helpline",
+      answers: { helpline: "1800-200-3000" },
+    });
+    expect((await screen.findByTestId("template-applied")).textContent).toContain(
+      "Helpline and crisis support",
+    );
   });
 
   it("a template is not offered on a chatbot that isn't blank", () => {

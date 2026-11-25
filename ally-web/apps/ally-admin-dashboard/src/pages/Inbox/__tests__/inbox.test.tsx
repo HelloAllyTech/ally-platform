@@ -39,6 +39,7 @@ vi.mock("@hooks", () => ({ useUser: () => ({ user: { id: 7 } }) }));
 vi.mock("../useInboxStream", () => ({ useInboxStream: () => undefined }));
 
 // eslint-disable-next-line import/first
+import { TF1_COPY } from "../../AssistantHome/copy/tf1";
 import { INBOX } from "../copy";
 // eslint-disable-next-line import/first
 import { Inbox } from "../Inbox";
@@ -192,6 +193,25 @@ describe("Inbox", () => {
     );
     fireEvent.click(screen.getByText(INBOX.handBack));
     await waitFor(() => expect(h.handBack).toHaveBeenCalled());
+  });
+
+  // TF1 S5: one row per person; an owner's reply in an older chat never reached them.
+  it("a person's row says how many chats; an older chat sends replies to their latest", () => {
+    h.items.current = [item({ chats: 2 }), item({ id: "c3", needsPersonReason: "crisis" })];
+    h.thread.current = thread({
+      state: "held",
+      heldBy: { id: 7, name: "Asha Rao" },
+      otherChats: [
+        { id: "c9", channel: "web", lastMessageAt: "2026-11-24T10:00:00Z", preview: "Back again" },
+      ],
+      newerChatId: "c9",
+    });
+    open("/inbox?conversation=c1&bot=b1");
+    expect(screen.getByTestId("inbox-chats").textContent).toBe("2 chats");
+    expect(screen.getByText(`Needs a person · ${TF1_COPY.inbox.crisisReason}`)).toBeTruthy();
+    expect(screen.getByTestId("inbox-other-chats")).toBeTruthy();
+    expect(screen.getByTestId("inbox-newer-chat").textContent).toContain(TF1_COPY.inbox.newerChat);
+    expect(screen.queryByPlaceholderText(INBOX.replyPlaceholder)).toBeNull();
   });
 
   it("someone else has it: who, and no reply box", () => {

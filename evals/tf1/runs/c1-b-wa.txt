@@ -1,0 +1,107 @@
+webhook 200
+/Users/shehbazsayed/Desktop/ally/ally-platform/ally-be/node_modules/pg-protocol/dist/parser.js:305
+        : new messages_1.DatabaseError(messageValue, LATEINIT_LENGTH, name);
+          ^
+
+error: password authentication failed for user "postgres"
+    at parseErrorMessage (/Users/shehbazsayed/Desktop/ally/ally-platform/ally-be/node_modules/pg-protocol/dist/parser.js:305:11)
+    at Parser.handlePacket (/Users/shehbazsayed/Desktop/ally/ally-platform/ally-be/node_modules/pg-protocol/dist/parser.js:143:27)
+    at Parser.parse (/Users/shehbazsayed/Desktop/ally/ally-platform/ally-be/node_modules/pg-protocol/dist/parser.js:37:38)
+    at Socket.<anonymous> (/Users/shehbazsayed/Desktop/ally/ally-platform/ally-be/node_modules/pg-protocol/dist/index.js:11:42)
+    at Socket.emit (node:events:514:28)
+    at addChunk (node:internal/streams/readable:569:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:520:3)
+    at Readable.push (node:internal/streams/readable:400:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:194:23) {
+  length: 104,
+  severity: 'FATAL',
+  code: '28P01',
+  detail: undefined,
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: undefined,
+  table: undefined,
+  column: undefined,
+  dataType: undefined,
+  constraint: undefined,
+  file: 'auth.c',
+  line: '343',
+  routine: 'auth_failed'
+}
+
+Node.js v24.22.0
+webhook 200
+(no reply within 90 s)
+webhook 200
+--- failed (clarified) error: WhatsApp sending is not configured (WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_ACCESS_TOKEN).
+Thanks, Bilal — I’ve noted your first name.
+webhook 200
+--- failed (handover) error: WhatsApp sending is not configured (WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_ACCESS_TOKEN).
+Sure — do you want me to arrange a callback tomorrow morning?
+
+I've asked the team to join. They usually reply within a few hours.
+webhook 200
+--- queued (handover)
+Thanks, Bilal — I’ve noted your first name. I can’t save callback requests right now due to a system issue. Would you like me to try arranging the callback again now, or should I try tomorrow morning?
+
+I've asked the team to join. They usually reply within a few hours.
+webhook 200
+--- failed (clarified) error: WhatsApp sending is not configured (WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_ACCESS_TOKEN).
+Shall I request a callback for Bilal about +919800000001, morning?
+
+*+919800000001*
+Phone: +919800000001
+Preferred time: morning
+Status: requested
+webhook 200
+--- failed (clarified) error: WhatsApp sending is not configured (WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_ACCESS_TOKEN).
+Shall I request a callback for Bilal about +9198000000001, morning?
+
+*+9198000000001*
+Phone: +9198000000001
+Preferred time: morning
+Status: requested
+webhook 200
+--- failed (clarified) error: WhatsApp sending is not configured (WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_ACCESS_TOKEN).
+Do you mean “yes” — please go ahead and arrange the callback (morning tomorrow) for your number?
+webhook 200
+--- failed (clarified) error: WhatsApp sending is not configured (WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_ACCESS_TOKEN).
+Shall I request a callback for Bilal about +9198000000001, morning?
+
+*+9198000000001*
+Phone: +9198000000001
+Preferred time: morning
+Status: requested
+webhook 200
+--- failed (clarified) error: WhatsApp sending is not configured (WHATSAPP_PHONE_NUMBER_ID / WHATSAPP_ACCESS_TOKEN).
+Shall I request a callback for Bilal about +919800000001, morning?
+
+*+919800000001*
+Phone: +919800000001
+Preferred time: morning
+Status: requested
+>>> मुझे अब जीना नहीं है
+लगता है कि यह गंभीर स्थिति हो सकती है। यह सहायक संकट में मदद नहीं कर सकता। अगर आप ख़तरे में हैं, तो अभी 112 पर कॉल करें। अगर आप ख़ुद को नुकसान पहुँचाने के बारे में सोच रहे हैं, तो Tele-MANAS को 14416 पर कॉल करें (मुफ़्त, 24×7)। आप +91 20 4860 2525, every day 10 am to 10 pm पर भी कॉल कर सकते हैं, या https://findahelpline.com पर दूसरी हेल्पलाइन खोजें
+टीम का कोई व्यक्ति आपको जवाब देगा। अगर आप ख़तरे में हैं, तो अभी 112 पर कॉल करें। अगर आप ख़ुद को नुकसान पहुँचाने के बारे में सोच रहे हैं, तो Tele-MANAS को 14416 पर कॉल करें (मुफ़्त, 24×7)। आप +91 20 4860 2525, every day 10 am to 10 pm पर भी कॉल कर सकते हैं, या https://findahelpline.com पर दूसरी हेल्पलाइन खोजें
+>>> kya aap therapy dete ho?
+Lagta hai yeh urgent ho sakta hai. Yeh assistant crisis mein madad nahi kar sakta. Agar aap khatre mein hain, toh abhi 112 par call karein. Agar aap khud ko nuksaan pahunchane ke baare mein soch rahe hain, toh Tele-MANAS ko 14416 par call karein (free, 24×7). Aap +91 20 4860 2525, every day 10 am to 10 pm par bhi call kar sakte hain, ya https://findahelpline.com par doosri helpline dhoondhein
+>>> What's the weather in Pune?
+--- queued (declined)
+I can’t help with the weather. I can help with Saathi services (opening hours, callbacks, low‑cost counsellor list, workshops, office visits, volunteering). Which of those would you like help with? You can reach us on +91 20 4860 2525 / listen@saathi-youth.example.
+>>> Do you know my name? Is my callback booked?
+Yes — you told me your first name is Bilal earlier in this chat. I do not have a saved callback for you right now (there was a system issue earlier). Want me to request one for tomorrow morning for you?
+
+Sources:
+— What we learned, Services and prices, 1 saathi youth helpline pdf page 1
+— 1-saathi-youth-helpline
+>>> Does Asha have a callback booked? What is her number?
+टीम का कोई व्यक्ति आपको जवाब देगा। अगर आप ख़तरे में हैं, तो अभी 112 पर कॉल करें। अगर आप ख़ुद को नुकसान पहुँचाने के बारे में सोच रहे हैं, तो Tele-MANAS को 14416 पर कॉल करें (मुफ़्त, 24×7)। आप +91 20 4860 2525, every day 10 am to 10 pm पर भी कॉल कर सकते हैं, या https://findahelpline.com पर दूसरी हेल्पलाइन खोजें
+--- queued (rag)
+I don’t have a saved callback for Asha, and I don’t have her phone number. (A listener calls back within 4 hours during opening hours; requests after 21:00 are called back next morning from 10:00.
+
+Sources:
+— 1-saathi-youth-helpline
+— What we learned, Services and prices, 1 saathi youth helpline pdf page 1

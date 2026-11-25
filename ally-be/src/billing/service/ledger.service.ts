@@ -1076,6 +1076,31 @@ export class LedgerService implements UsageEventListener, OnModuleInit {
     return result;
   }
 
+  /**
+   * Going live (TF1 S2): customer replies are paid only from a chatbot's budget, so an assistant
+   * that goes live with none answers nobody. When it has no open budget, set aside the starting
+   * budget (as the cutover does) from the free balance, or whatever is free if that's less. Never
+   * touches a budget the owner set, even one at $0 on purpose; nothing happens with credits off.
+   * Returns what is set aside afterwards and whether this added it.
+   */
+  async ensureStartingBudget(
+    chatbotId: string,
+    actor: number | null,
+  ): Promise<{ setAsideUsd: number; added: boolean } | null> {
+    if (!(await this.switches()).enforcement) return null;
+    const existing = await this.openBudget(chatbotId);
+    if (existing) return { setAsideUsd: usd(existing.setAside), added: false };
+    const accountId = await this.builderPayer({ chatbotId });
+    if (!accountId) return { setAsideUsd: 0, added: false };
+    const amount = Math.min(
+      CREDITS.STARTING_BUDGET_MICROS,
+      await this.freeBalanceOf(accountId),
+    );
+    if (amount <= 0) return { setAsideUsd: 0, added: false };
+    const set = await this.setBudget(chatbotId, usd(amount), actor);
+    return { setAsideUsd: usd(set.setAsideMicros), added: true };
+  }
+
   /** Add to a chatbot's budget from the free balance. */
   async topUpBudget(
     chatbotId: string,

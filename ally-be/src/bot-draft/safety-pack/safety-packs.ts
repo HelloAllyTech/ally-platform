@@ -636,6 +636,90 @@ const INDIA_EMERGENCY_FIRST: Record<
   },
 };
 
+/**
+ * TF1 F19: what kind of emergency a message describes, so the first line fits it. A flood, a fire
+ * or someone trapped needs a rescue (112), not "the nearest emergency department"; someone who has
+ * collapsed or isn't breathing needs an ambulance and someone with them. Null: the medical line.
+ */
+export type EmergencyKind = 'flood' | 'rescue' | 'collapse';
+
+const RESCUE =
+  /\b(?:flood(?:ed|ing|s)?|stuck on (?:the |our |a )?roof|trapped|water (?:is )?(?:rising|coming in)|house is (?:flooding|on fire)|building (?:is )?(?:on fire|collapsed|collapsing)|on fire|fire (?:in|at) (?:the|our|my)|baadh|baarh|phans? gaye|phans?e (?:hue|hain)|chhat par)\b|बाढ़|फँस|फंस|छत पर|आग लग/iu;
+/** TF1 F19 (approved 25 Nov): a flood or rising water keeps "the safest, highest place". */
+const FLOOD =
+  /\b(?:flood(?:ed|ing|s)?|water (?:is )?(?:rising|coming in)|house is flooding|stuck on (?:the |our |a )?roof|baadh|baarh|paani (?:badh|bhar|aa gaya|ghus))\b|बाढ़|पानी (?:बढ़|भर|आ गया|घुस)/iu;
+const COLLAPSE =
+  /\b(?:collapsed|fainted|passed out|unconscious|not breathing|isn'?t breathing|stopped breathing|not responding|unresponsive|behosh|hosh nahi(?:n)?|saa?ns? nahi)\b|बेहोश|होश नहीं|साँस नहीं|सांस नहीं/iu;
+
+export function emergencyKindOf(
+  text: string | null | undefined,
+): EmergencyKind | null {
+  const t = text ?? '';
+  if (FLOOD.test(t)) return 'flood';
+  if (RESCUE.test(t)) return 'rescue';
+  if (COLLAPSE.test(t)) return 'collapse';
+  return null;
+}
+
+// COPY: needs approval (TF1 F19). The first line for a rescue or a collapse.
+const KIND_FIRST: Record<
+  'india' | 'elsewhere',
+  Record<CrisisLanguage, Record<EmergencyKind, string>>
+> = {
+  india: {
+    en: {
+      rescue:
+        'This sounds like an emergency. Call 112 now and ask for rescue. Get to the safest place you can and stay there until help reaches you.',
+      flood:
+        'This sounds like an emergency. Call 112 now and ask for rescue. Move to the safest, highest place you can and stay there until help reaches you.',
+      collapse:
+        'This sounds like an emergency. Call 112 or 108 now for an ambulance, and stay with them. The person on the call will tell you what to do until help arrives.',
+    },
+    hi: {
+      rescue:
+        'यह आपात स्थिति लगती है। अभी 112 पर कॉल करें और बचाव के लिए कहें। जितनी सुरक्षित जगह हो सके वहाँ जाएँ, और मदद पहुँचने तक वहीं रहें।',
+      flood:
+        'यह आपात स्थिति लगती है। अभी 112 पर कॉल करें और बचाव के लिए कहें। जितनी सुरक्षित और ऊँची जगह हो सके वहाँ जाएँ, और मदद पहुँचने तक वहीं रहें।',
+      collapse:
+        'यह आपात स्थिति लगती है। एम्बुलेंस के लिए अभी 112 या 108 पर कॉल करें, और उनके पास रहें। कॉल पर मौजूद व्यक्ति बताएगा कि मदद आने तक क्या करना है।',
+    },
+    'hi-latn': {
+      rescue:
+        'Yeh emergency lagti hai. Abhi 112 par call karein aur rescue ke liye kahein. Jitni surakshit jagah ho sake wahan jaayein, aur madad pahunchne tak wahin rahein.',
+      flood:
+        'Yeh emergency lagti hai. Abhi 112 par call karein aur rescue ke liye kahein. Jitni surakshit aur oonchi jagah ho sake wahan jaayein, aur madad pahunchne tak wahin rahein.',
+      collapse:
+        'Yeh emergency lagti hai. Ambulance ke liye abhi 112 ya 108 par call karein, aur unke paas rahein. Call par maujood vyakti batayega ki madad aane tak kya karna hai.',
+    },
+  },
+  elsewhere: {
+    en: {
+      rescue:
+        'This sounds like an emergency. Call your local emergency number now and ask for rescue. Get to the safest place you can and stay there until help reaches you.',
+      flood:
+        'This sounds like an emergency. Call your local emergency number now and ask for rescue. Move to the safest, highest place you can and stay there until help reaches you.',
+      collapse:
+        'This sounds like an emergency. Call your local emergency number now for an ambulance, and stay with them. The person on the call will tell you what to do until help arrives.',
+    },
+    hi: {
+      rescue:
+        'यह आपात स्थिति लगती है। अभी अपने स्थानीय आपातकालीन नंबर पर कॉल करें और बचाव के लिए कहें। जितनी सुरक्षित जगह हो सके वहाँ जाएँ, और मदद पहुँचने तक वहीं रहें।',
+      flood:
+        'यह आपात स्थिति लगती है। अभी अपने स्थानीय आपातकालीन नंबर पर कॉल करें और बचाव के लिए कहें। जितनी सुरक्षित और ऊँची जगह हो सके वहाँ जाएँ, और मदद पहुँचने तक वहीं रहें।',
+      collapse:
+        'यह आपात स्थिति लगती है। एम्बुलेंस के लिए अभी अपने स्थानीय आपातकालीन नंबर पर कॉल करें, और उनके पास रहें। कॉल पर मौजूद व्यक्ति बताएगा कि मदद आने तक क्या करना है।',
+    },
+    'hi-latn': {
+      rescue:
+        'Yeh emergency lagti hai. Abhi apne local emergency number par call karein aur rescue ke liye kahein. Jitni surakshit jagah ho sake wahan jaayein, aur madad pahunchne tak wahin rahein.',
+      flood:
+        'Yeh emergency lagti hai. Abhi apne local emergency number par call karein aur rescue ke liye kahein. Jitni surakshit aur oonchi jagah ho sake wahan jaayein, aur madad pahunchne tak wahin rahein.',
+      collapse:
+        'Yeh emergency lagti hai. Ambulance ke liye abhi apne local emergency number par call karein, aur unke paas rahein. Call par maujood vyakti batayega ki madad aane tak kya karna hai.',
+    },
+  },
+};
+
 export function emergencyReply(options: {
   language?: CrisisLanguage | string | null;
   organisation?: string | null;
@@ -648,14 +732,22 @@ export function emergencyReply(options: {
   helplineNumbers?: string | null;
   /** The assistant is in India (`isIndiaAssistant`): "call 112", and India's crisis lines. */
   india?: boolean;
+  /** TF1 F19: a rescue or a collapse gets its own first line. */
+  kind?: EmergencyKind | null;
 }): string {
   const language = curated(options.language);
   const texts = EMERGENCY_TEXTS[language];
   const first = options.india ? INDIA_EMERGENCY_FIRST[language] : texts;
   const organisation = (options.organisation ?? '').trim();
   const number = (options.emergencyNumber ?? '').trim();
+  const kindLine =
+    options.kind && !options.animal
+      ? KIND_FIRST[options.india ? 'india' : 'elsewhere'][language][
+          options.kind
+        ]
+      : null;
   return [
-    options.animal ? first.animal : first.base,
+    kindLine ?? (options.animal ? first.animal : first.base),
     organisation && number ? texts.business(organisation, number) : '',
     options.selfHarm
       ? ` ${fixedCrisisInformation(options.helplineNumbers ?? null, language, options.india)}`

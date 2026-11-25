@@ -112,7 +112,9 @@ export class TemplateController {
     return this.templates.catalogue();
   }
 
-  @Post('bot-drafts/:id/template')
+  // TF1: its own path. It shared `bot-drafts/:id/template` with the library templates (Create's
+  // older starting points), whose route is registered first, so this one was never reached.
+  @Post('bot-drafts/:id/use-case')
   @AssistantScope('service')
   @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
   @ApiOperation({

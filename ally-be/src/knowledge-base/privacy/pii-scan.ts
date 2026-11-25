@@ -20,6 +20,23 @@ export interface PiiFinding {
 export interface PiiScanResult {
   findings: PiiFinding[];
   total: number;
+  /** TF1 F4: how many different phone numbers and email addresses were found. */
+  distinctContacts: number;
+}
+
+/**
+ * TF1 F4: an organisation's own document (a brochure, a handbook) lists its front desk, a
+ * helpline and an info@ address. Up to this many different phone numbers and emails, with no
+ * identity numbers, read as its published contacts, not as a list of people.
+ */
+export const ORG_CONTACTS_MAX = 4;
+
+/** Whether a scan found only a few contact details: the organisation's own, not held. */
+export function onlyOrganisationContacts(result: PiiScanResult): boolean {
+  return (
+    result.findings.every((f) => f.kind === 'phone' || f.kind === 'email') &&
+    result.distinctContacts <= ORG_CONTACTS_MAX
+  );
 }
 
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
@@ -99,6 +116,9 @@ export function scanForPii(
     add('phone', d);
   }
   const findings = [...found.values()];
+  const distinctContacts = [...found.keys()].filter(
+    (k) => k.startsWith('phone:') || k.startsWith('email:'),
+  ).length;
   // One finding per kind for the screen, with the total count and the first masked sample.
   const byKind = new Map<PiiKind, PiiFinding>();
   for (const f of findings) {
@@ -110,5 +130,6 @@ export function scanForPii(
   return {
     findings: merged,
     total: merged.reduce((n, f) => n + f.count, 0),
+    distinctContacts,
   };
 }

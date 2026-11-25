@@ -16,6 +16,8 @@ import {
   toListData,
   todayFor,
   toListQuery,
+  withdrawable,
+  withdrawOnlyDefinition,
 } from '../list-tools';
 
 type Field = ListDefinitionView['fields'][number];
@@ -235,6 +237,23 @@ describe('schemas', () => {
   );
   const findSlots = listToolDefinitions(slots, names, dated)[0];
   const findListings = listToolDefinitions(listings, names)[0];
+
+  // TF1 F9: "what did I book?" in a new chat asked for a name instead of looking it up.
+  // TF1 F16: a Hindi question searched English entries with Hindi words and found nothing.
+  it('a text filter says to search with the words the entries are written in', () => {
+    const title = findListings.input_schema.properties.title_contains as {
+      description: string;
+    };
+    expect(title.description).toMatch(/words the entries are written in/);
+  });
+
+  it("a person's list tells the model to look up their own entries first", () => {
+    expect(find.description).toMatch(
+      /only the entries of the person in this chat/,
+    );
+    expect(find.description).toMatch(/never ask for their name or phone/);
+    expect(findListings.description).not.toMatch(/person in this chat/);
+  });
 
   it('gives find filters by field type, with sort, limit and aggregate', () => {
     const p = findSlots.input_schema.properties;
@@ -756,5 +775,91 @@ describe('a find over a day (Q4 B7)', () => {
       toListQuery(slots, { starts_at_from: '2026-11-27T00:00:00Z', limit: 10 })
         .limit,
     ).toBe(10);
+  });
+});
+
+// TF1 B4: a person withdraws their own open request, even while Change is Never.
+describe('withdrawing one’s own request (TF1 B4)', () => {
+  const callbacks = list(
+    'callback_requests',
+    'Callback requests',
+    [
+      field('phone', ListFieldType.PHONE, { agent_write: true }),
+      field('requester', ListFieldType.RELATION, {
+        options: { to: 'contact' },
+        agent_write: true,
+      }),
+      field('reason', ListFieldType.TEXT, { agent_write: true }),
+      field('status', ListFieldType.SELECT, {
+        options: { values: ['requested', 'called', 'closed', 'withdrawn'] },
+      }),
+    ],
+    {
+      agent_write: true,
+      settings: { title_field: 'reason', person_field: 'requester' },
+    },
+  );
+  const never = {
+    abilities: {
+      find_callback_requests: 'do_it',
+      create_callback_requests: 'do_it',
+      update_callback_requests: 'never',
+    },
+  } as never;
+
+  it('offers a change tool that can only withdraw, while Change is Never', () => {
+    const offered = offeredListTools([callbacks], never, { knowsPerson: true });
+    const update = offered.definitions.find(
+      (d) => d.name === 'update_callback_requests',
+    )!;
+    expect(Object.keys(update.input_schema.properties).sort()).toEqual([
+      'id',
+      'status',
+    ]);
+    expect(update.input_schema.properties.status).toMatchObject({
+      enum: expect.arrayContaining(['withdrawn']),
+    });
+    expect(update.description).toMatch(/can't change anything else/);
+  });
+
+  it('a list without "withdrawn" offers no change tool at Never', () => {
+    const plain = list(
+      'donor_enquiries',
+      'Donor enquiries',
+      callbacks.fields.map((f) =>
+        f.key === 'status'
+          ? { ...f, options: { values: ['new', 'answered', 'closed'] } }
+          : f,
+      ),
+      { agent_write: true, settings: callbacks.settings },
+    );
+    const offered = offeredListTools(
+      [plain],
+      {
+        abilities: { update_donor_enquiries: 'never' },
+      } as never,
+      { knowsPerson: true },
+    );
+    expect(offered.definitions.map((d) => d.name)).not.toContain(
+      'update_donor_enquiries',
+    );
+  });
+
+  it('the withdraw-only tool refuses any other change', () => {
+    const def = withdrawOnlyDefinition(callbacks);
+    expect(() =>
+      parseListToolInput(def, { id: 'r-1', status: 'withdrawn' }),
+    ).not.toThrow();
+    expect(() =>
+      parseListToolInput(def, { id: 'r-1', status: 'called' }),
+    ).toThrow();
+    expect(() =>
+      parseListToolInput(def, { id: 'r-1', phone: '+919800000009' }),
+    ).toThrow();
+  });
+
+  it('only a person’s list with a "withdrawn" status is withdrawable', () => {
+    expect(withdrawable(callbacks)).toBe(true);
+    expect(withdrawable({ ...callbacks, settings: {} })).toBe(false);
   });
 });

@@ -313,6 +313,17 @@ export class WhatsAppInboundService {
       const sharedContactId =
         (await this.sharedStore?.contactIdFor(settings, contact, chatbot.id)) ??
         null;
+      // TF1 B5: a WhatsApp contact with no name takes their WhatsApp profile name; a name they give
+      // in the chat (a booking's, or memory's) replaces it later.
+      if (sharedContactId && inbound.profileName?.trim()) {
+        await this.chatbotRepository.manager
+          ?.query(
+            `UPDATE chatbot_contacts SET display_name = $2, "updatedAt" = now()
+              WHERE id = $1 AND (display_name IS NULL OR btrim(display_name) = '')`,
+            [sharedContactId, inbound.profileName.trim().slice(0, 120)],
+          )
+          .catch(() => undefined);
+      }
 
       // ── 5b. Erase in chat and the consent answer (stage 5) ───────────────
       // After STOP/START, and after the free crisis keyword check: a crisis message is never read

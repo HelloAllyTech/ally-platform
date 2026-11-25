@@ -1,0 +1,51 @@
+
+## a2 Create, from your documents
+  chatbot 275dbe9c-5854-43c8-b97e-774ba89a454d, draft 237495cb-c2ad-4e92-aa92-a8a3706f27b5
+  name in working copy: Jalraksha Flood Relief
+  document: needs_review chunks=0
+  404 GET /api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false {"statusCode":404,"timestamp":"2026-11-24T14:33:45.161Z","path":"/api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false","message":"Not Found","error":"Error"}
+  404 GET /api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false {"statusCode":404,"timestamp":"2026-11-24T14:34:02.646Z","path":"/api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false","message":"Not Found","error":"Error"}
+
+## a2 Knowledge review
+  "What it knows": 31 facts with a page citation
+  approved the held source
+  API errors: 404 GET /api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false {"statusCode":404,"timestamp":"2026-11-24T14:39:27.331Z","path":"/api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false","message":"Not Found","error":"Error"}
+
+## a2 Add from a template: Campaigns and urgent updates
+  17 cards; "Campaigns and urgent updates" is #6
+   | Campaigns and urgent updates | What’s changed recently that people should know? | A short title, then what changed, like “Office closed - closed on Friday for the holiday”. | We'll add examples you can replace later. | Who does it affect, and until when? | We'll add examples you can replace later. | Who will keep the updates current? | They can change them any time in Tools → Updates. | We'll add examples you can replace later. | 
+file:///Users/shehbazsayed/Desktop/ally/ally-platform/evals/tf1/scripts/build-case.mjs:26
+  if (!res.ok) throw new Error(`${cmd} ${JSON.stringify(args)}: ${text.split('\n')[0]}`);
+                     ^
+
+Error: fill {"sel":"form textarea","nth":1,"value":"Camp move: families registered at Bahadurpur, until 30 November (tempo).\nDonation drive: donors, until 15 December."}: locator.fill: Timeout 15000ms exceeded.
+
+Node.js v24.22.0
+
+## a2 Lists and abilities
+  Look things up in it: Do it
+  lists: updates
+  pack (live): 
+  memory: (unset)
+
+## a3 Checkup
+  14% · 4 of 6 questions need a fix
+  FAILED: What’s the latest news?
+  FAILED: Can you message me when something changes?
+  FAILED: What happened last year?
+  FAILED: Are you open tomorrow?
+  PASSED: Is the From 22 November the relief camp at Bahadurpur Middle School has moved to Laheriasarai Town Hall, near Laheriasarai railway station. Free tempo from Bahadurpur school gate every 2 hours, 8 am to 6 pm. still on?
+  PASSED: Does this affect me?
+
+## b1 Go live
+  "Before going live |  | ✓ Say who will use it: adults only, or people who may be under 18. | ✓ Add a way for people to reach a person: a phone number, an email or a web page. | ○ Choose what the assistant is for. | ✓ Read and accept the safety terms. | ✓ Run the crisis check. It must pass in at least one language, and every language you turn on must be checked. |  | Crisis check by language |  | English | Passed | Run the crisis check |  | This can't go live yet. Finish the checklist first. | 
+  Go live is disabled in the UI (N18); publishing through POST /v1/bot-drafts/:id/publish
+  publish 201: {"chatbotId":"275dbe9c-5854-43c8-b97e-774ba89a454d","slug":"jalraksha-flood-relief","link":"http://localhost:8081/chat/nxfipx0w","access":"invite"}
+  live row: Jalraksha Flood Relief | live | listed | purpose=answer
+  page: jalraksha-flood-relief nxfipx0w
+
+## b2 Budget and invites
+  budget: 1.00000000000000000000
+  Added 2.
+
+RESULT {"chatbotId":"275dbe9c-5854-43c8-b97e-774ba89a454d","draftId":"237495cb-c2ad-4e92-aa92-a8a3706f27b5","page":"jalraksha-flood-relief nxfipx0w"}

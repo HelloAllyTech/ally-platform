@@ -1,0 +1,120 @@
+# Chunk TF1 notes: one complete pass, then fix in a loop
+
+Branch `test/agents-v2-tf1` from master `2eb64bb88` (crisis fix #376 and BT1 #380 merged). Brief: `chunk-tf1.md`. The issue list, with both rounds' results: `ISSUES-TF1.md`. The new wording, approved on 25 Nov: `TEXTS-TF1.md`.
+
+## Result
+
+One pass on five fictional non-profits (a youth helpline, a disability NGO, an animal shelter, a literacy NGO's volunteer handbook, a flood-relief NGO), each from its own PDF, on a fresh local stack: the owner in the real admin UI, an email person on the real bot page, a phone person on signed WhatsApp webhooks, and a stranger. It found 7 Serious issues, 20 to fix before customers, 14 polish and 6 decisions.
+
+Two rounds of fixes, one issue per commit, each with a test, each re-run on the live stack:
+
+| | Pass (24 Nov) | After round 2 (25 Nov) |
+|---|---|---|
+| Serious | 7 | 0 open |
+| Fix before customers | 20 | 0 open; F7 and F18 moved after launch |
+| Polish (approved four) | 4 | 0 open; P13 needed no code |
+| Decisions | 6 | B1, B2, B4, B5 built; B3 is S5; B6 unchanged |
+| Found in the re-runs | | N1, N2, N3, all fixed |
+
+What still needs a person, not code: the DPDP legal check below; two prompt changes for the ally-ai prompt owner (F8's false refusal, F10's "I've noted…" when memory is turned on by hand); the withdrawal's wording (below).
+
+## Code map
+
+ally-be unless marked web.
+
+| Issue | Where |
+|---|---|
+| S1 go-live checklist | `ally-be/src/chatbot/safety/go-live-gate.service.ts` (`checklist`: the working copy's purpose); web `pages/AssistantHome/sections/Overview.tsx` (a never-live assistant goes to Build; refusals shown) |
+| S2 starting budget | `ally-be/src/billing/service/ledger.service.ts` (`ensureStartingBudget`), called from `ally-be/src/bot-draft/service/bot-draft-publish.service.ts` and `ChatbotService.setStatus`; web `pages/Onboarding/create/GoLive.tsx` |
+| S3 pack survives publish | `ally-be/src/bot-draft/safety-pack/sync-draft-pack.ts`, used by the template install and the Settings pack correction |
+| S4 helpline confirm | web `HelplineConfirm` in `pages/AssistantHome/sections/Safety.tsx`, rendered in `pages/AssistantHome/sections/Settings.tsx`; the template hint in `ally-be/src/chatbot/templates/templates.ts` |
+| S5 Inbox by person | `ally-be/src/chatbot/inbox/inbox.service.ts` (one row per contact, contact labels, other chats, `newerChatId`); web `pages/Inbox/Inbox.tsx`, `pages/Inbox/ChatView.tsx` |
+| S6 templates in Create | web `pages/Onboarding/create/StartPanel.tsx`, `BuildScreen.tsx`; the route `POST bot-drafts/:id/use-case` in `ally-be/src/bot-draft/templates/template.controller.ts` (N2) |
+| S7 safeguarding | `ally-be/src/chatbot/engine/safeguarding.ts`; the engine's `fixedReply` in `ally-be/src/chatbot/engine/chatbot-engine.service.ts` |
+| F1, F9, F16 list tools | `ally-be/src/chatbot/agent-tools/list-tools.service.ts` (`fillFromIntake`, `withoutOtherScriptText`), `ally-be/src/chatbot/agent-tools/list-tools.ts` (tool descriptions) |
+| F2 typed yes | `ActionsService.typedYes` in `ally-be/src/chatbot/actions/actions.service.ts` |
+| F4 held PDFs | `ally-be/src/knowledge-base/privacy/pii-scan.ts`, `knowledge-review.service.ts`; web `pages/Onboarding/create/Sources.tsx` |
+| F5, F12, N3 names | `ally-be/src/chatbot/service/chatbot.service.ts` (list names), `ally-be/src/bot-draft/service/bot-draft.service.ts` (`save`), `ally-be/src/bot-draft/name-placeholders.ts`; web `pages/BuilderHome/BuilderHome.tsx` |
+| F6 examples | `ally-be/src/chatbot/lists/list-records.service.ts` (`query`, agent only) |
+| F8 change by chat | `ally-be/src/bot-draft/home/change.service.ts` |
+| F11 paused page | web `botPage/BotPageApp.tsx`, `botPage/screens/ErrorState.tsx` |
+| F13 checkup label | web `summaryHeading` in `pages/AssistantHome/sections/Checkup.tsx` |
+| F17, B2 access lines | web `botPage/copy/en.ts`, `hi.ts`, `pages/AssistantHome/sections/WhoMayChat.tsx`; Go live's access in `GoLive.tsx` |
+| F19 emergency wording | `emergencyKindOf` and `KIND_FIRST` in `ally-be/src/bot-draft/safety-pack/safety-packs.ts`; `EMERGENCY_HOLDING_COPY` in `ally-be/src/chatbot/safety/crisis-copy.ts` |
+| F20 done card after a tap | `confirmedWrite` in `ally-be/src/chatbot/bot-page/live-steps.ts` |
+| P1, P2 citations | `ally-be/src/whatsapp/util/reply-composer.ts` |
+| P3 "Reply STOP" | `withoutStopLine` in `ally-be/src/chatbot/safety/chat-notice.ts` |
+| B1 memory notice | `ally-be/src/chatbot/privacy/memory-consent.service.ts`, `memory-consent-copy.ts`; template flags in `templates.ts` |
+| B4 withdraw | `withdrawable`, `withdrawOnlyDefinition` in `list-tools.ts`; `withdrawOnly` in `list-tools.service.ts`; the gateway in `ally-be/src/chatbot/agent-tools/agent-gateway.service.ts`; statuses in `ally-be/src/chatbot/templates/template-lists.ts` and `ally-be/src/chatbot/lists/ready-made-lists.ts` |
+| B5 WhatsApp names | `ally-be/src/whatsapp/provider/meta-whatsapp.provider.ts`, `ally-be/src/whatsapp/service/whatsapp-inbound.service.ts` |
+| N1 consent yes | `askedLast` in `memory-consent.service.ts`, used by `ally-be/src/chatbot/privacy/chat-privacy.service.ts` |
+
+All new customer-facing text: web `pages/AssistantHome/copy/tf1.ts`, and the lines listed in `TEXTS-TF1.md`.
+
+## Decisions
+
+- **The checklist reads the working copy; the status switch reads the live row.** Go live publishes the working copy, so its checklist must too. Overview's "Turn on" on a never-published assistant goes to Build instead of trying a status change that can't make a page.
+- **A starting budget, not a new checklist item.** $2 (the cutover's own starting budget), or what's free if less; a budget the owner set, even $0, is never touched.
+- **A template's helpline number still waits for the owner's confirm (Q4 G7)**; the confirm moved to where owners look.
+- **Safeguarding is decided by the message, not the crisis check's `self_harm` flag**, which fires on harm to someone else. The fixed reply still wins when the person speaks of harming themselves, or for a medical emergency. The crisis alert still goes out.
+- **An organisation's PDF with up to 4 phone numbers or emails, and no identity numbers or private names, is its published contacts.** Crawled pages keep the old rule.
+- **Example entries are hidden from the assistant only**; the owner still sees them to replace.
+- **A typed yes confirms the card just shown** only when the last message carried its question; anything else goes to the agent.
+- **"kya aap therapy dete ho?" after a crisis message still gets the crisis reply.** The check reads earlier messages on purpose (chunk 15a); safety is not relaxed.
+- **B4 is new installs only.** Existing lists keep their statuses; an owner can re-add a list from its template.
+
+## Memory: the DPDP legal check (before outside users)
+
+B1 turns memory on by default for Services, Donors and volunteers, and Staff onboarding, and replaces the YES/NO consent question with a one-line notice for adult audiences ("… Say 'forget me' any time."). Memory starts when the notice is shown; "forget me" erases at any time. Young or unstated audiences are still asked YES or NO.
+
+This is notice and opt-out, not opt-in consent. **Before outside users, it needs a legal check against India's DPDP Act**, in particular:
+
+- whether a notice with opt-out is valid consent for these purposes, or whether "legitimate use" covers it;
+- the notice's required content (what is kept, why, how long, how to withdraw, whom to complain to) and its languages;
+- children's data: the young-people path still asks, but an "adults" setting is the owner's word, not verified;
+- retention limits for memory lines, and erasure on request across both stores.
+
+Until then, internal launch only. Turning it back to the question is one setting per template (`memory_notice`), and the code path is kept.
+
+## How to test
+
+- **Unit:** each fix's spec sits beside its code (search the spec files for "TF1"). ally-be: `npm test -- --forceExit`. ally-web: `npm run test:admin`.
+- **Postgres specs** (template install, inbox): `CHATBOT_STORE_TEST_DB=postgres://…/ally_tf1_test npx jest src/bot-draft/templates src/chatbot/inbox`, with a scratch database made from the current schema (CHUNK-12-NOTES has the recipe).
+- **Live:** the scripts in `evals/tf1/scripts/` (a browser driver, a WhatsApp webhook signer, case builders). The re-run steps and what they showed are in `ISSUES-TF1.md`; screenshots in `evals/tf1/screenshots/` (`r1-*`).
+
+## Results of the suites (25 Nov)
+
+- **ally-be:** typecheck clean; ESLint clean on the files this branch changed; full jest 20,138 passed, 1 failed (an auth rate-limit spec that passes alone; nothing here touches it).
+- **ally-web admin:** typecheck clean; ESLint clean on changed files; every test this branch touched passes; the round-1 timeouts were machine load, and those files pass on a re-run. AnalyticsAgentTab passes on master and on this branch.
+- **Known failures, not from this branch:** two inbox Postgres specs (null scope; same on master); the templates drift check inside the container (ally-web isn't mounted there; passes on the host).
+
+## Open questions
+
+1. **Withdrawal wording.** It reads "Shall I cancel your evening on +919800000001?" and "Done: +919800000001 is cancelled." (the list's existing cancel lines). Proposed: "Shall I withdraw your callback request?" / "Done: your callback request is withdrawn." New wording: yours to approve.
+2. **Existing request lists** don't get "withdrawn" (B4 is new installs only). Backfill them, or leave owners to re-add?
+3. **Prompts (ally-ai)**: F8's false refusal in change by chat; F10's "I've noted…" before the consent question when memory is turned on by hand.
+4. **Weaviate** was killed for memory once during the full suites on a dev laptop; worth a memory limit note in the local stack docs.
+
+## After launch (moved on 25 Nov)
+
+| # | What |
+|---|---|
+| F7 | One setup answer copied onto every entry (documents on every service; the 80G line on in-kind gifts) |
+| F18 | Settings → Safety empty after a template install until a reload |
+| P4 | PDF facts listed under "From your website" |
+| P5 | "Memory has moved to Tools" while Tools has no memory; "Turn it on in Tools" opens Settings |
+| P6 | History shows a raw "safetyPack" key |
+| P7 | Checkup: a raw "{s} s to answer" line; a whole update embedded in a question |
+| P8 | Credits chart labels are raw keys |
+| P9 | Every owner page logs 403 on `/users/me/preferences`; a React error once on "People who may be under 18" |
+| P10 | No greeting on the bot page; generic suggested questions |
+| P11 | Phone not normalised; awkward confirm lines; no chips for set choices |
+| P12 | A spurious 409 when adding a pre-chat question |
+| P14 | Template questions not pre-filled from the uploaded PDF; an unexplained empty "Callback requests" list |
+| New | Withdrawal wording (open question 1) |
+
+## Local setup notes
+
+- `ally_tf1` is a schema-only copy of `ally_local` plus the migration-seeded rows; migrations can't run from an empty database (`1700000000000` needs `scenarios`). `ally_local` was never touched.
+- ally-be ran as build then `node dist/main` with a compose override (`DB_DATABASE=ally_tf1`, dummy SES, a local WhatsApp app secret, no send token). Sign-in codes came from the log; WhatsApp replies were read from `wa_messages`.
+- The pre-commit hook was off (`HUSKY=0`), as asked; lint and the suites ran at the end of each round.

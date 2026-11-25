@@ -26,6 +26,7 @@ import {
 } from "./notifications";
 import { useInboxStream } from "./useInboxStream";
 import { chatbotAccess } from "../AssistantHome/access";
+import { TF1_COPY } from "../AssistantHome/copy/tf1";
 import { useReadOnly } from "../AssistantHome/readOnly";
 
 import "../../components/v2/v2.css";
@@ -253,13 +254,22 @@ export const Inbox: React.FC<{ chatbotId?: string; onForbidden?: () => void }> =
                 </span>
                 <span className="ally-small ally-inbox__preview">{item.preview}</span>
                 <span className="ally-inbox__tags">
+                  {(item.chats ?? 1) > 1 && (
+                    <span className="ally-badge" data-testid="inbox-chats">
+                      {fill(TF1_COPY.inbox.chats, { n: item.chats ?? 1 })}
+                    </span>
+                  )}
                   {item.safety && (
                     <span className="ally-badge ally-inbox__safety">{INBOX.safety}</span>
                   )}
                   {item.state === "needs_person" && (
                     <span className="ally-badge ally-inbox__needs">
                       {INBOX.needsPerson}
-                      {item.needsPersonReason ? ` · ${INBOX.reasons[item.needsPersonReason]}` : ""}
+                      {item.needsPersonReason === "crisis"
+                        ? ` · ${TF1_COPY.inbox.crisisReason}`
+                        : item.needsPersonReason && INBOX.reasons[item.needsPersonReason]
+                          ? ` · ${INBOX.reasons[item.needsPersonReason]}`
+                          : ""}
                     </span>
                   )}
                   {item.state === "held" && (

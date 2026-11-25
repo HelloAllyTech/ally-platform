@@ -202,4 +202,42 @@ describe('CheckupService.scheduleAfterChange', () => {
     jest.advanceTimersByTime(10 * 60_000);
     expect(start).not.toHaveBeenCalled();
   });
+
+  // TF1 F8: before go-live the greeting is in the working copy; the preview said "—" and Apply
+  // wrote only the live row, so the change was lost at Go live.
+  it('reads and writes the working copy the owner sees and publishes', async () => {
+    const h = build({ introduction: '' });
+    (h.draft as Record<string, unknown>).draftConfig = {
+      introduction: "Hi, I'm the assistant for Saathi.",
+      tone: 'warm',
+    };
+    h.ai.proposeChange.mockResolvedValue({
+      reply: 'ok',
+      refused: false,
+      changes: [],
+    });
+    await h.service.propose('bot', 'say calls are free');
+    expect(h.ai.proposeChange.mock.calls[0][0].current.introduction).toBe(
+      "Hi, I'm the assistant for Saathi.",
+    );
+
+    await h.service.apply('bot', [
+      {
+        field: 'introduction',
+        before: "Hi, I'm the assistant for Saathi.",
+        after: "Hi, I'm the assistant for Saathi. Calls are free.",
+      },
+    ]);
+    expect(
+      (
+        (h.draft as Record<string, unknown>).draftConfig as Record<
+          string,
+          unknown
+        >
+      ).introduction,
+    ).toBe("Hi, I'm the assistant for Saathi. Calls are free.");
+    expect(h.state.introduction).toBe(
+      "Hi, I'm the assistant for Saathi. Calls are free.",
+    );
+  });
 });

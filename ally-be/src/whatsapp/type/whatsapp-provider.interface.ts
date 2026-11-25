@@ -2,6 +2,8 @@ import { Request } from 'express';
 
 /** One inbound message, normalised across providers. */
 export interface InboundWhatsAppMessage {
+  /** TF1 B5: the sender's WhatsApp profile name (Meta's `contacts[].profile.name`), when sent. */
+  profileName?: string;
   /** The provider's message id. The dedupe key — see WaMessage. */
   providerMessageId: string;
   /** Sender in E.164, without the leading '+'. Normalised by the provider adapter. */

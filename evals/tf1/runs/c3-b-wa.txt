@@ -1,0 +1,28 @@
+>>> Hi, I want to adopt a puppy. What's the process? Main Bangalore mein rehti hoon
+--- queued (rag)
+Warm welcome — that’s great you want to adopt! Here’s the process: 1) Send an adoption enquiry; 2) the team does a home visit; 3) then a meet-and-greet at the shelter. Adopters must be 21 or older and, if renting, have the landlord’s permission. We only rehome animals within Bengaluru. Adoption itself is free, though we ask a ₹500 contribution towards vaccination. (All from our notes.
+
+If you want to start, you can contact the shelter directly — their phone is listed for enquiries (9:00–18:00). Would you like that phone number now so you can call them?
+
+Sources:
+— What we learned, Policies, 3 pawsome animal shelter pdf page 1
+— What we learned, Services and prices, 3 pawsome animal shelter pdf page 1
+— What we learned, Key facts
+
+You are chatting with an AI assistant. The AI and people at Pawsome Animal Shelter may read this chat.
+This is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.
+>>> I'd also like to sign up as a volunteer. My name is Meena, my number is +91 98000 00003
+--- queued (clarified)
+Shall I register Meena for +919800000003?
+
+*Meena*
+Phone: +919800000003
+Status: new
+>>> haan
+Ho gaya — aapka volunteer sign-up bana diya gaya: Meena, +919800000003, status: new.
+
+Kya main aapko kisi shift ke liye sign up kar doon? Options: Saturday morning 8:00–11:00 (dog walking & kennel cleaning), Saturday afternoon 15:00–18:00 (socialising puppies & cats), or Sunday morning 8:00–11:00 (dog walking & bathing).
+
+Sources:
+— Volunteer sign-ups, Meena
+— What we learned, Key facts

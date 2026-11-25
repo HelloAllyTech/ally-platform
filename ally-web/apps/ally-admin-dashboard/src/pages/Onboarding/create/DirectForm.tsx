@@ -58,6 +58,8 @@ export const DirectForm: React.FC<{
   addFiles: (files: File[]) => Promise<unknown>;
   /** Show the go-live section (the create screen; a live chatbot's Build keeps it off). */
   goLive: boolean;
+  /** TF1 B2: the working copy's access (Staff onboarding sets organisation-only). */
+  accessMode?: "public" | "organisation" | "invite";
 }> = ({
   copy,
   draftId,
@@ -68,6 +70,7 @@ export const DirectForm: React.FC<{
   addAddress,
   addFiles,
   goLive,
+  accessMode,
 }) => {
   const credits = copy.creditsOut;
   const common = (name: string): Omit<FieldCommon, "label"> => {
@@ -176,6 +179,7 @@ export const DirectForm: React.FC<{
             onLive={() => void copy.refresh()}
             onCreditsOut={copy.markCreditsOut}
             field={common}
+            accessMode={accessMode}
           />
         </Section>
       )}

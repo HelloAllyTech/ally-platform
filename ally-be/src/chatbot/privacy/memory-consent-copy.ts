@@ -28,6 +28,27 @@ const YOUNG: Record<ReplyLanguage, string> = {
     'Kya yeh theek hai agar main aapki batayi kuch baatein yaad rakhoon, taaki agli baar behtar madad kar sakoon? Aap mana kar sakte hain, aur kabhi bhi bhoolne ke liye keh sakte hain. HAAN ya NAHIN likhein.',
 };
 
+/** TF1 B1: a template's notice instead of the question (adults only). */
+export const NOTICE_WORDING_VERSION = 'memory-notice-v1';
+
+// COPY: needs approval (TF1 B1). The notice in Hindi and Hinglish; English is the template's own.
+const NOTICE_OTHER: Record<Exclude<ReplyLanguage, 'en'>, string> = {
+  hi: 'मैं आपका नाम और आपकी बताई ज़रूरी बातें याद रख सकता हूँ, ताकि आपको दोबारा न बताना पड़े। कभी भी ‘मुझे भूल जाओ’ लिखें।',
+  'hi-latn':
+    'Main aapka naam aur aapki batayi zaroori baatein yaad rakh sakta hoon, taaki aapko dobara na batana pade. Kabhi bhi ‘mujhe bhool jao’ likhein.',
+};
+
+/** The notice in the person's language: the template's English line, else the fixed Hindi one. */
+export function noticeWording(
+  notice: string,
+  language: ReplyLanguage,
+): { text: string; version: string } {
+  return {
+    text: language === 'en' ? notice : NOTICE_OTHER[language],
+    version: NOTICE_WORDING_VERSION,
+  };
+}
+
 export function consentWording(
   audienceAge: AudienceAge | null | undefined,
   language: ReplyLanguage,

@@ -1251,7 +1251,8 @@ export const ApiEndpoints = {
   },
   BOT_DRAFTS: {
     LIST: "/v1/bot-drafts",
-    TEMPLATE: (id: string) => `/v1/bot-drafts/${id}/template`,
+    /** T1's use-case templates, applied whole during setup (TF1: its own path). */
+    TEMPLATE: (id: string) => `/v1/bot-drafts/${id}/use-case`,
     CURRENT: "/v1/bot-drafts/current",
     BY_ID: (id: string) => `/v1/bot-drafts/${id}`,
     EVENTS: (id: string) => `/v1/bot-drafts/${id}/events`,

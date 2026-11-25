@@ -23,6 +23,8 @@ export const BrandPreview: React.FC<{
   suggestedQuestions?: string[];
   disclaimer?: string;
   statusLine?: string;
+  /** TF1: the page's real access, so the preview's cover line matches the page. */
+  access?: "public" | "organisation" | "invite";
 }> = ({
   name,
   brand,
@@ -33,12 +35,13 @@ export const BrandPreview: React.FC<{
   suggestedQuestions = [],
   disclaimer = "",
   statusLine,
+  access = "invite",
 }) => {
   const page = useMemo<PublicBotPage>(() => {
     const accent = readableAccent(brand.accent ?? DEFAULT_ACCENT);
     return {
       slug: "preview",
-      access: "invite",
+      access,
       branding: {
         logoUrl: logoSrc,
         accentColour: accent,

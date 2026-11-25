@@ -16,9 +16,11 @@ import { ChatbotStatus } from "@types";
 import { AllNumbers } from "./AllNumbers";
 import { HowItsDoing } from "./HowItsDoing";
 import { Scorecard } from "./Scorecard";
+import { messageOf } from "../../Onboarding/create/logic";
 import { TemplateOriginLine } from "../../Templates/TemplateOriginLine";
 import { fill, HOME } from "../copy";
 import { LIVE_ACCESS_COPY as la, OVERVIEW_COPY as o } from "../copy/overview";
+import { TF1_COPY } from "../copy/tf1";
 import { Group, SectionHead } from "../fields";
 
 import type { SectionProps } from "./props";
@@ -44,6 +46,29 @@ export const OverviewSection: React.FC<
   const [allNumbers, setAllNumbers] = useState(openAllNumbers && isStaff);
   const navigate = useNavigate();
   const live = bot.status === ChatbotStatus.LIVE;
+  // Never published: going live is Build's checklist and Go live (TF1 S1), not the status switch.
+  const neverLive = bot.status === ChatbotStatus.DRAFT;
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const toggle = async () => {
+    if (neverLive) {
+      go("build", "personality");
+      return;
+    }
+    setStatusError(null);
+    try {
+      await setStatus({
+        id: bot.id,
+        status: live ? ChatbotStatus.PAUSED : ChatbotStatus.LIVE,
+      }).unwrap();
+    } catch (error) {
+      const reason = messageOf(error);
+      setStatusError(
+        reason
+          ? fill(TF1_COPY.overview.turnOnFailed, { reason })
+          : TF1_COPY.overview.turnOnFailedNoReason,
+      );
+    }
+  };
   // The one access list decides who can chat, so the live line says so (nobody listed = nobody).
   const access = useGetAccessListQuery(bot.id, { skip: !live });
   const nobody = live && access.data !== undefined && access.data.length === 0;
@@ -77,17 +102,17 @@ export const OverviewSection: React.FC<
               variant={live ? ButtonVariant.TERTIARY : ButtonVariant.PRIMARY}
               type="button"
               disabled={statusState.isLoading}
-              onClick={() =>
-                void setStatus({
-                  id: bot.id,
-                  status: live ? ChatbotStatus.PAUSED : ChatbotStatus.LIVE,
-                })
-              }
+              onClick={() => void toggle()}
             >
-              {live ? t.pause : t.turnOn}
+              {live ? t.pause : neverLive ? TF1_COPY.overview.finishToGoLive : t.turnOn}
             </Button>
           )}
         </div>
+        {statusError && (
+          <p className="ally-small" role="alert">
+            {statusError}
+          </p>
+        )}
         <TemplateOriginLine
           botId={bot.id}
           onReplace={key =>

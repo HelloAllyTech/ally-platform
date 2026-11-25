@@ -18,11 +18,25 @@ export const NAME_PATHS = new Set([
   '/branding/title',
 ]);
 
-/** `value` unless it is empty or a placeholder, else `fallback`. */
+/**
+ * TF1: a new draft's default name. Not a placeholder (it may be what's shown before anything is
+ * named), but never chosen over a real name: the page said "people at Your assistant" while the
+ * owner had named it.
+ */
+const DEFAULT_NAME = /^your assistant$/i;
+
+/** `value` unless it is empty, a placeholder or the default name (when the fallback is real). */
 export function realName(
   value: string | null | undefined,
   fallback: string,
 ): string {
   const v = (value ?? '').trim();
-  return v && !isPlaceholder(v) ? v : fallback;
+  if (!v || isPlaceholder(v)) return fallback;
+  if (
+    DEFAULT_NAME.test(v) &&
+    fallback.trim() &&
+    !DEFAULT_NAME.test(fallback.trim())
+  )
+    return fallback;
+  return v;
 }

@@ -1,0 +1,22 @@
+"You:
+What's my name, and what did I apply for?
+
+Sahyog Disability Services:
+Your name is Ravi Kumar Sharma, and you applied for “Aids and appliances” with preferred centre Malviya Nagar. The application status is received.
+
+You are chatting with an AI assistant. The AI and people at Sahyog Disability Services may read this chat.
+This is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.
+
+Applications
+-----
+"You:
+Has my application been seen yet?
+
+Sahyog Disability Services:
+I can’t see whether a caseworker has already looked at your specific file from here. Our process is that a caseworker calls you within 3 working days after you start an application to fix an appointment. Would you like me to ask the team to call you about this?
+What do you do?
+What do you offer, and what does it cost?
+What are your opening hours?
+
+Sources
+-----

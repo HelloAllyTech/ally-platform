@@ -27,6 +27,30 @@ import type { SectionProps } from "./props";
 
 const t = COPY.checkup;
 const c = HOME.checkupControls;
+
+/**
+ * The checkup's one-line verdict. TF1 F13: a failed answer is never "Ready" (45% accurate read
+ * "Ready for clients"); only gaps (questions its information doesn't cover yet) can be ready.
+ */
+export const summaryHeading = (
+  view: {
+    gate?: { ready: boolean; needFix: number; questions: number } | null;
+    totals: { failed: number; hardFails: number; gaps: number; questions: number };
+  },
+  clients: string,
+): string =>
+  view.gate && !view.gate.ready
+    ? fill(c.summaryNeedFix, { n: view.gate.needFix, total: view.gate.questions })
+    : view.totals.failed > 0 || view.totals.hardFails > 0
+      ? fill(c.summaryNeedFix, {
+          n: Math.max(view.totals.failed, view.totals.hardFails),
+          total: view.totals.questions,
+        })
+      : view.totals.gaps === 1
+        ? fill(c.summaryGap, { clients })
+        : view.totals.gaps
+          ? fill(t.summaryGaps, { clients, gaps: view.totals.gaps })
+          : fill(t.summaryClear, { clients });
 const POLL_MS = 2000;
 
 /** The decline wording, as a quote inside a sentence: no full stop of its own. */
@@ -240,18 +264,7 @@ export const CheckupSection: React.FC<Pick<SectionProps, "bot" | "canEdit">> = (
               <span>{t.accurate}</span>
             </div>
             <div>
-              <h3 className="ally-heading">
-                {view.gate && !view.gate.ready
-                  ? fill(c.summaryNeedFix, {
-                      n: view.gate.needFix,
-                      total: view.gate.questions,
-                    })
-                  : view.totals.gaps === 1
-                    ? fill(c.summaryGap, { clients })
-                    : view.totals.gaps
-                      ? fill(t.summaryGaps, { clients, gaps: view.totals.gaps })
-                      : fill(t.summaryClear, { clients })}
-              </h3>
+              <h3 className="ally-heading">{summaryHeading(view, clients)}</h3>
               {view.totals.gaps > 0 && (
                 <p className="ally-body">
                   {fill(t.summaryBody, {

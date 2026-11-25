@@ -1,3 +1,5 @@
+import { withoutStopLine } from '../safety/chat-notice';
+import { realName } from '../../bot-draft/name-placeholders';
 import { ActionsService } from '../actions/actions.service';
 import {
   ActionPartsService,
@@ -354,13 +356,17 @@ export class ChatbotService {
       this.countBy(this.audienceRepository, ids),
       this.countBy(this.memberRepository, ids),
       this.stats(ids),
-      this.setupDrafts(ids),
+      this.setupDraftRows(ids),
       this.waitingCounts(ids),
       this.untouchedBlanks(ids),
     ]);
     return bots.map((bot) => ({
       id: bot.id,
-      name: bot.name,
+      // TF1 F5: before go-live the name is in the working copy; the card said "Your assistant".
+      name:
+        bot.status === ChatbotStatus.DRAFT
+          ? realName(setups.get(bot.id)?.name ?? '', bot.name)
+          : bot.name,
       description: bot.description ?? null,
       status: bot.status,
       accessMode: bot.accessMode,
@@ -378,7 +384,7 @@ export class ChatbotService {
       stats: stats.get(bot.id) ?? EMPTY_STATS,
       waitingForPerson: waiting.get(bot.id) ?? 0,
       lastTestedAt: bot.lastTestedAt ?? null,
-      setupDraftId: setups.get(bot.id) ?? null,
+      setupDraftId: setups.get(bot.id)?.id ?? null,
       blank: blanks.has(bot.id),
       archivedAt: bot.archivedAt ?? null,
       createdAt: bot.createdAt,
@@ -423,16 +429,33 @@ export class ChatbotService {
    * one, so the dependency can't run the other way. Only the person setting it up resumes it.
    */
   private async setupDrafts(ids: string[]): Promise<Map<string, string>> {
+    return new Map(
+      [...(await this.setupDraftRows(ids)).entries()].map(([k, v]) => [
+        k,
+        v.id,
+      ]),
+    );
+  }
+
+  /** The caller's open setup per bot: its id and the name typed in its working copy. */
+  private async setupDraftRows(
+    ids: string[],
+  ): Promise<Map<string, { id: string; name: string | null }>> {
     const userId = currentUserId();
     if (!userId) return new Map();
     const rows = await this.chatbotRepository.manager.query<
-      { chatbot_id: string; id: string }[]
+      { chatbot_id: string; id: string; name: string | null }[]
     >(
-      `SELECT chatbot_id, id FROM bot_drafts
+      `SELECT chatbot_id, id, draft_config->>'name' AS name FROM bot_drafts
         WHERE chatbot_id = ANY($1::uuid[]) AND status = 'active' AND owner_user_id = $2`,
       [ids, userId],
     );
-    return new Map((rows ?? []).map((row) => [row.chatbot_id, row.id]));
+    return new Map(
+      (rows ?? []).map((row) => [
+        row.chatbot_id,
+        { id: row.id, name: row.name ?? null },
+      ]),
+    );
   }
 
   /** Stage 3: the bots that are still untouched blanks (created at the click, nothing chosen). */
@@ -636,6 +659,14 @@ export class ChatbotService {
     );
     if (status === ChatbotStatus.LIVE) {
       await this.plans?.ensureIncludedSeats(id).catch(() => undefined);
+      // TF1 S2: without a budget a live assistant answers nobody.
+      await this.ledger
+        ?.ensureStartingBudget(id, currentUserId() || null)
+        .catch((error: unknown) =>
+          this.logger.warn(
+            `Starting budget not set for chatbot ${id}: ${error instanceof Error ? error.message : 'unknown'}`,
+          ),
+        );
     }
     // One switch: live means people can use it, so its page (and website chat) turns on with it.
     // Pausing leaves the page on, where visitors see that it's away rather than a missing page.
@@ -1128,9 +1159,12 @@ export class ChatbotService {
           bodyIsWelcome: decision.isWelcome,
           // Stage 4: the fixed start notice, exactly as a new person receives it.
           notice: startNotice({
-            disclaimer: this.settingsService.renderPlaceholders(
-              settings.disclaimerText ?? '',
-              settings,
+            // TF1 P3: Try it is the web page's chat: no "Reply STOP".
+            disclaimer: withoutStopLine(
+              this.settingsService.renderPlaceholders(
+                settings.disclaimerText ?? '',
+                settings,
+              ),
             ),
             language: replyLanguageOf(dto.message ?? ''),
             organisation: bot.name,

@@ -25,6 +25,7 @@ import {
   type RelatedWords,
 } from './entry-words';
 import {
+  abilityFor,
   bookedForField,
   datedLists,
   listToolDefinitions,
@@ -38,6 +39,8 @@ import {
   type ListToolDefinition,
   type OfferedListTools,
   type RecordPassage,
+  withdrawable,
+  withdrawOnlyDefinition,
 } from './list-tools';
 import type {
   AgentGatewayTool,
@@ -189,15 +192,47 @@ export class ListToolsService {
     const list = lists.find((l) => l.key === parsed.key);
     if (!list) return undefined;
     const names = new Map(lists.map((l) => [l.key, l.name]));
-    const def = listToolDefinitions(list, names, datedLists(lists)).find(
+    let def = listToolDefinitions(list, names, datedLists(lists)).find(
       (d) => d.name === name,
     );
     if (!def) return undefined;
+    // TF1 B4: with Change at Never, a request list's change tool is the withdraw-only one: its
+    // schema takes only the entry and "withdrawn", so nothing else can be changed through it.
+    if (
+      def.kind === 'update' &&
+      withdrawable(list) &&
+      abilityFor(await this.storedSettings(chatbotId), name) !== 'do_it'
+    ) {
+      def = withdrawOnlyDefinition(list);
+    }
     return {
       name,
       parse: (input) => parseListToolInput(def, input),
       run: (ctx, input) => this.run(ctx, def, list, lists, input),
     };
+  }
+
+  /**
+   * TF1 B4: whether this tool is a request list's withdraw-only change, allowed while its Change
+   * is Never. The gateway lets exactly this through; the tool's schema allows nothing else.
+   */
+  async withdrawOnly(chatbotId: string, name: string): Promise<boolean> {
+    const parsed = parseListToolName(name);
+    if (parsed?.kind !== 'update') return false;
+    const list = (await this.definitions.listLists(chatbotId)).find(
+      (l) => l.key === parsed.key,
+    );
+    return Boolean(list && withdrawable(list));
+  }
+
+  private async storedSettings(
+    chatbotId: string,
+  ): Promise<ChatbotSettingsOverride | null> {
+    const [row] = (await this.dataSource.query(
+      `SELECT settings FROM chatbots WHERE id = $1`,
+      [chatbotId],
+    )) as { settings: ChatbotSettingsOverride | null }[];
+    return row?.settings ?? null;
   }
 
   private async run(
@@ -252,6 +287,28 @@ export class ListToolsService {
           );
           if (roomier.total > 0) found = roomier;
         }
+        // TF1 F16: a text filter in another script ("कंबल") against entries written in English
+        // finds nothing; without those filters, the newest entries, for the agent to read.
+        let otherLanguage = false;
+        const latinOnly = withoutOtherScriptText(input);
+        if (found.total === 0 && !found.aggregate && latinOnly) {
+          const wider = await this.freeOnly(
+            ctx.chatbotId,
+            list,
+            await this.records.query(
+              ctx.chatbotId,
+              list.key,
+              actor,
+              toListQuery(list, latinOnly),
+              scope,
+            ),
+            held,
+          );
+          if (wider.total > 0) {
+            found = wider;
+            otherLanguage = true;
+          }
+        }
         // Nothing at the time asked for (chunk 8a): the nearest times there are, so the agent
         // offers them instead of passing the booking to the team.
         // When nothing near then fits the other details either (a party of 5, every table
@@ -293,6 +350,7 @@ export class ListToolsService {
               ? { nearest: loosened ? 'other_details' : true }
               : {}),
             ...(found.aggregate ? { aggregate: found.aggregate } : {}),
+            ...(otherLanguage ? { searched_without_text: true } : {}),
           },
         };
       }
@@ -573,6 +631,17 @@ export class ListToolsService {
     data: Record<string, unknown>,
     personName: unknown,
   ): Promise<void> {
+    // TF1 F1: "my number is this one" on WhatsApp is not a phone number: it counts as empty, and
+    // the number they are messaging from fills it below.
+    for (const f of list.fields) {
+      if (
+        f.type === ListFieldType.PHONE &&
+        typeof data[f.key] === 'string' &&
+        (String(data[f.key]).match(/\d/g) ?? []).length < 7
+      ) {
+        delete data[f.key];
+      }
+    }
     const empty = (key: string) =>
       data[key] === undefined || data[key] === null || data[key] === '';
     const writable = list.fields.filter(
@@ -615,6 +684,25 @@ export class ListToolsService {
             : undefined) ?? answer('name', /name/i);
       }
       if (value?.trim()) data[f.key] = value.trim();
+    }
+    // TF1 F1: on WhatsApp the person's phone is the number they write from: never asked for.
+    const phoneField = writable.find(
+      (f) => f.type === ListFieldType.PHONE && empty(f.key),
+    );
+    if (phoneField && ctx.contactId) {
+      try {
+        const [row] = (await this.dataSource.query(
+          `SELECT external_id FROM chatbot_contact_identities
+            WHERE contact_id = $1 AND channel = 'whatsapp'
+            ORDER BY "createdAt" LIMIT 1`,
+          [ctx.contactId],
+        )) as { external_id: string }[];
+        if (row?.external_id && /^\d{8,15}$/.test(row.external_id)) {
+          data[phoneField.key] = `+${row.external_id}`;
+        }
+      } catch {
+        // Left empty: the assistant asks, as before.
+      }
     }
   }
 
@@ -899,6 +987,25 @@ export function nearestForWindow<T>(
  * A refusal the agent reads: the code (stored as the run's error code), §26's message, and any
  * alternatives as passages of the list they come from.
  */
+/**
+ * TF1 F16: the find input without its text filters written in a non-Latin script (Devanagari and
+ * the like), or null when it has none. Entries are mostly written in English.
+ */
+export function withoutOtherScriptText(
+  input: Record<string, string | number>,
+): Record<string, string | number> | null {
+  const other = Object.entries(input).filter(
+    ([key, value]) =>
+      key.endsWith('_contains') &&
+      typeof value === 'string' &&
+      /[^\u0000-\u024f\s\d\p{P}]/u.test(value),
+  );
+  if (!other.length) return null;
+  const rest = { ...input };
+  for (const [key] of other) delete rest[key];
+  return rest;
+}
+
 /**
  * What the agent is told about a refusal (Q4 B8): plain words, and what to offer instead. Fixed
  * text, in `Q4-PROMPTS.md` for review; the owner-facing wording stays the list's own.

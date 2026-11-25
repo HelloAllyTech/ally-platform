@@ -20,9 +20,11 @@ export interface InboxItem {
   lastMessageAt: string;
   unread: number;
   state: "assistant" | "needs_person" | "held";
-  needsPersonReason: "asked" | "declined_twice" | "assistant" | null;
+  needsPersonReason: "asked" | "declined_twice" | "assistant" | "crisis" | null;
   heldBy: { id: number; name: string | null } | null;
   safety: boolean;
+  /** TF1 S5: one row per person; how many chats they have with this assistant. */
+  chats?: number;
 }
 
 export interface InboxMessage {
@@ -44,6 +46,10 @@ export interface InboxThread extends InboxItem {
   /** WhatsApp only: the team can reply until then. */
   replyWindowClosesAt: string | null;
   messages: InboxMessage[];
+  /** TF1 S5: the person's other chats here, newest first. */
+  otherChats?: { id: string; channel: InboxChannel; lastMessageAt: string; preview: string }[];
+  /** TF1 S5: set when they have a newer chat on this channel, where replies reach them. */
+  newerChatId?: string | null;
 }
 
 /** One thing the assistant remembers about a person (chunk 8a). */

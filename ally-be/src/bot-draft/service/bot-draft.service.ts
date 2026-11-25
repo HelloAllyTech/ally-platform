@@ -1,3 +1,4 @@
+import { realName } from '../name-placeholders';
 import {
   BadRequestException,
   ConflictException,
@@ -962,6 +963,24 @@ export class BotDraftService {
       events: [...draft.events, ...newEvents].slice(-MAX_DRAFT_EVENTS),
       version: basedOn + 1,
     };
+    // TF1 N3: the name it uses in chat follows the assistant's name while it is still the default
+    // ("Your assistant" on the card and in chat after the owner had named it). An owner's own chat
+    // name is never touched.
+    const named = String(next.draftConfig?.name ?? '').trim();
+    if (
+      next.draftConfig &&
+      /^your assistant$/i.test(
+        String(next.draftConfig.assistantName ?? '').trim(),
+      ) &&
+      named &&
+      realName(named, '') === named &&
+      !/^your assistant$/i.test(named)
+    ) {
+      next.draftConfig = {
+        ...next.draftConfig,
+        assistantName: named.slice(0, 60),
+      };
+    }
     const result = await this.drafts
       .createQueryBuilder()
       .update(BotDraftEntity)
@@ -1011,6 +1030,27 @@ export class BotDraftService {
         message:
           'Something changed while you were editing. Your view has been refreshed.',
       });
+    }
+    // TF1 F12: before go-live the name typed in setup is the assistant's name everywhere (Try it,
+    // the checkup, the list card): the not-yet-live chatbot row takes it. Never a placeholder, and
+    // never on a live chatbot (its name changes on Apply).
+    const typedName = String(next.draftConfig?.name ?? '').trim();
+    if (
+      next.chatbotId &&
+      typedName &&
+      realName(typedName, '') === typedName &&
+      !/^your assistant$/i.test(typedName)
+    ) {
+      await this.drafts.manager
+        ?.query(
+          `UPDATE chatbots SET name = $2::text,
+                  persona = CASE WHEN COALESCE(persona->>'displayName', '') ~* '^(your assistant)?$'
+                                 THEN jsonb_set(COALESCE(persona, '{}'::jsonb), '{displayName}', to_jsonb(left($2::text, 60)))
+                                 ELSE persona END
+            WHERE id = $1 AND status = 'draft'`,
+          [next.chatbotId, typedName.slice(0, 120)],
+        )
+        .catch(() => undefined);
     }
     // Q3-fast Part 2: once the facts are a document, it follows every save (an unchanged text is
     // a no-op there), so a removed page, a correction or a re-read reaches what the assistant knows.

@@ -1,0 +1,57 @@
+# TF1: new wording, for one approval
+
+Every new line a person or an owner can see, from the TF1 fixes. In code each one is marked
+`// COPY: needs approval`. **Approved on 25 Nov**, with one change in F19 (a fire or someone
+trapped no longer says "highest place"; only a flood does), applied in round 2.
+
+| Issue | Where | Text |
+|---|---|---|
+| S1 | Overview, the one switch, for an assistant that was never live | Finish setup and go live |
+| S1 | Overview, when turning on is refused | Couldn't turn it on. {reason} |
+| S1 | Overview, when turning on fails without a reason | Couldn't turn it on. Try again. |
+| S2 | Go live, once live, when a starting budget was set aside | We set aside ${amount} of your free credits so it can answer people. Change this in Settings, under Budget. |
+| S2 | Go live, once live, when nothing could be set aside | It can't answer anyone yet: no credits are set aside for it. Add some in Settings, under Budget. |
+| S4 | Settings → Safety, under "When someone may be at risk" | Your helpline number ({numbers}) isn't in crisis replies yet. Check it's right, then confirm it. |
+| S4 | the same, its button | Use it in crisis replies |
+| S4 | the same, after confirming | Crisis replies now give {numbers} beside the national numbers. |
+| S4 | the same, when it fails | Couldn't confirm it. Try again. |
+| S4 | Helpline and Mental-health practice templates, the helpline question's hint (was "Every crisis reply gives this number beside the national ones.") | Crisis replies give this number beside the national ones once you confirm it in Settings, under Safety. |
+| S7 | the end of every reply to a worry about a child's safety (India) | If a child is in danger right now, call 112. Childline: 1098, free, any time. |
+| S7 | the same, in Hindi | अगर किसी बच्चे को अभी खतरा है, तो 112 पर कॉल करें। चाइल्डलाइन: 1098, मुफ़्त, किसी भी समय। |
+| S7 | the same, outside India | If a child is in danger right now, call your local emergency number. |
+| S7 | the same, outside India, in Hindi | अगर किसी बच्चे को अभी खतरा है, तो अपने यहाँ के आपातकालीन नंबर पर कॉल करें। |
+| S6 | Create → Pick a template, below the use-case templates | More starting points |
+| S5 | Inbox row, a person with more than one chat | {n} chats |
+| S5 | Inbox chat, the person's other chats | Their other chats |
+| S5 | Inbox, an older chat when they have a newer one | They've started a newer chat. Reply there so they see it. |
+| S5 | the same, its link | Open their latest chat |
+| S5 | Inbox badge for a chat the crisis check flagged (was "Needs a person · undefined") | Needs a person · May be at risk |
+| F4 | Create → Sources, a file held for personal details (was a raw "needs_review") | Waiting for you: check it for personal details below |
+| F19 | emergency reply, a flood or rising water, India | This sounds like an emergency. Call 112 now and ask for rescue. Move to the safest, highest place you can and stay there until help reaches you. |
+| F19 | emergency reply, a fire or someone trapped, India (changed on approval, 25 Nov) | This sounds like an emergency. Call 112 now and ask for rescue. Get to the safest place you can and stay there until help reaches you. |
+| F19 | the same three outside India | "…Call your local emergency number now and ask for rescue…" (flood: "the safest, highest place"; fire or trapped: "the safest place") / "…Call your local emergency number now for an ambulance…" |
+| F19 | emergency reply, someone collapsed or not breathing, India | This sounds like an emergency. Call 112 or 108 now for an ambulance, and stay with them. The person on the call will tell you what to do until help arrives. |
+| F19 | the same in Hindi and Hinglish | in `ally-be/src/bot-draft/safety-pack/safety-packs.ts` (`KIND_FIRST`) |
+| F19 | holding line after an emergency (was the self-harm help line), India | Someone from the team will reply to you. If anyone is in danger, call 112 now. |
+| F19 | the same outside India, Hindi and Hinglish | in `ally-be/src/chatbot/safety/crisis-copy.ts` (`EMERGENCY_HOLDING_COPY`) |
+| F5 | Chatbots list, a card for an assistant still in setup | Knowledge, lists and settings |
+| B1 | first reply on a Services assistant with memory on (adults), instead of the YES/NO question | I can remember your name and your applications so you don’t have to repeat them. Say ‘forget me’ any time. |
+| B1 | the same, Donors and volunteers | I can remember your name, your shifts and how you like to help, so you don’t have to repeat them. Say ‘forget me’ any time. |
+| B1 | the same, Staff and volunteer onboarding | I remember your name and the questions you’ve sent the team. Say ‘forget me’ any time. |
+| B1 | the same, in Hindi (every template) | मैं आपका नाम और आपकी बताई ज़रूरी बातें याद रख सकता हूँ, ताकि आपको दोबारा न बताना पड़े। कभी भी ‘मुझे भूल जाओ’ लिखें। |
+| B1 | the same, in Hinglish | Main aapka naam aur aapki batayi zaroori baatein yaad rakh sakta hoon, taaki aapko dobara na batana pade. Kabhi bhi ‘mujhe bhool jao’ likhein. |
+| F17 | bot page sign-in, under the crisis information (was "If you were invited, check your email.") | If you were invited, use the email address the team added for you. |
+| F17 | the same, in Hindi | अगर आपको आमंत्रित किया गया था, तो वही ईमेल पता लिखें जो टीम ने आपके लिए जोड़ा था। |
+| B2 / F17 | Channels → Who may chat, invite only (was "Invite only is the one option for now.") | Who can chat: only the people on this list. Share the link with them yourself. |
+| B2 | the same, organisation-only | Who can chat: people in your organisation, after they confirm their work email. |
+| B2 | the same, public (off for now) | Who can chat: anyone with the link. |
+
+## Added after approval (25 Nov), waiting for your OK
+
+| Issue | Where | Text |
+|---|---|---|
+| Public choice | Channels → Who may chat, a choice shown but switched off | Public — "Anyone with the link can chat, with no sign-in. Off for now." |
+| Public choice | the same, on a page that is public already | This page is public now. Choose Invite only to let only the people on this list chat. |
+| Public choice | the same, empty list on a public page | Nobody is on the list. While the page is public, the list isn't used: anyone with the link can chat. |
+| Public choice | Sites it has loaded on, on a public page | The chat bubble can go on any website. These are the sites it has appeared on. While your page is public, anyone can chat there without signing in. |
+| Public choice | when switching fails | Couldn't change who can chat. Try again. |

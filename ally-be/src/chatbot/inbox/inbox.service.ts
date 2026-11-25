@@ -40,6 +40,9 @@ export interface InboxItem {
   needsPersonReason: string | null;
   heldBy: { id: number; name: string | null } | null;
   safety: boolean;
+  /** TF1 S5: the person (contact) this chat is with, and how many chats they have here. */
+  contactId: string | null;
+  chats: number;
 }
 
 const userId = (): number => Number(ExecutionManager.getUserId() ?? 0);
@@ -91,30 +94,43 @@ export class InboxService {
         `c.last_message_at >= now() - interval '${LIVE_MINUTES} minutes'`,
       );
     }
+    // TF1 S5: one row per person (contact): their most urgent, then latest, chat, with how many
+    // chats they have; labelled by who they are, not by the chat.
     const rows = (await this.dataSource.query(
-      `SELECT c.id, c.chatbot_id, b.name AS assistant, c.channel, c.last_message_at,
-              c.handled_by_user_id, u.name AS held_by_name, c.needs_person_since,
-              c.needs_person_reason, c.safety_at, c.metadata->'intake' AS intake,
-              c.metadata->'source'->>'kind' AS source, ident.external_id,
-              (SELECT m.text FROM chatbot_messages m WHERE m.conversation_id = c.id
-                ORDER BY m."createdAt" DESC LIMIT 1) AS preview,
-              (SELECT COUNT(*) FROM chatbot_messages m
-                WHERE m.conversation_id = c.id AND m.direction = 'inbound'
-                  AND m."createdAt" > COALESCE(r.read_at, 'epoch')) AS unread
-         FROM chatbot_conversations c
-         JOIN chatbots b ON b.id = c.chatbot_id AND b.archived_at IS NULL
-         LEFT JOIN users u ON u.id = c.handled_by_user_id
-         LEFT JOIN chatbot_conversation_reads r
-                ON r.conversation_id = c.id AND r.user_id = $1
-         LEFT JOIN LATERAL (
-           SELECT i.external_id FROM chatbot_contact_identities i
-            WHERE i.contact_id = c.contact_id AND i.channel = c.channel LIMIT 1
-         ) ident ON true
-        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-        ORDER BY (c.safety_at IS NOT NULL AND c.safety_at > COALESCE(r.read_at, 'epoch')) DESC,
-                 (c.needs_person_since IS NOT NULL AND c.handled_by_user_id IS NULL) DESC,
-                 c.last_message_at DESC
-        LIMIT ${INBOX_PAGE}`,
+      `SELECT * FROM (
+         SELECT c.id, c.chatbot_id, c.contact_id, b.name AS assistant, c.channel, c.last_message_at,
+                c.handled_by_user_id, u.name AS held_by_name, c.needs_person_since,
+                c.needs_person_reason, c.safety_at, c.metadata->'intake' AS intake,
+                c.metadata->'source'->>'kind' AS source, ident.external_id,
+                ${CONTACT_COLUMNS},
+                (SELECT m.text FROM chatbot_messages m WHERE m.conversation_id = c.id
+                  ORDER BY m."createdAt" DESC LIMIT 1) AS preview,
+                (SELECT COUNT(*) FROM chatbot_messages m
+                  WHERE m.conversation_id = c.id AND m.direction = 'inbound'
+                    AND m."createdAt" > COALESCE(r.read_at, 'epoch')) AS unread,
+                (c.safety_at IS NOT NULL AND c.safety_at > COALESCE(r.read_at, 'epoch')) AS safety_unread,
+                (c.needs_person_since IS NOT NULL AND c.handled_by_user_id IS NULL) AS waiting,
+                COUNT(*) OVER (PARTITION BY COALESCE(c.contact_id, c.id)) AS chats,
+                ROW_NUMBER() OVER (
+                  PARTITION BY COALESCE(c.contact_id, c.id)
+                  ORDER BY (c.safety_at IS NOT NULL AND c.safety_at > COALESCE(r.read_at, 'epoch')) DESC,
+                           (c.needs_person_since IS NOT NULL AND c.handled_by_user_id IS NULL) DESC,
+                           c.last_message_at DESC
+                ) AS pick
+           FROM chatbot_conversations c
+           JOIN chatbots b ON b.id = c.chatbot_id AND b.archived_at IS NULL
+           LEFT JOIN users u ON u.id = c.handled_by_user_id
+           LEFT JOIN chatbot_conversation_reads r
+                  ON r.conversation_id = c.id AND r.user_id = $1
+           LEFT JOIN LATERAL (
+             SELECT i.external_id FROM chatbot_contact_identities i
+              WHERE i.contact_id = c.contact_id AND i.channel = c.channel LIMIT 1
+           ) ident ON true
+          ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       ) x
+       WHERE x.pick = 1
+       ORDER BY x.safety_unread DESC, x.waiting DESC, x.last_message_at DESC
+       LIMIT ${INBOX_PAGE}`,
       params,
     )) as Record<string, unknown>[];
     return rows.map((row) => toItem(row));
@@ -157,6 +173,9 @@ export class InboxService {
     await this.access.assert(chatbotId, ChatbotMemberRole.VIEWER);
     const [conversation] = (await this.dataSource.query(
       `SELECT c.id, c.chatbot_id, c.contact_id, b.name AS assistant, c.channel,
+              ${CONTACT_COLUMNS},
+              (SELECT i.external_id FROM chatbot_contact_identities i
+                WHERE i.contact_id = c.contact_id AND i.channel = c.channel LIMIT 1) AS external_id,
               c.metadata->'intake' AS intake,
               c.metadata->'source'->>'kind' AS source,
               c.handled_by_user_id, u.name AS held_by_name, c.needs_person_since,
@@ -181,8 +200,40 @@ export class InboxService {
     )) as Record<string, unknown>[];
     const lastInbound = [...messages].reverse().find((m) => m.role === 'user')
       ?.at as Date | undefined;
+    // TF1 S5: the person's other chats with this assistant, newest first. A reply goes to the chat
+    // they are in now (their latest on this channel), so an older one says where to reply instead.
+    const others = conversation.contact_id
+      ? ((await this.dataSource.query(
+          `SELECT c.id, c.channel, c.last_message_at,
+                  (SELECT m.text FROM chatbot_messages m WHERE m.conversation_id = c.id
+                    ORDER BY m."createdAt" DESC LIMIT 1) AS preview
+             FROM chatbot_conversations c
+            WHERE c.contact_id = $1 AND c.chatbot_id = $2 AND c.id <> $3
+            ORDER BY c.last_message_at DESC LIMIT 20`,
+          [conversation.contact_id, chatbotId, conversationId],
+        )) as Record<string, unknown>[])
+      : [];
+    const latestElsewhere = others.find(
+      (o) =>
+        o.channel === conversation.channel &&
+        new Date(o.last_message_at as string) >
+          new Date(conversation.last_message_at as string),
+    );
     return {
-      ...toItem({ ...conversation, preview: '', unread: 0 }),
+      ...toItem({
+        ...conversation,
+        preview: '',
+        unread: 0,
+        chats: others.length + 1,
+      }),
+      otherChats: others.map((o) => ({
+        id: String(o.id),
+        channel: o.channel as ConversationChannel,
+        lastMessageAt: new Date(o.last_message_at as string).toISOString(),
+        preview: String(o.preview ?? '').slice(0, 140),
+      })),
+      /** Set when the person has a newer chat on this channel: replies belong there. */
+      newerChatId: latestElsewhere ? String(latestElsewhere.id) : null,
       // Whose chat it is, for what the assistant remembers about them (chunk 8a).
       contactId: (conversation.contact_id as string | null) ?? null,
       intake:
@@ -223,6 +274,16 @@ export class InboxService {
   }
 }
 
+/** The person's name and identities, for the inbox label (TF1 S5). */
+const CONTACT_COLUMNS = `
+  (SELECT co.display_name FROM chatbot_contacts co WHERE co.id = c.contact_id) AS contact_name,
+  (SELECT i.external_id FROM chatbot_contact_identities i
+    WHERE i.contact_id = c.contact_id AND i.channel = 'email' AND i.verified
+    ORDER BY i."createdAt" LIMIT 1) AS contact_email,
+  (SELECT i.external_id FROM chatbot_contact_identities i
+    WHERE i.contact_id = c.contact_id AND i.channel = 'whatsapp'
+    ORDER BY i."createdAt" LIMIT 1) AS contact_phone`;
+
 /** Who the visitor is, as the list shows them: a pre-chat name, a phone's last 4, or "Visitor". */
 function visitorLabel(row: Record<string, unknown>): string {
   const answers = (
@@ -247,7 +308,18 @@ function visitorLabel(row: Record<string, unknown>): string {
  * id, so the same chat always has the same tag.
  */
 export function inboxVisitor(row: Record<string, unknown>): string {
-  const label = visitorLabel(row);
+  // TF1 S5: who the person is, from their contact: the name they gave, else their verified email,
+  // else their WhatsApp number. Then the pre-chat name, then a short tag.
+  const contactName = String(row.contact_name ?? '').trim();
+  if (contactName) return contactName;
+  const intakeName = visitorLabel(row);
+  if (intakeName !== 'Visitor' && !intakeName.startsWith('…'))
+    return intakeName;
+  const email = String(row.contact_email ?? '').trim();
+  if (email) return email;
+  const phone = String(row.contact_phone ?? '').trim();
+  if (/^\d{8,15}$/.test(phone)) return `+${phone}`;
+  const label = intakeName;
   if (label.startsWith('…')) return `Visitor · ${label.slice(1)}`;
   if (label === 'Visitor')
     return `Visitor · ${visitorTag(String(row.id ?? ''))}`;
@@ -283,5 +355,7 @@ function toItem(row: Record<string, unknown>): InboxItem {
       ? { id: held, name: (row.held_by_name as string | null) ?? null }
       : null,
     safety: Boolean(row.safety_at),
+    contactId: (row.contact_id as string | null) ?? null,
+    chats: Number(row.chats ?? 1),
   };
 }

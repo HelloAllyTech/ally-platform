@@ -7,7 +7,8 @@ import type { ReplyLanguage } from '../engine/reply-language';
 import { safetySettingsOf } from '../safety/safety-settings';
 import { SWITCHES, switchOn } from '../safety/switches';
 import { affectedOf } from './erased';
-import { consentWording } from './memory-consent-copy';
+import { consentWording, noticeWording } from './memory-consent-copy';
+import { memorySettingsOf } from '../memory/memory-settings';
 
 export type ConsentState = 'unasked' | 'asked' | 'granted' | 'declined';
 
@@ -17,6 +18,10 @@ export interface ConsentView {
   subjectKey: string;
   wordingVersion: string | null;
 }
+
+/** The consent question's own ending, in each language (`memory-consent-copy.ts`). */
+const CONSENT_QUESTION_MARK =
+  /Reply YES or NO\.|HAAN ya NAHIN likhein\.|हाँ या नहीं लिखें।/;
 
 /** The memory cutover's state row (D7). */
 export const MEMORY_CUTOVER_STATE = 'memory_consent_cutover';
@@ -102,6 +107,25 @@ export class MemoryConsentService {
     };
   }
 
+  /**
+   * TF1: whether the assistant's last message in this chat asked the consent question. A "yes" is
+   * a consent answer only then: Kiran's yes to "Shall I book you…?" was taken as memory consent
+   * because an old question was still open. A failed lookup reads as not asked.
+   */
+  async askedLast(conversationId: string): Promise<boolean> {
+    try {
+      const [row] = (await this.dataSource.query(
+        `SELECT text FROM chatbot_messages
+          WHERE conversation_id = $1 AND role = 'assistant'
+          ORDER BY "createdAt" DESC LIMIT 1`,
+        [conversationId],
+      )) as { text: string | null }[];
+      return CONSENT_QUESTION_MARK.test(row?.text ?? '');
+    } catch {
+      return false;
+    }
+  }
+
   /** Whether memory may be written for this contact. */
   async isGranted(chatbotId: string, contactId: string): Promise<boolean> {
     return (await this.stateFor(chatbotId, contactId)).state === 'granted';
@@ -123,10 +147,18 @@ export class MemoryConsentService {
       `SELECT settings FROM chatbots WHERE id = $1`,
       [chatbotId],
     )) as { settings: Record<string, unknown> | null }[];
-    const wording = consentWording(
-      safetySettingsOf(bot?.settings as never).audienceAge,
-      language,
-    );
+    const audienceAge = safetySettingsOf(bot?.settings as never).audienceAge;
+    // TF1 B1: a template's notice, for adults: told, not asked, and memory starts; "forget me"
+    // (erase in chat) removes it at any time. Young or unstated audiences are still asked.
+    const notice = memorySettingsOf({
+      settings: bot?.settings as never,
+    }).notice;
+    if (notice && audienceAge === 'adults') {
+      const told = noticeWording(notice, language);
+      await this.record(chatbotId, contactId, 'granted', told.version, now);
+      return { text: told.text, wordingVersion: told.version };
+    }
+    const wording = consentWording(audienceAge, language);
     const subject = await this.subjectFor(chatbotId, contactId);
     await this.dataSource.query(
       `INSERT INTO memory_consents (chatbot_id, subject_key, end_person_id, contact_id, state, asked_at, wording_version)

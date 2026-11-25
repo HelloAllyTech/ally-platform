@@ -1,0 +1,22 @@
+>>> Camp ab kahan hai? Bahadurpur wala
+--- queued (rag)
+Camp ab Laheriasarai Town Hall (Laheriasarai railway station ke nazdeek) mein hai. Free tempo Bahadurpur school gate se har 2 ghante par, 8:00–18:00 chalta hai. (Update: 22 November)
+
+Sources:
+— Updates, From 22 November the relief camp at Bahadurpur Middle School has moved to Laheriasarai Town Hall, near Laheriasarai railway station. Free tempo from Bahadurpur school gate every 2 hours, 8 am to 6 pm.
+— What we learned, Key facts
+
+Aap ek AI assistant se baat kar rahe hain. AI aur Jalraksha Flood Relief ke log yeh chat padh sakte hain.
+This is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.
+
+*From 22 November the relief camp at Bahadurpur Middle School has moved to Laheriasarai Town Hall, near Laheriasarai railway station. Free tempo from Bahadurpur school gate every 2 hours, 8 am to 6 pm.*
+Date: Tue 24 Nov 2026
+Who it affects: Camp move: families registered at Bahadurpur, until 30 November. Donation drive: donors, until 15 December.
+>>> Someone came to my door asking for cash for Jalraksha, is that you?
+--- queued (rag)
+No — Jalraksha does not collect cash door to door. Anyone asking for cash in our name is not from us. If you want to report it or check, contact our helpdesk or office (they are listed in our information).
+
+Sources:
+— What we learned, Key facts
+— 5-jalraksha-flood-relief
+— What we learned, Location and contact, 5 jalraksha flood relief pdf page 1

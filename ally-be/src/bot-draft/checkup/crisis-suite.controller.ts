@@ -54,6 +54,6 @@ export class CrisisSuiteController {
     @Body() dto: RunCrisisCheckDto,
   ) {
     const results = await this.suite.run(id, dto.languages);
-    return { results, checklist: await this.gate.check(id) };
+    return { results, checklist: await this.gate.checklist(id) };
   }
 }

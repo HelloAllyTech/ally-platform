@@ -198,7 +198,8 @@ function valueHint(f: FieldView): string {
     case ListFieldType.RELATION:
       return `the id of a ${relationTarget(f)} entry from find_${relationTarget(f)}`;
     case ListFieldType.PHONE:
-      return 'a phone number';
+      // TF1 F1: never ask a WhatsApp person for the number they are writing from.
+      return 'a phone number; on WhatsApp leave it empty unless they give a different number: the number they write from is used';
     case ListFieldType.EMAIL:
       return 'an email address';
     case ListFieldType.URL:
@@ -273,7 +274,11 @@ function findSchema(list: ListView): ListToolInputSchema {
     } else if (CONTAINS_TYPES.has(f.type)) {
       put(
         `${f.key}_contains`,
-        text(`${f.label} contains this text; empty for any`),
+        // TF1 F16: a Hindi question searched English entries with Hindi words and found nothing.
+        text(
+          `${f.label} contains this text, in the words the entries are written in (search in ` +
+            `English when they are, whatever language the person writes in); empty for any`,
+        ),
       );
     } else if (RANGE_TYPES.has(f.type)) {
       if (f.type === ListFieldType.DATETIME) {
@@ -468,6 +473,12 @@ function findDescription(list: ListView): string {
     (summable ? ` or to add up ${lower(summable.label)}.` : '.') +
     (exact
       ? ` When the person named a time, use ${exact.key}_at to find exactly that time.`
+      : '') +
+    // TF1 F9: "what did I book?" in a new chat asked for their name instead of looking.
+    (hasPersonField(list)
+      ? ' It returns only the entries of the person in this chat, so when they ask about their own ' +
+        '("what did I book?", "my request", "cancel that"), call it first, with memory on or off; ' +
+        'never ask for their name or phone to find them.'
       : '')
   ).replace(/\.\s+returns/, '. Returns');
 }
@@ -571,6 +582,48 @@ export function listToolDefinitions(
   return out;
 }
 
+/**
+ * TF1 B4: a list of requests (a callback, an application, an enquiry) whose status has
+ * "withdrawn": the person may withdraw their own open one even while Change is Never.
+ */
+export function withdrawable(list: ListView): boolean {
+  if (!hasPersonField(list)) return false;
+  const status = list.fields.find(
+    (f) =>
+      !f.archived_at && f.key === 'status' && f.type === ListFieldType.SELECT,
+  );
+  return Boolean(
+    status &&
+    selectValues(status as never).some((v) => String(v) === WITHDRAWN),
+  );
+}
+
+export const WITHDRAWN = 'withdrawn';
+
+/**
+ * TF1 B4: the change tool cut down to one thing, for a request list whose Change is Never: set
+ * the person's own entry to withdrawn. Nothing else can be changed through it.
+ */
+export function withdrawOnlyDefinition(list: ListView): ListToolDefinition {
+  const listName = list.name.trim();
+  return {
+    name: listToolName('update', list.key),
+    description:
+      `Withdraw an entry in ${list.name} that belongs to the person in this chat, when they ask ` +
+      `to cancel or withdraw it; id comes from find_${list.key}. Only after they've confirmed it. ` +
+      `This can't change anything else: for any other change, offer to pass it to the team.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        id: text(`The id of the entry to withdraw, from find_${list.key}`),
+        status: choice('Always "withdrawn"', [WITHDRAWN]),
+      },
+    },
+    kind: 'update',
+    ...(listName ? { list_name: listName } : {}),
+  };
+}
+
 export interface OfferedListTools {
   definitions: ListToolDefinition[];
   /** Tools the bot has on but that didn't fit under the cap. */
@@ -594,8 +647,13 @@ export function offeredListTools(
     .flatMap((list) =>
       withPlaybook(
         list,
-        listToolDefinitions(list, names, dated).filter(
-          (def) => abilityFor(stored, def.name) === 'do_it',
+        listToolDefinitions(list, names, dated).flatMap((def) =>
+          abilityFor(stored, def.name) === 'do_it'
+            ? [def]
+            : // TF1 B4: Change is Never, but a request can still be withdrawn by its person.
+              def.kind === 'update' && withdrawable(list)
+              ? [withdrawOnlyDefinition(list)]
+              : [],
         ),
       ),
     );

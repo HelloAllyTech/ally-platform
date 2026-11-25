@@ -117,6 +117,16 @@ describe('ChatPrivacyService', () => {
     expect(reply?.body).toBe(CONSENT_RECORDED_COPY.granted.en);
   });
 
+  // TF1: Kiran's yes to "Shall I book you…?" was taken as the answer to an old consent question.
+  it('a yes to something else goes to the engine, even with the question still open', async () => {
+    const h = setup({ consent: 'asked' });
+    (h.consent as Record<string, unknown>).askedLast = jest
+      .fn()
+      .mockResolvedValue(false);
+    expect(await h.service.beforeTurn(h.turn('Yes'))).toBeNull();
+    expect(h.consent.record).not.toHaveBeenCalled();
+  });
+
   it('a yes with no consent question open goes to the engine', async () => {
     const h = setup({ consent: 'unasked' });
     expect(await h.service.beforeTurn(h.turn('yes'))).toBeNull();

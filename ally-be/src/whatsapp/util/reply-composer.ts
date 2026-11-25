@@ -54,7 +54,7 @@ export function composeReply(input: ComposeReplyInput): string {
   // A clarify uses the model's question — the whole point of it is that it is specific to what was
   // asked. Which makes all three intents the same rule now: use what the model wrote if it wrote
   // anything, otherwise the configured decline.
-  const bodyText = answer.trim() || declineText;
+  const bodyText = withoutCitationDebris(answer.trim()) || declineText;
 
   const body = truncateAtSentence(bodyText, maxAnswerChars);
 
@@ -92,6 +92,27 @@ export function composeReply(input: ComposeReplyInput): string {
  * Deduplicated by document + location, because two chunks from the same page are one source to a
  * reader and repeating it looks like padding.
  */
+/** TF1 P2: the setup's own documents (facts learned, the owner's notes), never shown as a source. */
+const INTERNAL_TITLES = /^(what we learned|owner notes)\b/i;
+
+/**
+ * TF1 P1: citation markers the model leaves in its text ("(12)", "(12,1)", "{11,12}", a stray
+ * "cited)", a "Citations:" line). Sources are shown apart from the text, so these are only noise.
+ * Only one- and two-digit markers, so "(022) 2345 6789" or "(2024)" stay.
+ */
+export function withoutCitationDebris(text: string): string {
+  return text
+    .replace(/^\s*(?:citations?|sources?)\s*:.*$/gim, '')
+    .replace(/\s*\(\s*\d{1,2}(?:\s*,\s*\d{1,2})*\s*\)/g, '')
+    .replace(/\s*\{\s*\d{1,2}(?:\s*,\s*\d{1,2})*\s*\}/g, '')
+    .replace(/\s*\[\s*\d{1,2}(?:\s*,\s*\d{1,2})*\s*\]/g, '')
+    .replace(/\s+cited\)/gi, '')
+    .replace(/\s+\)(?=\s|$)/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+}
+
 function renderCitations(
   citations: KnowledgeCitation[],
   maxCitations: number,
@@ -102,6 +123,8 @@ function renderCitations(
   for (const citation of citations) {
     const parts: string[] = [];
     const title = (citation.document_title || '').trim();
+    // TF1 P2: the assistant's own working documents are not a source to show a person.
+    if (INTERNAL_TITLES.test(title)) continue;
     if (title) parts.push(title);
 
     if (citation.page_from) {

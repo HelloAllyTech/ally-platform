@@ -31,6 +31,7 @@ import {
 } from './alert-outbox.service';
 import {
   ALERT_COPY,
+  emergencyHoldingMessage,
   holdingMessage,
   noOneAvailableMessage,
 } from './crisis-copy';
@@ -148,7 +149,13 @@ export class CrisisAlertService implements OnModuleInit {
       await this.queueCrisisEmails(chatbot, conversationId, Number(row.level));
     }
     if (row.first && row.handled_by_user_id === null) {
-      await this.queueHolding(chatbot, conversationId, row.channel, now);
+      await this.queueHolding(
+        chatbot,
+        conversationId,
+        row.channel,
+        now,
+        crisis.level,
+      );
     }
     await this.events.publishInbox({
       type: 'state',
@@ -226,8 +233,14 @@ export class CrisisAlertService implements OnModuleInit {
     conversationId: string,
     channel: ConversationChannel,
     now: Date,
+    level: number = 1,
   ): Promise<void> {
-    const text = await this.fixedText(chatbot, conversationId, holdingMessage);
+    // TF1 F19: after an emergency reply, the emergency holding line, not the self-harm one.
+    const text = await this.fixedText(
+      chatbot,
+      conversationId,
+      level >= 2 ? emergencyHoldingMessage : holdingMessage,
+    );
     await this.outbox.enqueue({
       chatbotId: chatbot.id,
       conversationId,

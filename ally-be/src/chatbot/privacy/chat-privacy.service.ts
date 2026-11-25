@@ -169,6 +169,10 @@ export class ChatPrivacyService {
     if (!answer) return null;
     const view = await this.consent.stateFor(turn.chatbot.id, turn.contactId);
     if (view.state !== 'asked') return null;
+    // TF1: only a yes or no to the question itself, asked in the assistant's last message.
+    if ((await this.consent.askedLast?.(turn.conversationId)) === false) {
+      return null;
+    }
     const version =
       view.wordingVersion ??
       consentWording(

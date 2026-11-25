@@ -1,4 +1,5 @@
 import { PlanService } from 'src/billing/service/plan.service';
+import { LedgerService } from '../../billing/service/ledger.service';
 import { ListOwnerService } from '../../chatbot/lists/list-owner.service';
 import { realName } from '../name-placeholders';
 import {
@@ -65,6 +66,8 @@ export interface PublishResult {
   slug: string;
   link: string;
   access: BotPageAccess;
+  /** TF1 S2: what is set aside for its customers' replies, and whether going live added it. */
+  budget?: { setAsideUsd: number; added: boolean } | null;
 }
 
 /**
@@ -98,6 +101,8 @@ export class BotDraftPublishService {
     @Optional() private readonly goLive?: GoLiveGateService,
     // Q4 B10: "Bring in customers" gets its Callback requests list on publish.
     @Optional() private readonly lists?: ListOwnerService,
+    // TF1 S2: a starting budget, so a live assistant can answer. Optional for specs.
+    @Optional() private readonly ledger?: LedgerService,
   ) {}
 
   async publish(
@@ -280,11 +285,24 @@ export class BotDraftPublishService {
           `Included seats not created for chatbot ${chatbot.id}: ${error instanceof Error ? error.message : 'unknown error'}`,
         ),
       );
+    // TF1 S2: customer replies are paid from the assistant's budget; without one it answers nobody.
+    const budget = await this.ledger
+      ?.ensureStartingBudget(
+        chatbot.id,
+        Number(ExecutionManager.getUserId() ?? 0) || null,
+      )
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `Starting budget not set for chatbot ${chatbot.id}: ${error instanceof Error ? error.message : 'unknown error'}`,
+        );
+        return null;
+      });
     return {
       chatbotId: chatbot.id,
       slug: view.slug,
       link: view.link,
       access: pageAccess,
+      ...(budget ? { budget } : {}),
     };
   }
 

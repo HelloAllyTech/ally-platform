@@ -76,7 +76,7 @@ export class GoLiveController {
       'The go-live checklist: what is missing before customers can use it, and each language’s crisis check',
   })
   checklist(@Param('id', ParseUUIDPipe) id: string) {
-    return this.gate.check(id);
+    return this.gate.checklist(id);
   }
 
   @Get('chatbots/:id/safety-terms')
@@ -118,7 +118,7 @@ export class GoLiveController {
       SAFETY_TERMS_VERSION,
       Number(ExecutionManager.getUserId() ?? 0) || null,
     );
-    return this.gate.check(id);
+    return this.gate.checklist(id);
   }
 
   @Post('staff/assistants/unpublish-backfill')

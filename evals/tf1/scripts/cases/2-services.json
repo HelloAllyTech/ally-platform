@@ -1,0 +1,16 @@
+{
+  "tag": "c2",
+  "pdf": "pdfs/2-sahyog-disability-services.pdf",
+  "template": "Services and eligibility",
+  "answers": [
+    { "kind": "textarea", "value": "Help with a disability certificate (UDID card) - anyone with 40% or more disability\nAids and appliances - people with a UDID card and family income under Rs 22,500 a month\nDisability pension applications - adults 18+ with 40% or more disability\nPhysiotherapy for children - under 14, Malviya Nagar only" },
+    { "kind": "textarea", "value": "Aadhaar card, two passport photos, any doctor's reports; for aids also the UDID card and an income certificate" },
+    { "kind": "textarea", "value": "Malviya Nagar centre - Plot 14, Sector 5, Malviya Nagar, Jaipur - Mon to Sat 9:30 am to 5:30 pm\nSanganer centre - Near Bus Stand, Tonk Road, Sanganer - Tue to Sat 10 am to 4 pm" },
+    { "kind": "yesno", "value": "Yes" }
+  ],
+  "audience": "Adults only",
+  "purpose": "Take enquiries",
+  "contact": "+91 141 400 7110",
+  "budget": 1,
+  "invite": ["ravi.tf1@example.com", "+919800000002"]
+}

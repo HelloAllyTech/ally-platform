@@ -1,5 +1,5 @@
 import { KnowledgeCitation } from 'src/ai/dto/knowledge.dto';
-import { composeReply } from '../reply-composer';
+import { composeReply, withoutCitationDebris } from '../reply-composer';
 
 /**
  * The composer produces the literal bytes a mental healthcare worker receives. Its failure modes are
@@ -256,5 +256,47 @@ describe('composeReply', () => {
       expect(out).not.toContain('Sources:');
       expect(out.length).toBeLessThanOrEqual(90);
     });
+  });
+});
+
+// TF1 P1 and P2: citation markers left in answers, and internal documents named as sources.
+describe('reply text without citation debris (TF1 P1, P2)', () => {
+  it.each([
+    [
+      'Volunteers come on weekends (12). Shifts are 3 hours (12,1).',
+      'Volunteers come on weekends. Shifts are 3 hours.',
+    ],
+    ['Bring your certificate {11,12}.', 'Bring your certificate.'],
+    ['Visit us in Kothrud. cited)', 'Visit us in Kothrud.'],
+    ['Calls are free.\nCitations: 1, 2', 'Calls are free.'],
+    ['Calls are free. ) Tip: call early.', 'Calls are free. Tip: call early.'],
+  ])('%s', (dirty, clean) => {
+    expect(withoutCitationDebris(dirty)).toBe(clean);
+  });
+
+  it('keeps numbers that are part of the answer', () => {
+    expect(
+      withoutCitationDebris('Call (022) 2345 6789, open since (2024).'),
+    ).toBe('Call (022) 2345 6789, open since (2024).');
+  });
+});
+
+describe('sources never name the setup’s own documents (TF1 P2)', () => {
+  it('leaves out What we learned and Owner notes', () => {
+    const body = composeReply({
+      intent: 'answer',
+      answer: 'The camp moved to the school.',
+      declineText: 'Sorry.',
+      citations: [
+        { document_title: 'What we learned', section_path: 'Key facts' },
+        { document_title: 'Owner notes', section_path: 'Notes' },
+        { document_title: 'Jalraksha update', page_from: 1 },
+      ] as never,
+      maxAnswerChars: 1000,
+      maxReplyChars: 1500,
+      maxCitations: 3,
+    });
+    expect(body).toContain('Jalraksha update');
+    expect(body).not.toMatch(/What we learned|Owner notes/);
   });
 });

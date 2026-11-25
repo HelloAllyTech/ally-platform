@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import {
   useApplyBotTemplateMutation,
+  useApplyDraftTemplateMutation,
   useGetBotDraftQuery,
   usePatchBotDraftMutation,
   useSetBuildModeMutation,
@@ -11,6 +12,7 @@ import {
 import type { BotTemplateCard, BuildMode, StartPath } from "@api";
 import { Button, Orb, SplitBuild } from "@components/v2";
 import { ROUTES } from "@constants";
+import type { TemplateAnswers } from "@types";
 
 import { Copilot } from "./Copilot";
 import { BUILD_COPY } from "./copy";
@@ -94,6 +96,7 @@ export const BuildScreen: React.FC<{
   const [bridge] = useState(createSplitBridge);
   const [setBuildMode] = useSetBuildModeMutation();
   const [applyTemplate] = useApplyBotTemplateMutation();
+  const [applyUseCase] = useApplyDraftTemplateMutation();
   const [patchDraft] = usePatchBotDraftMutation();
   const sources = useSources(draftId, wc?.chatbotId ?? null);
 
@@ -163,6 +166,13 @@ export const BuildScreen: React.FC<{
       writeSnapshot(draftId, versions);
       setSnapshot(versions);
       setTemplateNote({ name: result.template.name, indexing: result.sourcesIndexing });
+    });
+
+  // TF1 S6: a use-case template applies whole to the draft (T1 "one click in setup").
+  const onUseCase = (templateId: string, answers: TemplateAnswers) =>
+    void begin("template", async () => {
+      const { result } = await applyUseCase({ draftId, template: templateId, answers }).unwrap();
+      setTemplateNote({ name: result.template.name, indexing: 0 });
     });
 
   const onWebsite = (address: string) =>
@@ -328,6 +338,7 @@ export const BuildScreen: React.FC<{
           creditsOut={copy.creditsOut}
           templatesOffered={templatesOffered && wc.blank && !wc.template}
           onTemplate={onTemplate}
+          onUseCase={onUseCase}
           onWebsite={onWebsite}
           onDocuments={onDocuments}
           onInterview={onInterview}
@@ -357,6 +368,7 @@ export const BuildScreen: React.FC<{
               addAddress={sources.addAddress}
               addFiles={sources.addFiles}
               goLive={surface === "create" || !copy.live}
+              accessMode={draft.data?.draft?.access?.mode}
             />
           </div>
         </>

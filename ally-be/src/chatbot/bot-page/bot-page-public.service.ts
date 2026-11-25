@@ -2,6 +2,8 @@ import { usageContext } from 'src/billing/context/usage-context';
 import { withFirstMessageParts } from '../engine/first-reply';
 import { startNotice } from '../safety/chat-notice';
 import { offMessage } from '../safety/off-message';
+import { withoutStopLine } from '../safety/chat-notice';
+export { withoutStopLine } from '../safety/chat-notice';
 import { ActionsService } from '../actions/actions.service';
 import { LANGUAGE_CHOICE } from '../actions/action-copy';
 import { enabledLanguagesOf } from '../languages/reply-language-for';
@@ -463,10 +465,12 @@ export class BotPagePublicService {
   ): Pick<PublicBotPage, 'notice' | 'disclaimer'> {
     const { settings, chatbot } = available;
     const notice = startNotice({
-      disclaimer:
+      // TF1 P3: "Reply STOP to opt out" is WhatsApp's; on the page there's nothing to reply STOP to.
+      disclaimer: withoutStopLine(
         available.botSettings?.disclaimerText ??
-        chatbot.settings?.disclaimerText ??
-        '',
+          chatbot.settings?.disclaimerText ??
+          '',
+      ),
       language: replyLanguageOf('', settings.language),
       organisation: settings.branding.title || chatbot.name,
     });
@@ -977,7 +981,8 @@ export class BotPagePublicService {
           handledBy: decision.handledBy,
           bodyIsWelcome: decision.isWelcome,
           notice: startNotice({
-            disclaimer: botSettings.disclaimerText ?? '',
+            // TF1 P3: no "Reply STOP" in a web chat.
+            disclaimer: withoutStopLine(botSettings.disclaimerText ?? ''),
             language: replyLanguageOf(text),
             organisation: chatbot.name,
           }),

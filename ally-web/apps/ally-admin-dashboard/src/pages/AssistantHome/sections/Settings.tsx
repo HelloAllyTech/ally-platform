@@ -10,7 +10,7 @@ import { Group, SectionHead, TextField } from "../fields";
 import { BudgetLimits } from "./BudgetLimits";
 import { HowItWorksSection } from "./HowItWorks";
 import { QuickReplies } from "./QuickReplies";
-import { SafetySection } from "./Safety";
+import { HelplineConfirm, SafetySection } from "./Safety";
 import { TeamGroups } from "./Share";
 import { StaffAccess } from "./StaffAccess";
 import { STRUCTURE } from "../copy/structure";
@@ -65,6 +65,8 @@ export const SettingsSection: React.FC<SectionProps> = props => {
     <div className="ally-home__stack" data-testid="settings">
       <SectionHead title={STRUCTURE.sections.settings} subtitle={STRUCTURE.subtitles.settings} />
       <SafetySection {...props} />
+      {/* TF1 S4: the helpline number a template wrote, waiting for the owner's confirm. */}
+      <HelplineConfirm botId={props.bot.id} canEdit={props.canEdit} />
       <SafetyPrivacy botId={bot.id} canEdit={canEdit} />
       {bot.connectors.length > 0 && (
         <Group title={s.repliesTitle} hint={s.repliesHint} testId="settings-quick-replies">

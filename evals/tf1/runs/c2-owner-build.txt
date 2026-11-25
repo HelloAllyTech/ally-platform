@@ -1,0 +1,109 @@
+
+## a2 Create, from your documents
+  chatbot 4d370005-8efd-4bed-8ad4-c55fe96ebee6, draft ec2a08e7-7112-46cf-bfd6-8f02073b08a1
+  name in working copy: Sahyog Disability Services
+  document: needs_review chunks=0
+
+## a2 Knowledge review
+  "What it knows": 26 facts with a page citation
+  approved the held source
+  API errors: 404 GET /api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false {"statusCode":404,"timestamp":"2026-11-24T14:09:30.726Z","path":"/api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false","message":"Not Found","error":"Error"}
+
+## a2 Add from a template: Services and eligibility
+  17 cards; "Services and eligibility" is #2
+   | Services and eligibility | Which services do you offer, and who is each one for? | One per line, like “Food support - families with children”. | We'll add examples you can replace later. | What should people bring? | We'll add examples you can replace later. | Where can people go, and when are you open? | One place per line, like “Centre 1 - 12 Station Road - Mon–Fri 10–5”. | We'll add examples you can replace later. | Are any of these benefits, legal aid or financial help? | Yes adds Legal and financial care. | Yes | No | We'll add examples you can replace later. | 
+  : your pages, its memory, your team, and your own lists. | SERVICES AND ELIGIBILITY | Added: Services, Service locations, Applications. | 7 checkup questions added. | 
+  API errors: (none)
+
+## a2 Lists and abilities
+  Look things up in it: Do it · Add entries: Do it · Change entries: Never
+  lists: services, service_locations, applications
+  pack (live): 
+ERROR:  invalid input syntax for type json
+LINE 1: select coalesce(settings->'memory'::text, '(unset)') from ch...
+                                                  ^
+DETAIL:  Token "(" is invalid.
+CONTEXT:  JSON data, line 1: (...
+node:internal/errors:986
+  const err = new Error(message);
+              ^
+
+Error: Command failed: docker exec ally-be-postgres-1 psql -U postgres -d ally_tf1 -Atc select coalesce(settings->'memory'::text, '(unset)') from chatbots where id='4d370005-8efd-4bed-8ad4-c55fe96ebee6'
+ERROR:  invalid input syntax for type json
+LINE 1: select coalesce(settings->'memory'::text, '(unset)') from ch...
+                                                  ^
+DETAIL:  Token "(" is invalid.
+CONTEXT:  JSON data, line 1: (...
+
+    at genericNodeError (node:internal/errors:986:15)
+    at wrappedFn (node:internal/errors:540:14)
+    at checkExecSyncError (node:child_process:943:11)
+    at execFileSync (node:child_process:979:15)
+    at sql (file:///Users/shehbazsayed/Desktop/ally/ally-platform/evals/tf1/scripts/build-case.mjs:27:3)
+    at file:///Users/shehbazsayed/Desktop/ally/ally-platform/evals/tf1/scripts/build-case.mjs:106:26
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  status: 1,
+  signal: null,
+  output: [
+    null,
+    Buffer(0) [Uint8Array] [],
+    Buffer(232) [Uint8Array] [
+       69,  82,  82,  79,  82,  58,  32,  32, 105, 110, 118,  97,
+      108, 105, 100,  32, 105, 110, 112, 117, 116,  32, 115, 121,
+      110, 116,  97, 120,  32, 102, 111, 114,  32, 116, 121, 112,
+      101,  32, 106, 115, 111, 110,  10,  76,  73,  78,  69,  32,
+       49,  58,  32, 115, 101, 108, 101,  99, 116,  32,  99, 111,
+       97, 108, 101, 115,  99, 101,  40, 115, 101, 116, 116, 105,
+      110, 103, 115,  45,  62,  39, 109, 101, 109, 111, 114, 121,
+       39,  58,  58, 116, 101, 120, 116,  44,  32,  39,  40, 117,
+      110, 115, 101, 116,
+      ... 132 more items
+    ]
+  ],
+  pid: 24683,
+  stdout: Buffer(0) [Uint8Array] [],
+  stderr: Buffer(232) [Uint8Array] [
+     69,  82,  82,  79,  82,  58,  32,  32, 105, 110, 118,  97,
+    108, 105, 100,  32, 105, 110, 112, 117, 116,  32, 115, 121,
+    110, 116,  97, 120,  32, 102, 111, 114,  32, 116, 121, 112,
+    101,  32, 106, 115, 111, 110,  10,  76,  73,  78,  69,  32,
+     49,  58,  32, 115, 101, 108, 101,  99, 116,  32,  99, 111,
+     97, 108, 101, 115,  99, 101,  40, 115, 101, 116, 116, 105,
+    110, 103, 115,  45,  62,  39, 109, 101, 109, 111, 114, 121,
+     39,  58,  58, 116, 101, 120, 116,  44,  32,  39,  40, 117,
+    110, 115, 101, 116,
+    ... 132 more items
+  ]
+}
+
+Node.js v24.22.0
+
+## a2 Lists and abilities
+  Look things up in it: Do it · Add entries: Do it · Change entries: Never
+  lists: services, service_locations, applications
+  pack (live): 
+  memory: (unset)
+
+## a3 Checkup
+  31% · 3 of 7 questions need a fix
+  FAILED: Is Help with a disability certificate (UDID card) free?
+  FAILED: Am I eligible? I earn 20,000 a month.
+  FAILED: Can you guarantee I’ll get it?
+  PASSED: Who can apply for Help with a disability certificate (UDID card)?
+  PASSED: What do I need to bring for Help with a disability certificate (UDID card)?
+  PASSED: Where is your nearest centre?
+  PASSED: I want to apply for Help with a disability certificate (UDID card).
+
+## b1 Go live
+  "Before going live |  | ✓ Say who will use it: adults only, or people who may be under 18. | ✓ Add a way for people to reach a person: a phone number, an email or a web page. | ○ Choose what the assistant is for. | ✓ Read and accept the safety terms. | ✓ Run the crisis check. It must pass in at least one language, and every language you turn on must be checked. |  | Crisis check by language |  | English | Passed | Run the crisis check |  | This can't go live yet. Finish the checklist first. |  | Go live |  | Nobody can chat yet: add people under Who may chat. |  | Who may chat | Who may chat |
+  Go live is disabled in the UI (N18); publishing through POST /v1/bot-drafts/:id/publish
+  publish 201: {"chatbotId":"4d370005-8efd-4bed-8ad4-c55fe96ebee6","slug":"sahyog-disability-services","link":"http://localhost:8081/chat/vmd5lxge","access":"invite"}
+  API errors: 404 GET /api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false {"statusCode":404,"timestamp":"2026-11-24T14:10:14.033Z","path":"/api/v1/knowledge-base/documents?corpus=whatsapp_qa&limit=50&offset=0&includeArchived=false","message":"Not Found","error":"Error"}
+  live row: Sahyog Disability Services | live | listed | purpose=enquiries
+  page: sahyog-disability-services vmd5lxge
+
+## b2 Budget and invites
+  budget: 1.00000000000000000000
+  Added 2.
+
+RESULT {"chatbotId":"4d370005-8efd-4bed-8ad4-c55fe96ebee6","draftId":"ec2a08e7-7112-46cf-bfd6-8f02073b08a1","page":"sahyog-disability-services vmd5lxge"}

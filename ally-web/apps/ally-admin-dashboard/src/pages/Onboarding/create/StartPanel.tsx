@@ -1,16 +1,20 @@
 import React, { useRef, useState } from "react";
 
+import { useGetTemplateCatalogueQuery } from "@api";
 import type { BotTemplateCard } from "@api";
 import { Button, PrimaryButton } from "@components/v2";
+import type { TemplateAnswers } from "@types";
 
 import { BUILD_COPY } from "./copy";
 import { TemplateCatalog } from "./TemplateCatalog";
 import { SOURCE_ACCEPT, filesOk } from "./useSources";
+import { TF1_COPY } from "../../AssistantHome/copy/tf1";
+import { TemplateSetup } from "../../Templates/TemplateSetup";
 import { fill } from "../copy";
 
 const S = BUILD_COPY.start;
 
-type View = "choose" | "template" | "scratch" | "website" | "documents";
+type View = "choose" | "template" | "library" | "scratch" | "website" | "documents";
 
 /**
  * The left panel of a new, blank chatbot: Pick a template, or Start from scratch with a website,
@@ -27,6 +31,11 @@ export const StartPanel: React.FC<{
     template: BotTemplateCard,
     answers: Record<string, string | boolean | string[]>,
   ) => void;
+  /**
+   * TF1 S6: a use-case template (T1: For organisations, For businesses), applied whole to the
+   * draft: purpose, pack, instructions, languages, lists, checkup questions and the answers.
+   */
+  onUseCase?: (templateId: string, answers: TemplateAnswers) => void;
   onWebsite: (address: string) => void;
   onDocuments: (files: File[]) => void;
   onInterview: () => void;
@@ -36,6 +45,7 @@ export const StartPanel: React.FC<{
   creditsOut,
   templatesOffered,
   onTemplate,
+  onUseCase,
   onWebsite,
   onDocuments,
   onInterview,
@@ -45,6 +55,9 @@ export const StartPanel: React.FC<{
   const [files, setFiles] = useState<File[]>([]);
   const [fileProblem, setFileProblem] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const useCases = useGetTemplateCatalogueQuery(undefined, {
+    skip: view !== "template" || !onUseCase,
+  });
 
   const error = (problem || fileProblem) && (
     <p className="ally-error" role="alert">
@@ -52,13 +65,33 @@ export const StartPanel: React.FC<{
     </p>
   );
 
-  if (view === "template" && templatesOffered) {
+  if (view === "template" && templatesOffered && onUseCase) {
+    return (
+      <div className="ally-build__start" data-testid="start-use-cases">
+        <TemplateSetup
+          catalogue={useCases.data}
+          loading={useCases.isLoading}
+          failed={useCases.isError}
+          onRetry={() => void useCases.refetch()}
+          busy={busy}
+          error={problem}
+          onBack={() => setView("choose")}
+          onSubmit={(template, answers) => onUseCase(template.id, answers)}
+        />
+        <button type="button" className="ally-link ally-small" onClick={() => setView("library")}>
+          {TF1_COPY.create.moreStartingPoints}
+        </button>
+      </div>
+    );
+  }
+
+  if ((view === "library" || view === "template") && templatesOffered) {
     return (
       <TemplateCatalog
         busy={busy}
         problem={problem}
         onApply={onTemplate}
-        onBack={() => setView("choose")}
+        onBack={() => setView(onUseCase ? "template" : "choose")}
       />
     );
   }

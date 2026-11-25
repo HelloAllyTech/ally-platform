@@ -198,6 +198,7 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         changes?: {
           value?: {
             metadata?: { phone_number_id?: string };
+            contacts?: { wa_id?: string; profile?: { name?: string } }[];
             messages?: {
               id?: string;
               from?: string;
@@ -223,6 +224,15 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         // message is tagged with the number it was sent to; the webhook drops the ones no connected
         // number answers for, so a reply never reaches a worker from a number they never wrote to.
         const addressedTo = change?.value?.metadata?.phone_number_id;
+        // TF1 B5: the sender's profile name, by their WhatsApp id.
+        const profiles = new Map(
+          (change?.value?.contacts ?? [])
+            .filter((c) => c?.wa_id && c.profile?.name?.trim())
+            .map((c) => [
+              String(c.wa_id),
+              c.profile!.name!.trim().slice(0, 120),
+            ]),
+        );
         for (const message of change?.value?.messages ?? []) {
           if (!message?.id || !message?.from) continue;
 
@@ -250,6 +260,9 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
               ? new Date(Number(message.timestamp) * 1000)
               : new Date(),
             ...(addressedTo ? { phoneNumberId: addressedTo } : {}),
+            ...(profiles.get(message.from)
+              ? { profileName: profiles.get(message.from) }
+              : {}),
           });
         }
       }

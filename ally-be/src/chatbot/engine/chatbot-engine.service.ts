@@ -16,6 +16,7 @@ import { usageContext } from 'src/billing/context/usage-context';
 import { Injectable, Optional } from '@nestjs/common';
 import {
   crisisReply,
+  emergencyKindOf,
   emergencyReply,
 } from '../../bot-draft/safety-pack/safety-packs';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -82,6 +83,11 @@ import {
 import { caringDecline } from './caring-decline';
 import { crisisHelplines } from './crisis-helplines';
 import { replyLanguageOf } from './reply-language';
+import {
+  isChildSafeguarding,
+  selfHarmHere,
+  withSafeguardingLine,
+} from './safeguarding';
 import { helplineNumbersWithExtras } from '../quick-replies/quick-reply-copy.service';
 import {
   curatedLanguageOf,
@@ -761,6 +767,10 @@ export class ChatbotEngineService {
     if (turn.tap) {
       const tapped = await this.actions?.perform(turn);
       if (tapped) return tapped;
+    } else {
+      // TF1 F2: a typed yes to the card just shown confirms that card, as its tap would.
+      const typed = await this.actions?.typedYes?.(turn);
+      if (typed) return typed;
     }
 
     // ── 4. Answer ────────────────────────────────────────────────────────
@@ -952,6 +962,19 @@ export class ChatbotEngineService {
       );
     }
     const checked = settle(crisisCheck);
+    // TF1 S7: a worry about a child's safety is answered from the organisation's own procedure,
+    // with the fixed child-protection line, not the self-harm reply. Still the fixed reply when the
+    // person is at risk themselves, or for a medical emergency.
+    const safeguarding = isChildSafeguarding(turn.text);
+    const fixedReply = (
+      verdict: PromiseSettledResult<CrisisCheckResponse | null>,
+    ): verdict is PromiseFulfilledResult<CrisisCheckResponse> =>
+      isUrgent(verdict) &&
+      !(
+        safeguarding &&
+        !selfHarmHere(turn.text) &&
+        crisisLevelOf(verdict.value) !== 'emergency'
+      );
 
     // 1. Only for a message that looks emotional (stop 1, option c): the level, if it comes within
     //    LEVEL_WAIT_MS (the classifier's p90 is about 2.5 s). At risk or an emergency: the fixed
@@ -964,7 +987,7 @@ export class ChatbotEngineService {
       }),
     );
     const early = await Promise.race([checked, after(waitMs)]);
-    if (early && isUrgent(early)) {
+    if (early && fixedReply(early)) {
       return this.crisisDecision(turn, early.value!, ran, { notOnList: false });
     }
     const mood =
@@ -988,7 +1011,7 @@ export class ChatbotEngineService {
     if (!early) {
       const first = await Promise.race([
         running.then(() => null),
-        checked.then((verdict) => (isUrgent(verdict) ? verdict : null)),
+        checked.then((verdict) => (fixedReply(verdict) ? verdict : null)),
       ]);
       if (first) {
         stop.abort();
@@ -1021,7 +1044,7 @@ export class ChatbotEngineService {
       // model to choose crisis when uncertain, so re-gating here would undo that instruction.
       const crisis =
         crisisResult.status === 'fulfilled' ? crisisResult.value : null;
-      if (crisis?.is_crisis) {
+      if (crisis?.is_crisis && fixedReply(crisisResult)) {
         return {
           ...(await this.crisisDecision(turn, crisis, ran, {
             notOnList: false,
@@ -1150,6 +1173,36 @@ export class ChatbotEngineService {
       if (agent) decision.agent = agent;
       return this.withConflictCheck(turn, answer, decision);
     })();
+    if (safeguarding) {
+      const flagged =
+        crisisResult.status === 'fulfilled' &&
+        Boolean(crisisResult.value?.is_crisis);
+      if (flagged) {
+        this.logger.warn(
+          `Child-safeguarding message on chatbot ${turn.chatbot.id}: answered from its own information with the child-protection line`,
+        );
+      }
+      return {
+        ...decided,
+        body: withSafeguardingLine(
+          decided.body ?? '',
+          replyLanguageOf(turn.text ?? '', turn.language),
+          isIndiaAssistant(turn.chatbot.settings),
+        ),
+        ...(flagged && !decided.alert
+          ? {
+              alert: this.alert(
+                200,
+                'crisis',
+                `A child-safeguarding message on chatbot "${turn.chatbot.name}" (${turn.channel.type}, ` +
+                  `sender ${turn.sender.label}). It was answered from the assistant's own information, ` +
+                  `with the child-protection numbers.`,
+                'Chatbot Crisis Classifier',
+              ),
+            }
+          : {}),
+      };
+    }
     return unsure || upset
       ? withUnsureCrisisInformation(turn, decided)
       : decided;
@@ -1315,6 +1368,7 @@ export class ChatbotEngineService {
             ),
             selfHarm: Boolean(crisis.self_harm),
             animal: aboutAnAnimal(turn.text),
+            kind: emergencyKindOf(turn.text),
             helplineNumbers: crisisHelplines(turn.settings) || null,
             india: isIndiaAssistant(chatbot.settings),
           })

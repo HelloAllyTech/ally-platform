@@ -211,6 +211,24 @@ describe("BotPageApp", () => {
     expect(await screen.findByRole("heading", { name: /isn't available/ })).toBeInTheDocument();
   });
 
+  // TF1 F11: a paused link said only "isn't available", with no crisis information.
+  it("a paused assistant's link shows its off message, with the crisis lines", async () => {
+    const api = fakeApi({
+      page: vi.fn().mockRejectedValue(
+        new BotPageApiError("BOT_PAGE_NOT_FOUND", 404, undefined, {
+          assistantOff: "paused",
+          offMessage:
+            "Saathi is away right now.\nIf you're in danger, call 112. Tele-MANAS: 14416.",
+        }),
+      ),
+    });
+    render(<BotPageApp slug="paused" api={api} />);
+    expect(
+      await screen.findByRole("heading", { name: "Saathi is away right now." }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("bp-error-more")).toHaveTextContent("Tele-MANAS: 14416");
+  });
+
   it("explains a wrong code and lets the visitor try again", async () => {
     const user = userEvent.setup();
     const api = fakeApi({

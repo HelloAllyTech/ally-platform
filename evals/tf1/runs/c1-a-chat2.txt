@@ -1,0 +1,37 @@
+"You:
+Hi, do you remember my name?
+
+Saathi Youth Helpline:
+Yes — I remember your name is Asha. How can I help you today?
+
+You are chatting with an AI assistant. The AI and people at Saathi Youth Helpline may read this chat.
+This is an automated assistant that answers from our reference material. It is not medical advice and not a crisis service. Reply STOP to opt out.
+What do you do?
+What do you offer, and what does it cost?
+What are your opening hours?
+Show what I did:
+==========
+"You:
+What did I ask for last time? Do I have a callback booked?
+
+Saathi Youth Helpline:
+Last time you asked for a callback. You do have a callback request listed: requester Asha, phone +91 98111 22334, preferred time “evening”, status “requested”. A listener will call back within 4 hours during opening hours.
+
+Callback requests
+
++919811122334
+
+Requester
+Asha
+==========
+"You:
+Please cancel my callback request
+
+Passing this to the team…
+
+Passing this to the team…
+
+"
+--- buttons:
+"What do you do? | What do you offer, and what does it cost? | What are your opening hours? | Show what I did:\nSearched Saathi Youth Helpline's information | 👍 | 👎 | Show what I did:\nSearched Saathi Youth Helpline's information · Looked in Callback requests | 👍 | 👎"
+==========

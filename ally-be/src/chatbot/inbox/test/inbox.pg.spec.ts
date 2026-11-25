@@ -134,6 +134,48 @@ describePg('Inbox (Postgres)', () => {
     });
   });
 
+  // TF1 S5: Asha (signed in, named) showed as "Visitor · 0799" and "Visitor · 4477", one row per chat.
+  it('one row per person, named from their contact, with their other chats in the thread', async () => {
+    const first = await chat('My first question', '2026-11-09T08:00:00Z');
+    const [{ contact_id: asha }] = await dataSource.query(
+      `SELECT contact_id FROM chatbot_conversations WHERE id = $1`,
+      [first],
+    );
+    await dataSource.query(
+      `UPDATE chatbot_contacts SET display_name = 'Asha' WHERE id = $1`,
+      [asha],
+    );
+    const second = await chat('Back again', '2026-11-09T10:00:00Z');
+    await dataSource.query(
+      `UPDATE chatbot_conversations SET contact_id = $2 WHERE id = $1`,
+      [second, asha],
+    );
+    // Someone with only a verified email.
+    const ravi = await chat('Hello', '2026-11-09T09:00:00Z');
+    await dataSource.query(
+      `INSERT INTO chatbot_contact_identities (contact_id, chatbot_id, channel, external_id, verified)
+       SELECT contact_id, chatbot_id, 'email', 'ravi@example.com', true
+         FROM chatbot_conversations WHERE id = $1`,
+      [ravi],
+    );
+    const inbox = new InboxService(dataSource, {
+      accessibleChatbotIds: async () => [bot],
+      assert: async () => undefined,
+    } as never);
+
+    const list = await inbox.list();
+    expect(list.map((c) => [c.id, c.visitor, c.chats])).toEqual([
+      [second, 'Asha', 2],
+      [ravi, 'ravi@example.com', 1],
+    ]);
+
+    const older = await inbox.thread(bot, first);
+    expect(older?.otherChats.map((o) => o.id)).toEqual([second]);
+    // Replies go where she is now.
+    expect(older?.newerChatId).toBe(second);
+    expect((await inbox.thread(bot, second))?.newerChatId).toBeNull();
+  });
+
   it('marks website chats, and filters Website apart from Bot page (chunk 13)', async () => {
     const page = await chat('From the page', '2026-11-09T10:00:00Z');
     const widget = await chat(

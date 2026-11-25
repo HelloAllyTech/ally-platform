@@ -13,6 +13,7 @@ import { Permissions } from "@constants";
 const h = vi.hoisted(() => ({
   overview: vi.fn(),
   readAgain: vi.fn(),
+  setStatus: vi.fn(),
   permissions: { current: [] as string[] },
   access: { current: [{ id: "e1" }] as unknown[] | undefined },
 }));
@@ -25,7 +26,10 @@ vi.mock("@api", async importOriginal => ({
   useGetAssistantTemplatesQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useInstallTemplateMutation: () => [vi.fn(), { isLoading: false }],
   useArchiveChatbotMutation: () => [vi.fn(), { isLoading: false }],
-  useSetChatbotStatusMutation: () => [vi.fn(), { isLoading: false }],
+  useSetChatbotStatusMutation: () => [
+    (args: unknown) => ({ unwrap: () => h.setStatus(args) }),
+    { isLoading: false },
+  ],
   useGetAccessListQuery: () => ({ data: h.access.current }),
   useGetHomeOverviewQuery: (arg: unknown) => h.overview(arg),
   useReadSourceAgainMutation: () => [
@@ -51,6 +55,7 @@ vi.mock("../sections/AllNumbers", () => ({
 
 const { OverviewSection } = await import("../sections/Overview");
 const { HOME } = await import("../copy");
+const { TF1_COPY } = await import("../copy/tf1");
 const { OVERVIEW_COPY: o, LIVE_ACCESS_COPY: la } = await import("../copy/overview");
 const t = HOME.overview;
 
@@ -97,6 +102,7 @@ const view = (home: Record<string, unknown> = {}, props: Record<string, unknown>
 beforeEach(() => {
   h.overview.mockReset().mockReturnValue({ data: DATA, isError: false, refetch: vi.fn() });
   h.readAgain.mockReset().mockReturnValue({ changed: false });
+  h.setStatus.mockReset().mockResolvedValue({});
   h.permissions.current = [];
   h.access.current = [{ id: "e1" }];
 });
@@ -233,5 +239,28 @@ describe("See all numbers", () => {
   it("an old usage link does not open it for a builder", () => {
     view({}, { openAllNumbers: true });
     expect(screen.queryByTestId("all-numbers")).toBeNull();
+  });
+});
+
+// TF1 S1: "Turn on" on a never-published assistant got a silent 409.
+describe("the one switch", () => {
+  it("sends a never-published assistant to Build, where the checklist and Go live are", () => {
+    const go = vi.fn();
+    view({}, { bot: { id: "bot-1", status: "draft" }, go });
+    fireEvent.click(screen.getByRole("button", { name: TF1_COPY.overview.finishToGoLive }));
+    expect(go).toHaveBeenCalledWith("build", "personality");
+    expect(h.setStatus).not.toHaveBeenCalled();
+  });
+
+  it("says why turning a paused assistant on was refused", async () => {
+    h.setStatus.mockReturnValue(
+      Promise.reject({ status: 409, data: { message: "Finish the checklist first." } }),
+    );
+    view({}, { bot: { id: "bot-1", status: "paused" } });
+    fireEvent.click(screen.getByRole("button", { name: t.turnOn }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toContain("Finish the checklist first."),
+    );
+    expect(h.setStatus).toHaveBeenCalledWith({ id: "bot-1", status: "live" });
   });
 });

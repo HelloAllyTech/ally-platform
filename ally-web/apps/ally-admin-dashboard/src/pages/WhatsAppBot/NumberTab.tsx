@@ -204,7 +204,7 @@ export const useWaNumbers = (chatbotId?: string) => {
 const SetupSteps: React.FC<{ current: StepId }> = ({ current }) => {
   const index = STEPS.findIndex(step => step.id === current);
   return (
-    <ol className="flex flex-col gap-3 min-w-[11rem]">
+    <ol className="flex flex-wrap gap-x-6 gap-y-2">
       {STEPS.map((step, i) => {
         const done = i < index;
         const active = i === index;
@@ -268,9 +268,11 @@ export const ConnectWhatsAppFlow: React.FC<{ chatbotId?: string; onClose: () => 
         </Button>
       }
     >
-      <div className="flex max-md:flex-col gap-8">
+      {/* TF1: the steps across the top and the instructions full width below. Side by side, the
+          flow is too cramped in the side sheet it opens in, whatever the screen width. */}
+      <div className="flex flex-col gap-6">
         <SetupSteps current={step === "done" ? "test" : step} />
-        <div className="flex-1 min-w-0 flex flex-col gap-4">
+        <div className="min-w-0 flex flex-col gap-4 [&_.cds--inline-notification]:max-w-full [&_.cds--inline-notification]:min-w-0">
           {step === "details" && <DetailsStep onReady={() => setHasDetails(true)} />}
           {step === "connect" && (
             <ConnectStep chatbotId={chatbotId} onConnected={id => setCreatedId(id)} />

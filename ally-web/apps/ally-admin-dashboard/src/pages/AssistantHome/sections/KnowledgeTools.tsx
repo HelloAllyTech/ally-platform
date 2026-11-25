@@ -39,7 +39,7 @@ const Problem: React.FC<{ text: string | null }> = ({ text }) =>
   ) : null;
 
 /** Sources held back for personal details: an owner approves, an editor can leave them out. */
-const Review: React.FC<{ botId: string; canEdit: boolean; canManage: boolean }> = ({
+export const Review: React.FC<{ botId: string; canEdit: boolean; canManage: boolean }> = ({
   botId,
   canEdit,
   canManage,
