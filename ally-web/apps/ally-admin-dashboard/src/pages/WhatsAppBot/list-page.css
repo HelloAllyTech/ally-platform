@@ -102,6 +102,15 @@
 .ally-list-page__card-wrap--menu .ally-list-page__card-top {
   padding-right: 40px;
 }
+/* TF1 F5: a draft's link to its home sits inside the card's frame, at the bottom, not beside it. */
+.ally-list-page__card-wrap--home-link > .ally-list-page__card {
+  padding-bottom: 44px;
+}
+.ally-list-page__home-link {
+  position: absolute;
+  left: 21px;
+  bottom: 16px;
+}
 .ally-list-page__menu {
   position: absolute;
   top: 12px;

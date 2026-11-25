@@ -241,6 +241,10 @@ const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () 
             key={bot.id}
             className={`ally-list-page__card-wrap${
               access.manage ? " ally-list-page__card-wrap--menu" : ""
+            }${
+              bot.status === ChatbotStatus.DRAFT && bot.setupDraftId
+                ? " ally-list-page__card-wrap--home-link"
+                : ""
             }`}
           >
             <button
@@ -298,7 +302,7 @@ const ChatbotGrid: React.FC<{ bots: Chatbot[]; canCreate: boolean; onCreate: () 
             {bot.status === ChatbotStatus.DRAFT && bot.setupDraftId && (
               <button
                 type="button"
-                className="ally-link ally-small"
+                className="ally-link ally-small ally-list-page__home-link"
                 data-testid={`open-home-${bot.id}`}
                 onClick={() => navigate(ROUTES.CHATBOT_DETAIL.replace(":botId", bot.id))}
               >
