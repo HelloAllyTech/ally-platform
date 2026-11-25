@@ -17,6 +17,8 @@ function harness(
     stillEligible?: string[];
     budgets?: boolean;
     budgetFor?: string[];
+    /** Names of the builder's chatbots made today. */
+    taken?: { name: string }[];
   } = {},
 ) {
   const deleted: string[] = [];
@@ -26,6 +28,7 @@ function harness(
       queries.push(sql);
       if (sql.includes('pg_advisory_xact_lock')) return [];
       if (sql.includes('count(*) OVER ()')) return opts.existing ?? [];
+      if (sql.startsWith('SELECT name FROM chatbots')) return opts.taken ?? [];
       if (sql.includes('FOR UPDATE SKIP LOCKED')) return [{ id: params[0] }];
       if (sql.includes('SELECT 1 FROM (')) {
         return (opts.stillEligible ?? []).includes(String(params[2]))
@@ -87,6 +90,31 @@ describe('BlankChatbotService', () => {
       expect(h.drafts.create).toHaveBeenCalledWith(
         expect.objectContaining({ blank: true }),
       );
+    });
+
+    it("names it 'Your new Ally Chatbot DDMMYY' and a number, counting the builder's day", async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2025-11-25T09:00:00Z'));
+      try {
+        const h = harness({
+          taken: [
+            { name: 'Your new Ally Chatbot 2511251' },
+            { name: 'Your new Ally Chatbot 2511252' },
+          ],
+        });
+        await h.service.createOrReuse();
+        expect(h.drafts.create).toHaveBeenCalledWith({
+          name: 'Your new Ally Chatbot 2511253',
+          blank: true,
+        });
+        const first = harness();
+        await first.service.createOrReuse();
+        expect(first.drafts.create).toHaveBeenCalledWith({
+          name: 'Your new Ally Chatbot 2511251',
+          blank: true,
+        });
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('reuses the newest untouched blank: a double click makes one', async () => {

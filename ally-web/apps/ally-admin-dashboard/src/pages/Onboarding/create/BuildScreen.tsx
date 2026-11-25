@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 
-import { Link } from "react-router-dom";
+import { createPortal } from "react-dom";
 
 import {
   useApplyBotTemplateMutation,
@@ -10,10 +10,11 @@ import {
   useSetBuildModeMutation,
 } from "@api";
 import type { BotTemplateCard, BuildMode, StartPath } from "@api";
+import { ASSISTANT_HEADER_SLOT_ID } from "@components/assistant-only/headerSlot";
 import { Button, Orb, SplitBuild } from "@components/v2";
-import { ROUTES } from "@constants";
 import type { TemplateAnswers } from "@types";
 
+import { BuildBreadcrumb } from "./BuildBreadcrumb";
 import { Copilot } from "./Copilot";
 import { BUILD_COPY } from "./copy";
 import { DirectForm } from "./DirectForm";
@@ -94,6 +95,11 @@ export const BuildScreen: React.FC<{
     readSnapshot(draftId),
   );
   const [bridge] = useState(createSplitBridge);
+  // Where the Create screen's breadcrumb is drawn: the shell's top bar, when it has a slot for it.
+  const [crumbSlot, setCrumbSlot] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    setCrumbSlot(document.getElementById(ASSISTANT_HEADER_SLOT_ID));
+  }, []);
   const [setBuildMode] = useSetBuildModeMutation();
   const [applyTemplate] = useApplyBotTemplateMutation();
   const [applyUseCase] = useApplyDraftTemplateMutation();
@@ -286,15 +292,30 @@ export const BuildScreen: React.FC<{
 
   const usable = Boolean(wc.chatbotId) && !archived && draft.data?.status !== "abandoned";
 
+  // On the Create screen the way back and the name live in the shell's top bar (inline, above the
+  // build area, when there is no top bar to put them in). The name is edited there.
+  const chatbotName = asText(copy.values.name) || B.title;
+  const breadcrumb = (
+    <BuildBreadcrumb
+      name={chatbotName}
+      onRename={async next => (await copy.commit("name", next)).status === "saved"}
+    />
+  );
+
   const left = (
-    <div className="ally-build__left" data-testid="build-left">
-      {surface === "create" && (
-        <Link to={ROUTES.WHATSAPP_BOT} className="ally-link ally-small">
-          {B.back}
-        </Link>
-      )}
-      <header className="ally-build__head">
-        <h2 className="ally-heading">{asText(copy.values.name) || B.title}</h2>
+    <div
+      className={`ally-build__left${surface === "create" ? " ally-build__left--create" : ""}`}
+      data-testid="build-left"
+    >
+      {surface === "create" && !crumbSlot && breadcrumb}
+      <header
+        className={`ally-build__head${surface === "create" ? " ally-build__head--create" : ""}`}
+      >
+        {surface === "create" ? (
+          <h2 className="ally-heading">{SPLIT_COPY.build.title}</h2>
+        ) : (
+          <h2 className="ally-heading">{chatbotName}</h2>
+        )}
         {!start && (
           <div className="ally-build__modes" role="group" aria-label={B.modes.label}>
             {(["copilot", "form"] as const).map(m => (
@@ -382,6 +403,7 @@ export const BuildScreen: React.FC<{
       data-testid="build-screen"
       data-live={copy.live ? "1" : "0"}
     >
+      {surface === "create" && crumbSlot && createPortal(breadcrumb, crumbSlot)}
       <SplitBuild
         build={left}
         test={

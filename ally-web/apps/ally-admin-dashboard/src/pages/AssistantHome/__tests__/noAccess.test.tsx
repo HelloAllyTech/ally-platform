@@ -24,8 +24,8 @@ describe("An assistant you're not on (A1)", () => {
     expect(screen.getByTestId("assistant-no-access").textContent).toContain(
       "You don't have access to this assistant. Ask its owner to add you.",
     );
-    expect(screen.getByRole("link", { name: "Go to your assistants" }).getAttribute("href")).toBe(
-      "/assistants",
-    );
+    expect(
+      screen.getByRole("link", { name: "Back to Your Ally Chatbots" }).getAttribute("href"),
+    ).toBe("/assistants");
   });
 });

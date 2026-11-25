@@ -33,8 +33,14 @@ describe("AssistantOnlyHeader while setting up an assistant", () => {
     },
   );
 
-  it("keeps the link on the assistants list", () => {
+  it("has no link out to Ally admin on the assistants list", () => {
     renderAt("/assistants");
+    expect(screen.queryByRole("link", { name: "Back to Ally admin" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("corner-menu-button")).toBeInTheDocument();
+  });
+
+  it("keeps the link on an assistant's own pages", () => {
+    renderAt("/assistants/3ca28ccf-31aa-4969-bdf5-b1437f42e9e6");
     expect(screen.getByRole("link", { name: "Back to Ally admin" })).toBeInTheDocument();
   });
 });

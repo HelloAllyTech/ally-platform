@@ -42,3 +42,30 @@ describe('the default name never beats a real one (TF1)', () => {
     expect(realName('Your assistant', '')).toBe('Your assistant');
   });
 });
+
+describe('the auto name of a new chatbot', () => {
+  it('never wins over a real name, like the old default', () => {
+    expect(
+      realName('Your new Ally Chatbot 2511251', 'Saathi Youth Helpline'),
+    ).toBe('Saathi Youth Helpline');
+    expect(realName('Your new Ally Chatbot 25112512', 'Saathi')).toBe('Saathi');
+  });
+
+  it('is kept when there is no real name to prefer', () => {
+    expect(realName('Your new Ally Chatbot 2511251', '')).toBe(
+      'Your new Ally Chatbot 2511251',
+    );
+    expect(
+      realName(
+        'Your new Ally Chatbot 2511251',
+        'Your new Ally Chatbot 2511252',
+      ),
+    ).toBe('Your new Ally Chatbot 2511251');
+  });
+
+  it('is not mistaken for a name that merely starts the same way', () => {
+    expect(realName('Your new Ally Chatbot for schools', 'Saathi')).toBe(
+      'Your new Ally Chatbot for schools',
+    );
+  });
+});

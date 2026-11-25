@@ -9,7 +9,7 @@ export const SAFETY_PRIVACY_COPY = {
   hint: "Who uses this chatbot, how long chats are kept, and how your team hears about someone who may be at risk.",
   saved: "Saved.",
   saveFailed: "That didn't save. Try again.",
-  ownerOnly: "Only an owner can make this setting less strict.",
+  ownerOnly: "Only an author can make this setting less strict.",
   audience: {
     label: "Who will use it",
     unstated: "Not said yet",
@@ -40,7 +40,7 @@ export const SAFETY_PRIVACY_COPY = {
     immediate: "Straight away",
     digest: "In a digest",
     recipients: "Extra email addresses to alert, one per line",
-    recipientsHint: "Leave empty to alert the owners and responders.",
+    recipientsHint: "Leave empty to alert the authors and responders.",
     save: "Save alerts",
   },
   wait: {
@@ -77,12 +77,12 @@ export const SAFETY_PRIVACY_COPY = {
   knowledge: {
     reviewTitle: "Sources to review",
     reviewHint:
-      "These may contain personal details, so they are held back until an owner approves them.",
+      "These may contain personal details, so they are held back until an author approves them.",
     reviewEmpty: "Nothing is waiting for review.",
     found: "Found",
     approve: "Approve",
     exclude: "Leave out",
-    ownerApprove: "Only an owner can approve a source.",
+    ownerApprove: "Only an author can approve a source.",
     freshTitle: "Keep it fresh",
     freshDays: "Your oldest source was read {n} days ago.",
     freshNone: "No sources to read again yet.",

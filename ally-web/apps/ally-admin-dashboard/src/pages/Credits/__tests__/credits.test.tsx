@@ -103,12 +103,12 @@ describe("Credits page", () => {
     expect(screen.queryByTestId("credits-paused")).toBeNull();
   });
 
-  it("always offers 'Contact Ally for more credits'", () => {
+  it("offers 'Contact Ally for more credits', and asks them to reach their Ally contact when pressed", () => {
     renderBody(CREDITS);
-    expect(screen.getByRole("link", { name: "Contact Ally for more credits" })).toHaveAttribute(
-      "href",
-      expect.stringContaining("mailto:"),
-    );
+    expect(screen.queryByTestId("credits-contact-message")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Contact Ally for more credits" }));
+    expect(screen.getByRole("status")).toHaveTextContent("reach out to your contact at Ally");
+    expect(screen.queryByRole("link", { name: "Contact Ally for more credits" })).toBeNull();
   });
 
   it("warns when the free balance is under the reserve and when it is used up", () => {

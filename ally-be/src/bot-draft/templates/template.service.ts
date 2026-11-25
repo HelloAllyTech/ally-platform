@@ -23,8 +23,6 @@ import {
 import { listDefinition } from '../../chatbot/templates/template-lists';
 import {
   TEMPLATE_GROUPS,
-  TEMPLATES,
-  templateById,
   type UseCaseTemplate,
 } from '../../chatbot/templates/templates';
 import type { ChatbotSettingsOverride } from '../../chatbot/type/chatbot.type';
@@ -44,6 +42,7 @@ import {
 } from '../safety-pack/safety-packs';
 import { BotDraftPublishService } from '../service/bot-draft-publish.service';
 import { BotDraftService } from '../service/bot-draft.service';
+import { TemplateRegistryService } from './template-registry.service';
 import type { DraftEvent } from '../type/bot-draft.type';
 
 /** What happened to the safety pack. */
@@ -100,15 +99,17 @@ export class TemplateService {
     private readonly records: ListRecordsService,
     private readonly drafts: BotDraftService,
     private readonly publish: BotDraftPublishService,
+    private readonly registry: TemplateRegistryService,
   ) {}
 
   // ---- the catalogue ---------------------------------------------------------------------------
 
   /** The cards, in two groups, the suggested one first in its group. */
-  catalogue({
+  async catalogue({
     industry,
     has = [],
   }: { industry?: string | null; has?: string[] } = {}) {
+    const TEMPLATES = await this.registry.all();
     const suggested =
       (industry && TEMPLATES.find((t) => t.suggested_for.includes(industry))) ||
       null;
@@ -181,10 +182,11 @@ export class TemplateService {
     answers: SetupAnswers,
   ): Promise<InstallResult> {
     await this.access.assert(chatbotId, ChatbotMemberRole.OWNER);
-    const template = this.templateOrRefuse(templateId);
+    const { template, version } = await this.templateOrRefuse(templateId);
     const draft = await this.draftOf(chatbotId);
     const { result, plan } = await this.install(chatbotId, template, answers, {
       setup: false,
+      version,
     });
     // The setup answers the assistant answers from: in its owner's notes, as setup writes them.
     if (draft && plan.facts.length) {
@@ -211,7 +213,7 @@ export class TemplateService {
   ): Promise<{ result: InstallResult; draft: BotDraftEntity }> {
     if (!draft.chatbotId)
       throw new NotFoundException('That setup was not found.');
-    const template = this.templateOrRefuse(templateId);
+    const { template, version } = await this.templateOrRefuse(templateId);
     await this.access.assert(draft.chatbotId, ChatbotMemberRole.OWNER);
     const { result, plan } = await this.install(
       draft.chatbotId,
@@ -220,6 +222,7 @@ export class TemplateService {
       {
         setup: true,
         draftPack: draft.safetyPack ? draft.draftConfig.safetyPackId : null,
+        version,
       },
     );
 
@@ -280,7 +283,13 @@ export class TemplateService {
     {
       setup,
       draftPack = null,
-    }: { setup: boolean; draftPack?: SafetyPackId | null },
+      version = null,
+    }: {
+      setup: boolean;
+      draftPack?: SafetyPackId | null;
+      /** The managed template's version, so an install records which wording it started from. */
+      version?: number | null;
+    },
   ): Promise<{ result: InstallResult; plan: InstallPlan }> {
     const chatbot = await this.dataSource
       .getRepository(Chatbot)
@@ -436,6 +445,7 @@ export class TemplateService {
         m.getRepository(ChatbotTemplateInstall).create({
           chatbotId,
           templateId: template.id,
+          templateVersion: version,
           setupAnswers: answers as Record<string, unknown>,
           added: fresh.map((l) => l.use.key),
           skipped,
@@ -506,8 +516,8 @@ export class TemplateService {
         ORDER BY installed_at ASC LIMIT 1`,
       [chatbotId],
     )) as { template_id: string }[];
-    const template = row ? templateById(row.template_id) : undefined;
-    return template ? { id: template.id, name: template.name } : null;
+    const found = row ? await this.registry.byId(row.template_id) : undefined;
+    return found ? { id: found.template.id, name: found.template.name } : null;
   }
 
   /** Example entries still to replace: written by a template, never changed since. */
@@ -529,15 +539,17 @@ export class TemplateService {
 
   // ---- helpers ---------------------------------------------------------------------------------
 
-  private templateOrRefuse(id: string): UseCaseTemplate {
-    const template = templateById(id);
-    if (!template) {
+  private async templateOrRefuse(
+    id: string,
+  ): Promise<{ template: UseCaseTemplate; version: number | null }> {
+    const found = await this.registry.byId(id);
+    if (!found) {
       throw new BadRequestException({
         errorCode: 'unknown_template',
         message: 'That template isn’t available.',
       });
     }
-    return template;
+    return { template: found.template, version: found.version };
   }
 
   private async draftOf(chatbotId: string): Promise<BotDraftEntity | null> {
