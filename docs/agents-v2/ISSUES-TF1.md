@@ -58,7 +58,7 @@ One pass on five fictional non-profits on master `2eb64bb88` (crisis fix and BT1
 | P13 | Not changed in code | Model wording. In the re-run, case 5 gave its number. Watch in round 2. |
 | B1 | Done and re-run live | Services, Donors and Staff onboarding set memory on with the notice; a staff member was told "I remember your name … Say 'forget me' any time." Young or unstated audiences are still asked. |
 | B2 | Done and re-run live | Channels says who can chat in one line; the onboarding template went live organisation-only, and a member chatted. Public stays off. |
-| B4 | **Not done: round 2** | Needs a "withdrawn" status on the request lists and a status-only change the assistant may make while Change is Never. A list-definition change, so it gets its own commit and re-run. |
+| B4 | Done in round 2 (below) | Needs a "withdrawn" status on the request lists and a status-only change the assistant may make while Change is Never. A list-definition change, so it gets its own commit and re-run. |
 | B5 | Done and re-run live | A new WhatsApp contact takes the profile name; the name given in chat ("Bilal") replaces it. |
 | B3, B6 | B3 is S5; B6 no change | |
 
@@ -68,7 +68,7 @@ One pass on five fictional non-profits on master `2eb64bb88` (crisis fix and BT1
 |---|---|---|---|
 | N1 | Fix before customers | A "Yes" to "Shall I book you…?" was taken as the answer to a memory consent question still open from an earlier chat: memory turned on, the booking never happened. | Fixed and re-run live: a yes counts as consent only right after the question. |
 | N2 | Serious (part of S6) | `POST bot-drafts/:id/template` was two routes; the use-case one could never be reached. | Fixed, with a test that setup routes are unique. |
-| N3 | Polish | The list card's second line and the chat label still say "Your assistant" until the owner fills "Name it uses in chat". | Open: round 2 (default it to the chatbot's name). |
+| N3 | Polish | The list card's second line and the chat label still say "Your assistant" until the owner fills "Name it uses in chat". | Done in round 2 (below). |
 
 ### After launch (moved, as you decided)
 
@@ -76,11 +76,28 @@ F7, F18, P4, P5, P6, P7, P8, P9, P10, P11, P12, P14.
 
 ### Local notes for this round
 
-- The pre-commit hook was switched off (`HUSKY=0`) as you asked; lint and the full suites ran once at the end of the round:
-  - **ally-be:** typecheck clean; ESLint clean on the 61 files this branch changed (the whole-repo run runs out of memory on this machine); full jest: only the three known failures below.
-  - **ally-web (admin):** typecheck clean; ESLint clean on every file this branch changed; Prettier flags 11 files this branch never touched. Vitest: 15 failures in the first full run, all in areas this branch doesn't touch, with the machine overloaded (1,000-second tests); 14 pass on a re-run. One AnalyticsAgentTab test hangs even alone (no analytics code changed here; not yet checked on master).
+- The pre-commit hook was switched off (`HUSKY=0`) as you asked; lint and the full suites ran once at the end of each round. Final results are under Round 2.
 - Two inbox Postgres specs fail on master too (they pass a null scope); not touched.
 - The container can't run the templates' drift check (ally-web isn't mounted in it); it passes on the host.
+
+## Round 2 (25 Nov)
+
+Wording approved, with one change (F19, below). Six commits, each re-run live.
+
+| # | Status | What the re-run showed |
+|---|---|---|
+| F19 (approved wording) | Done | A flood or rising water keeps "Move to the safest, highest place you can"; a fire or someone trapped gets "Get to the safest place you can and stay there until help reaches you." In English, Hindi and Hinglish, in India and outside it. |
+| B4 | Fixed and re-run live (one follow-up) | Callback requests, Applications, Volunteer sign-ups, Donor enquiries and Questions for the team have a "withdrawn" status, reachable only from an open entry. With Change at Never, the assistant gets a change tool that can only withdraw the person's own entry. On WhatsApp, Bilal booked a callback, asked to cancel it, said yes: the entry is "withdrawn", and Change is still Never. The follow-up made those lists' status one the assistant can set (it was dropped before, and the question read "move … to …"). New installs get this; existing lists keep theirs. |
+| N3 | Fixed and re-run live (one follow-up) | While the chat name is still the default, it follows the assistant's name; the card no longer shows "Your assistant". A chat name the owner chose is never touched. |
+
+**Wording to look at after launch:** a withdrawal reads "Shall I cancel your evening on +919800000001?" and "Done: +919800000001 is cancelled.", the list's existing cancel lines applied to a callback. "Shall I withdraw your callback request?" would read better; it is new wording, so it waits for you.
+
+**AnalyticsAgentTab:** passes on master (26 tests, 8 s) and on this branch (26 tests, 6 s). It never hangs. The 1,000-second timeouts in round 1 came from running three full suites at once on this machine (Weaviate was also killed for memory during them, and restarted). My round-1 note that it "hangs even alone" was wrong: that run never started, as macOS has no `timeout` command.
+
+**Final suites:**
+
+- **ally-be:** typecheck clean; ESLint clean on the files this branch changed (the whole-repo run runs out of memory here). Full jest on the host, as CI runs it: 20,138 passed, 1 failed; that one (an auth rate-limit spec) passes alone and this branch touches no rate-limit or auth code. My round-1 line ("only the three known failures") was read from a run that hadn't finished; this is the real result. Postgres specs, run on their own scratch database for the template install and the inbox: all pass, except two inbox specs that fail the same way on master. The other Postgres specs were skipped, as in CI.
+- **ally-web (admin):** typecheck clean; ESLint clean on every file this branch changed. Vitest: every test this branch touched passes; the 15 failures in round 1's overloaded run pass when re-run (AnalyticsAgentTab included, above).
 
 ## The five cases
 
