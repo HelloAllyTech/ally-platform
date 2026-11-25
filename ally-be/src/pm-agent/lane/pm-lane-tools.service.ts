@@ -315,7 +315,7 @@ export class PmLaneToolsService implements PmToolbox {
       kind: draft.kind,
       label: draft.label.slice(0, 200),
       fetchedAt,
-      excerpt: serialised.slice(0, 600),
+      excerpt: serialised.slice(0, PM_PIPELINE.CRITIC_EVIDENCE_MAX_CHARS),
     };
   }
 
