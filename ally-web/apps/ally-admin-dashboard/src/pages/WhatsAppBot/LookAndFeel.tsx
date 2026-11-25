@@ -85,7 +85,9 @@ export const LookAndFeel: React.FC<{
   welcome?: string;
   /** Retired in stage 7; ignored. */
   teamNames?: string[];
-}> = ({ name, editor, canEdit, live, botId, welcome = "" }) => {
+  /** TF1: the page's real access, for the preview's cover line. */
+  access?: "public" | "organisation" | "invite";
+}> = ({ name, editor, canEdit, live, botId, welcome = "", access }) => {
   const brand = editor.brand;
   if (!brand) return null;
 
@@ -166,6 +168,7 @@ export const LookAndFeel: React.FC<{
             coverSrc={null}
             screen="cover"
             introduction={welcome}
+            access={access}
           />
         </PhonePreview>
       </div>
@@ -197,6 +200,7 @@ export const LookAndFeelSection: React.FC<{ bot: Chatbot; canEdit: boolean }> = 
       live={Boolean(page?.live.ok)}
       botId={bot.id}
       welcome={page?.settings.branding.welcome ?? ""}
+      access={page?.access}
     />
   );
 };

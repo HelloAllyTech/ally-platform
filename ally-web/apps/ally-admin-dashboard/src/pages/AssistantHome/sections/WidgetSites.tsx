@@ -4,6 +4,7 @@ import { useGetWidgetSitesQuery } from "@api";
 
 import { fill } from "../../Onboarding/copy";
 import { CHANNELS_COPY } from "../copy/channels";
+import { TF1_COPY } from "../copy/tf1";
 import { Group } from "../fields";
 
 const t = CHANNELS_COPY.sites;
@@ -15,12 +16,21 @@ const day = (iso: string): string =>
  * "Sites it has loaded on" (stage 7): the widget may load on any site, so the owner sees where it
  * has been. Editors only (the route is editor+); nothing shows for a viewer.
  */
-export const WidgetSites: React.FC<{ botId: string; canEdit: boolean }> = ({ botId, canEdit }) => {
+export const WidgetSites: React.FC<{
+  botId: string;
+  canEdit: boolean;
+  /** TF1: a public page needs no sign-in, so the hint mustn't say it does. */
+  pageAccess?: string;
+}> = ({ botId, canEdit, pageAccess }) => {
   const { data, isLoading, isError } = useGetWidgetSitesQuery(botId, { skip: !canEdit });
   if (!canEdit) return null;
   const sites = data?.sites ?? [];
   return (
-    <Group title={t.title} hint={t.hint} testId="widget-sites">
+    <Group
+      title={t.title}
+      hint={pageAccess === "public" ? TF1_COPY.access.sitesHintPublic : t.hint}
+      testId="widget-sites"
+    >
       {isError ? (
         <p className="ally-error" role="alert">
           {t.loadFailed}

@@ -14,6 +14,7 @@ import { ChatbotAccessMode } from "@types";
 
 import { ACCESS_COPY as C } from "../../Credits/copy";
 import { TF1_COPY } from "../copy/tf1";
+import { useHomeField } from "../useHomeField";
 import { Group } from "../fields";
 
 import type { SectionProps } from "./props";
@@ -57,7 +58,13 @@ export const WhoMayChat: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
   const [update] = useUpdateChatbotMutation();
   const [text, setText] = useState("");
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
-  const listed = bot.accessMode === ChatbotAccessMode.LISTED;
+  // TF1: the page's own access decides who can open the link (public needs no sign-in).
+  const pageAccess = home?.fields?.pageAccess?.value ?? "invite";
+  const inviteListed = () => {
+    if (bot.accessMode !== ChatbotAccessMode.LISTED) {
+      void update({ id: bot.id, accessMode: ChatbotAccessMode.LISTED });
+    }
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -86,30 +93,21 @@ export const WhoMayChat: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
 
   return (
     <Group title={C.title} hint={C.hint} testId="who-may-chat">
-      <fieldset className="ally-home__choices" disabled={!canEdit}>
-        <legend className="ally-sr-only">{C.mode.label}</legend>
-        <label className="ally-home__choice is-on">
-          <Input
-            className="!h-4 !w-4"
-            type="radio"
-            name={`access-mode-${bot.id}`}
-            checked={listed}
-            onChange={() => update({ id: bot.id, accessMode: ChatbotAccessMode.LISTED })}
-          />
-          <span>
-            <span className="ally-home__strong">{C.mode.listed}</span>
-            <span className="ally-field__hint">{C.mode.listedHint}</span>
-          </span>
-        </label>
-      </fieldset>
-      {/* TF1 B2: who can chat now, in one plain line, from the page's own access. */}
-      <p className="ally-field__hint" data-testid="who-can-chat-line">
-        {home?.fields?.pageAccess?.value === "organisation"
-          ? TF1_COPY.access.organisation
-          : home?.fields?.pageAccess?.value === "public"
-            ? TF1_COPY.access.public
-            : TF1_COPY.access.invite}
-      </p>
+      {pageAccess === "public" && home?.fields?.pageAccess ? (
+        <PublicPageSwitch
+          bot={bot}
+          canEdit={canEdit}
+          field={home.fields.pageAccess}
+          onInvite={inviteListed}
+        />
+      ) : (
+        <AccessChoices
+          botId={bot.id}
+          canEdit={canEdit}
+          pageAccess={pageAccess}
+          onInvite={inviteListed}
+        />
+      )}
 
       {canEdit && (
         <form onSubmit={submit} noValidate>
@@ -152,7 +150,7 @@ export const WhoMayChat: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
       )}
       {data && data.length === 0 && (
         <p className="ally-body" data-testid="access-empty">
-          {C.list.empty}
+          {pageAccess === "public" ? TF1_COPY.access.emptyWhilePublic : C.list.empty}
         </p>
       )}
       {data && data.length > 0 && (
@@ -196,5 +194,94 @@ export const WhoMayChat: React.FC<SectionProps> = ({ bot, home, canEdit }) => {
         </table>
       )}
     </Group>
+  );
+};
+
+/**
+ * TF1 (25 Nov): who can chat, as choices. Public is shown but off for now; a page that is
+ * public already shows it selected, so the owner sees the truth and can switch to Invite only.
+ */
+const AccessChoices: React.FC<{
+  botId: string;
+  canEdit: boolean;
+  pageAccess: string;
+  onInvite: () => void;
+  error?: string | null;
+}> = ({ botId, canEdit, pageAccess, onInvite, error }) => (
+  <>
+    <fieldset className="ally-home__choices" disabled={!canEdit}>
+      <legend className="ally-sr-only">{C.mode.label}</legend>
+      <label className={`ally-home__choice${pageAccess === "invite" ? " is-on" : ""}`}>
+        <Input
+          className="!h-4 !w-4"
+          type="radio"
+          name={`access-mode-${botId}`}
+          checked={pageAccess === "invite"}
+          onChange={onInvite}
+        />
+        <span>
+          <span className="ally-home__strong">{C.mode.listed}</span>
+          <span className="ally-field__hint">{C.mode.listedHint}</span>
+        </span>
+      </label>
+      <label
+        className={`ally-home__choice${pageAccess === "public" ? " is-on" : ""}`}
+        data-testid="access-public"
+      >
+        <Input
+          className="!h-4 !w-4"
+          type="radio"
+          name={`access-mode-${botId}`}
+          checked={pageAccess === "public"}
+          disabled
+          readOnly
+          aria-label={TF1_COPY.access.publicChoiceLabel}
+        />
+        <span>
+          <span className="ally-home__strong">{TF1_COPY.access.publicChoice}</span>
+          <span className="ally-field__hint">{TF1_COPY.access.publicChoiceHint}</span>
+        </span>
+      </label>
+    </fieldset>
+    {/* TF1 B2: who can chat now, in one plain line, from the page's own access. */}
+    <p className="ally-field__hint" data-testid="who-can-chat-line">
+      {pageAccess === "organisation"
+        ? TF1_COPY.access.organisation
+        : pageAccess === "public"
+          ? TF1_COPY.access.public
+          : TF1_COPY.access.invite}
+    </p>
+    {pageAccess === "public" && (
+      <p className="ally-field__hint" data-testid="access-public-now">
+        {TF1_COPY.access.publicNow}
+      </p>
+    )}
+    {error && (
+      <p className="ally-error" role="alert">
+        {error}
+      </p>
+    )}
+  </>
+);
+
+/** A page that is public now: choosing Invite only saves the page's access. */
+const PublicPageSwitch: React.FC<{
+  bot: SectionProps["bot"];
+  canEdit: boolean;
+  field: NonNullable<SectionProps["home"]>["fields"]["pageAccess"];
+  onInvite: () => void;
+}> = ({ bot, canEdit, field, onInvite }) => {
+  const access = useHomeField(bot.id, "pageAccess", field, TF1_COPY.access.switchFailed);
+  return (
+    <AccessChoices
+      botId={bot.id}
+      canEdit={canEdit}
+      pageAccess={access.value}
+      error={access.error}
+      onInvite={() => {
+        access.set("invite", { now: true });
+        onInvite();
+      }}
+    />
   );
 };

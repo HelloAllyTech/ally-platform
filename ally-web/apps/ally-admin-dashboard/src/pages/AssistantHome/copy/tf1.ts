@@ -51,5 +51,17 @@ export const TF1_COPY = {
     invite: "Who can chat: only the people on this list. Share the link with them yourself.",
     organisation: "Who can chat: people in your organisation, after they confirm their work email.",
     public: "Who can chat: anyone with the link.",
+    /** Public shown as a choice, switched off for now (25 Nov). */
+    publicChoice: "Public",
+    publicChoiceLabel: "Public (off for now)",
+    publicChoiceHint: "Anyone with the link can chat, with no sign-in. Off for now.",
+    /** A page that is public already (set before this choice existed). */
+    publicNow:
+      "This page is public now. Choose Invite only to let only the people on this list chat.",
+    emptyWhilePublic:
+      "Nobody is on the list. While the page is public, the list isn't used: anyone with the link can chat.",
+    sitesHintPublic:
+      "The chat bubble can go on any website. These are the sites it has appeared on. While your page is public, anyone can chat there without signing in.",
+    switchFailed: "Couldn't change who can chat. Try again.",
   },
 } as const;

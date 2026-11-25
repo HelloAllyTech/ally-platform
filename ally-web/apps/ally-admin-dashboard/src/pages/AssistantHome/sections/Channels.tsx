@@ -36,7 +36,11 @@ export const ChannelsSection: React.FC<SectionProps> = props => {
       <CustomDomain botId={props.bot.id} canEdit={props.canEdit} />
       <PageSection {...props} />
       <ShareGroups {...props} />
-      <WidgetSites botId={props.bot.id} canEdit={props.canEdit} />
+      <WidgetSites
+        botId={props.bot.id}
+        canEdit={props.canEdit}
+        pageAccess={props.home?.fields?.pageAccess?.value}
+      />
       <WhoMayChat {...props} />
       <BuiltInPanel
         tool="@pages"

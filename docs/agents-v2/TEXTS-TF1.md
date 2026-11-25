@@ -45,3 +45,13 @@ trapped no longer says "highest place"; only a flood does), applied in round 2.
 | B2 / F17 | Channels → Who may chat, invite only (was "Invite only is the one option for now.") | Who can chat: only the people on this list. Share the link with them yourself. |
 | B2 | the same, organisation-only | Who can chat: people in your organisation, after they confirm their work email. |
 | B2 | the same, public (off for now) | Who can chat: anyone with the link. |
+
+## Added after approval (25 Nov), waiting for your OK
+
+| Issue | Where | Text |
+|---|---|---|
+| Public choice | Channels → Who may chat, a choice shown but switched off | Public — "Anyone with the link can chat, with no sign-in. Off for now." |
+| Public choice | the same, on a page that is public already | This page is public now. Choose Invite only to let only the people on this list chat. |
+| Public choice | the same, empty list on a public page | Nobody is on the list. While the page is public, the list isn't used: anyone with the link can chat. |
+| Public choice | Sites it has loaded on, on a public page | The chat bubble can go on any website. These are the sites it has appeared on. While your page is public, anyone can chat there without signing in. |
+| Public choice | when switching fails | Couldn't change who can chat. Try again. |
