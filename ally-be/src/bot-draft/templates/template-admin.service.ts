@@ -13,7 +13,6 @@ import {
   TEMPLATE_KEY_PATTERN,
   TEMPLATE_LIMITS,
   validateTemplate,
-  type TemplateIssue,
 } from '../../chatbot/templates/template-validation';
 import {
   TEMPLATE_GROUPS,
@@ -516,5 +515,3 @@ export class TemplateAdminService {
     });
   }
 }
-
-export type { TemplateIssue };
