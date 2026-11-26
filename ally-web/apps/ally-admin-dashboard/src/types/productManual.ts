@@ -151,6 +151,27 @@ export interface ManualAdminSettings {
   [key: string]: unknown;
 }
 
+/** One page in an import file; the same shape `POST /admin/import` takes. */
+export interface ManualImportPage {
+  slug: string;
+  title: string;
+  summary?: string;
+  parentSlug?: string | null;
+  position?: number;
+  kind?: "section" | "page";
+  body?: string;
+  roles?: string[];
+  surfaces?: string[];
+  journeys?: string[];
+}
+
+export interface ManualImportResult {
+  created: number;
+  updated: number;
+  unchanged: number;
+  errors: string[];
+}
+
 export interface ManualRun {
   id: string;
   status?: string;

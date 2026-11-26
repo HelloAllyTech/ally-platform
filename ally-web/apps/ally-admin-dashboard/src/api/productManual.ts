@@ -5,6 +5,8 @@ import {
   ManualChangeRow,
   ManualConversation,
   ManualConversationSummary,
+  ManualImportPage,
+  ManualImportResult,
   ManualGraph,
   ManualPageDetail,
   ManualPageRow,
@@ -155,6 +157,21 @@ export const productManualAPI = baseAPI.injectEndpoints({
       ],
     }),
 
+    importManualPages: builder.mutation<ManualImportResult, ManualImportPage[]>({
+      query: pages => ({
+        url: ApiEndpoints.PRODUCT_MANUAL.ADMIN_IMPORT,
+        method: HttpMethod.POST,
+        body: { pages },
+      }),
+      invalidatesTags: [
+        { type: TAG_TYPES.PRODUCT_MANUAL_PAGE },
+        { type: TAG_TYPES.PRODUCT_MANUAL_TREE, id: "ALL" },
+        { type: TAG_TYPES.PRODUCT_MANUAL_TREE, id: "GRAPH" },
+        { type: TAG_TYPES.PRODUCT_MANUAL_CHANGES, id: "ALL" },
+        { type: TAG_TYPES.PRODUCT_MANUAL_STATE, id: "ONE" },
+      ],
+    }),
+
     getManualRuns: builder.query<ManualRun[], void>({
       query: () => ({
         url: ApiEndpoints.PRODUCT_MANUAL.ADMIN_RUNS,
@@ -228,6 +245,7 @@ export const {
   useGetManualAdminSettingsQuery,
   useUpdateManualAdminSettingsMutation,
   useRunManualAgentNowMutation,
+  useImportManualPagesMutation,
   useGetManualRunsQuery,
   useGetManualProposalsQuery,
   useDismissManualProposalMutation,

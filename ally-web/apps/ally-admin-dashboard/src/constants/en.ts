@@ -16622,6 +16622,27 @@ export const en = {
       runFailed: "The run didn't start. Try again.",
       runs: "Recent runs",
       noRuns: "No runs yet.",
+      importTitle: "Import pages",
+      importHelp:
+        "Add or update pages from a JSON file. A page with the same address is updated; identical pages are left alone.",
+      importChoose: "Choose file",
+      importChosen: (name: string, count: number) =>
+        `${name} · ${count} ${count === 1 ? "page" : "pages"}`,
+      importRun: (count: number) => `Import ${count} ${count === 1 ? "page" : "pages"}`,
+      importRunning: (done: number, total: number) => `Importing… part ${done} of ${total}`,
+      importDone: (created: number, updated: number, unchanged: number) =>
+        `${created} added · ${updated} updated · ${unchanged} unchanged`,
+      importRefused: "Pages that were refused",
+      importMore: (count: number) => `and ${count} more`,
+      importFailed:
+        "The import stopped part-way. Parts sent before the problem were saved. Try again.",
+      importNotJson: "That file isn't valid JSON.",
+      importShape: 'Expected a list of pages, or an object with a "pages" list.',
+      importEmpty: "The file has no pages.",
+      importTooBig: "That file is too large to import.",
+      importTooMany: "Too many pages in one file (the limit is 1000).",
+      importBadPage: (position: number) =>
+        `Page ${position} needs a title and an address made of lowercase letters, numbers and dashes.`,
       proposals: "Open proposals",
       noProposals: "No open proposals.",
       dismissProposal: "Dismiss",
