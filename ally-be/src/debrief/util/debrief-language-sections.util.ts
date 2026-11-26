@@ -1,4 +1,8 @@
-import { DebriefCards, TranscriptTurn } from './debrief-cards.util';
+import {
+  DebriefCards,
+  TranscriptTurn,
+  withSkillLabels,
+} from './debrief-cards.util';
 
 /** One named block of the debrief's visible text, as the language judge reads it. */
 export interface LanguageSection {
@@ -42,7 +46,10 @@ export function languageSections(cards: DebriefCards): LanguageSection[] {
       (c) => `${c.lead} "${c.quote}" ${c.why} "${c.try_saying}"`,
     ),
   );
-  const p = cards.practise_next;
+  // The learner reads Practise next's skill by its label in the debrief's
+  // language; the stored `skill` is the English key progress matches on, and
+  // showing it here made the judge call it "English in a Kannada debrief".
+  const p = withSkillLabels(cards).practise_next;
   if (p) {
     add(
       'practise_next',

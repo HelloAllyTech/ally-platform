@@ -77,6 +77,18 @@ describe('the language check reads only what the learner reads', () => {
     expect(all).toContain('सक्रिय श्रवण');
   });
 
+  it("reads Practise next's skill by the label the learner sees, not the English key", () => {
+    const cards = {
+      ...CARDS,
+      practise_next: { skill: 's', reason: 'अगली बार भावना का नाम लें' },
+    };
+    const text = languageSections(cards).find(
+      (x) => x.section === 'practise_next',
+    )!.text;
+    expect(text).toContain('सक्रिय श्रवण');
+    expect(text).not.toMatch(/^s\./);
+  });
+
   it('sends only the turns the cards cite', () => {
     expect(
       citedTurns(CARDS, TRANSCRIPT as any).map((t) => t.turn_index),
