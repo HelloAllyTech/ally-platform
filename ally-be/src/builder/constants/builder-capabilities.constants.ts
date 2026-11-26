@@ -1226,6 +1226,33 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'helpline list',
     ],
   },
+  {
+    id: 'crm-contacts',
+    name: "Contacts (the team's shared CRM)",
+    whatItIs:
+      "The Ally team's own minimal CRM in the admin console: people we know (name, organization, " +
+      'job title, notes), a dated conversation log under each that the whole team reads, and one ' +
+      'relationship manager per contact chosen from the admins who have the Contacts toggle. ' +
+      'One platform-wide list, switched on per admin and off by default.',
+    reuseWhen:
+      'Someone wants to track people or organizations the team talks to (partners, funders, ' +
+      'advisors, customers), keep notes or a log of conversations with them, or assign who owns a ' +
+      'relationship. Not for learners or counsellors, who are users.',
+    extendVia:
+      'CrmService for the rules (who may be a relationship manager, the duplicate-name match); a new ' +
+      'field is a column on crm_contacts plus the Contacts side panel.',
+    modules: ['ally-be:src/crm'],
+    adminRoute: '/contacts',
+    keywords: [
+      'contacts',
+      'crm',
+      'relationship manager',
+      'conversation log',
+      'key relationships',
+      'partners',
+      'funders',
+    ],
+  },
 ];
 
 /**

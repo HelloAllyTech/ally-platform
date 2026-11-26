@@ -70,6 +70,7 @@ import {
   AgentLogsPage,
   PmAgentPage,
   PmAgentFeed,
+  Contacts,
   DebriefSettingsPage,
   RoleplaySessionLogs,
   RoleplaySessionLogDetail,
@@ -915,6 +916,14 @@ export const RouteLayout: React.FC = () => {
             element={
               <PrivateLayout requiredFeature={FeatureToggleKey.BUG_HUNTER_V2_VERDICTS}>
                 <BugHunterV2ReportDetail />
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.CRM_CONTACTS}
+            element={
+              <PrivateLayout requiredFeature={FeatureToggleKey.CRM_CONTACTS}>
+                <Contacts />
               </PrivateLayout>
             }
           />

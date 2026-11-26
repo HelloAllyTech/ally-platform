@@ -388,6 +388,16 @@ export const ApiEndpoints = {
     SUGGESTION: (id: string, suggestionId: string) =>
       `/v1/blog-review/posts/${encodeURIComponent(id)}/suggestions/${encodeURIComponent(suggestionId)}`,
   },
+  // Contacts: the team's shared mini CRM (ally-be `src/crm`).
+  CRM: {
+    CONTACTS: "/v1/crm/contacts",
+    CONTACT: (id: string) => `/v1/crm/contacts/${encodeURIComponent(id)}`,
+    MATCH: "/v1/crm/contacts/match",
+    MANAGERS: "/v1/crm/managers",
+    LOGS: (id: string) => `/v1/crm/contacts/${encodeURIComponent(id)}/logs`,
+    LOG: (id: string, logId: string) =>
+      `/v1/crm/contacts/${encodeURIComponent(id)}/logs/${encodeURIComponent(logId)}`,
+  },
   PRODUCT_UPDATES: {
     /** Open to everyone: the live, public updates. The corner drawer's Change log reads it. */
     PUBLIC: "/v1/product-updates/public",
@@ -1539,6 +1549,7 @@ export const ROUTES = {
   LANDING_PAGES: "/landing-pages",
   LANDING_PAGE: "/landing-pages/:id",
   PRODUCT_UPDATES: "/product-updates",
+  CRM_CONTACTS: "/contacts",
   AI_LAB: "/ai-lab",
   PRODUCT_ROADMAP: "/product-roadmap",
   /** Roadmap v2's Queue (dark behind `roadmap_v2`; the old pages stay as they are). */
@@ -1754,6 +1765,8 @@ export const TAG_TYPES = {
   BLOG_REVIEW: "blogReview",
   // Product updates. Also registered in baseApi.ts's `tagTypes`.
   PRODUCT_UPDATES: "productUpdates",
+  // Contacts. Also registered in baseApi.ts's `tagTypes`.
+  CRM_CONTACTS: "crmContacts",
   SUPER_DUPER_ADMINS: "superDuperAdmins",
   // Feature toggles (PLATFORM_ADMIN collapse). Kept apart from USERS/permissions
   // so a toggle-editor save doesn't force an unrelated re-render elsewhere.

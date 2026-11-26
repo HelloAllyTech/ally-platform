@@ -383,6 +383,19 @@ describe("deriveNavigationItems", () => {
     expect(without.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.PM_AGENT);
   });
 
+  it("shows Contacts only to a holder of the crm_contacts toggle", () => {
+    const withToggle = deriveNavigationItems({
+      permissions: [],
+      features: [FeatureToggleKey.CRM_CONTACTS],
+      savedOrder: undefined,
+    });
+    expect(withToggle.find(i => i.id === SIDEBAR_ITEMS.CRM_CONTACTS)?.path).toBe(
+      ROUTES.CRM_CONTACTS,
+    );
+    const without = deriveNavigationItems({ permissions: [], features: [], savedOrder: undefined });
+    expect(without.map(i => i.id)).not.toContain(SIDEBAR_ITEMS.CRM_CONTACTS);
+  });
+
   it("shows a Chatbots-only login (a custom login) just the Assistants item", () => {
     // It holds the platform-admin role's permissions, which would otherwise surface every
     // permission-gated tab.
@@ -638,7 +651,13 @@ describe("sections", () => {
     expect(labelsOf("create")).toEqual(
       expect.arrayContaining(["Roleplays", "Events", "Characters", "Blog"]),
     );
-    expect(labelsOf("people")).toEqual(["Users", "Badges", "Debriefs", "Roleplay Logs"]);
+    expect(labelsOf("people")).toEqual([
+      "Users",
+      "Badges",
+      "Debriefs",
+      "Roleplay Logs",
+      "Contacts",
+    ]);
     expect(labelsOf("insights")).toEqual(["Analytics", "Conversation Drift"]);
     expect(labelsOf("ai-languages")).toEqual(
       expect.arrayContaining([

@@ -148,6 +148,7 @@ export const SIDEBAR_ITEMS = {
   BUG_HUNTER_V2: "bug-hunter-v2",
   BUILDER: "builder",
   CONTEXT_LIBRARY: "context-library",
+  CRM_CONTACTS: "crm-contacts",
   COURSE_COPILOT: "course-copilot",
   ALLY_GUIDE: "ally-guide",
   COMPONENT_LIBRARY: "component-library",

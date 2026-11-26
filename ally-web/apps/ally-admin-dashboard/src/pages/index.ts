@@ -29,6 +29,7 @@ export * from "./Blog/Blog";
 export * from "./LandingPages/LandingPages";
 export * from "./LandingPages/LandingPageEditor";
 export * from "./ProductUpdates/ProductUpdates";
+export * from "./Contacts/Contacts";
 export * from "./AILab";
 export * from "./Evaluate";
 export * from "./Settings/Settings";
