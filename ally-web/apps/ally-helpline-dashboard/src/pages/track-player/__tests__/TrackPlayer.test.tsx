@@ -109,6 +109,33 @@ describe("TrackPlayer", () => {
     );
   });
 
+  it("never starts the item frame hidden, so a stalled animation cannot leave a blank page", async () => {
+    (api.useGetLearnTrackDetailQuery as vi.Mock).mockReturnValue({
+      data: mockTrackDetail,
+      isError: false,
+      refetch: vi.fn(),
+    });
+    (api.useStartTrackItemMutation as vi.Mock).mockReturnValue(mockStartTrackItemMutation);
+
+    render(
+      <Provider store={store}>
+        <MemoryRouter initialEntries={["/track/track1/item1"]}>
+          <Routes>
+            <Route path="/track/:trackId/:itemId" element={<TrackPlayer />} />
+          </Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+
+    // Read synchronously, before any animation frame can run: the frame's
+    // starting style is what a learner sees if the animation never does.
+    const frame = screen.getByTestId("track-item-frame");
+    expect(frame.style.opacity).not.toBe("0");
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Mark as read" })).toBeInTheDocument(),
+    );
+  });
+
   it("shows the discussion thread below the content when hasDiscussion is true", async () => {
     const mockTrackWithDiscussion = {
       ...mockTrackDetail,

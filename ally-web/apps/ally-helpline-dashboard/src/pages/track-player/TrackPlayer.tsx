@@ -1,6 +1,6 @@
 import { FC, useCallback, useEffect, useRef, useState } from "react";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { I18nextProvider, useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -327,43 +327,45 @@ export const TrackPlayer: FC = () => {
         />
 
         <div className="min-h-0 flex-1 overflow-hidden">
-          <AnimatePresence mode="wait" custom={directionRef.current}>
-            <motion.div
-              key={itemId}
-              custom={directionRef.current}
-              initial={{ opacity: 0, x: directionRef.current * 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: directionRef.current * -40 }}
-              transition={{ duration: 0.22, ease: "easeOut" }}
-              drag={isCardsItem ? false : "x"}
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.15}
-              onDragEnd={(_, info) => {
-                if (info.offset.x < -80 && nav.canAdvance && nav.hasNext) nav.goNext();
-                else if (info.offset.x > 80 && nav.hasPrev) nav.goPrev();
-              }}
-              className="h-full min-h-0"
-            >
-              {hasDiscussion ? (
-                <div data-testid="track-item-scroll" className="h-full min-h-0 overflow-y-auto">
-                  <div className="min-h-0">
-                    <ErrorBoundary variant="panel" resetKey={itemId}>
-                      {renderItem()}
-                    </ErrorBoundary>
-                  </div>
-                  {isItemReady && (
-                    <ErrorBoundary variant="panel" resetKey={`discussion-${itemId}`}>
-                      <DiscussionThread itemId={itemId} highlightPostId={highlightPostId} />
-                    </ErrorBoundary>
-                  )}
+          {/* A slide-in on arrival, and nothing else. The next item is never
+                held back waiting for this one to animate out, and the frame
+                never starts hidden: if an animation stalls (it has, on a
+                finished Cards article) the learner sees the item, a few
+                pixels off, rather than a blank page. */}
+          <motion.div
+            key={itemId}
+            data-testid="track-item-frame"
+            initial={{ x: directionRef.current * 40 }}
+            animate={{ x: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            drag={isCardsItem ? false : "x"}
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.15}
+            onDragEnd={(_, info) => {
+              if (info.offset.x < -80 && nav.canAdvance && nav.hasNext) nav.goNext();
+              else if (info.offset.x > 80 && nav.hasPrev) nav.goPrev();
+            }}
+            className="h-full min-h-0"
+          >
+            {hasDiscussion ? (
+              <div data-testid="track-item-scroll" className="h-full min-h-0 overflow-y-auto">
+                <div className="min-h-0">
+                  <ErrorBoundary variant="panel" resetKey={itemId}>
+                    {renderItem()}
+                  </ErrorBoundary>
                 </div>
-              ) : (
-                <ErrorBoundary variant="panel" resetKey={itemId}>
-                  {renderItem()}
-                </ErrorBoundary>
-              )}
-            </motion.div>
-          </AnimatePresence>
+                {isItemReady && (
+                  <ErrorBoundary variant="panel" resetKey={`discussion-${itemId}`}>
+                    <DiscussionThread itemId={itemId} highlightPostId={highlightPostId} />
+                  </ErrorBoundary>
+                )}
+              </div>
+            ) : (
+              <ErrorBoundary variant="panel" resetKey={itemId}>
+                {renderItem()}
+              </ErrorBoundary>
+            )}
+          </motion.div>
         </div>
 
         {!hideBottomNav && (
