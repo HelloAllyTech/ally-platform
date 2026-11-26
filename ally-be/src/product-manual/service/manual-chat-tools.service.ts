@@ -73,6 +73,23 @@ export interface ManualToolContext {
    * work item), as `repo:path`. An edit that is not applying a proposal must cite one of them.
    */
   filesRead: Set<string>;
+  /**
+   * Weekly only: how many lookups one work item may make. A lookup past it is refused with a plain
+   * instruction to decide. The first production runs gave the model 8 then 12 steps and it spent
+   * every one searching; asking for "at most 4 lookups" in the prompt changed nothing.
+   */
+  lookupBudget?: { code: number; manual: number };
+  /** Lookups made so far, counting every attempt (a failing search still costs a step). */
+  lookupsUsed: { code: number; manual: number };
+  /** Every tool call this turn or work item made, in order: where its steps went. */
+  trace: ManualToolTraceEntry[];
+}
+
+export interface ManualToolTraceEntry {
+  tool: string;
+  ok: boolean;
+  /** Why it failed, short; never page text. */
+  note?: string;
 }
 
 export function newToolContext(
@@ -90,6 +107,8 @@ export function newToolContext(
     appliedProposals: [],
     dismissedProposals: [],
     filesRead: new Set(),
+    lookupsUsed: { code: 0, manual: 0 },
+    trace: [],
     ...init,
   };
 }
@@ -138,6 +157,13 @@ const CHAT_ONLY = new Set([
   'log_gap',
 ]);
 const EDIT_TOOLS = new Set(['edit_manual_page', 'create_manual_page']);
+/** Lookups that read code, and lookups that read the manual: each has its own weekly budget. */
+const CODE_LOOKUP_TOOLS = new Set([
+  'github_search_code',
+  'github_read_file',
+  'github_repo_tree',
+]);
+const MANUAL_LOOKUP_TOOLS = new Set(['search_manual', 'read_manual_page']);
 /** Offered only when GitHub is configured here: otherwise every call fails and the model retries. */
 const CODE_TOOLS = new Set([
   'github_search_code',
@@ -439,8 +465,45 @@ export class ManualChatToolsService {
     }
   }
 
-  /** Run one tool. Never throws. A tool not offered to this context is refused, not run. */
+  /** Run one tool and record it on the context's trace. Never throws. */
   async execute(
+    name: string,
+    input: Record<string, any>,
+    ctx: ManualToolContext,
+  ): Promise<ManualToolOutcome> {
+    const outcome = await this.executeOne(name, input, ctx);
+    ctx.trace.push({
+      tool: name,
+      ok: outcome.ok,
+      ...(outcome.ok ? {} : { note: failureNote(outcome) }),
+    });
+    return outcome;
+  }
+
+  /** The refusal for a lookup past this work item's budget, or null when it may run (and counts it). */
+  private lookupRefusal(name: string, ctx: ManualToolContext): string | null {
+    const budget = ctx.lookupBudget;
+    if (!budget) return null;
+    const kind = CODE_LOOKUP_TOOLS.has(name)
+      ? 'code'
+      : MANUAL_LOOKUP_TOOLS.has(name)
+        ? 'manual'
+        : null;
+    if (!kind) return null;
+    if (ctx.lookupsUsed[kind] >= budget[kind]) {
+      return (
+        `Lookup budget used: you have already made ${budget[kind]} ${kind} lookups for this page. ` +
+        'Do not look anything else up. Decide now: edit_manual_page citing a file you read, ' +
+        'mark_verified if the code you read supports the page, or stop and say in one sentence ' +
+        'what you could not find.'
+      );
+    }
+    ctx.lookupsUsed[kind] += 1;
+    return null;
+  }
+
+  /** Run one tool. Never throws. A tool not offered to this context is refused, not run. */
+  private async executeOne(
     name: string,
     input: Record<string, any>,
     ctx: ManualToolContext,
@@ -451,6 +514,9 @@ export class ManualChatToolsService {
         MANUAL_TOOL_FAILURE_SENTENCES.unavailable,
       );
     }
+    const refusal = this.lookupRefusal(name, ctx);
+    if (refusal)
+      return fail(refusal, MANUAL_TOOL_FAILURE_SENTENCES.lookup_budget);
     try {
       const { result, summary } = await this.run(name, input ?? {}, ctx);
       const ok = result?.ok !== false;
@@ -1051,6 +1117,18 @@ function normaliseSources(raw: unknown): ManualSourceRef[] {
 }
 
 /** The model reads the detailed error; the person reads a plain sentence. */
+/** A short, plain reason a tool call failed, for the run's item log. */
+function failureNote(outcome: ManualToolOutcome): string {
+  try {
+    const parsed = JSON.parse(outcome.modelResult);
+    const error = typeof parsed?.error === 'string' ? parsed.error : '';
+    if (error) return error.replace(/\s+/g, ' ').slice(0, 80);
+  } catch {
+    // fall through to the plain sentence
+  }
+  return String(outcome.summary ?? 'failed').slice(0, 80);
+}
+
 const fail = (message: string, summary: string): ManualToolOutcome => ({
   modelResult: JSON.stringify({ ok: false, error: message }),
   summary,

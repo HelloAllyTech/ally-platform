@@ -735,3 +735,121 @@ describe('ManualChatToolsService proposal kinds', () => {
     );
   });
 });
+
+describe('ManualChatToolsService weekly lookup budget and trace', () => {
+  const weekly = (over: Record<string, unknown> = {}) =>
+    newToolContext({
+      mode: 'weekly',
+      userId: null,
+      ref: 'run-1',
+      editsAllowed: true,
+      lookupBudget: { code: 2, manual: 1 },
+      ...over,
+    });
+
+  it('refuses a code lookup past the budget with an instruction to decide, without running it', async () => {
+    const { tools, githubRead } = setup();
+    const ctx = weekly();
+    await tools.execute('github_search_code', { query: 'a' }, ctx);
+    await tools.execute('github_search_code', { query: 'b' }, ctx);
+    const third = await tools.execute(
+      'github_search_code',
+      { query: 'c' },
+      ctx,
+    );
+    expect(third.ok).toBe(false);
+    expect(JSON.parse(third.modelResult).error).toMatch(
+      /Lookup budget used.*Decide now/,
+    );
+    expect(githubRead.searchCode).toHaveBeenCalledTimes(2);
+    // Reading a file and listing a folder draw on the same code budget.
+    const read = await tools.execute(
+      'github_read_file',
+      { repo: 'ally-web', path: 'x.tsx' },
+      ctx,
+    );
+    expect(read.ok).toBe(false);
+    expect(githubRead.readFile).not.toHaveBeenCalled();
+  });
+
+  it('keeps a separate budget for manual lookups, and never limits deciding', async () => {
+    const { tools, pages } = setup();
+    const ctx = weekly();
+    expect(
+      (await tools.execute('search_manual', { query: 'roleplay' }, ctx)).ok,
+    ).toBe(true);
+    const over = await tools.execute(
+      'read_manual_page',
+      { slug: 'running-a-roleplay' },
+      ctx,
+    );
+    expect(over.ok).toBe(false);
+    expect(JSON.parse(over.modelResult).error).toMatch(/manual lookups/);
+    // The decision tools stay open however many lookups were made.
+    const verified = await tools.execute(
+      'mark_verified',
+      { slug: 'running-a-roleplay' },
+      ctx,
+    );
+    expect(verified.ok).toBe(true);
+    expect(pages.markVerified).toHaveBeenCalled();
+  });
+
+  it('counts a failing lookup, because it still costs a step', async () => {
+    const { tools, githubRead } = setup();
+    githubRead.searchCode.mockResolvedValue({
+      ok: false,
+      error: 'search_failed',
+    });
+    const ctx = weekly();
+    await tools.execute('github_search_code', { query: 'a' }, ctx);
+    await tools.execute('github_search_code', { query: 'b' }, ctx);
+    const third = await tools.execute(
+      'github_search_code',
+      { query: 'c' },
+      ctx,
+    );
+    expect(JSON.parse(third.modelResult).error).toMatch(/Lookup budget used/);
+    expect(githubRead.searchCode).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not limit lookups when no budget is set (chat)', async () => {
+    const { tools, githubRead } = setup();
+    const ctx = chatCtx();
+    for (let i = 0; i < 6; i += 1) {
+      const out = await tools.execute(
+        'github_search_code',
+        { query: `q${i}` },
+        ctx,
+      );
+      expect(out.ok).toBe(true);
+    }
+    expect(githubRead.searchCode).toHaveBeenCalledTimes(6);
+  });
+
+  it('records every call on the trace, with a short reason for a failure and never the page text', async () => {
+    const { tools, githubRead } = setup();
+    githubRead.searchCode.mockResolvedValueOnce({
+      ok: false,
+      error: 'GitHub returned 403: rate limit exceeded',
+    });
+    const ctx = weekly({ lookupBudget: { code: 1, manual: 3 } });
+    await tools.execute('github_search_code', { query: 'a' }, ctx);
+    await tools.execute('github_search_code', { query: 'b' }, ctx); // refused: over budget
+    await tools.execute('search_manual', { query: 'roleplay' }, ctx);
+    expect(ctx.trace).toEqual([
+      {
+        tool: 'github_search_code',
+        ok: false,
+        note: 'GitHub returned 403: rate limit exceeded',
+      },
+      {
+        tool: 'github_search_code',
+        ok: false,
+        note: expect.stringMatching(/^Lookup budget used/),
+      },
+      { tool: 'search_manual', ok: true },
+    ]);
+    expect(JSON.stringify(ctx.trace)).not.toContain('a <mark>b</mark>');
+  });
+});

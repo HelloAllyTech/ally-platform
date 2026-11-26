@@ -55,6 +55,8 @@ export const MANUAL_WEEKLY_LIMITS = {
   MAX_ITERATIONS_PER_PAGE: 12,
   /** Most code lookups (search or read) the work item asks the model to make before deciding. */
   MAX_CODE_LOOKUPS_PER_PAGE: 4,
+  /** Most manual lookups (search or read another page) a work item may make; its own page is given. */
+  MAX_MANUAL_LOOKUPS_PER_PAGE: 3,
   /** Most characters of the page text put into the work item. */
   MAX_PAGE_CHARS_IN_ITEM: 12_000,
   MAX_TOKENS: 4_000,
@@ -148,6 +150,7 @@ export const MANUAL_TOOL_FAILURE_SENTENCES = {
   docs_failed: "Couldn't list those files",
   // The loop runner's own
   repeated: 'Skipped a lookup that already failed',
+  lookup_budget: "Skipped a lookup: this page's budget is used",
   withheld: 'Skipped a lookup that keeps failing',
   threw: "That step didn't work",
   unavailable: "That step isn't available here",

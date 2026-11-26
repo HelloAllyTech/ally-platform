@@ -17,6 +17,11 @@ export interface ManualRunItemOutcome {
   status: string;
   iterations: number;
   costUsd: number;
+  /**
+   * Every tool the model called for this item, in order: `tool` when it worked, `tool!reason` when it
+   * did not. Shows where the steps went. Absent on runs from before the trace existed.
+   */
+  tools?: string[];
 }
 
 /** One weekly (or run-now) pass of the manual agent. At most one `running` row exists at a time. */
