@@ -2913,7 +2913,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     trigger: 'A large PRD is cut into milestones',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
-    defaultModel: 'gemini-2.5-pro',
+    defaultModel: 'gemini-3.1-pro-preview',
     configuredBy: 'BUILDER_PLANNER_MODEL',
     promptOverride: 'builder_epic_system',
     configPath: 'builder.plannerModel',
@@ -2930,7 +2930,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       'worked by opencode (builder-opencode-build, below).',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
-    defaultModel: 'gemini-2.5-pro',
+    defaultModel: 'gemini-3.1-pro-preview',
     configuredBy:
       'BUILDER_BUILD_MODEL / BUILDER_PLANNER_MODEL / BUILDER_VERIFIER_MODEL',
     configPath: 'builder.coderModel',
@@ -3111,7 +3111,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       'and every build phase read before opening files.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
-    defaultModel: 'gemini-2.5-pro',
+    defaultModel: 'gemini-3.1-pro-preview',
     configuredBy: 'BUILDER_MAP_MODEL (scripts/builder/refresh-repo-map.sh)',
   },
 ];

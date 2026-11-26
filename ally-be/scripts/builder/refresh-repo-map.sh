@@ -101,7 +101,7 @@ cat > opencode.json <<'OCEOF'
 }
 OCEOF
 
-MAP_MODEL="${BUILDER_MAP_MODEL:-gemini-2.5-pro}"
+MAP_MODEL="${BUILDER_MAP_MODEL:-gemini-3.1-pro-preview}"
 case "$MAP_MODEL" in
   */*) ;;
   claude-*) MAP_MODEL="anthropic/${MAP_MODEL}" ;;
