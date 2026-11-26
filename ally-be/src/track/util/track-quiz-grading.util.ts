@@ -5,6 +5,7 @@ import {
   McqSingleQuestion,
   OpenEndedQuestion,
   OrderingQuestion,
+  QuizContent,
   QuizQuestion,
   QuizQuestionType,
   TrueFalseQuestion,
@@ -30,6 +31,24 @@ export interface QuizCorrectAnswer {
 export function isQuestionGraded(question: QuizQuestion): boolean {
   if (question.type === QuizQuestionType.LIKERT_SCALE) return false;
   return question.isGraded !== false;
+}
+
+/**
+ * An assessment with no feedback: every graded question withholds its answer
+ * key and there is no pass mark to be judged against. The learner is told
+ * only that their answers were recorded — no right or wrong, no score, no
+ * Passed. With any pass mark, or any graded question that shows its answer,
+ * the usual results apply, so nothing else changes.
+ */
+export function isFeedbackHiddenQuiz(
+  quiz: Pick<QuizContent, 'settings' | 'questions'>,
+): boolean {
+  if (quiz.settings.passScore !== 0) return false;
+  const graded = quiz.questions.filter(isQuestionGraded);
+  return (
+    graded.length > 0 &&
+    graded.every((question) => question.showCorrectAnswer === false)
+  );
 }
 
 /**

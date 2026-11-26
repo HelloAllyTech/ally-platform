@@ -34,13 +34,16 @@ const QuestionRow: FC<{
   question: SanitizedQuizQuestion | undefined;
   result: QuizQuestionResult;
   answer: QuizAnswerState | undefined;
-}> = ({ index, question, result, answer }) => {
+  /** An assessment with no feedback: no verdict, points or pending marker. */
+  feedbackHidden: boolean;
+}> = ({ index, question, result, answer, feedbackHidden }) => {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const isPending = isPendingResult(result);
+  // With feedback hidden the server sends no verdict, which is not "waiting".
+  const isPending = !feedbackHidden && isPendingResult(result);
   const graded = isGraded(result);
   // Ungraded with no key: there is no right or wrong to report.
-  const hasVerdict = result.correct !== null && graded;
+  const hasVerdict = result.correct !== null && graded && !feedbackHidden;
 
   const statusIcon = isPending ? (
     <span className="inline-block h-4 w-4 rounded-full bg-warning-300" aria-hidden />
@@ -78,11 +81,13 @@ const QuestionRow: FC<{
         <span className="min-w-0 flex-1 text-sm font-medium text-typography-900">
           {index + 1}. {question?.prompt ?? ""}
         </span>
-        <span className="flex-shrink-0 text-xs text-typography-600">
-          {graded
-            ? `${result.pointsAwarded}/${result.pointsPossible}`
-            : t("tracks2.quiz.results.notScored")}
-        </span>
+        {!feedbackHidden && (
+          <span className="flex-shrink-0 text-xs text-typography-600">
+            {graded
+              ? `${result.pointsAwarded}/${result.pointsPossible}`
+              : t("tracks2.quiz.results.notScored")}
+          </span>
+        )}
         <ArrowDownFilled
           className={`mt-0.5 h-3.5 w-3.5 flex-shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
         />
@@ -172,9 +177,13 @@ export const QuizResults: FC<QuizResultsProps> = ({
 }) => {
   const { t } = useTranslation();
   const questionById = new Map(questions.map(q => [q.id, q]));
-  const hasPending = result.status === "PENDING_GRADING" || result.questions.some(isPendingResult);
-  // A survey has no score to ring or pass mark to be judged against.
-  const isSurvey = result.scorePct === null || isSurveyQuiz(result.questions);
+  const feedbackHidden = result.feedbackHidden === true;
+  const hasPending =
+    result.status === "PENDING_GRADING" ||
+    (!feedbackHidden && result.questions.some(isPendingResult));
+  // A survey has no score to ring or pass mark to be judged against, and an
+  // assessment with hidden feedback shows neither, nor whether it was passed.
+  const isSurvey = feedbackHidden || result.scorePct === null || isSurveyQuiz(result.questions);
 
   return (
     <div className="h-full overflow-y-auto px-4 py-6 sm:px-6">
@@ -227,6 +236,7 @@ export const QuizResults: FC<QuizResultsProps> = ({
               question={questionById.get(q.questionId)}
               result={q}
               answer={answers?.[q.questionId]}
+              feedbackHidden={feedbackHidden}
             />
           ))}
         </div>

@@ -595,9 +595,15 @@ export interface QuizAttemptResult {
   attemptId: string;
   attemptNumber: number;
   status: QuizAttemptStatus;
-  /** null when the quiz has no graded questions — a survey has no score. */
+  /** null when the quiz has no graded questions — a survey has no score — or feedback is hidden. */
   scorePct: number | null;
   passed: boolean;
+  /**
+   * An assessment with no feedback: the learner is told their answers were
+   * recorded and nothing about how they did. Missing on an older server —
+   * treat as false.
+   */
+  feedbackHidden?: boolean;
   passScore: number;
   attemptsUsed: number;
   maxAttempts: number | null;

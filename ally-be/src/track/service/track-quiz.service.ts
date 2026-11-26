@@ -26,6 +26,7 @@ import { autogradeQuestion, scoreQuizAttempt } from './track-quiz.autograder';
 import {
   QuizCorrectAnswer,
   correctAnswerOf,
+  isFeedbackHiddenQuiz,
   isQuestionGraded,
 } from '../util/track-quiz-grading.util';
 
@@ -33,8 +34,16 @@ export interface QuizAttemptResult {
   attemptId: string;
   attemptNumber: number;
   status: QuizAttemptStatus;
+  /** null when feedback is hidden, as for a survey: there is no score to show. */
   scorePct: number | null;
   passed: boolean | null;
+  /**
+   * true = an assessment with no feedback (see `isFeedbackHiddenQuiz`): the
+   * client shows that the answers were recorded and nothing about how they
+   * did. `scorePct` and every question's verdict, points and AI feedback are
+   * withheld; `passed` and `itemCompleted` still drive moving on.
+   */
+  feedbackHidden: boolean;
   passScore: number;
   attemptsUsed: number;
   maxAttempts: number | null;
@@ -70,17 +79,23 @@ export function buildQuestionResult(
   entry: QuizQuestionGrading,
   question: QuizQuestion | undefined,
   includeExplanations: boolean,
+  feedbackHidden = false,
 ): QuizQuestionResult {
   const correctAnswer = question ? correctAnswerOf(question) : null;
   return {
     questionId: entry.questionId,
-    correct: entry.correct,
+    // Nothing that says how the learner did leaves the server in an
+    // assessment with no feedback: not the verdict, the points, the AI's
+    // comments or the key.
+    correct: feedbackHidden ? null : entry.correct,
     graded: entry.graded ?? (question ? isQuestionGraded(question) : true),
-    pointsAwarded: entry.pointsAwarded,
+    pointsAwarded: feedbackHidden ? 0 : entry.pointsAwarded,
     pointsPossible: entry.pointsPossible,
     ...(includeExplanations ? { explanation: question?.explanation } : {}),
-    ...(entry.llm ? { llmFeedback: entry.llm.feedback } : {}),
-    ...(correctAnswer ? { correctAnswer } : {}),
+    ...(entry.llm && !feedbackHidden
+      ? { llmFeedback: entry.llm.feedback }
+      : {}),
+    ...(correctAnswer && !feedbackHidden ? { correctAnswer } : {}),
   };
 }
 
@@ -376,15 +391,20 @@ export class TrackQuizService {
       });
     }
 
+    const feedbackHidden = isFeedbackHiddenQuiz(quiz);
+
     return {
       attemptId: attempt.id,
       attemptNumber: attempt.attemptNumber,
       status: attempt.status,
       scorePct:
-        attempt.scorePct !== undefined && attempt.scorePct !== null
+        !feedbackHidden &&
+        attempt.scorePct !== undefined &&
+        attempt.scorePct !== null
           ? Number(attempt.scorePct)
           : null,
       passed: attempt.passed ?? null,
+      feedbackHidden,
       passScore: quiz.settings.passScore,
       attemptsUsed,
       maxAttempts: quiz.settings.maxAttempts ?? null,
@@ -393,6 +413,7 @@ export class TrackQuizService {
           entry,
           questionsById.get(entry.questionId),
           includeExplanations,
+          feedbackHidden,
         ),
       ),
       itemCompleted:
