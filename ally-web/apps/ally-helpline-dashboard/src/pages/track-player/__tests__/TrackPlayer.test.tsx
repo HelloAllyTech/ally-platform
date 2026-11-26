@@ -11,13 +11,17 @@ import { TrackDetail, TrackItemStatus, TrackItemType } from "@types";
 // so the real module throws inside a requestAnimationFrame callback.
 vi.mock("canvas-confetti", () => ({ default: vi.fn() }));
 
-vi.mock("@api", async () => ({
-  ...(await vi.importActual<typeof api>("@api")),
-  useGetLearnTrackDetailQuery: vi.fn(),
-  useStartTrackItemMutation: vi.fn(),
-  useSubmitQuizAttemptMutation: vi.fn(),
-  useGetCourseDiscussionQuery: vi.fn(),
-}));
+vi.mock("@api", async () => {
+  const actual = await vi.importActual<typeof api>("@api");
+  return {
+    ...actual,
+    useMarkArticleReadMutation: vi.fn(actual.useMarkArticleReadMutation),
+    useGetLearnTrackDetailQuery: vi.fn(),
+    useStartTrackItemMutation: vi.fn(),
+    useSubmitQuizAttemptMutation: vi.fn(),
+    useGetCourseDiscussionQuery: vi.fn(),
+  };
+});
 
 const mockTrackDetail: TrackDetail = {
   id: "track1",
@@ -406,6 +410,75 @@ describe("TrackPlayer", () => {
       await screen.findByText("Hello");
       expect(startItem).toHaveBeenCalledTimes(1);
       expect(startItem).toHaveBeenCalledWith({ itemId: "item1" });
+    });
+
+    it("moves on to the next item after Mark as read on a cards article", async () => {
+      const twoItems = {
+        ...articleTrack,
+        sections: [
+          {
+            ...articleTrack.sections[0],
+            items: [
+              { ...mockTrackDetail.sections[0].items[0], id: "a", order: 1, title: "First" },
+              { ...mockTrackDetail.sections[0].items[0], id: "b", order: 2, title: "Second" },
+            ],
+          },
+        ],
+      };
+      // Marking read refetches the track on the server: item "a" comes back
+      // COMPLETED, as a fresh object each time.
+      let marked = false;
+      (api.useGetLearnTrackDetailQuery as vi.Mock).mockImplementation(() => ({
+        data: {
+          ...twoItems,
+          sections: [
+            {
+              ...twoItems.sections[0],
+              items: twoItems.sections[0].items.map(item =>
+                item.id === "a" && marked ? { ...item, status: TrackItemStatus.COMPLETED } : item,
+              ),
+            },
+          ],
+        },
+        isError: false,
+        refetch: vi.fn(),
+      }));
+      const start = vi.fn().mockImplementation(({ itemId }: { itemId: string }) => ({
+        unwrap: vi.fn().mockResolvedValue({
+          type: TrackItemType.ARTICLE,
+          trackItemProgressId: `p-${itemId}`,
+          html: `<h2>Part</h2><p>Body of ${itemId}</p>`,
+          minReadSeconds: 0,
+          experience: "CARDS",
+        }),
+      }));
+      (api.useStartTrackItemMutation as vi.Mock).mockReturnValue([start]);
+      (api.useMarkArticleReadMutation as vi.Mock).mockReturnValue([
+        vi.fn().mockReturnValue({
+          unwrap: vi.fn().mockImplementation(async () => {
+            marked = true;
+            return { completed: true, sectionCompleted: false };
+          }),
+        }),
+        { isLoading: false },
+      ]);
+      render(
+        <Provider store={store}>
+          <MemoryRouter initialEntries={["/track/track1/a"]}>
+            <Routes>
+              <Route path="/track/:trackId/:itemId" element={<TrackPlayer />} />
+              <Route path="/track/:trackId/item/:itemId" element={<TrackPlayer />} />
+            </Routes>
+          </MemoryRouter>
+        </Provider>,
+      );
+      await screen.findByTestId("article-cards");
+      fireEvent.click(screen.getByRole("button", { name: /Start reading/ }));
+      fireEvent.click(await screen.findByRole("button", { name: "Mark as read" }));
+      fireEvent.click(await screen.findByRole("button", { name: /Continue/ }));
+      await waitFor(() => expect(start).toHaveBeenCalledWith({ itemId: "b" }));
+      expect(await screen.findByTestId("article-cards")).toBeInTheDocument();
+      expect(screen.getAllByText("Second").length).toBeGreaterThan(0);
     });
 
     it("keeps the bottom nav for magazine and classic articles", async () => {
