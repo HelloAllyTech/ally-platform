@@ -1473,6 +1473,8 @@ export const ApiEndpoints = {
     ADMIN_AGENT_KEYS: "/v1/product-manual/admin/agent-keys",
     ADMIN_AGENT_KEY: (id: string) =>
       `/v1/product-manual/admin/agent-keys/${encodeURIComponent(id)}`,
+    /** The proposal MCP a coding agent connects to (no admin session, its own key). */
+    MCP: "/v1/product-manual/mcp",
   },
 };
 

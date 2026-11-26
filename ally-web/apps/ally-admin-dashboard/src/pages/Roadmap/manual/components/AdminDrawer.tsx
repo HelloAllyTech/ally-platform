@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import {
   Button,
   CarbonToggle,
-  Modal,
   NumberInput,
   ProgressBar,
   SidePanel,
@@ -25,11 +24,16 @@ import {
   useRunManualAgentNowMutation,
   useUpdateManualAdminSettingsMutation,
 } from "@api";
-import { en } from "@constants";
+import { ApiEndpoints, en } from "@constants";
 import type { ManualImportPage, ManualImportResult, ManualState } from "@types";
 import { formatDate, formatRelativeTime } from "@utils";
 
+import { mcpEndpoint, testConnection } from "../../../ContextLibrary/insightsFormat";
+import { AGENT_TARGETS, KEY_PLACEHOLDER, snippetFor } from "../utils/agentConnect";
 import { IMPORT_MAX_FILE_BYTES, chunkImportPages, parseImportBundle } from "../utils/importBundle";
+
+import type { ConnectionOutcome } from "../../../ContextLibrary/insightsFormat";
+import type { AgentTarget } from "../utils/agentConnect";
 
 const usd = (value: number | null | undefined): string =>
   `$${(value ?? 0).toFixed((value ?? 0) < 10 ? 2 : 0)}`;
@@ -241,44 +245,6 @@ const ProposalsSection: React.FC = () => {
   );
 };
 
-/** The new key, shown once with Copy. */
-export const NewKeyModal: React.FC<{ keyValue: string | null; onClose: () => void }> = ({
-  keyValue,
-  onClose,
-}) => {
-  const copy = en.productManual.admin;
-  return (
-    <Modal
-      open={!!keyValue}
-      size="sm"
-      modalHeading={copy.keyTitle}
-      primaryButtonText={copy.done}
-      onRequestClose={onClose}
-      onRequestSubmit={onClose}
-    >
-      <p className="mb-3 text-sm font-semibold text-typography-900">{copy.keyWarning}</p>
-      <div className="flex items-center gap-2">
-        <code className="min-w-0 flex-1 break-all bg-neutral-100 px-3 py-2 font-mono text-sm">
-          {keyValue}
-        </code>
-        <Button
-          kind="tertiary"
-          size="sm"
-          onClick={() => {
-            if (!keyValue) return;
-            navigator.clipboard
-              ?.writeText(keyValue)
-              .then(() => toast.success(copy.copied))
-              .catch(() => undefined);
-          }}
-        >
-          {copy.copy}
-        </Button>
-      </div>
-    </Modal>
-  );
-};
-
 const readText = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -424,78 +390,250 @@ export const ImportSection: React.FC = () => {
   );
 };
 
-const KeysSection: React.FC = () => {
+const copyText = async (text: string) => {
+  const copy = en.productManual.admin;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(copy.copied);
+  } catch {
+    toast.error(copy.copyFailed);
+  }
+};
+
+/** A command or config to paste, with its own Copy button. */
+const CodeBlock: React.FC<{ text: string; label: string; testId?: string }> = ({
+  text,
+  label,
+  testId,
+}) => (
+  <div className="flex flex-col gap-1">
+    <pre
+      className="m-0 overflow-x-auto whitespace-pre-wrap break-all bg-neutral-100 p-3 font-mono text-xs"
+      data-testid={testId}
+    >
+      {text}
+    </pre>
+    <div>
+      <Button kind="tertiary" size="sm" onClick={() => void copyText(text)}>
+        {label}
+      </Button>
+    </div>
+  </div>
+);
+
+/** Read when the section mounts, never at module load. */
+const agentEndpoint = (): string =>
+  mcpEndpoint(
+    import.meta.env.VITE_API_BASE_URL,
+    typeof window === "undefined" ? "http://localhost" : window.location.origin,
+    ApiEndpoints.PRODUCT_MANUAL.MCP,
+  );
+
+/**
+ * Connect a coding agent, in the order a developer does it: make a key, paste one command for
+ * their agent, check it works. The key is shown once; the commands fill in with it so there is
+ * nothing to assemble by hand. Test connection is offered only while this page still holds the key.
+ */
+export const KeysSection: React.FC = () => {
   const copy = en.productManual.admin;
   const { data: keys = [], isLoading } = useGetManualAgentKeysQuery();
   const [create, { isLoading: creating }] = useCreateManualAgentKeyMutation();
   const [revoke] = useRevokeManualAgentKeyMutation();
+  const [url] = useState(agentEndpoint);
   const [label, setLabel] = useState("");
-  const [plaintext, setPlaintext] = useState<string | null>(null);
-  const onCreate = async () => {
+  const [fresh, setFresh] = useState<{ label: string; key: string } | null>(null);
+  const [target, setTarget] = useState<AgentTarget>("claude-code");
+  const [testing, setTesting] = useState(false);
+  const [outcome, setOutcome] = useState<ConnectionOutcome | null>(null);
+  const onCreate = async (event: React.FormEvent) => {
+    event.preventDefault();
     const name = label.trim();
     if (!name) return;
     try {
       const result = await create({ label: name }).unwrap();
       setLabel("");
-      setPlaintext(result.key);
+      setFresh({ label: name, key: result.key });
+      setOutcome(null);
     } catch {
       toast.error(copy.saveFailed);
     }
   };
+  const onTest = async () => {
+    if (!fresh) return;
+    setTesting(true);
+    setOutcome(null);
+    try {
+      setOutcome(await testConnection(url, fresh.key));
+    } finally {
+      setTesting(false);
+    }
+  };
+  const key = fresh?.key ?? KEY_PLACEHOLDER;
+  const stepTitle = "m-0 text-sm font-semibold text-typography-900";
   return (
     <Section title={copy.keys} help={copy.keysHelp}>
-      <div className="flex items-end gap-2">
-        <TextInput
-          id="manual-admin-key-label"
-          labelText={copy.keyLabel}
-          size="md"
-          value={label}
-          onChange={(event: React.ChangeEvent<HTMLInputElement>) => setLabel(event.target.value)}
-        />
-        <Button kind="tertiary" size="md" disabled={!label.trim() || creating} onClick={onCreate}>
-          {copy.createKey}
-        </Button>
+      <div className="flex flex-col gap-2" data-testid="manual-agent-step-create">
+        <h4 className={stepTitle}>{copy.stepCreate}</h4>
+        <p className="m-0 text-xs text-typography-600">{copy.stepCreateHelp}</p>
+        {fresh ? (
+          <div
+            className="flex flex-col gap-2 border border-amber-300 bg-amber-50 p-3"
+            role="status"
+            data-testid="manual-agent-fresh"
+          >
+            <p className="m-0 text-sm font-semibold text-typography-900">
+              {copy.newKeyHeading(fresh.label)}
+            </p>
+            <p className="m-0 text-xs text-amber-800">{copy.keyWarning}</p>
+            <div className="flex items-center gap-2">
+              <code className="min-w-0 flex-1 break-all bg-white px-3 py-2 font-mono text-xs">
+                {fresh.key}
+              </code>
+              <Button kind="tertiary" size="sm" onClick={() => void copyText(fresh.key)}>
+                {copy.copyKey}
+              </Button>
+            </div>
+            <div>
+              <Button
+                kind="ghost"
+                size="sm"
+                onClick={() => {
+                  setFresh(null);
+                  setOutcome(null);
+                }}
+              >
+                {copy.done}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form className="flex items-end gap-2" onSubmit={event => void onCreate(event)}>
+            <TextInput
+              id="manual-admin-key-label"
+              labelText={copy.keyLabel}
+              placeholder={copy.keyPlaceholder}
+              size="md"
+              maxLength={80}
+              value={label}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                setLabel(event.target.value)
+              }
+            />
+            <Button kind="tertiary" size="md" type="submit" disabled={!label.trim() || creating}>
+              {creating ? copy.creatingKey : copy.createKey}
+            </Button>
+          </form>
+        )}
       </div>
-      {isLoading ? (
-        <SkeletonText paragraph lineCount={2} />
-      ) : keys.length === 0 ? (
-        <p className="m-0 text-sm text-typography-600">{copy.noKeys}</p>
-      ) : (
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {keys.map(key => (
-            <li key={key.id} className="flex items-center gap-2 text-sm">
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="text-typography-900">
-                  {key.label} <code className="text-xs text-typography-600">{key.keyPrefix}…</code>
-                </span>
-                <span className="text-xs text-typography-600">
-                  {key.lastUsedAt
-                    ? copy.lastUsed(formatRelativeTime(key.lastUsedAt))
-                    : copy.neverUsed}
-                </span>
-              </div>
-              {key.revokedAt ? (
-                <Tag type="gray" size="sm">
-                  {copy.revoked}
-                </Tag>
-              ) : (
-                <Button
-                  kind="ghost"
-                  size="sm"
-                  onClick={() =>
-                    revoke(key.id)
-                      .unwrap()
-                      .catch(() => toast.error(copy.saveFailed))
-                  }
-                >
-                  {copy.revoke}
-                </Button>
-              )}
-            </li>
+
+      <div className="flex flex-col gap-2" data-testid="manual-agent-step-add">
+        <h4 className={stepTitle}>{copy.stepAdd}</h4>
+        {!fresh && <p className="m-0 text-xs text-typography-600">{copy.stepAddNoKey}</p>}
+        <div role="tablist" aria-label={copy.stepAdd} className="flex flex-wrap gap-1">
+          {AGENT_TARGETS.map(item => (
+            <Button
+              key={item}
+              role="tab"
+              aria-selected={target === item}
+              kind={target === item ? "primary" : "tertiary"}
+              size="sm"
+              onClick={() => setTarget(item)}
+            >
+              {copy.targets[item]}
+            </Button>
           ))}
-        </ul>
-      )}
-      <NewKeyModal keyValue={plaintext} onClose={() => setPlaintext(null)} />
+        </div>
+        <div role="tabpanel" className="flex flex-col gap-2">
+          {copy.targetHelp[target].map(line => (
+            <p key={line} className="m-0 text-xs text-typography-700">
+              {line}
+            </p>
+          ))}
+          {target === "other" && (
+            <p className="m-0 break-all text-xs text-typography-700">
+              <span className="font-semibold">URL: </span>
+              <code>{url}</code>
+            </p>
+          )}
+          <CodeBlock
+            text={snippetFor(target, url, key)}
+            label={copy.copySnippet}
+            testId="manual-agent-snippet"
+          />
+          <p className="m-0 text-xs text-typography-600">{copy.keepSecret}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2" data-testid="manual-agent-step-test">
+        <h4 className={stepTitle}>{copy.stepTest}</h4>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            kind="tertiary"
+            size="sm"
+            disabled={!fresh || testing}
+            onClick={() => void onTest()}
+          >
+            {testing ? copy.testing : copy.testConnection}
+          </Button>
+          {!fresh && <span className="text-xs text-typography-600">{copy.testNeedsKey}</span>}
+        </div>
+        <p
+          aria-live="polite"
+          data-testid="manual-agent-test-result"
+          data-outcome={outcome ?? undefined}
+          className={`m-0 text-xs ${
+            outcome === "reachable" ? "text-green-700" : outcome ? "text-red-700" : "sr-only"
+          }`}
+        >
+          {outcome ? copy.testResult[outcome] : ""}
+        </p>
+        <p className="m-0 text-xs text-typography-700">{copy.askAgent}</p>
+        <p className="m-0 text-xs text-typography-600">{copy.whatHappens}</p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <h4 className={stepTitle}>{copy.keysHeading}</h4>
+        {isLoading ? (
+          <SkeletonText paragraph lineCount={2} />
+        ) : keys.length === 0 ? (
+          <p className="m-0 text-sm text-typography-600">{copy.noKeys}</p>
+        ) : (
+          <ul className="m-0 flex list-none flex-col gap-2 p-0">
+            {keys.map(item => (
+              <li key={item.id} className="flex items-center gap-2 text-sm">
+                <div className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-typography-900">
+                    {item.label}{" "}
+                    <code className="text-xs text-typography-600">{item.keyPrefix}…</code>
+                  </span>
+                  <span className="text-xs text-typography-600">
+                    {item.lastUsedAt
+                      ? copy.lastUsed(formatRelativeTime(item.lastUsedAt))
+                      : copy.neverUsed}
+                  </span>
+                </div>
+                {item.revokedAt ? (
+                  <Tag type="gray" size="sm">
+                    {copy.revoked}
+                  </Tag>
+                ) : (
+                  <Button
+                    kind="ghost"
+                    size="sm"
+                    onClick={() =>
+                      revoke(item.id)
+                        .unwrap()
+                        .catch(() => toast.error(copy.saveFailed))
+                    }
+                  >
+                    {copy.revoke}
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </Section>
   );
 };
