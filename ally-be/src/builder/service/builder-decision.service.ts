@@ -27,6 +27,7 @@ import { BuilderInterviewOrchestratorService } from './builder-interview-orchest
 import { BuilderMessageRole, BuilderSessionStatus } from '../enum/builder.enum';
 import {
   AnswerBuilderDecisionDto,
+  BuilderBriefResponseDto,
   CreateBuilderMessageDto,
 } from '../dto/builder.dto';
 import {
@@ -1258,8 +1259,13 @@ export class BuilderDecisionService implements OnModuleInit, OnModuleDestroy {
     sessionId: string,
     message: string,
     userId: number,
+    briefResponse?: BuilderBriefResponseDto,
   ): Promise<void> {
-    await this.startTurn(sessionId, { message }, userId);
+    await this.startTurn(
+      sessionId,
+      { message, ...(briefResponse ? { briefResponse } : {}) },
+      userId,
+    );
   }
 
   private async startTurn(

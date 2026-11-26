@@ -2,6 +2,7 @@ import { ApiEndpoints, HttpMethod, TAG_TYPES } from "@constants";
 
 import { baseAPI } from "./baseApi";
 
+import type { BuilderBriefResponse } from "../types/builder";
 import type { RoadmapItemDetail } from "../types/roadmapV2";
 
 /** One thing standing between a plan and Close plan (ally-be plan-close-readiness.util). */
@@ -48,15 +49,21 @@ export const roadmapPlanningAPI = baseAPI.injectEndpoints({
       invalidatesTags: (_r, _e, { code }) => [itemTag(code), listTag, readinessTag(code)],
     }),
 
-    /** The planner's message; empty asks the agent for its opening situation brief. */
+    /**
+     * The planner's message; empty asks the agent for its opening situation brief. With
+     * `briefResponse` it answers that brief line by line, and `text` is the summary shown.
+     */
     sendRoadmapPlanMessage: builder.mutation<
       { started: true },
-      { code: string; sessionId: string; text?: string }
+      { code: string; sessionId: string; text?: string; briefResponse?: BuilderBriefResponse }
     >({
-      query: ({ code, text }) => ({
+      query: ({ code, text, briefResponse }) => ({
         url: ApiEndpoints.ROADMAP_V2_FLOW.PLAN_MESSAGE(code),
         method: HttpMethod.POST,
-        body: text ? { text } : {},
+        body: {
+          ...(text ? { text } : {}),
+          ...(briefResponse ? { briefResponse } : {}),
+        },
       }),
       invalidatesTags: (_r, _e, { sessionId }) => [
         { type: TAG_TYPES.BUILDER_SESSION, id: sessionId },

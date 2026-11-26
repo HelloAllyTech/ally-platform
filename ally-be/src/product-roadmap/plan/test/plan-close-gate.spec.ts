@@ -210,6 +210,21 @@ describe('PlanTurnService', () => {
     );
   });
 
+  it('an answer to the situation brief rides along with the turn', async () => {
+    const { service, deps } = build({ workPlan: true });
+    const briefResponse = {
+      briefId: 'b-1',
+      lines: [{ id: 'L1', verdict: 'confirm' as const }],
+    };
+    await service.send(1, 'OPP-1', 'Confirmed 1 line.', briefResponse);
+    expect(deps.decisions.startBackgroundTurn).toHaveBeenCalledWith(
+      's-1',
+      'Confirmed 1 line.',
+      1,
+      briefResponse,
+    );
+  });
+
   it('nothing typed asks for the opening situation brief', async () => {
     const { service, deps } = build({ workPlan: true });
     await service.send(1, 'OPP-1', undefined);

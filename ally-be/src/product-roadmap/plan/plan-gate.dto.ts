@@ -1,5 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsOptional,
+  IsString,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
+import { BuilderBriefResponseDto } from 'src/builder/dto/builder.dto';
 import { CLOSE_REASON_MAX } from 'src/product-planning/util/plan-close-readiness.util';
 import { PLANNER_MESSAGE_MAX } from './plan-turn.service';
 
@@ -19,11 +26,24 @@ export class RoadmapClosePlanDto {
   reason?: string;
 }
 
-/** The planner's message to the planning agent. Empty asks for the opening situation brief. */
+/**
+ * The planner's message to the planning agent. Empty asks for the opening situation brief.
+ * With `briefResponse` it is the planner's answer to that brief, line by line, and `text` is the
+ * one-line summary the transcript shows.
+ */
 export class RoadmapPlanMessageDto {
   @ApiPropertyOptional({ maxLength: PLANNER_MESSAGE_MAX })
   @IsOptional()
   @IsString()
   @MaxLength(PLANNER_MESSAGE_MAX)
   text?: string;
+
+  @ApiPropertyOptional({
+    type: BuilderBriefResponseDto,
+    description: 'When answering the situation brief: a verdict per line',
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BuilderBriefResponseDto)
+  briefResponse?: BuilderBriefResponseDto;
 }

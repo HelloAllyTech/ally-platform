@@ -4,6 +4,7 @@ import {
   Injectable,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { BuilderBriefResponseDto } from 'src/builder/dto/builder.dto';
 import { BuilderDecisionService } from 'src/builder/service/builder-decision.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { RoadmapItemLookupService } from '../item/roadmap-item-lookup.service';
@@ -87,6 +88,7 @@ export class PlanTurnService {
     userId: number,
     code: string,
     text: string | undefined,
+    briefResponse?: BuilderBriefResponseDto,
   ): Promise<{ started: true }> {
     const item = await this.reader.detail(userId, code);
     if (!item.can.workPlan) {
@@ -109,11 +111,18 @@ export class PlanTurnService {
     if (!ref.builderSessionId) {
       throw new ConflictException('This idea has no plan yet.');
     }
-    await this.decisions.startBackgroundTurn(
-      ref.builderSessionId,
-      message,
-      userId,
-    );
+    await (briefResponse
+      ? this.decisions.startBackgroundTurn(
+          ref.builderSessionId,
+          message,
+          userId,
+          briefResponse,
+        )
+      : this.decisions.startBackgroundTurn(
+          ref.builderSessionId,
+          message,
+          userId,
+        ));
     this.broadcast.emit({
       kind: 'ITEM_CHANGED',
       actorId: userId,

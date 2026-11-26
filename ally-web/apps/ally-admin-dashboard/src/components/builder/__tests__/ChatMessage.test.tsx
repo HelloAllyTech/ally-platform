@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BuilderChatMessage, BuilderTurnReceipt } from "@types";
@@ -49,6 +49,61 @@ describe("ChatMessage", () => {
     );
 
     expect(screen.getByText("Stopped.")).toBeInTheDocument();
+  });
+
+  describe("the situation brief", () => {
+    const briefMessage: BuilderChatMessage = {
+      ...baseMessage,
+      brief: {
+        id: "brief-1",
+        message: "Here is what exists.",
+        lines: [{ id: "X1", kind: "exists", text: "Something exists", cites: [] }],
+      },
+    };
+
+    // The Roadmap idea page locks every other agent row but answers the brief, so the brief
+    // follows `briefDisabled` over `disabled` — the buttons were dead there before.
+    it("stays answerable when the host locks the row but not the brief", () => {
+      const onAnswerBrief = vi.fn();
+      render(
+        <ChatMessage
+          message={briefMessage}
+          index={0}
+          onAnswer={vi.fn()}
+          onAnswerBrief={onAnswerBrief}
+          disabled
+          briefDisabled={false}
+        />,
+      );
+
+      fireEvent.click(screen.getByText("Right"));
+      fireEvent.click(screen.getByText("Send"));
+      expect(onAnswerBrief).toHaveBeenCalledTimes(1);
+      expect(onAnswerBrief.mock.calls[0][0]).toMatchObject({
+        briefId: "brief-1",
+        lines: [{ id: "X1", verdict: "confirm" }],
+      });
+    });
+
+    it("is locked without an answer handler", () => {
+      render(
+        <ChatMessage message={briefMessage} index={0} onAnswer={vi.fn()} briefDisabled={false} />,
+      );
+      expect(screen.getByText("Right").closest("button")).toBeDisabled();
+    });
+
+    it("follows `disabled` when no override is given", () => {
+      render(
+        <ChatMessage
+          message={briefMessage}
+          index={0}
+          onAnswer={vi.fn()}
+          onAnswerBrief={vi.fn()}
+          disabled
+        />,
+      );
+      expect(screen.getByText("Right").closest("button")).toBeDisabled();
+    });
   });
 
   describe("the turn receipt", () => {

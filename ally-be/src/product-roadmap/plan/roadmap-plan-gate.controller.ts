@@ -69,6 +69,6 @@ export class RoadmapPlanGateController {
     @CurrentUser() user: TokenUser,
   ) {
     await this.settings.assertRoadmapV2();
-    return this.turns.send(user.id, code, dto.text);
+    return this.turns.send(user.id, code, dto.text, dto.briefResponse);
   }
 }
