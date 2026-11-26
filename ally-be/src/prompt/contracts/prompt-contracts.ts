@@ -584,6 +584,23 @@ export const COURSE_COPILOT_COURSE_META = definePrompt(
   },
 );
 
+/** src/prompts/course_copilot/answer_key_check.txt */
+export const COURSE_COPILOT_ANSWER_KEY_CHECK = definePrompt(
+  'course_copilot_answer_key_check',
+  {
+    brief_json: 'required',
+    questions_json: 'required',
+  },
+  {
+    name: 'Course Copilot — Answer Key Check',
+    description:
+      "Course Pilot: answers a freshly written quiz's choice and true/false questions without the answer key, flagging ambiguous ones; code compares the answers with the key and sends disputes back to the quiz writer once. JSON mode.",
+    category: 'Course Copilot',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
 /** src/prompts/course_copilot/blueprint_critic.txt */
 export const COURSE_COPILOT_BLUEPRINT_CRITIC = definePrompt(
   'course_copilot_blueprint_critic',

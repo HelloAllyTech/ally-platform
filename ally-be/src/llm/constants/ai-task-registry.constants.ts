@@ -3307,6 +3307,23 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
     promptOverride: 'course_copilot_blueprint_critic',
   },
   {
+    id: 'course-copilot-answer-key-check',
+    task: LlmTask.COURSE_COPILOT_ANSWER_KEY_CHECK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Course Pilot checks a freshly written quiz answer key (COURSE_PILOT_ANSWER_CHECK)',
+    detail:
+      'Answers every choice and true/false question without the key; code compares with ' +
+      'the key. Disputes go back to the quiz writer once, then a still-disputed question ' +
+      'is dropped. One call per quiz (two when repaired). JSON mode.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'course_copilot_answer_key_check',
+  },
+  {
     id: 'course-copilot-review',
     task: LlmTask.COURSE_COPILOT_REVIEW,
     runtime: LlmRuntime.ALLY_BE,

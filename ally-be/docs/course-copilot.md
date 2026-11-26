@@ -149,6 +149,7 @@ in AWS form, so they do not render locally — the same as the course editor's o
 | `OPENAI_IMAGE_MODEL` / `CHARACTER_IMAGE_DEFAULT_PROVIDER` + `LEARN_MEDIA_PUBLIC_S3_BUCKET` | — | Images are skipped with a reason without them |
 | `COURSE_PILOT_STAGES` | false | Course Pilot stage machine (below) and the B2/B3 transfer check |
 | `COURSE_PILOT_CRITIC` | false | Course Pilot blueprint critic (below) |
+| `COURSE_PILOT_ANSWER_CHECK` | false | Course Pilot quiz answer-key check (below) |
 
 Limits (sections 20, items 100, items per section 30, new cases 2, images 12, languages per roleplay 4, two
 active CREATE sessions per user) are in `constants/course-copilot.constants.ts` and enforced in code. New roleplays
@@ -156,7 +157,7 @@ have no limit of their own; the item limits and the session budget bound them.
 
 ## Course Pilot (behind switches, off by default)
 
-Phases 1 and 3 of the Course Pilot architecture plan, each behind its own env switch so production
+Phases 1, 3 and 4B of the Course Pilot architecture plan, each behind its own env switch so production
 behaves as before until one is turned on.
 
 - **Stage machine** (`COURSE_PILOT_STAGES`, `src/course-copilot/util/course-pilot-stages.util.ts`). The interview's
@@ -177,6 +178,13 @@ behaves as before until one is turned on.
   `course_copilot_blueprint_critic`). A separate model checks each proposed plan against the brief
   and Learning Design principles; blocking findings get one planner repair round, kept only if it is
   no worse. Adds about 100 s per plan; its report is in `metadata.coursePilot.critic`.
+- **Answer-key check** (`COURSE_PILOT_ANSWER_CHECK`, `src/course-copilot/service/specialists/answer-key-check.specialist.ts`,
+  prompt `course_copilot_answer_key_check`). After the quiz writer, a second model answers every
+  single-choice, multi-choice and true/false question without the key or explanations; code
+  compares its answers with the key. Any disagreement, or a question it calls ambiguous, goes back
+  to the writer as repair notes. On the repair pass a question still answered differently is
+  dropped while at least half the quiz remains (otherwise the item summary says to check it). Other
+  question types and scenario quizzes are not checked. A failed check never blocks the quiz.
 - **Evals** (`scripts/course-pilot-evals/`): `run.mjs` plays 10 fixed course requests end to end with
   a simulated trainer; `plan-eval.mjs` plans the same briefs with and without the critic or transfer
   check and scores them with an independent judge (`judge.mjs`); `manual-tests.mjs` runs test cases
