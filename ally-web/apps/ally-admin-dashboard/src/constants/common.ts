@@ -1466,6 +1466,7 @@ export const ApiEndpoints = {
     ADMIN_SETTINGS: "/v1/product-manual/admin/settings",
     ADMIN_RUN: "/v1/product-manual/admin/run",
     ADMIN_RUNS: "/v1/product-manual/admin/runs",
+    ADMIN_IMPORT: "/v1/product-manual/admin/import",
     ADMIN_PROPOSALS: "/v1/product-manual/admin/proposals",
     ADMIN_PROPOSAL_DISMISS: (id: string) =>
       `/v1/product-manual/admin/proposals/${encodeURIComponent(id)}/dismiss`,

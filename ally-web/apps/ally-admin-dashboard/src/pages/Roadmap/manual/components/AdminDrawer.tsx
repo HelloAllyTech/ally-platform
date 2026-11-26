@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { toast } from "sonner";
 
@@ -20,13 +20,16 @@ import {
   useGetManualAgentKeysQuery,
   useGetManualProposalsQuery,
   useGetManualRunsQuery,
+  useImportManualPagesMutation,
   useRevokeManualAgentKeyMutation,
   useRunManualAgentNowMutation,
   useUpdateManualAdminSettingsMutation,
 } from "@api";
 import { en } from "@constants";
-import type { ManualState } from "@types";
+import type { ManualImportPage, ManualImportResult, ManualState } from "@types";
 import { formatDate, formatRelativeTime } from "@utils";
+
+import { IMPORT_MAX_FILE_BYTES, chunkImportPages, parseImportBundle } from "../utils/importBundle";
 
 const usd = (value: number | null | undefined): string =>
   `$${(value ?? 0).toFixed((value ?? 0) < 10 ? 2 : 0)}`;
@@ -276,6 +279,151 @@ export const NewKeyModal: React.FC<{ keyValue: string | null; onClose: () => voi
   );
 };
 
+const readText = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+
+const MAX_SHOWN_REFUSALS = 10;
+
+/**
+ * Import pages from a JSON file (the same shape the authored bundle has). The file is checked in the
+ * browser, then sent in parts so each request stays small; the server still scrubs every page.
+ */
+export const ImportSection: React.FC = () => {
+  const copy = en.productManual.admin;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [importPages] = useImportManualPagesMutation();
+  const [file, setFile] = useState<{ name: string; pages: ManualImportPage[] } | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [result, setResult] = useState<ManualImportResult | null>(null);
+  const [stopped, setStopped] = useState(false);
+
+  const pick = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = event.target.files?.[0];
+    event.target.value = "";
+    setFile(null);
+    setProblem(null);
+    setResult(null);
+    setStopped(false);
+    if (!picked) return;
+    if (picked.size > IMPORT_MAX_FILE_BYTES) {
+      setProblem(copy.importTooBig);
+      return;
+    }
+    const parsed = parseImportBundle(await readText(picked));
+    if ("pages" in parsed) {
+      setFile({ name: picked.name, pages: parsed.pages });
+      return;
+    }
+    setProblem(
+      parsed.error === "notJson"
+        ? copy.importNotJson
+        : parsed.error === "shape"
+          ? copy.importShape
+          : parsed.error === "empty"
+            ? copy.importEmpty
+            : parsed.error === "tooMany"
+              ? copy.importTooMany
+              : copy.importBadPage(parsed.position ?? 0),
+    );
+  };
+
+  const run = async () => {
+    if (!file) return;
+    const chunks = chunkImportPages(file.pages);
+    const totals: ManualImportResult = { created: 0, updated: 0, unchanged: 0, errors: [] };
+    setStopped(false);
+    setResult(null);
+    try {
+      for (let index = 0; index < chunks.length; index += 1) {
+        setProgress({ done: index + 1, total: chunks.length });
+        const part = await importPages(chunks[index]).unwrap();
+        totals.created += part.created;
+        totals.updated += part.updated;
+        totals.unchanged += part.unchanged;
+        totals.errors.push(...(part.errors ?? []));
+        setResult({ ...totals });
+      }
+    } catch {
+      setStopped(true);
+      toast.error(copy.importFailed);
+    } finally {
+      setProgress(null);
+    }
+  };
+
+  return (
+    <Section title={copy.importTitle} help={copy.importHelp}>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/json,.json"
+        className="sr-only"
+        aria-label={copy.importChoose}
+        tabIndex={-1}
+        onChange={pick}
+      />
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          kind="secondary"
+          size="sm"
+          disabled={!!progress}
+          onClick={() => inputRef.current?.click()}
+        >
+          {copy.importChoose}
+        </Button>
+        {file && (
+          <span className="text-sm text-typography-600">
+            {copy.importChosen(file.name, file.pages.length)}
+          </span>
+        )}
+      </div>
+      {problem && (
+        <p role="alert" className="m-0 text-sm text-typography-900">
+          {problem}
+        </p>
+      )}
+      {file && (
+        <Button kind="primary" size="sm" disabled={!!progress} onClick={run} className="self-start">
+          {progress
+            ? copy.importRunning(progress.done, progress.total)
+            : copy.importRun(file.pages.length)}
+        </Button>
+      )}
+      {result && (
+        <div role="status" className="flex flex-col gap-1 text-sm text-typography-900">
+          <span>{copy.importDone(result.created, result.updated, result.unchanged)}</span>
+          {result.errors.length > 0 && (
+            <>
+              <span className="font-semibold">{copy.importRefused}</span>
+              <ul className="m-0 list-disc pl-5 text-xs text-typography-600">
+                {result.errors.slice(0, MAX_SHOWN_REFUSALS).map(message => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+              {result.errors.length > MAX_SHOWN_REFUSALS && (
+                <span className="text-xs text-typography-600">
+                  {copy.importMore(result.errors.length - MAX_SHOWN_REFUSALS)}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+      )}
+      {stopped && (
+        <p role="alert" className="m-0 text-sm text-typography-900">
+          {copy.importFailed}
+        </p>
+      )}
+    </Section>
+  );
+};
+
 const KeysSection: React.FC = () => {
   const copy = en.productManual.admin;
   const { data: keys = [], isLoading } = useGetManualAgentKeysQuery();
@@ -376,6 +524,7 @@ export const AdminDrawer: React.FC<{
           <SettingsSection state={state} />
           <RunsSection running={state?.agentState === "running"} />
           <ProposalsSection />
+          <ImportSection />
           <KeysSection />
         </div>
       )}
