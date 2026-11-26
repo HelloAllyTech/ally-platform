@@ -81,6 +81,7 @@ export enum FeatureToggleKey {
   LANDING_PAGES = 'landing_pages',
   PRODUCT_UPDATES = 'product_updates',
   PRODUCT_ROADMAP = 'product_roadmap',
+  PRODUCT_MANUAL = 'product_manual',
   USERS = 'users',
 
   // Analytics (route itself is SUPER_ADMIN-tier; two sub-tabs are SDA-only)
@@ -698,6 +699,14 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     label: 'Product Roadmap',
     description:
       'The Product Roadmap tab: view and vote. Managing it also needs Product Roadmap — Manage.',
+    legacyGrants: ALL_ADMIN_TIERS,
+    defaultEnabled: true,
+  },
+  {
+    key: FeatureToggleKey.PRODUCT_MANUAL,
+    label: 'Product Manual',
+    description:
+      'The Product Manual under Roadmap: read the guide to the whole product, search it, and ask its chat. Also needs a Roadmap role.',
     legacyGrants: ALL_ADMIN_TIERS,
     defaultEnabled: true,
   },

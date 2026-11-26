@@ -344,6 +344,9 @@ import { RepoClassifierService } from 'src/bug-hunter-approvals/service/repo-cla
     RoadmapAllocationRepository,
     RoadmapOpportunityService,
     RoadmapProductGoalRepository,
+    // The Product Manual's chat saves drafts and reads roadmap items through these.
+    RoadmapDraftService,
+    RoadmapItemReadService,
   ],
 })
 export class ProductRoadmapModule {}

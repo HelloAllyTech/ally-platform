@@ -6,6 +6,13 @@
       "headers": {
         "Authorization": "Bearer ${ALLY_BLOG_KEY}"
       }
+    },
+    "product-manual": {
+      "type": "http",
+      "url": "${ALLY_PRODUCT_MANUAL_URL}",
+      "headers": {
+        "Authorization": "Bearer ${ALLY_PRODUCT_MANUAL_KEY}"
+      }
     }
   }
 }

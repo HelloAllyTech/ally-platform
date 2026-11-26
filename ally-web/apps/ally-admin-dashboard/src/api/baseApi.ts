@@ -53,7 +53,11 @@ const baseQuery = fetchBaseQuery({
  * Reads whose 403 is expected for some roles and handled by the caller: no toast. A function, not
  * a constant: read at module load it breaks every suite that mocks `@constants` wholesale.
  */
-export const silentForbiddenReads = (): string[] => [ApiEndpoints.AUTH.GET_USER_PREFERENCES];
+export const silentForbiddenReads = (): string[] => [
+  ApiEndpoints.AUTH.GET_USER_PREFERENCES,
+  // Product Manual's "Save to my drafts": a 403 means no Idea role, and the tray says so in words.
+  ApiEndpoints.PRODUCT_MANUAL.DRAFTS,
+];
 
 /**
  * This function wraps the base query to handle authentication token refresh.
@@ -355,6 +359,12 @@ export const baseAPI = createApi({
     TAG_TYPES.CONTEXT_LIBRARY_LOOPS,
     TAG_TYPES.CONTEXT_LIBRARY_READER_KEYS,
     TAG_TYPES.BUILDER_PRINCIPLES,
+    TAG_TYPES.PRODUCT_MANUAL_TREE,
+    TAG_TYPES.PRODUCT_MANUAL_PAGE,
+    TAG_TYPES.PRODUCT_MANUAL_CHANGES,
+    TAG_TYPES.PRODUCT_MANUAL_STATE,
+    TAG_TYPES.PRODUCT_MANUAL_CONVERSATIONS,
+    TAG_TYPES.PRODUCT_MANUAL_ADMIN,
   ],
   endpoints: () => ({}),
 });
