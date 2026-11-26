@@ -19,6 +19,9 @@
   overflow-y: auto;
   min-height: 0;
   height: 100%;
+  /* TF1 round 2: the containing block for its visually hidden labels (position: absolute), so
+     they scroll inside this pane instead of stretching the page into a blank area below it. */
+  position: relative;
 }
 .ally-build__head {
   display: flex;

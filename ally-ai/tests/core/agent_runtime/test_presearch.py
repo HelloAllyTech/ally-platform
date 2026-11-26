@@ -48,6 +48,28 @@ async def test_a_plain_yes_is_not_searched(presearch_on, agent_run, chunk_servic
 
 
 @pytest.mark.asyncio
+async def test_a_greeting_or_introduction_is_not_searched(
+    presearch_on, agent_run, chunk_service
+):
+    """TF1 round 2 (Saathi B-1): "Hi, I'm Asha" was searched, and the passages it
+    found made the check decline the greeting."""
+    llm = FakeLLM(chat(turn_type="smalltalk"))
+    await agent_run("Hi, I'm Asha", llm)
+    chunk_service.search.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_question_after_a_greeting_is_searched(
+    presearch_on, agent_run, chunk_service
+):
+    chunk_service.search.return_value = [passage(CHUNK_A, 0.7)]
+    # A second step for the check's one rewrite (the fake reply cites nothing).
+    llm = FakeLLM(chat(turn_type="question"), chat(turn_type="question"))
+    await agent_run("Hi, I'm Asha, are you open now?", llm)
+    chunk_service.search.assert_called()
+
+
+@pytest.mark.asyncio
 async def test_a_message_in_another_script_is_searched_by_the_agent_in_english(
     presearch_on, agent_run, chunk_service
 ):

@@ -14,6 +14,12 @@ import { BaseWithoutTenantEntity } from 'src/common/entity/base-without-tenant.e
  * no stage and never appears on the board. Nothing here is readiness-checked. The author later
  * opens it, the copilot interview is seeded with `rawText`, and filing that interview creates the
  * real opportunity and deletes the draft.
+ *
+ * RETIRED: the idea-drafts routes, their service and the daily migration into
+ * plan drafts are gone (Roadmap v2 files ideas as `roadmap/drafts`), and
+ * nothing reads or writes this table now. The entity stays, unregistered in any
+ * module, as the record of the table's shape until any un-migrated rows are
+ * exported and a migration drops it.
  */
 @Entity('roadmap_idea_drafts')
 @Index('idx_roadmap_idea_drafts_owner', ['ownerUserId', 'updatedAt'], {

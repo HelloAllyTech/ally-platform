@@ -3,15 +3,9 @@ import { DataSource, EntityManager } from 'typeorm';
 /**
  * The Supabase → Ally roadmap import, as a reusable core.
  *
- * ONE code path, TWO entry points:
- *   - `src/database/scripts/import-roadmap-from-supabase.ts` — the CLI, reads a snapshot folder
- *   - `RoadmapImportService` → `POST /v1/product-roadmap/admin/import` — takes an upload
- *
- * They exist because the two have different reach: the CLI needs a host that can see production
- * Postgres (bastion, tunnel, one-off task), while the endpoint runs inside deployed ally-be, which
- * already can — and so avoids moving a snapshot containing user-interview transcripts between
- * machines. Neither may drift from the other, hence this file: the logic lives here once and the
- * entry points only differ in where the bytes come from.
+ * One entry point is left: `src/database/scripts/import-roadmap-from-supabase.ts`, the CLI, which
+ * reads a snapshot folder. The upload route (`POST /v1/product-roadmap/admin/import`) that shared
+ * this core was retired with the old Product Roadmap; the one-off import it served is long done.
  *
  * The critical properties are unchanged from the original script and must stay that way:
  *   - ONE transaction. Any failure rolls the whole load back and leaves the database untouched.

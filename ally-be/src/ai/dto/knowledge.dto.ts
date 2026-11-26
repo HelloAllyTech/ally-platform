@@ -160,6 +160,8 @@ export interface AgentGatewayBlock {
     list_name?: string;
     /** A create that saves the person's details for the team (chunk 6b). */
     takes_details?: boolean;
+    /** A create whose entry reaches the team with the person on it (TF1 round 2). */
+    passes_on?: boolean;
   }[];
   /** List tools the bot has on that didn't fit under the cap; named in the run's trace. */
   omitted?: string[];
@@ -325,6 +327,8 @@ export interface ConversationSummaryResponse {
 }
 
 interface KnowledgePersonaRequest {
+  /** TF1 round 2 (Sahyog N-2): the use-case template it was built from. */
+  template?: string;
   display_name?: string;
   system_prompt?: string;
   tone?: string;

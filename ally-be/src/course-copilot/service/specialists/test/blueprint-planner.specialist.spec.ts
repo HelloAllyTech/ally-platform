@@ -106,7 +106,7 @@ describe('BlueprintPlannerSpecialist', () => {
     expect(prompt).toContain('Notes: Keep it to two sections.');
     expect(prompt).toContain('0: Reflect the feeling behind a message');
     expect(prompt).toContain('"key": "TREX_RUNNER"');
-    expect(prompt).toContain('Max new 40');
+    expect(prompt).toContain('Max new 100');
 
     expect(blueprint.sections[0].items.map((entry) => entry.type)).toEqual([
       'ARTICLE',

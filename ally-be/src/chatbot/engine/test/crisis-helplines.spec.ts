@@ -67,4 +67,48 @@ describe('crisis helplines (Q4 G7)', () => {
       helplineConfirmedAt: null,
     });
   });
+
+  describe('only numbers reach a crisis reply (TF1 round 2, S-1)', () => {
+    const SAATHI =
+      '+91 20 4860 2525 (calls and WhatsApp chat on the same number). Open every day 10 am to 10 pm, including Sundays and public holidays. Closed on Diwali day (Lakshmi Puja) only. Calls are free from any n';
+
+    it("a confirmed answer with hours in it gives only Saathi's number", () => {
+      expect(
+        crisisHelplines({
+          helplineNumbers: SAATHI,
+          helplineSource: 'template',
+          helplineConfirmedAt: now.toISOString(),
+        }),
+      ).toBe('+91 20 4860 2525');
+      expect(crisisHelplines({ helplineNumbers: SAATHI })).toBe(
+        '+91 20 4860 2525',
+      );
+    });
+
+    it('text with no number is never a helpline, and never waits for a confirm', () => {
+      const text = {
+        helplineNumbers: 'Open 10 am to 10 pm',
+        helplineSource: 'owner' as const,
+      };
+      expect(crisisHelplines(text)).toBe('');
+      expect(
+        helplineNeedsConfirming({ ...text, helplineSource: 'template' }),
+      ).toBe(false);
+    });
+
+    it('cleaning a stored value is not the owner confirming it', () => {
+      const stored = {
+        helplineNumbers: SAATHI,
+        helplineSource: 'template' as const,
+        helplineConfirmedAt: null,
+      };
+      expect(
+        ownerHelplineFields(
+          stored,
+          { helplineNumbers: '+91 20 4860 2525' },
+          now,
+        ),
+      ).toEqual({ helplineSource: 'template', helplineConfirmedAt: null });
+    });
+  });
 });

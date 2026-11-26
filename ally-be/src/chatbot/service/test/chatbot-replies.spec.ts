@@ -88,6 +88,29 @@ describe('Per-bot keyword replies', () => {
       ]);
     });
 
+    it('TF1 round 2: knows which copies are still worded as their global', () => {
+      const rows = [
+        crisis,
+        row({
+          id: 'copy-same',
+          chatbotId: BOT,
+          overridesTemplateId: 'crisis',
+          responseText: '  Call   {helpline_numbers} ',
+        }),
+        row({
+          id: 'copy-own',
+          chatbotId: OTHER_BOT,
+          overridesTemplateId: 'crisis',
+          responseText: 'Please call our night line now.',
+        }),
+      ];
+      expect([...ChatbotReplyService.unchangedCopies(rows, BOT)]).toEqual([
+        'copy-same',
+      ]);
+      expect(ChatbotReplyService.unchangedCopies(rows, OTHER_BOT).size).toBe(0);
+      expect(ChatbotReplyService.unchangedCopies(rows, null).size).toBe(0);
+    });
+
     it('ignores a row that would switch a required reply off, however it was saved', () => {
       const off = row({
         id: 'off',

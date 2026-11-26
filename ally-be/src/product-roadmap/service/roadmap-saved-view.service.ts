@@ -11,14 +11,12 @@ import {
   CreateSavedViewDto,
   UpdateSavedViewDto,
 } from '../dto/roadmap-content.dto';
-import { RoadmapNotificationService } from './roadmap-notification.service';
 
 @Injectable()
 export class RoadmapSavedViewService {
   constructor(
     private readonly savedViewRepository: RoadmapSavedViewRepository,
     private readonly tabOrderRepository: RoadmapUserTabOrderRepository,
-    private readonly notifications: RoadmapNotificationService,
   ) {}
 
   /** Own views plus every pinned view. The row filter lives in the repository — see its docblock. */
@@ -55,7 +53,7 @@ export class RoadmapSavedViewService {
   ): Promise<RoadmapSavedView> {
     if (dto.pinned !== undefined) {
       throw new BadRequestException(
-        'Use PUT /views/:id/pin to change pinning; it requires roadmap manage permission',
+        'A view cannot be pinned or unpinned here.',
       );
     }
 
@@ -69,55 +67,15 @@ export class RoadmapSavedViewService {
     return this.savedViewRepository.save(view);
   }
 
-  /**
-   * Pin or unpin a view for everyone. Gated on edit:admin:product-roadmap at the controller —
-   * that decorator is the whole enforcement, and it replaces the source's enforce_pin_admin()
-   * trigger, which only existed because RLS let a creator update their own row's `pinned`.
-   */
-  async setPinned(
-    userId: number,
-    id: string,
-    pinned: boolean,
-  ): Promise<RoadmapSavedView> {
-    const view = await this.requireView(id);
-    view.pinned = pinned;
-    view.updatedBy = userId;
-    const saved = await this.savedViewRepository.save(view);
-
-    // Everyone's tab strip changes, so this is a board-wide invalidation.
-    this.notifications.emit({
-      kind: 'ROADMAP_INVALIDATED',
-      actorId: userId,
-      reason: 'views',
-    });
-    return saved;
-  }
-
   async remove(userId: number, id: string, canManage: boolean): Promise<void> {
     const view = await this.requireView(id);
     this.assertCanMutate(view, userId, canManage);
     await this.savedViewRepository.softDelete(id);
-
-    if (view.pinned) {
-      this.notifications.emit({
-        kind: 'ROADMAP_INVALIDATED',
-        actorId: userId,
-        reason: 'views',
-      });
-    }
   }
 
   async getTabOrder(userId: number): Promise<{ viewIds: string[] }> {
     const row = await this.tabOrderRepository.findOne({ where: { userId } });
     return { viewIds: row?.viewIds ?? [] };
-  }
-
-  async setTabOrder(
-    userId: number,
-    viewIds: string[],
-  ): Promise<{ viewIds: string[] }> {
-    await this.tabOrderRepository.setOrder(userId, viewIds);
-    return { viewIds };
   }
 
   private async requireView(id: string): Promise<RoadmapSavedView> {

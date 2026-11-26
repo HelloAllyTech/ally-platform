@@ -93,7 +93,7 @@ export function composeReply(input: ComposeReplyInput): string {
  * reader and repeating it looks like padding.
  */
 /** TF1 P2: the setup's own documents (facts learned, the owner's notes), never shown as a source. */
-const INTERNAL_TITLES = /^(what we learned|owner notes)\b/i;
+export const INTERNAL_TITLES = /^(what we learned|owner notes)\b/i;
 
 /**
  * TF1 P1: citation markers the model leaves in its text ("(12)", "(12,1)", "{11,12}", a stray
@@ -101,16 +101,24 @@ const INTERNAL_TITLES = /^(what we learned|owner notes)\b/i;
  * Only one- and two-digit markers, so "(022) 2345 6789" or "(2024)" stay.
  */
 export function withoutCitationDebris(text: string): string {
-  return text
-    .replace(/^\s*(?:citations?|sources?)\s*:.*$/gim, '')
-    .replace(/\s*\(\s*\d{1,2}(?:\s*,\s*\d{1,2})*\s*\)/g, '')
-    .replace(/\s*\{\s*\d{1,2}(?:\s*,\s*\d{1,2})*\s*\}/g, '')
-    .replace(/\s*\[\s*\d{1,2}(?:\s*,\s*\d{1,2})*\s*\]/g, '')
-    .replace(/\s+cited\)/gi, '')
-    .replace(/\s+\)(?=\s|$)/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/[ \t]+\n/g, '\n')
-    .trim();
+  return (
+    text
+      .replace(/^\s*(?:citations?|sources?)\s*:.*$/gim, '')
+      .replace(/\s*\(\s*\d{1,2}(?:\s*,\s*\d{1,2})*\s*\)/g, '')
+      .replace(/\s*\{\s*\d{1,2}(?:\s*,\s*\d{1,2})*\s*\}/g, '')
+      .replace(/\s*\[\s*\d{1,2}(?:\s*,\s*\d{1,2})*\s*\]/g, '')
+      // TF1 round 2 (Saathi B-3, B-5): an empty "[]" and worded markers ("(see citations)").
+      .replace(/\s*\[\s*\]/g, '')
+      .replace(
+        /\s*\(\s*(?:see|per|from)\s+(?:the\s+)?(?:citations?|sources?|references?|passages?)\s*\)/gi,
+        '',
+      )
+      .replace(/\s+cited\)/gi, '')
+      .replace(/\s+\)(?=\s|$)/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]+\n/g, '\n')
+      .trim()
+  );
 }
 
 function renderCitations(

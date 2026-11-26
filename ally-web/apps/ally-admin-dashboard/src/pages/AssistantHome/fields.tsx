@@ -197,15 +197,25 @@ export const LinesField: React.FC<{
 };
 
 /** A collapsed group (Extra instructions): closed until the owner opens it. */
-export const Collapsed: React.FC<{ summary: string; children: React.ReactNode }> = ({
-  summary,
-  children,
-}) => (
-  <details className="ally-home__details">
-    <summary>{summary}</summary>
-    <div className="ally-home__details-body">{children}</div>
-  </details>
-);
+export const Collapsed: React.FC<{
+  summary: string;
+  children: React.ReactNode;
+  /** TF1 round 2 (Saathi B-11): load what's inside only when first opened. */
+  lazy?: boolean;
+}> = ({ summary, children, lazy = false }) => {
+  const [opened, setOpened] = React.useState(!lazy);
+  return (
+    <details
+      className="ally-home__details"
+      onToggle={event => {
+        if ((event.currentTarget as HTMLDetailsElement).open) setOpened(true);
+      }}
+    >
+      <summary>{summary}</summary>
+      <div className="ally-home__details-body">{opened ? children : null}</div>
+    </details>
+  );
+};
 
 /**
  * A group card that opens and closes (Lists' Details, Rules and What your assistant can do, chunk

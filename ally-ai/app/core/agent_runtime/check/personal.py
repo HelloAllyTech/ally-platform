@@ -57,11 +57,25 @@ def _stems(text: str) -> Set[str]:
     }
 
 
+#: TF1 round 2 (Saathi B-2): an offer of help is not a claim for the organisation, so
+#: "Your name is Asha. How can we help you today?" is still about the person.
+_OFFER_OF_HELP = re.compile(
+    r"(?:^|(?<=[.!?]))\s*(?:how|what) can (?:i|we) (?:help|do for you)[^.!?]*[.!?]?"
+    r"|(?:^|(?<=[.!?]))\s*(?:it'?s )?nice to meet you[^.!?]*[.!?]?",
+    re.I,
+)
+
+
 def about_the_person(answer: str, personal: str) -> bool:
     """Whether `answer` only tells the person what they said about themselves."""
     if not personal.strip() or not answer.strip():
         return False
-    if _FOR_THE_ORGANISATION.search(answer) or _LINK_OR_EMAIL.search(answer):
+    claims = _OFFER_OF_HELP.sub(" ", answer)
+    # A question back to them ("How can our listeners help?") claims nothing.
+    claims = " ".join(
+        s for s in re.split(r"(?<=[.!?।])\s+", claims) if not s.rstrip().endswith("?")
+    )
+    if _FOR_THE_ORGANISATION.search(claims) or _LINK_OR_EMAIL.search(answer):
         return False
     if not _TO_THEM.search(answer):
         return False
@@ -69,3 +83,34 @@ def about_the_person(answer: str, personal: str) -> bool:
     if any(n not in given for n in _NUMBER.findall(answer)):
         return False
     return bool(_stems(answer) & _stems(personal))
+
+
+#: "I'll use it in our chats", "say 'forget my name' any time": about the name
+#: itself, never a claim about the organisation.
+_ABOUT_THE_NAME = re.compile(
+    r"\b(?:i'?ll|i will)\s+use\s+(?:it|that|the name|your name)\b|forget my name",
+    re.I,
+)
+
+
+def personal_part(answer: str, personal: str) -> str:
+    """The sentences of `answer` that only tell the person what they told us (TF1
+    round 2, B-2), with lines about using their name; "" when none do. The first
+    sentence must be one of them, so an answer that leads with an uncited claim
+    is never cut down to a stray clause."""
+    # A clause after a dash is its own sentence here ("…is Asha — I'll use it…").
+    sentences = [
+        s.strip()
+        for s in re.split(r"(?<=[.!?।])\s+|\s+[—–]\s+", answer or "")
+        if s.strip()
+    ]
+    if not sentences or not about_the_person(
+        _ABOUT_THE_NAME.sub("", sentences[0]) or sentences[0], personal
+    ):
+        return ""
+    kept = [
+        s
+        for s in sentences
+        if about_the_person(s, personal) or _ABOUT_THE_NAME.search(s)
+    ]
+    return " ".join(kept).strip()

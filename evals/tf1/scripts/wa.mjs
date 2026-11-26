@@ -80,12 +80,12 @@ async function send() {
     port: Number(process.env.PGPORT ?? 5477),
     user: process.env.PGUSER ?? 'postgres',
     password: process.env.PGPASSWORD ?? dockerEnv('POSTGRES_PASSWORD'),
-    database: process.env.PGDATABASE ?? 'ally_tf1',
+    database: process.env.PGDATABASE ?? 'ally_local',
   });
   await pg.connect();
   // The DB's own clock (createdAt is timestamp without time zone), so the read-back can't miss rows.
   const started = (await pg.query('SELECT localtimestamp AS t')).rows[0].t;
-  const res = await fetch(`${API}/api/v1/webhook/whatsapp`, {
+  const res = await fetch(`${API}/api/v1/webhook/whatsapp${process.env.WA_WEBHOOK_KEY ? "/" + process.env.WA_WEBHOOK_KEY : ""}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-hub-signature-256': sig },
     body,

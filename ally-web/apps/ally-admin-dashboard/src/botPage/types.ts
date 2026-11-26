@@ -116,6 +116,9 @@ export interface PublicMessage {
   createdAt: string;
   /** "Was this helpful?" shows under it (chunk Q2a); never on a crisis reply. */
   rateable?: boolean;
+  /** TF1 round 2 (Sahyog N-11): the card and parts the reply showed, drawn again after a reload. */
+  confirmation?: PublicConfirmation;
+  parts?: ReplyParts;
 }
 
 export interface PublicFinal {
@@ -138,6 +141,8 @@ export interface PublicFinal {
   confirmation?: PublicConfirmation;
   /** BT1: chips and cards built from what the assistant looked up or is about to write. */
   parts?: ReplyParts;
+  /** TF1 round 2 (Saathi B-2): the name this reply saved, for "Your name: … · Remove". */
+  name?: string;
 }
 
 /**

@@ -45,19 +45,16 @@ describe('RoadmapStrategyGoalService', () => {
         .fn()
         .mockResolvedValue({ maxScore: 10, maxVoters: 3, totalGoals: 4 }),
     };
-    const notifications = { emit: jest.fn() };
 
     return {
       service: new RoadmapStrategyGoalService(
         goalRepository as never,
         impactRepository as never,
         weightsRepository as never,
-        notifications as never,
       ),
       goalRepository,
       impactRepository,
       weightsRepository,
-      notifications,
     };
   };
 

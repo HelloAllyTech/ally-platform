@@ -76,7 +76,6 @@ function build(over: Record<string, any> = {}) {
     notifications: { notify: jest.fn() },
     dataSource: { query: jest.fn(async () => [{ id: 'p1' }]) },
     opportunities: { update: jest.fn() },
-    drafts: { find: jest.fn(async () => []), softDelete: jest.fn() },
     ...over.deps,
   };
   const service = new PlanIdeaService(
@@ -95,7 +94,6 @@ function build(over: Record<string, any> = {}) {
     deps.notifications,
     deps.dataSource,
     deps.opportunities,
-    deps.drafts,
   );
   return { service, deps, plan };
 }
@@ -303,7 +301,6 @@ describe('PlanIdeaService', () => {
       },
     });
     expect(await service.sweepExpiry()).toEqual({ archived: 0, purged: 0 });
-    expect(await service.migrateIdeaDrafts()).toBe(0);
     expect(deps.store.repository.createQueryBuilder).not.toHaveBeenCalled();
   });
 

@@ -100,8 +100,12 @@ export const inboxApi = baseAPI.injectEndpoints({
       }),
       providesTags: [TAG_TYPES.INBOX],
     }),
-    getInboxCounts: builder.query<InboxCounts, void>({
-      query: () => ({ url: ApiEndpoints.INBOX.COUNTS, method: HttpMethod.GET }),
+    getInboxCounts: builder.query<InboxCounts, { chatbotId?: string } | void>({
+      query: args => ({
+        url: ApiEndpoints.INBOX.COUNTS,
+        method: HttpMethod.GET,
+        params: args && args.chatbotId ? { chatbotId: args.chatbotId } : undefined,
+      }),
       providesTags: [TAG_TYPES.INBOX],
     }),
     getInboxThread: builder.query<InboxThread, { chatbotId: string; id: string }>({

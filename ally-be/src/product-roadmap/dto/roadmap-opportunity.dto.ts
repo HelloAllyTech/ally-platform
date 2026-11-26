@@ -4,9 +4,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsNotEmpty,
-  IsNumber,
   IsUrl,
-  Max,
   IsBoolean,
   IsEnum,
   IsIn,
@@ -20,7 +18,6 @@ import {
   MaxLength,
   Min,
   MinLength,
-  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -38,18 +35,14 @@ import { BUG_HUNTER_V2_APPS } from 'src/bug-hunter-approvals/dto/board.dto';
 const BUG_FIX_SESSION_REPOS = BUG_HUNTER_V2_APPS;
 type BugFixSessionRepo = (typeof BUG_HUNTER_V2_APPS)[number];
 import {
-  RoadmapBoardGroupBy,
   RoadmapOpportunityEffort,
   RoadmapOpportunitySource,
   RoadmapOpportunityStage,
   RoadmapOpportunityType,
-  RoadmapReferenceImageContentType,
 } from '../enum/roadmap-opportunity.enum';
 import {
-  ROADMAP_BOARD_DEFAULTS,
   ROADMAP_EFFORT_UNSIZED,
   ROADMAP_LIMITS,
-  ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES,
 } from '../constants/product-roadmap.constants';
 
 /**
@@ -286,7 +279,7 @@ export class ListOpportunitiesQueryDto extends RoadmapOpportunityFiltersDto {
 export class RoadmapReferenceImageDto {
   @ApiProperty({
     description:
-      'S3 object URL returned by POST /product-roadmap/reference-images/upload-url',
+      'S3 object URL under the roadmap reference-image prefix (uploaded through the since-retired presign route)',
   })
   @IsString()
   @IsNotEmpty()
@@ -306,41 +299,6 @@ export class RoadmapReferenceImageDto {
   @IsString()
   @MaxLength(ROADMAP_LIMITS.REFERENCE_IMAGE_CAPTION_MAX)
   caption?: string | null;
-}
-
-/**
- * Ask for a presigned PUT so the browser can upload one image straight to S3.
- *
- * Same shape as the blog's image presign, and the same reason for existing: the bytes never pass
- * through this service, so a 5 MB screenshot is not a 5 MB request body through the API gateway.
- * The returned `imageUrl` is what the client then sends back in `referenceImages`.
- *
- * Gated at the VOTE tier, matching POST /opportunities — the person FILING an opportunity is the
- * one with the screenshot, and making them file first and attach later (edit is the MANAGE tier)
- * would put the picture behind a permission most filers do not hold.
- */
-export class RoadmapReferenceImageUploadUrlDto {
-  @ApiProperty({ example: 'filter-row-wrapping.png' })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(255)
-  fileName!: string;
-
-  @ApiProperty({
-    description: 'File size in bytes',
-    minimum: 1,
-    maximum: ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES,
-  })
-  @IsNumber()
-  @Min(1)
-  // Checked here as well as in S3Service so an oversized file is refused before anything is
-  // signed, rather than after the client has already been handed a URL.
-  @Max(ROADMAP_REFERENCE_IMAGE_MAX_SIZE_BYTES)
-  fileSize!: number;
-
-  @ApiProperty({ enum: RoadmapReferenceImageContentType })
-  @IsEnum(RoadmapReferenceImageContentType)
-  contentType!: RoadmapReferenceImageContentType;
 }
 
 export class SuggestTitleDto {
@@ -420,8 +378,7 @@ export class CreateOpportunityDto {
   ownerUserId?: number | null;
 
   /**
-   * The `readinessToken` from the guided interview's final turn
-   * (`POST ai/opportunity-interview`), verbatim.
+   * The `readinessToken` from the copilot interview's final turn, verbatim.
    *
    * This is what makes the readiness checklist a real gate rather than a discipline the admin
    * client chose to keep: it proves the draft being filed is the draft that was graded, and
@@ -434,7 +391,7 @@ export class CreateOpportunityDto {
    */
   @ApiPropertyOptional({
     description:
-      'The `readinessToken` from POST ai/opportunity-interview for this exact draft. Required once the readiness ' +
+      "The `readinessToken` from the copilot interview's final turn for this exact draft. Required once the readiness " +
       'gate is fully enforced; a tampered, expired or stale token is always a 400.',
   })
   @IsOptional()
@@ -785,168 +742,6 @@ export class UpdateOpportunityDto {
   @ValidateNested({ each: true })
   @Type(() => RoadmapReferenceImageDto)
   referenceImages?: RoadmapReferenceImageDto[];
-}
-
-/**
- * The month board read. Same filters as the table, but windowed by month instead of paginated by
- * offset — a lane has to be COMPLETE to be honest, and an offset window would fill the first
- * lane and leave the rest looking empty.
- */
-export class MonthBoardQueryDto extends RoadmapOpportunityFiltersDto {
-  @ApiPropertyOptional({
-    description:
-      "First month lane, 'YYYY-MM'. Defaults to one month before the current month.",
-  })
-  @IsOptional()
-  @Matches(MONTH_KEY_REGEX, { message: `from ${MONTH_KEY_MESSAGE}` })
-  from?: string;
-
-  @ApiPropertyOptional({
-    description:
-      "Last month lane, 'YYYY-MM'. Defaults to four months after the current month.",
-  })
-  @IsOptional()
-  @Matches(MONTH_KEY_REGEX, { message: `to ${MONTH_KEY_MESSAGE}` })
-  to?: string;
-
-  @ApiPropertyOptional({
-    default: ROADMAP_BOARD_DEFAULTS.LANE_LIMIT,
-    description:
-      'Cards returned per lane. Each lane reports its true total regardless, so a truncated ' +
-      'lane can say how many it is hiding rather than pretending to be complete.',
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  laneLimit?: number;
-
-  @ApiPropertyOptional({
-    enum: RoadmapBoardGroupBy,
-    default: RoadmapBoardGroupBy.MONTH,
-    description:
-      'How to group the lanes. `from`/`to` are MONTH-only and are ignored by the other ' +
-      'groupings, which have no window — a stage board that dropped every card without a ' +
-      'planned month would be empty for no reason a reader could see.',
-  })
-  @IsOptional()
-  @IsEnum(RoadmapBoardGroupBy)
-  groupBy?: RoadmapBoardGroupBy;
-}
-
-/**
- * Drop a card into a lane.
- *
- * `orderedIds` is the FULL resulting order of the destination lane, not a delta — the same
- * whole-array-overwrite shape as PUT views/tab-order and PUT product-goals/order. A delta
- * ("insert after X") reads as cheaper but needs the server to reconstruct the lane it was
- * computed against, and two people dragging in the same lane would interleave into an order
- * neither of them saw. An absolute order is idempotent and the last write plainly wins.
- *
- * Stale ids are tolerated, not rejected: an id that is no longer in this lane is skipped rather
- * than 409'd, because the alternative is a drag that fails because somebody else moved an
- * unrelated card while this one was mid-air.
- */
-export class MoveOpportunityDto {
-  @ApiProperty()
-  @IsUUID()
-  opportunityId!: string;
-
-  @ApiPropertyOptional({
-    enum: RoadmapBoardGroupBy,
-    default: RoadmapBoardGroupBy.MONTH,
-    description:
-      'Which grouping the drag happened on — decides WHICH FIELD the drop writes. Defaults to ' +
-      'month so an older client keeps working unchanged.',
-  })
-  @IsOptional()
-  @IsEnum(RoadmapBoardGroupBy)
-  groupBy?: RoadmapBoardGroupBy;
-
-  @ApiProperty({
-    nullable: true,
-    description:
-      "Destination lane. 'YYYY-MM' when grouping by month (null = Unscheduled); the stage, " +
-      'product goal or owner value otherwise (null = the catch-all lane, which for stage is ' +
-      'not a legal destination). Must be sent explicitly.',
-  })
-  @ValidateIf((o: MoveOpportunityDto) => o.lane !== null)
-  @IsString()
-  @MaxLength(ROADMAP_LIMITS.GOAL_NAME_MAX)
-  lane!: string | null;
-
-  @ApiPropertyOptional({
-    type: [String],
-    description:
-      'Every card id in the destination lane, in its new top-to-bottom order. MONTH ONLY — the ' +
-      'other groupings order by priority and have no hand-ordering to rewrite, so sending it ' +
-      'there is ignored rather than rejected.',
-  })
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(ROADMAP_BOARD_DEFAULTS.MAX_LANE_IDS)
-  // Plain @IsUUID, matching MergeOpportunitiesDto: migrated ids come from the source database
-  // and a version assertion would reject legitimate historical rows.
-  @IsUUID(undefined, { each: true })
-  orderedIds?: string[];
-}
-
-export class SplitPartDto {
-  @ApiPropertyOptional({
-    description:
-      'Set on EXACTLY ONE part — the original opportunity, which is kept and reworded. ' +
-      'Omit on every new part.',
-  })
-  @IsOptional()
-  @IsUUID()
-  id?: string;
-
-  @ApiProperty({ maxLength: ROADMAP_LIMITS.DESCRIPTION_MAX })
-  @IsString()
-  @MinLength(1)
-  @MaxLength(ROADMAP_LIMITS.DESCRIPTION_MAX)
-  description!: string;
-
-  @ApiProperty({
-    description: 'Relative weight; the vote split is proportional to this',
-  })
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  weight!: number;
-}
-
-export class SplitOpportunityDto {
-  @ApiProperty({ type: [SplitPartDto], minItems: 2 })
-  @IsArray()
-  @Type(() => SplitPartDto)
-  parts!: SplitPartDto[];
-}
-
-export class MergeOpportunitiesDto {
-  @ApiProperty({ description: 'The surviving opportunity' })
-  @IsUUID()
-  primaryId!: string;
-
-  @ApiProperty({
-    description: 'Opportunities to fold in and soft-delete',
-    type: [String],
-  })
-  @IsArray()
-  // Plain @IsUUID, not version-pinned: migrated ids come from the source database and we do
-  // not want a version assertion rejecting legitimate historical rows.
-  @IsUUID(undefined, { each: true })
-  sourceIds!: string[];
-
-  @ApiPropertyOptional({
-    description: "Optional rewrite of the primary's description",
-    maxLength: ROADMAP_LIMITS.DESCRIPTION_MAX,
-  })
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(ROADMAP_LIMITS.DESCRIPTION_MAX)
-  description?: string;
 }
 
 /**

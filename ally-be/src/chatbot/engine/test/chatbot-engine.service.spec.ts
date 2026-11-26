@@ -500,7 +500,9 @@ describe('ChatbotEngineService', () => {
             setTimeout(
               () =>
                 resolve({ is_crisis: true, confidence: 0.9, signal: 'end it' }),
-              5,
+              // Late enough that the failed run has settled first, even on a cold or busy runner
+              // (5 ms lost that race on CI, 2026-11-25).
+              200,
             ),
           ),
       );

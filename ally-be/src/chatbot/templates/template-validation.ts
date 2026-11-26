@@ -44,7 +44,8 @@ export const AROUND_THE_YES =
 
 const GROUPS = ['organisations', 'businesses'];
 const ABILITIES = ['do_it', 'never'];
-const KINDS = ['text', 'long_text', 'yes_no', 'choices'];
+// TF1 round 2 (S-1): 'phone' asks a helpline number on its own, so only a number reaches crisis replies.
+const KINDS = ['text', 'long_text', 'yes_no', 'choices', 'phone'];
 const EXPECTS = ['answer', 'decline', 'clarify', 'crisis_only'];
 const FILLS = [
   'fact',
@@ -421,6 +422,7 @@ export function sampleAnswers(t: UseCaseTemplate): SetupAnswers {
   for (const q of t.setup) {
     if (q.kind === 'yes_no') out[q.key] = true;
     else if (q.kind === 'choices') out[q.key] = [q.choices![0]];
+    else if (q.kind === 'phone') out[q.key] = '+91 20 4860 2525';
     else out[q.key] = 'First thing - 1200\nSecond thing - 2500';
   }
   return out;

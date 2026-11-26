@@ -12,6 +12,7 @@ import { Cover } from "./screens/Cover";
 import { ErrorState } from "./screens/ErrorState";
 import { Prechat } from "./screens/Prechat";
 import { surfaceProps } from "./theme";
+import { clearUnsent, dropUnsent, keepUnsent, withUnsent } from "./unsent";
 
 import type { BlockedState, PublicBotPage, PublicMessage, PublicSession } from "./types";
 
@@ -21,6 +22,7 @@ interface Loaded {
   stage: Stage;
   messages?: ChatItem[];
   signedInAs?: string | null;
+  knownName?: string | null;
 }
 
 type Stage =
@@ -49,7 +51,14 @@ const toItem = (m: PublicMessage): ChatItem => ({
   citations: m.citations,
   rateable: m.rateable,
   ...(m.sender ? { sender: m.sender } : {}),
+  // TF1 round 2 (Sahyog N-11): the card the reply showed, drawn again after a reload.
+  ...(m.confirmation ? { confirmation: m.confirmation } : {}),
+  ...(m.parts ? { parts: m.parts } : {}),
 });
+
+/** A send that didn't reach us or failed on our side: kept as not sent, with Send again (N-14). */
+const notReached = (err: unknown): boolean =>
+  !(err instanceof BotPageApiError) || err.status === 0 || err.status >= 500;
 
 /** Waits between reconnects of the visitor stream, then 30 s (chunk 11a). */
 const STREAM_BACKOFF_MS = [1_000, 2_000, 5_000, 10_000, 30_000];
@@ -93,6 +102,8 @@ export function BotPageApp({
   const [error, setError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<string | null>(null);
   const [signedInAs, setSignedInAs] = useState<string | null>(null);
+  // TF1 round 2 (Saathi B-2): the name the assistant keeps for them, with Remove.
+  const [knownName, setKnownName] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatItem[]>([]);
   const [pending, setPending] = useState<PendingReply | null>(null);
   // The assistant's live steps while it works (chunk 6b).
@@ -130,8 +141,9 @@ export function BotPageApp({
   );
 
   const openChat = useCallback(async () => {
-    const { messages: stored } = await api.conversation(slug);
-    setMessages(stored.filter(m => m.text.trim()).map(toItem));
+    const { messages: stored, name } = await api.conversation(slug);
+    setMessages(withUnsent(slug, stored.filter(m => m.text.trim()).map(toItem), stored));
+    setKnownName(name ?? null);
     setStage({ kind: "chat" });
   }, [api, slug]);
 
@@ -181,8 +193,13 @@ export function BotPageApp({
         return {
           page: loaded,
           stage: { kind: "chat" },
-          messages: resumed.messages.filter(m => m.text.trim()).map(toItem),
+          messages: withUnsent(
+            slug,
+            resumed.messages.filter(m => m.text.trim()).map(toItem),
+            resumed.messages,
+          ),
           signedInAs: session?.signedInAs ?? null,
+          knownName: resumed.name ?? null,
         };
       }
     } catch {
@@ -195,6 +212,7 @@ export function BotPageApp({
     if (result.page) setPage(result.page);
     if (result.messages) setMessages(result.messages);
     if (result.signedInAs !== undefined) setSignedInAs(result.signedInAs);
+    if (result.knownName !== undefined) setKnownName(result.knownName);
     setStage(result.stage);
   }, []);
 
@@ -288,22 +306,10 @@ export function BotPageApp({
               arrivedWhileClosed();
               setMessages(list => {
                 if (list.some(item => item.id === event.id)) return list;
-                const joined =
-                  event.role === "agent_human" &&
-                  list[list.length - 1]?.role !== "agent_human" &&
-                  event.sender
-                    ? [
-                        {
-                          id: `joined-${event.id}`,
-                          role: "notice" as const,
-                          text: fill(copy.chat.joined, { sender: event.sender }),
-                          citations: [],
-                        },
-                      ]
-                    : [];
+                // TF1 round 2 (Saathi): the server stores one "A person from … has joined" notice
+                // per take-over; the page adding its own line showed two.
                 return [
                   ...list,
-                  ...joined,
                   {
                     id: event.id,
                     role: event.role,
@@ -348,20 +354,27 @@ export function BotPageApp({
   }, [api, slug, stage.kind, streamKey, copy, arrivedWhileClosed]);
 
   if (!page || stage.kind === "loading") {
+    // TF1 round 2: before the page loads (an off or paused link, a bad link) there is no
+    // branding yet, but the screen still sits on the page's surface: its fonts, colours, sizes.
     if (stage.kind === "error") {
       return (
-        <ErrorState
-          copy={copy}
-          message={stage.message}
-          actionLabel={copy.errors.tryAgain}
-          onAction={stage.final ? undefined : reload}
-        />
+        <div className="brand-surface bp-root">
+          <ErrorState
+            copy={copy}
+            message={stage.message}
+            actionLabel={copy.errors.tryAgain}
+            onAction={stage.final ? undefined : reload}
+            crisis={page?.crisis}
+          />
+        </div>
       );
     }
     return (
-      <p role="status" className="flex h-full items-center justify-center text-stone-500">
-        {copy.loading}
-      </p>
+      <div className="brand-surface bp-root">
+        <p role="status" className="bp-screen bp-pad bp-muted" style={{ justifyContent: "center" }}>
+          {copy.loading}
+        </p>
+      </div>
     );
   }
 
@@ -405,8 +418,15 @@ export function BotPageApp({
 
   const newChat = () =>
     run(async () => {
+      // TF1 round 2: New chat works while a reply is pending: the stream stops, its pending reply
+      // goes, and nothing from it lands in the new chat.
       abortRef.current?.abort();
+      abortRef.current = null;
+      live.stop();
+      setPending(null);
+      setReturnedDraft(null);
       await api.newConversation(slug);
+      clearUnsent(slug);
       setMessages([]);
       setPending(null);
     });
@@ -431,7 +451,10 @@ export function BotPageApp({
     abortRef.current?.abort();
     abortRef.current = controller;
     const local: ChatItem = { id: `local-${Date.now()}`, role: "user", text, citations: [] };
-    setMessages(m => [...m, local]);
+    // The same words sent again replace their unsent copy (N-14).
+    const same = (t: string) => t.trim() === text.trim();
+    dropUnsent(slug, m => same(m.text));
+    setMessages(m => [...m.filter(item => !(item.unsent && same(item.text))), local]);
     setPending({ status: null, text: "" });
     live.start();
     setReturnedDraft(null);
@@ -477,9 +500,14 @@ export function BotPageApp({
           {
             onStatus: code => {
               // A draft sent back to be rewritten (chunk H1): its streamed text goes.
+              // TF1 round 2: the draft leaves the screen now, not when the rewrite starts
+              // streaming; a frozen draft followed by a new one read as the reply sent twice.
               if (code === "rewriting") {
                 target = "";
                 shown = 0;
+                revealStarted = 0;
+                setPending(p => (p ? { ...p, status: code, text: "" } : p));
+                return;
               }
               setPending(p => (p ? { ...p, status: code } : p));
             },
@@ -493,6 +521,8 @@ export function BotPageApp({
         );
         await finishReveal();
         clearInterval(timer);
+        // Stopped by New chat (or a newer message) while the reveal ran: that reply is gone.
+        if (controller.signal.aborted) return;
         live.stop();
         setPending(null);
         if (connectedTo.current !== final.conversationId) setStreamKey(k => k + 1);
@@ -512,11 +542,14 @@ export function BotPageApp({
           ]);
           return;
         }
+        if (final.name) setKnownName(final.name);
         setMessages(m => [
           ...m,
           {
             id: final.messageId,
             role: "assistant",
+            // The checked reply takes the streamed bubble's place: it doesn't rise in as a new one.
+            ...(shown > 0 ? { inPlace: true } : {}),
             text: final.reply,
             citations: final.citations,
             rateable: final.rateable,
@@ -547,6 +580,16 @@ export function BotPageApp({
           ]);
           return;
         }
+        if (notReached(err)) {
+          // TF1 round 2 (Sahyog N-14): offline, or the server down: the message stays, marked not
+          // sent, with Send again, and its words go back in the box. Kept for a reload too.
+          const unsent = action ? { action } : {};
+          setMessages(m => m.map(item => (item.id === local.id ? { ...item, unsent } : item)));
+          keepUnsent(slug, { id: local.id, text, ...unsent, at: Date.now() });
+          if (!action) setReturnedDraft({ text });
+          fail(err);
+          return;
+        }
         if (err instanceof BotPageApiError && err.status > 0) {
           // An HTTP refusal comes before anything is stored, so the message goes back in the box.
           setMessages(m => m.filter(item => item.id !== local.id));
@@ -558,7 +601,8 @@ export function BotPageApp({
         }
         fail(err);
       } finally {
-        setBusy(false);
+        // An aborted send leaves busy to what aborted it (New chat's own run, or the next send).
+        if (!controller.signal.aborted) setBusy(false);
       }
     })();
   };
@@ -572,6 +616,7 @@ export function BotPageApp({
           message={stage.message}
           actionLabel={copy.errors.startAgain}
           onAction={stage.restart ? reload : undefined}
+          crisis={page?.crisis}
         />
       );
       break;
@@ -611,6 +656,7 @@ export function BotPageApp({
           branding={page.branding}
           copy={copy}
           email={stage.email}
+          crisis={page.crisis}
           onSubmit={code => void verify(stage.email, code)}
           onResend={() => void sendCode(stage.email)}
           onChangeEmail={() => {
@@ -654,10 +700,22 @@ export function BotPageApp({
           pending={pending ? { ...pending, step: live.current, slow: live.slow } : null}
           onSend={text => send(text)}
           onTap={button => send(button.label, button.token)}
+          onResend={item => {
+            dropUnsent(slug, m => m.id === item.id);
+            setMessages(m => m.filter(x => x.id !== item.id));
+            send(item.text, item.unsent?.action);
+          }}
           onNewChat={() => void newChat()}
           busy={busy}
           error={error}
           signedInAs={signedInAs}
+          knownName={knownName}
+          onForgetName={() =>
+            void api
+              .forgetName(slug)
+              .then(() => setKnownName(null))
+              .catch(() => undefined)
+          }
           returnedDraft={returnedDraft}
           onAskPerson={askForPerson}
           onClose={closePanel}

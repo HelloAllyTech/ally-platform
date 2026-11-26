@@ -1,11 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-import { useGetHowItWorksQuery, useGetReadyMadeListsQuery, useGetUserListsQuery } from "@api";
+import {
+  useGetChatbotDocumentsQuery,
+  useGetHowItWorksQuery,
+  useGetReadyMadeListsQuery,
+  useGetUserListsQuery,
+} from "@api";
 import { Button } from "@components/button";
 import { ButtonVariant } from "@components/types";
 import { Skeleton } from "@components/v2";
 import type { UserList } from "@types";
 
+import { isInternalSource } from "../../Onboarding/create/logic";
 import { TEMPLATE_COPY } from "../../Templates/copy";
 import { HOME, fill } from "../copy";
 import { CollapsibleGroup, SectionHead } from "../fields";
@@ -357,6 +363,12 @@ export const BuiltInPanel: React.FC<{
   standalone?: boolean;
 }> = ({ tool, bot, home, canEdit, canManage, go, standalone = false }) => {
   const { data: how } = useGetHowItWorksQuery(bot.id);
+  // TF1 round 2: the owner's documents, counted as documents: the assistant's own working
+  // documents ("What we learned", "Owner notes") are not among them.
+  const { data: documents } = useGetChatbotDocumentsQuery(bot.id, { skip: tool !== "@pages" });
+  const documentCount = documents
+    ? documents.filter(d => !d.archived && !d.isGlobal && !isInternalSource(d.title)).length
+    : null;
   const name = tool.slice(1);
   return (
     <div
@@ -370,8 +382,12 @@ export const BuiltInPanel: React.FC<{
         <div className="ally-card ally-tools__card">
           <h3 className="ally-home__group-title">{t().tools.pages}</h3>
           <p className="ally-small">{t().tools.pagesBody}</p>
-          {how && (
-            <p className="ally-body">{fill(t().tools.pagesCount, { n: how.search.documents })}</p>
+          {how && documentCount !== null && (
+            <p className="ally-body">
+              {documentCount === 1
+                ? t().tools.documentsCountOne
+                : fill(t().tools.documentsCount, { n: documentCount })}
+            </p>
           )}
           <div>
             <Button

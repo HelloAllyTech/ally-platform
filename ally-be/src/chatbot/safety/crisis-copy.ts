@@ -13,10 +13,12 @@ import type { ReplyLanguage } from '../engine/reply-language';
 export const CRISIS_LINK = 'https://findahelpline.com';
 
 // COPY: needs approval
+// TF1 round 2 (approved 25 Nov): after a crisis reply, no numbers again (the reply has them).
 export const HOLDING_COPY: Record<ReplyLanguage, string> = {
-  en: 'Someone from the team will reply to you. {help}',
-  hi: 'टीम का कोई व्यक्ति आपको जवाब देगा। {help}',
-  'hi-latn': 'Team ka koi vyakti aapko jawab dega. {help}',
+  en: 'Someone from the team will see this and reply as soon as they can.',
+  hi: 'टीम का कोई व्यक्ति इसे देखेगा और जितनी जल्दी हो सके जवाब देगा।',
+  'hi-latn':
+    'Team ka koi vyakti ise dekhega aur jitni jaldi ho sake jawab dega.',
 };
 
 // COPY: needs approval
@@ -63,15 +65,13 @@ export function helpLine(
     .replace('{link}', CRISIS_LINK);
 }
 
-export function holdingMessage(
-  language: ReplyLanguage,
-  helplineNumbers?: string | null,
-  india = false,
-): string {
-  return HOLDING_COPY[language].replace(
-    '{help}',
-    helpLine(language, helplineNumbers, india),
-  );
+/**
+ * The line after the crisis reply. TF1 round 2 (Saathi): it no longer repeats the crisis
+ * information the reply gave three seconds earlier ("two messages that repeat the numbers"); the
+ * "no one is available" message, which can come much later, still carries it.
+ */
+export function holdingMessage(language: ReplyLanguage): string {
+  return HOLDING_COPY[language];
 }
 
 // COPY: needs approval (TF1 F19). After an emergency reply (a collapse, a flood), not the self-harm

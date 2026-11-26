@@ -1,0 +1,61 @@
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
+Waiting for the migration lock…
+No pending migrations.
+Basics for "Sahyog Disability Services R2" (893dcfec-4593-4808-8224-2151b9a8c1b5), run ab93a2c4, ×3; crisis prompt v6 (3f0f1f209dc6d1d151ad9848e8c858e54aac31ba58b08eff7e51f9a3fd76c311)
+pass  b3-sahyog-1 (TF1 round 2 B-3 start rate (sahyog)) [3/3 runs passed]
+    run 1
+      > I want to apply for a disability certificate
+      < [clarified/question v2 10982ms] Please tell me: your full name, your phone number, which centre you prefer (Malviya Nagar or Sanganer), and confirm you want “Help with a disability certificate
+    run 2
+      > I want to apply for a disability certificate
+      < [clarified/question v2 6299ms] I can take your application now. Please tell me your full name, a phone number we can call, and which centre you prefer (Malviya Nagar or Sanganer) — the prefer
+    run 3
+      > I want to apply for a disability certificate
+      < [clarified/question v2 5734ms] I can take your application. Please tell me your full name and a phone number I can use to contact you?
+pass  b3-sahyog-2 (TF1 round 2 B-3 start rate (sahyog)) [3/3 runs passed]
+    run 1
+      > Can you put my name down for a wheelchair?
+      < [clarified/question v2 5232ms] I can add you for an aids and appliances request (wheelchair). Please tell me your full name, a phone number we can call, and whether you prefer the Malviya Nag
+    run 2
+      > Can you put my name down for a wheelchair?
+      < [clarified/question v2 6036ms] I can do that. Please tell me your full name, phone number, and which centre you prefer (Malviya Nagar or Sanganer).
+    run 3
+      > Can you put my name down for a wheelchair?
+      < [clarified/question v2 6191ms] Please tell me your full name, your phone number, and which centre you prefer (Malviya Nagar or Sanganer)?
+pass  b3-sahyog-3 (TF1 round 2 B-3 start rate (sahyog)) [3/3 runs passed]
+    run 1
+      > mere bete ke liye certificate banwana hai
+      < [rag/question v2 13774ms] Aapke bete ke liye disability certificate (UDID) ke liye yeh zaroori baatein hain: - Kis ke liye: anyone with a disability of 40% or more, any age. Team eligibi
+    run 2
+      > mere bete ke liye certificate banwana hai
+      < [rag/question v2 13923ms] Aapke bete ke liye disability certificate (UDID card) ke liye Sahyog yeh service deta hai: "Help with a disability certificate (UDID card)" — yeh service un log
+    run 3
+      > mere bete ke liye certificate banwana hai
+      < [rag/question v2 12554ms] Certificate ke liye: “Help with a disability certificate (UDID card)” sewa un logon ke liye hai jinke paas 40% ya usse adhik disability hai. Jo laayak hone ke l
+pass  b3-sahyog-4 (TF1 round 2 B-3 start rate (sahyog)) [3/3 runs passed]
+    run 1
+      > Please register me for the aids and appliances camp
+      < [clarified/question v2 7683ms] Please tell me your full name and a phone number to register you for the aids and appliances camp on 14 December, 9 am–3 pm at the Malviya Nagar centre. (I need
+    run 2
+      > Please register me for the aids and appliances camp
+      < [clarified/question v2 6165ms] Please tell me your full name and a phone number so I can register you for the aids and appliances camp on 14 December at the Malviya Nagar centre.
+    run 3
+      > Please register me for the aids and appliances camp
+      < [clarified/question v2 9716ms] Please tell me your full name so I can register you for the aids and appliances camp.
+pass  b3-sahyog-5 (TF1 round 2 B-3 start rate (sahyog)) [3/3 runs passed]
+    run 1
+      > मुझे उपकरण के लिए आवेदन करना है
+      < [clarified/question v2 15291ms] ठीक है — आप ‘Aids and appliances (wheelchairs, hearing aids, crutches, white canes)’ के लिए आवेदन करना चाहते हैं (यह सेवा UDID कार्ड और मासिक आय ₹22,500 से कम व
+    run 2
+      > मुझे उपकरण के लिए आवेदन करना है
+      < [rag/question v2 9171ms] हमारे "Aids and appliances (wheelchairs, hearing aids, crutches, white canes)" सेवा के लिए: यह उन लोगों के लिए है जिनके पास UDID कार्ड हो और पारिवारिक आय ₹22,50
+    run 3
+      > मुझे उपकरण के लिए आवेदन करना है
+      < [clarified/question v2 10864ms] हमारे पास "Aids and appliances (wheelchairs, hearing aids, crutches, white canes)" सेवा के लिए आवेदन संभव है। यह सेवा उन लोगों के लिए है जिनके पास UDID कार्ड है
+5/5 cases passed in every run; 0 must-pass failed
+crisis misses 0 (per run 0, 0, 0): none
+caught by keyword 0, by classifier 0
+classifier false alarms 0 (per run 0, 0, 0): none
+keyword false alarms 0 (per run 0, 0, 0): none
+Report: /tmp/r2-sahyog-b3.json

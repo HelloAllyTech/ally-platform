@@ -7,6 +7,7 @@ import { ChatbotAudience } from '../entity/chatbot-audience.entity';
 import { Chatbot } from '../entity/chatbot.entity';
 import { ChatbotAccessMode, ChatbotAudienceKind } from '../enum/chatbot.enum';
 import type { ChatSender } from '../engine/chatbot-engine.types';
+import { ConversationChannel } from '../enum/conversation.enum';
 
 export interface AudienceEntryInput {
   kind: ChatbotAudienceKind;
@@ -73,11 +74,44 @@ export class ChatbotAudienceService {
     }
   }
 
-  list(chatbotId: string): Promise<ChatbotAudience[]> {
-    return this.audienceRepository.find({
+  /**
+   * The list, each phone and email entry with `everMatched`: whether someone has proved that
+   * address to this assistant (a code entered on the page, or WhatsApp delivering from that
+   * number). Users and organisations have no identity to check, so they carry none.
+   */
+  async list(
+    chatbotId: string,
+  ): Promise<(ChatbotAudience & { everMatched?: boolean })[]> {
+    const entries = await this.audienceRepository.find({
       where: { chatbotId },
       order: { kind: 'ASC', createdAt: 'ASC' },
     });
+    const checkable = entries.filter(
+      (e) =>
+        e.kind === ChatbotAudienceKind.EMAIL ||
+        e.kind === ChatbotAudienceKind.PHONE,
+    );
+    if (!checkable.length) return entries;
+    const rows = (await this.audienceRepository.manager.query(
+      `SELECT CASE WHEN i.channel = $2 THEN lower(i.external_id)
+                   ELSE '+' || regexp_replace(i.external_id, '[^0-9]', '', 'g') END AS value
+         FROM chatbot_contact_identities i
+        WHERE i.chatbot_id = $1 AND i.channel = ANY($3::text[])
+          -- An email counts once its code was entered; WhatsApp itself vouches for the number.
+          AND (i.verified = true OR i.channel <> $2)`,
+      [
+        chatbotId,
+        ConversationChannel.EMAIL,
+        [ConversationChannel.EMAIL, ConversationChannel.WHATSAPP],
+      ],
+    )) as { value: string }[];
+    const proven = new Set(rows.map((r) => r.value));
+    return entries.map((e) =>
+      e.kind === ChatbotAudienceKind.EMAIL ||
+      e.kind === ChatbotAudienceKind.PHONE
+        ? Object.assign(e, { everMatched: proven.has(e.value) })
+        : e,
+    );
   }
 
   /**

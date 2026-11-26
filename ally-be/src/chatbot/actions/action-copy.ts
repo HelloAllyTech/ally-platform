@@ -49,7 +49,9 @@ export const BUTTONS: Record<
 
 /**
  * What a tap stands for, shown as the person's message and kept in the conversation so the agent
- * sees it next turn. `{title}` is the entry's title (its day and time), `{list}` the list's name.
+ * sees it next turn. TF1 round 2 (Sahyog N-11): Confirm is kept as the button's own words, as the
+ * page showed it when tapped (after a reload it read "Confirmed: Ravi Test"); the done line after
+ * it names the entry. `{title}` is the entry's title (its day and time), `{list}` the list's name.
  */
 // COPY: needs approval (BT1)
 export const TAPPED: Record<
@@ -63,26 +65,34 @@ export const TAPPED: Record<
   }
 > = {
   en: {
-    confirmed: 'Confirmed: {title}',
+    confirmed: 'Confirm',
     change: "I'd like to change it.",
     cancel: 'Please cancel my {list} for {title}.',
     move: "I'd like to move my {list} for {title} to another time.",
     keep: 'Keep it.',
   },
   hi: {
-    confirmed: 'पक्का किया: {title}',
+    confirmed: 'पक्का करें',
     change: 'मैं इसे बदलना चाहता/चाहती हूँ।',
     cancel: 'कृपया {title} का मेरा {list} रद्द करें।',
     move: 'मैं {title} का अपना {list} किसी और समय पर करना चाहता/चाहती हूँ।',
     keep: 'रहने दें।',
   },
   'hi-latn': {
-    confirmed: 'Confirm kiya: {title}',
+    confirmed: 'Confirm karein',
     change: 'Main ise badalna chahta/chahti hoon.',
     cancel: 'Kripya {title} ka mera {list} cancel karein.',
     move: 'Main {title} ka apna {list} kisi aur time par karna chahta/chahti hoon.',
     keep: 'Rehne dein.',
   },
+};
+
+/** TF1 round 2 (Saathi B-4): a withdrawn callback request, said as one (never "Done: Asha is cancelled."). */
+// COPY: needs approval (TF1 round 2)
+export const CALLBACK_CANCELLED_LINE: Record<ReplyLanguage, string> = {
+  en: 'Done: your callback request is cancelled.',
+  hi: 'हो गया: आपका कॉल बैक का अनुरोध रद्द कर दिया गया है।',
+  'hi-latn': 'Ho gaya: aapka callback ka anurodh cancel ho gaya hai.',
 };
 
 /**
@@ -126,6 +136,36 @@ export const DONE_LINE: Record<ReplyLanguage, Record<CardHeadline, string>> = {
     saved: 'Ho gaya: yeh save ho gaya hai ({what}).',
     changed: 'Ho gaya: ise {what} par badal diya gaya hai.',
     cancelled: 'Ho gaya: {what} cancel ho gaya hai.',
+  },
+};
+
+/**
+ * TF1 round 2 (Sahyog N-11): what happens next, after the done line of a write the team acts on.
+ * Fixed and generic: a list stores no next step of its own, and nothing here is invented ("within
+ * 3 working days" is the assistant's to say from the information, never this line's).
+ */
+// COPY: needs approval (TF1 round 2)
+export const NEXT_STEP: Record<
+  ReplyLanguage,
+  Partial<Record<CardHeadline, string>>
+> = {
+  en: {
+    application: 'The team will be in touch.',
+    request: 'The team will be in touch.',
+    sent: 'The team will be in touch.',
+    callback: 'Someone from the team will call you.',
+  },
+  hi: {
+    application: 'टीम आपसे संपर्क करेगी।',
+    request: 'टीम आपसे संपर्क करेगी।',
+    sent: 'टीम आपसे संपर्क करेगी।',
+    callback: 'टीम से कोई आपको कॉल करेगा।',
+  },
+  'hi-latn': {
+    application: 'Team aapse sampark karegi.',
+    request: 'Team aapse sampark karegi.',
+    sent: 'Team aapse sampark karegi.',
+    callback: 'Team se koi aapko call karega.',
   },
 };
 

@@ -5,7 +5,8 @@ export type TemplateGroupId = "organisations" | "businesses";
 export interface TemplateSetupQuestion {
   key: string;
   ask: string;
-  kind: "text" | "long_text" | "yes_no" | "choices";
+  /** `phone`: one phone number, the helpline a crisis reply may give (TF1 round 2, S-1). */
+  kind: "text" | "long_text" | "yes_no" | "choices" | "phone";
   choices?: string[];
   hint?: string;
 }

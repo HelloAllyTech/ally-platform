@@ -60,6 +60,9 @@ const TELE_MANAS: Record<ReplyLanguage, string> = {
     ' Agar abhi mushkil ho rahi hai, toh Tele-MANAS ko 14416 par call karein (free, 24×7).',
 };
 
+/** The packs whose assistants answer a request to be diagnosed with the fixed reply, no run. */
+export const DIAGNOSIS_PACKS = new Set(['mental_health', 'minors']);
+
 /** A mental-health condition asked about (E1): Tele-MANAS on any assistant. */
 const MENTAL_CONDITION =
   /\b(?:depress\w*|anxiety|anxious|adhd|bipolar|ocd|ptsd|trauma|panic|eating disorder|anorexi\w*|bulimi\w*|schizo\w*|mental(?:ly)? ill\w*|insomnia)\b|डिप्रेशन|अवसाद|एंग्जायटी|चिंता/iu;
@@ -115,7 +118,9 @@ export function caringDecline(options: {
   /** The assistant's safety pack (E1: Tele-MANAS on mental health and young people). */
   pack?: string | null;
 }): string | null {
-  if (!options.upset && asksForDiagnosis(options.question)) {
+  // TF1 round 2 (Saathi B-5): a request to be diagnosed gets the diagnosis reply even when the
+  // person is upset; the upset line ("talk it through with our team") doesn't answer it.
+  if (asksForDiagnosis(options.question)) {
     return diagnosisDecline(options);
   }
   const texts = options.upset

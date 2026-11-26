@@ -220,6 +220,11 @@ export interface ChatbotDecision {
    * The crisis flag service reads it as is (`chatbot/safety/crisis-flag.ts`).
    */
   crisis?: { level: 1 | 2; path: 'keyword' | 'classifier' | 'handover' };
+  /**
+   * TF1 round 2 (Sahyog N-6): the person was upset (the crisis check's "upset"). The reply
+   * carries the crisis numbers; channels add no memory or name notice to it.
+   */
+  upset?: boolean;
   /** A human should hear about this (crisis, degraded safety net). */
   alert?: NotificationErrorType;
   /**

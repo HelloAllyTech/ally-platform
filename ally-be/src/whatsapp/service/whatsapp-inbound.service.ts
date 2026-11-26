@@ -319,7 +319,8 @@ export class WhatsAppInboundService {
         await this.chatbotRepository.manager
           ?.query(
             `UPDATE chatbot_contacts SET display_name = $2, "updatedAt" = now()
-              WHERE id = $1 AND (display_name IS NULL OR btrim(display_name) = '')`,
+              WHERE id = $1 AND (display_name IS NULL OR btrim(display_name) = '')
+                AND name_forgotten_at IS NULL`,
             [sharedContactId, inbound.profileName.trim().slice(0, 120)],
           )
           .catch(() => undefined);
@@ -523,9 +524,17 @@ export class WhatsAppInboundService {
         text: inbound.text,
         language: contact.locale,
       });
-      const body = consentQuestion
-        ? `${firstBody}\n\n${consentQuestion}`
-        : firstBody;
+      // TF1 round 2 (Saathi B-2): the name they just gave is kept, and this reply says so, once.
+      const nameNotice = await this.privacy?.nameNotice({
+        chatbot,
+        contactId: sharedContactId,
+        decision,
+        text: inbound.text,
+        language: contact.locale,
+      });
+      const body = [firstBody, nameNotice?.notice, consentQuestion]
+        .filter(Boolean)
+        .join('\n\n');
       if (decision.language) {
         await this.contactRepository.update(
           { id: contact.id },

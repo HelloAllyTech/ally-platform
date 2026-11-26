@@ -42,6 +42,29 @@ import { CourseCopilotStructureService } from './course-copilot-structure.servic
  * validate path, so the tree, the estimate and the approve button can never
  * disagree about what is being approved.
  */
+/**
+ * The model sees an item's completion rule as `rule` (`compactBlueprint`), so it patches
+ * `/sections/2/items/0/rule`; the blueprint keeps it as `completionCriteria`. Read the name it
+ * sees, and let `replace` set a rule the item does not have yet (a journal has none).
+ */
+const RULE_PATH =
+  /^(\/sections\/\d+\/items\/\d+\/)(rule|completionCriteria)(?=\/|$)/;
+
+export function blueprintPatchOps(ops: JsonPatchOp[]): JsonPatchOp[] {
+  return (ops ?? []).map((op) => {
+    const match =
+      typeof op?.path === 'string' ? op.path.match(RULE_PATH) : null;
+    if (!match) return op;
+    const path = op.path.replace(RULE_PATH, '$1completionCriteria');
+    const wholeRule = path === `${match[1]}completionCriteria`;
+    return {
+      ...op,
+      path,
+      op: op.op === 'replace' && wholeRule ? 'add' : op.op,
+    };
+  });
+}
+
 @Injectable()
 export class CourseCopilotBlueprintService {
   private readonly logger = LoggerService.getInstance(
@@ -152,7 +175,10 @@ export class CourseCopilotBlueprintService {
       );
     }
     this.assertEditable(session);
-    const patched = applyJsonPatch<CourseBlueprint>(session.blueprint, ops);
+    const patched = applyJsonPatch<CourseBlueprint>(
+      session.blueprint,
+      blueprintPatchOps(ops),
+    );
     return this.store(session, patched);
   }
 

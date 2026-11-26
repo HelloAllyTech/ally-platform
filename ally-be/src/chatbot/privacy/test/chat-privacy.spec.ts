@@ -35,7 +35,15 @@ describe('ChatPrivacyService', () => {
         .mockResolvedValue({ text: 'Can I remember?', wordingVersion: 'v' }),
       record: jest.fn().mockResolvedValue({}),
     };
-    const service = new ChatPrivacyService(erasure as never, consent as never);
+    const memory = {
+      forgetName: jest.fn().mockResolvedValue(true),
+      nameNow: jest.fn().mockResolvedValue(null),
+    };
+    const service = new ChatPrivacyService(
+      erasure as never,
+      consent as never,
+      memory as never,
+    );
     const chatbot = {
       id: 'bot-1',
       settings: { memory: { on: opts.memoryOn ?? true } },
@@ -49,8 +57,54 @@ describe('ChatPrivacyService', () => {
       crisisKeyword: false,
       ...extra,
     });
-    return { service, erasure, consent, chatbot, turn };
+    return { service, erasure, consent, memory, chatbot, turn };
   };
+
+  describe('the name (TF1 round 2, Saathi B-2)', () => {
+    it.each([
+      'forget my name',
+      'Please delete my name',
+      'mera naam hata do',
+      'मेरा नाम भूल जाओ',
+    ])('"%s" removes only the name, at once', async (text) => {
+      const h = setup();
+      const reply = await h.service.beforeTurn(h.turn(text));
+      expect(reply?.kind).toBe('name_forgotten');
+      expect(h.memory.forgetName).toHaveBeenCalledWith('bot-1', CONTACT);
+      expect(h.erasure.eraseEndPerson).not.toHaveBeenCalled();
+    });
+
+    it('"forget me" is still the full erase, with its confirm', async () => {
+      const h = setup();
+      const reply = await h.service.beforeTurn(h.turn('forget me'));
+      expect(reply?.kind).toBe('erase_confirm');
+      expect(h.memory.forgetName).not.toHaveBeenCalled();
+    });
+
+    it("the agent's reply that learns the name says so once; a crisis reply never", async () => {
+      const h = setup();
+      h.memory.nameNow.mockResolvedValue('Asha');
+      const notice = await h.service.nameNotice({
+        chatbot: { ...h.chatbot, safetyPack: null } as never,
+        contactId: CONTACT,
+        decision: { handledBy: WaHandledBy.RAG, body: 'Hi Asha!' } as never,
+        text: "Hi, I'm Asha",
+      });
+      expect(notice).toEqual({
+        name: 'Asha',
+        notice:
+          "I'll use the name Asha in our chats. Say 'forget my name' any time.",
+      });
+      expect(
+        await h.service.nameNotice({
+          chatbot: { ...h.chatbot, safetyPack: null } as never,
+          contactId: CONTACT,
+          decision: { handledBy: WaHandledBy.CRISIS, body: '…' } as never,
+          text: "I'm Asha and I want to die",
+        }),
+      ).toBeNull();
+    });
+  });
 
   it('asks to confirm an erase request, and stores the pending question', async () => {
     const h = setup();

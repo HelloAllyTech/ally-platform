@@ -142,7 +142,11 @@ const baseQueryWithReauth: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQue
       // the saved sidebar order (only holders of the preference grant have one; a clinical
       // advisor does not), which otherwise greeted them with this toast on every load.
       const url = typeof args === "string" ? args : args.url;
-      if (!silentForbiddenReads().some(path => url.split("?")[0].endsWith(path))) {
+      // TF1 round 2 (Saathi B-11): the responder agreement is asked for in a dialog by the caller;
+      // "You don't have permission" on top of it told an owner something untrue.
+      const code = (result.error.data as { errorCode?: unknown } | undefined)?.errorCode;
+      const handled = code === "responder_agreement_required";
+      if (!handled && !silentForbiddenReads().some(path => url.split("?")[0].endsWith(path))) {
         toast.error(en.error.forbidden);
       }
     }

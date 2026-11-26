@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   useAddKnowledgeFromPoolMutation,
@@ -39,12 +39,20 @@ const Problem: React.FC<{ text: string | null }> = ({ text }) =>
   ) : null;
 
 /** Sources held back for personal details: an owner approves, an editor can leave them out. */
-export const Review: React.FC<{ botId: string; canEdit: boolean; canManage: boolean }> = ({
-  botId,
-  canEdit,
-  canManage,
-}) => {
-  const { data } = useGetKnowledgeReviewQuery(botId);
+export const Review: React.FC<{
+  botId: string;
+  canEdit: boolean;
+  canManage: boolean;
+  /**
+   * TF1 round 2, N-3: the ids of the sources shown as held where this panel sits. When they
+   * change the list is fetched again, so the panel and the source's status agree without a reload.
+   */
+  heldIds?: string;
+}> = ({ botId, canEdit, canManage, heldIds }) => {
+  const { data, refetch } = useGetKnowledgeReviewQuery(botId, { refetchOnMountOrArgChange: true });
+  useEffect(() => {
+    if (heldIds) void refetch();
+  }, [heldIds, refetch]);
   const [approve] = useApproveKnowledgeMutation();
   const [exclude] = useExcludeKnowledgeMutation();
   const [problem, setProblem] = useState<string | null>(null);

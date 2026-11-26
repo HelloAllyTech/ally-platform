@@ -1,4 +1,7 @@
 import type { WhatsAppBotSettings } from '../../whatsapp/type/whatsapp-settings.type';
+import { helplineLines } from './phone-text';
+
+export { helplineLines };
 
 type HelplineSettings = Pick<
   WhatsAppBotSettings,
@@ -14,7 +17,9 @@ type HelplineSettings = Pick<
 export function crisisHelplines(
   settings: Partial<HelplineSettings> | null | undefined,
 ): string {
-  const numbers = settings?.helplineNumbers?.trim() ?? '';
+  // TF1 round 2, S-1: only phone numbers (with a short label at most) ever reach a crisis reply,
+  // whatever was stored.
+  const numbers = helplineLines(settings?.helplineNumbers);
   if (!settings || !numbers) return '';
   if (!settings.helplineSource) return numbers;
   if (settings.helplineSource === 'owner') return numbers;
@@ -24,7 +29,8 @@ export function crisisHelplines(
 /** Whether the helpline waits for the owner's confirmation before crisis replies use it. */
 export function helplineNeedsConfirming(settings: HelplineSettings): boolean {
   return (
-    Boolean(settings.helplineNumbers?.trim()) && !crisisHelplines(settings)
+    Boolean(helplineLines(settings.helplineNumbers)) &&
+    !crisisHelplines(settings)
   );
 }
 
@@ -38,11 +44,13 @@ export function ownerHelplineFields(
   next: { helplineNumbers?: string | null; helplineConfirm?: boolean },
   now: Date,
 ): Pick<HelplineSettings, 'helplineSource' | 'helplineConfirmedAt'> {
-  const before = previous?.helplineNumbers?.trim() ?? '';
+  // Compared as crisis replies would give them (TF1 round 2, S-1), so cleaning a stored value is
+  // never mistaken for the owner changing it.
+  const before = helplineLines(previous?.helplineNumbers);
   const after =
     next.helplineNumbers === undefined
       ? before
-      : (next.helplineNumbers ?? '').trim();
+      : helplineLines(next.helplineNumbers);
   if (after && (after !== before || next.helplineConfirm)) {
     return { helplineSource: 'owner', helplineConfirmedAt: now.toISOString() };
   }

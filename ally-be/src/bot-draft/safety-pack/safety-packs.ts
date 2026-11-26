@@ -5,6 +5,7 @@ import {
   newHelplines,
 } from '../../chatbot/engine/blocked-notice';
 import { CareTopic, Industry, SafetyPackId } from '../enum/bot-draft.enum';
+import { isFloodNow } from '../../chatbot/engine/emergency-keywords';
 import { livePack, packOverride } from './live-packs';
 
 /**
@@ -647,7 +648,7 @@ const RESCUE =
   /\b(?:flood(?:ed|ing|s)?|stuck on (?:the |our |a )?roof|trapped|water (?:is )?(?:rising|coming in)|house is (?:flooding|on fire)|building (?:is )?(?:on fire|collapsed|collapsing)|on fire|fire (?:in|at) (?:the|our|my)|baadh|baarh|phans? gaye|phans?e (?:hue|hain)|chhat par)\b|बाढ़|फँस|फंस|छत पर|आग लग/iu;
 /** TF1 F19 (approved 25 Nov): a flood or rising water keeps "the safest, highest place". */
 const FLOOD =
-  /\b(?:flood(?:ed|ing|s)?|water (?:is )?(?:rising|coming in)|house is flooding|stuck on (?:the |our |a )?roof|baadh|baarh|paani (?:badh|bhar|aa gaya|ghus))\b|बाढ़|पानी (?:बढ़|भर|आ गया|घुस)/iu;
+  /\b(?:flood(?:ed|ing|s)?|water (?:is )?(?:rising|coming in|entering)|house is flooding|stuck on (?:the |our |a )?roof|baadh|baarh|paani (?:badh|bhar|aa gaya|ghus))\b|बाढ़|पानी (?:बढ़|भर|आ गया|घुस)/iu;
 const COLLAPSE =
   /\b(?:collapsed|fainted|passed out|unconscious|not breathing|isn'?t breathing|stopped breathing|not responding|unresponsive|behosh|hosh nahi(?:n)?|saa?ns? nahi)\b|बेहोश|होश नहीं|साँस नहीं|सांस नहीं/iu;
 
@@ -655,7 +656,8 @@ export function emergencyKindOf(
   text: string | null | undefined,
 ): EmergencyKind | null {
   const t = text ?? '';
-  if (FLOOD.test(t)) return 'flood';
+  // TF1 round 2, S-2: water coming in wins over "trapped", so the flood gets "the highest place".
+  if (isFloodNow(t) || FLOOD.test(t)) return 'flood';
   if (RESCUE.test(t)) return 'rescue';
   if (COLLAPSE.test(t)) return 'collapse';
   return null;

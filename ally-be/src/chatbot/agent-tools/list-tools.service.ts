@@ -87,6 +87,8 @@ export class ListToolsService {
     recordId: string,
     contactId: string | null,
     runId: string,
+    /** TF1 round 2 (Saathi B-4): what this write did; the card was always "create" before. */
+    action: 'create' | 'update' | 'cancel' = 'create',
   ): Promise<{
     list: string;
     title: string;
@@ -118,7 +120,11 @@ export class ListToolsService {
         runId,
         contactId,
       );
-      return cardOf(list, record, related, 'create');
+      // A change that ends the entry (withdrawn, cancelled) is a cancel, whatever tool did it.
+      const ended = /^(?:cancel+ed|withdrawn)$/i.test(
+        String(record.data?.status ?? ''),
+      );
+      return cardOf(list, record, related, ended ? 'cancel' : action);
     } catch (error) {
       if (
         error instanceof ListRefusalException ||
@@ -475,7 +481,7 @@ export class ListToolsService {
               : 'update';
         const card = {
           action,
-          ...cardOf(list, intended, related, action),
+          ...cardOf(list, intended, related, action, { unconfirmed: true }),
         } as const;
         const asked = this.consent
           ? await this.consent.offer(
@@ -518,7 +524,9 @@ export class ListToolsService {
         // The name typed in the chat wins over the signed-in account's (Q4 H7: "I'm Priya Test"
         // was booked under the account's name). The entry, the inbox and the next chat show it.
         await this.dataSource.query(
-          `UPDATE chatbot_contacts SET display_name = $3, "updatedAt" = now()
+          // TF1 round 2: a name they typed is them giving it again, after "forget my name" too.
+          `UPDATE chatbot_contacts
+              SET display_name = $3, name_forgotten_at = NULL, "updatedAt" = now()
             WHERE id = $1 AND chatbot_id = $2`,
           [
             ctx.contactId,
@@ -1019,6 +1027,9 @@ export const AGENT_REFUSAL: Partial<Record<string, string>> = {
     'That would go over the limit. Say so plainly and offer the free times listed here, if any.',
   limit_reached:
     'They already have as many as this list allows. Say so plainly and offer to change their existing one instead.',
+  // TF1 round 2 (Saathi B-3): a missing detail is asked for, never answered around.
+  required_missing:
+    'A detail it needs is missing (named here). Ask for that one detail in one short question, then call this again. Never answer with general information instead.',
   transition_not_allowed:
     "That can't be changed or cancelled here. Say so plainly, and offer to pass it to the team if one of your tools can; never say it's done.",
 };
@@ -1088,6 +1099,11 @@ export function cardOf(
   record: ListRecordView,
   related: RelatedWords,
   action: 'create' | 'update' | 'cancel',
+  /**
+   * TF1 round 2 (Sahyog P2): a card waiting for the person's yes showed "Status: received"
+   * before anything was sent. An unconfirmed card never shows a status.
+   */
+  { unconfirmed = false }: { unconfirmed?: boolean } = {},
 ): {
   list: string;
   title: string;
@@ -1098,6 +1114,7 @@ export function cardOf(
   const fields = list.fields
     .filter(
       (f) =>
+        !(unconfirmed && f.key === 'status') &&
         !f.archived_at &&
         f.agent_read &&
         !f.privacy?.masked &&

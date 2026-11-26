@@ -52,6 +52,22 @@ export function isEraseRequest(
   return sets.some((set) => set.some((re) => re.test(folded)));
 }
 
+const FORGET_NAME = [
+  /\b(forget|delete|remove|erase|clear|don t use|stop using)\b.{0,10}\bmy name\b/,
+  /\bmera naam\b.{0,10}\b(bhool|bhul|hata|hatao|hata do|mita|mitao|mita do|delete)\b/,
+  /मेरा नाम.{0,10}(भूल|हटा|मिटा|डिलीट)/u,
+];
+
+/**
+ * "Forget my name" (TF1 round 2, Saathi B-2): only the name goes, at once, with no confirm
+ * question; "forget me" still erases everything after its confirm.
+ */
+export function isForgetNameRequest(text: string): boolean {
+  const folded = fold(text ?? '');
+  if (!folded || folded.length > 120) return false;
+  return FORGET_NAME.some((re) => re.test(folded));
+}
+
 const YES =
   /^(yes|y|yes please|yes erase|erase|confirm|ok erase|haan|haa|han|ha|ji haan|haan ji|हाँ|हां|हा|जी हाँ|जी हां)$/u;
 const NO = /^(no|n|cancel|stop|nahi|nahin|na|mat|नहीं|ना|मत)$/u;

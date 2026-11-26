@@ -52,9 +52,12 @@ export const TEMPLATE_LISTS: ReadyMadeList[] = [
     agent_read: true,
     settings: { title_field: 'name', person_field: 'applicant' },
     fields: [
-      text('name', 'Name', { ...required, ...agent }),
+      // TF1 round 2 (Sahyog P2): "Name" and "Applicant" showed the same value. The person the
+      // service is for is the Applicant; the person chatting (who may apply for a parent) is the
+      // Contact. COPY: needs approval (TF1 round 2)
+      text('name', 'Applicant', { ...required, ...agent }),
       phone('phone', 'Phone', { ...required, ...agent }),
-      relation('applicant', 'Applicant', 'contact', required),
+      relation('applicant', 'Contact', 'contact', required),
       examples('service', 'Service', ['Service 1', 'Service 2'], agent),
       text('preferred_centre', 'Preferred centre', agent),
       status(

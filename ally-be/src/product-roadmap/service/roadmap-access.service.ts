@@ -6,9 +6,8 @@ import { PERMISSIONS } from 'src/authorization/constants/permissions.constants';
  * Answers "does this caller hold the roadmap MANAGE permission?" for endpoints that are gated
  * on a lower tier but behave differently for managers.
  *
- * Three places need this, and in all three the rule is genuinely row-level, so it cannot be a
+ * Two places need this, and in both the rule is genuinely row-level, so it cannot be a
  * decorator:
- *   - deleting a comment (author OR manager; editing is author-only);
  *   - editing/deleting an interview note (author OR manager);
  *   - editing/deleting a saved view (owner OR manager).
  *

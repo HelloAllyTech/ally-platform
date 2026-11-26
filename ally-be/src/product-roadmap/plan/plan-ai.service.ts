@@ -11,8 +11,6 @@ export const PLANNING_PROMPTS = {
   PRIVACY_REVIEW: 'planning_privacy_review',
   AI_QUALITY_REVIEW: 'planning_ai_quality_review',
   OUTCOME_REVIEW: 'planning_outcome_review',
-  LAUNCH_PLAN: 'planning_launch_plan',
-  RESEARCH_PLAN: 'planning_research_plan',
   SIGNAL_SCOUT: 'planning_signal_scout',
 } as const;
 

@@ -58,6 +58,8 @@ export const DirectForm: React.FC<{
   addFiles: (files: File[]) => Promise<unknown>;
   /** Show the go-live section (the create screen; a live chatbot's Build keeps it off). */
   goLive: boolean;
+  /** TF1 round 2 (Saathi B-7): told when the owner goes live here, so the confirmation stays. */
+  onWentLive?: () => void;
   /** TF1 B2: the working copy's access (Staff onboarding sets organisation-only). */
   accessMode?: "public" | "organisation" | "invite";
 }> = ({
@@ -70,6 +72,7 @@ export const DirectForm: React.FC<{
   addAddress,
   addFiles,
   goLive,
+  onWentLive,
   accessMode,
 }) => {
   const credits = copy.creditsOut;
@@ -176,7 +179,10 @@ export const DirectForm: React.FC<{
             chatbotId={chatbotId}
             live={copy.live}
             disabled={!canEdit}
-            onLive={() => void copy.refresh()}
+            onLive={() => {
+              onWentLive?.();
+              void copy.refresh();
+            }}
             onCreditsOut={copy.markCreditsOut}
             field={common}
             accessMode={accessMode}

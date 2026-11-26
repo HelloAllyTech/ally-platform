@@ -13,6 +13,8 @@ import {
   isNegative,
   planInstall,
   resolveWhen,
+  shortName,
+  splitPerEntry,
   type SetupAnswers,
 } from '../template-plan';
 import {
@@ -208,11 +210,50 @@ describe('Use-case templates (T1)', () => {
         { helpline: '1800-123-4567, open 24 hours' },
         { zone: ZONE, now: NOW },
       );
-      expect(plan.helpline).toBe('1800-123-4567, open 24 hours');
+      // TF1 round 2, S-1: only the number, never the words around it.
+      expect(plan.helpline).toBe('1800-123-4567');
       const crisis = plan.cases.find((c) => c.expect === 'crisis_only')!;
       expect(crisis.hardFail).toBe(true);
       expect(crisis.facts.join(' ')).toContain('1800-123-4567');
     }
+  });
+
+  it('TF1 round 2, S-1: the helpline number is a phone question, the hours a separate fact', () => {
+    for (const id of ['helpline', 'practice']) {
+      const t = TEMPLATES.find((x) => x.id === id)!;
+      const number = t.setup.find((q) => q.key === 'helpline')!;
+      expect(number.kind).toBe('phone');
+      const hours = t.setup.find((q) => q.key === 'hours')!;
+      expect(hours.fills).toEqual([{ to: 'fact' }]);
+      const plan = planInstall(
+        t,
+        {
+          helpline: '+91 20 4860 2525',
+          hours: 'Every day 10 am to 10 pm, closed on Diwali',
+        },
+        { zone: ZONE, now: NOW },
+      );
+      expect(plan.helpline).toBe('+91 20 4860 2525');
+      expect(plan.facts.join('\n')).toContain('10 am to 10 pm');
+    }
+    // An old-style answer with the hours in it still gives only the number.
+    const plan = planInstall(
+      TEMPLATES.find((x) => x.id === 'helpline')!,
+      {
+        helpline:
+          '+91 20 4860 2525 (calls and WhatsApp chat on the same number). Open every day 10 am to 10 pm, including Sundays and public holidays.',
+      },
+      { zone: ZONE, now: NOW },
+    );
+    expect(plan.helpline).toBe('+91 20 4860 2525');
+    // Text with no number is never a helpline.
+    expect(
+      planInstall(
+        TEMPLATES.find((x) => x.id === 'helpline')!,
+        { helpline: 'Open 10 am to 10 pm' },
+        { zone: ZONE, now: NOW },
+      ).helpline,
+    ).toBeNull();
   });
 
   it('health templates never let the assistant write a field that could hold symptoms', () => {
@@ -405,4 +446,141 @@ describe("a template's answer is read as written (Q4 H10)", () => {
     'Bank transfer to our account',
     'Cheque in the name of the trust',
   ])('"%s" is not', (line) => expect(isNegative(line)).toBe(false));
+});
+
+describe('TF1 round 2, N-4 and N-13: Sahyog’s answers land in the right details', () => {
+  const services = TEMPLATES.find((t) => t.id === 'services')!;
+  const answers: SetupAnswers = {
+    services:
+      'Help with a disability certificate (UDID card) - anyone with 40% or more disability\n' +
+      'Aids and appliances - people with a UDID card and family income under Rs 22,500 a month\n' +
+      'Disability pension applications - adults 18+ with 40% or more disability\n' +
+      'Physiotherapy for children - under 14, Malviya Nagar only',
+    bring:
+      'Disability certificate: Aadhaar card, two passport photos, any doctor’s reports. ' +
+      'Aids and appliances: UDID card, income certificate, Aadhaar card. ' +
+      'Disability pension: UDID card, bank passbook, Aadhaar card. ' +
+      'Physiotherapy: any doctor’s reports.',
+    where:
+      'Malviya Nagar centre - Plot 14, Sector 5, Malviya Nagar, Jaipur 302017 - Mon–Sat 9:30–5:30 - +91 141 400 7110\n' +
+      'Sanganer centre - Near Bus Stand, Tonk Road, Sanganer, Jaipur 302029 - Tue–Sat 10–4 - +91 141 400 7220',
+    benefits: true,
+  };
+  const plan = planInstall(services, answers, { zone: ZONE, now: NOW });
+  const service = (name: RegExp) =>
+    plan.entries.services.find((r) => name.test(String(r.values.name)))!.values;
+
+  it('gives each service only its own documents', () => {
+    expect(service(/certificate/).documents_to_bring).toBe(
+      'Aadhaar card, two passport photos, any doctor’s reports.',
+    );
+    expect(service(/Aids/).documents_to_bring).toBe(
+      'UDID card, income certificate, Aadhaar card.',
+    );
+    expect(service(/pension/).documents_to_bring).toBe(
+      'UDID card, bank passbook, Aadhaar card.',
+    );
+    expect(service(/Physio/).documents_to_bring).toBe('Any doctor’s reports.');
+  });
+
+  it('keeps a clause for every service on every service, and one naming a service on it', () => {
+    expect(
+      splitPerEntry(
+        [
+          'Help with a disability certificate (UDID card)',
+          'Aids and appliances',
+        ],
+        'Aadhaar card, two passport photos, any doctor’s reports; for aids also the UDID card and an income certificate',
+      ),
+    ).toEqual([
+      'Aadhaar card, two passport photos, any doctor’s reports.',
+      'Aadhaar card, two passport photos, any doctor’s reports. For aids also the UDID card and an income certificate.',
+    ]);
+  });
+
+  it('falls back to the whole text when it names no service', () => {
+    expect(
+      splitPerEntry(['Food support', 'Legal aid'], 'A photo ID'),
+    ).toBeNull();
+    const plan2 = planInstall(
+      services,
+      { ...answers, bring: 'A photo ID and proof of address' },
+      { zone: ZONE, now: NOW },
+    );
+    for (const row of plan2.entries.services) {
+      expect(row.values.documents_to_bring).toBe(
+        'A photo ID and proof of address',
+      );
+    }
+  });
+
+  it('reads a place line by what each part is: name, address, hours, phone', () => {
+    expect(plan.entries.service_locations.map((r) => r.values)).toEqual([
+      {
+        name: 'Malviya Nagar centre',
+        address: 'Plot 14, Sector 5, Malviya Nagar, Jaipur 302017',
+        area: 'Malviya Nagar',
+        hours: 'Mon–Sat 9:30–5:30',
+        phone: '+91 141 400 7110',
+      },
+      {
+        name: 'Sanganer centre',
+        address: 'Near Bus Stand, Tonk Road, Sanganer, Jaipur 302029',
+        area: 'Sanganer',
+        hours: 'Tue–Sat 10–4',
+        phone: '+91 141 400 7220',
+      },
+    ]);
+  });
+
+  it('never reads an age range as hours', () => {
+    const tuition = planInstall(
+      services,
+      { services: 'Tuition - children 5 to 12' },
+      { zone: ZONE, now: NOW },
+    );
+    expect(tuition.entries.services[0].values).toEqual({
+      name: 'Tuition',
+      who_its_for: 'children 5 to 12',
+    });
+  });
+
+  it('fills Where and Cost only when the answer says so', () => {
+    expect(service(/Physio/).where).toBe('Malviya Nagar centre');
+    expect(service(/certificate/).where).toBeUndefined();
+    for (const row of plan.entries.services) {
+      expect(row.values.cost).toBeUndefined();
+    }
+    const free = planInstall(
+      services,
+      { services: 'Food support - families with children - Free' },
+      { zone: ZONE, now: NOW },
+    );
+    expect(free.entries.services[0].values).toMatchObject({
+      name: 'Food support',
+      who_its_for: 'families with children',
+      cost: 'Free',
+    });
+  });
+
+  it('asks the checkup with a short service name', () => {
+    expect(shortName('Help with a disability certificate (UDID card)')).toBe(
+      'a disability certificate',
+    );
+    expect(
+      shortName(
+        'Aids and appliances (wheelchairs, hearing aids, crutches, white canes)',
+      ),
+    ).toBe('Aids and appliances');
+    expect(plan.cases.find((c) => c.id === 'cost')!.question).toBe(
+      'Is a disability certificate free?',
+    );
+  });
+
+  it('a cost the list lacks passes when the reply gives it from the information', () => {
+    const fact = plan.cases.find((c) => c.id === 'cost')!.facts[0];
+    expect(fact).toMatch(
+      /^Says the cost as your information gives it, or says it doesn’t have/,
+    );
+  });
 });

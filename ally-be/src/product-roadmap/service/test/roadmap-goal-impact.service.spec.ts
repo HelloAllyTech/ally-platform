@@ -1,7 +1,6 @@
 import { RoadmapGoalImpactService } from '../roadmap-goal-impact.service';
 import { RoadmapAiService } from '../roadmap-ai.service';
 
-const ACTOR = 7;
 const OPP = 'opp-1';
 
 /**
@@ -37,16 +36,13 @@ describe('RoadmapGoalImpactService', () => {
     const aiService = {
       assessGoalImpact: overrides.assess ?? jest.fn().mockResolvedValue([]),
     };
-    const notifications = { emit: jest.fn() };
-
     const service = new RoadmapGoalImpactService(
       goalRepository as never,
       impactRepository as never,
       opportunityRepository as never,
       aiService as unknown as RoadmapAiService,
-      notifications as never,
     );
-    return { service, replaceForOpportunity, aiService, notifications };
+    return { service, replaceForOpportunity, aiService };
   };
 
   it('does not call the model when no strategy is defined', async () => {
@@ -57,7 +53,7 @@ describe('RoadmapGoalImpactService', () => {
       goals: [],
     });
 
-    await expect(service.assess(OPP, ACTOR)).resolves.toEqual([]);
+    await expect(service.assess(OPP)).resolves.toEqual([]);
     expect(aiService.assessGoalImpact).not.toHaveBeenCalled();
     expect(replaceForOpportunity).not.toHaveBeenCalled();
   });
@@ -69,7 +65,7 @@ describe('RoadmapGoalImpactService', () => {
       assess: jest.fn().mockRejectedValue(new Error('anthropic 529')),
     });
 
-    await expect(service.assessQuietly(OPP, ACTOR)).resolves.toBeUndefined();
+    await expect(service.assessQuietly(OPP)).resolves.toBeUndefined();
   });
 
   it('keeps going when one opportunity in a bulk run fails', async () => {
@@ -96,11 +92,10 @@ describe('RoadmapGoalImpactService', () => {
       impactRepository as never,
       opportunityRepository as never,
       { assessGoalImpact: jest.fn().mockResolvedValue([]) } as never,
-      { emit: jest.fn() } as never,
     );
 
     // 'b' throws NotFoundException; the run still reaches 'c'.
-    await expect(service.assessMissing(ACTOR)).resolves.toEqual({
+    await expect(service.assessMissing()).resolves.toEqual({
       assessed: 2,
       failed: 1,
       remaining: 1,

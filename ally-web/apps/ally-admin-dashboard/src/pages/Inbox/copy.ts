@@ -104,9 +104,11 @@ export const INBOX = {
     summaryHint:
       "Your assistant's own summary of the earlier messages, which it no longer reads word for word.",
     neverKeeps: "It never keeps:",
-    changeNever: "Change this in Tools",
+    // COPY: needs approval (TF1 round 2). Memory's switch is in Settings, where these links go.
+    changeNever: "Change this in Settings",
     off: "Your assistant doesn't remember people between chats.",
-    turnOn: "Turn it on in Tools",
+    // COPY: needs approval (TF1 round 2)
+    turnOn: "Turn it on in Settings",
   },
 } as const;
 

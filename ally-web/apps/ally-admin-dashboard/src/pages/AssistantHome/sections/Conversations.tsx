@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 
 import { StaffConversations } from "../../ChatbotSupport/StaffConversations";
 import { Inbox } from "../../Inbox";
@@ -23,7 +23,17 @@ import type { SectionProps } from "./props";
  */
 export const ConversationsSection: React.FC<SectionProps> = ({ bot }) => {
   const [asking, setAsking] = useState(false);
-  const gate = useMemo(() => ({ require: () => setAsking(true) }), []);
+  // TF1 round 2 (Saathi B-11): what they were doing (Take over) carries on once they accept.
+  const then = useRef<(() => void) | null>(null);
+  const gate = useMemo(
+    () => ({
+      require: (next?: () => void) => {
+        then.current = next ?? null;
+        setAsking(true);
+      },
+    }),
+    [],
+  );
   const { responderOnly } = chatbotAccess(bot);
   const readOnly = useReadOnly();
   if (readOnly) {
@@ -51,7 +61,16 @@ export const ConversationsSection: React.FC<SectionProps> = ({ bot }) => {
           <Inbox chatbotId={bot.id} />
         </div>
       </ResponderAgreementGate>
-      {asking && <ResponderAgreementDialog onClose={() => setAsking(false)} />}
+      {asking && (
+        <ResponderAgreementDialog
+          onClose={() => setAsking(false)}
+          onAccepted={() => {
+            const next = then.current;
+            then.current = null;
+            next?.();
+          }}
+        />
+      )}
     </AgreementGateContext.Provider>
   );
 };

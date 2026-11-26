@@ -1266,8 +1266,8 @@ Whether it may hand over at all (A1: the assistant's owners decide; Ally's platf
 
 - Memory has moved to Tools.
 - Open Tools
-- Turn it on in Tools
-- Change this in Tools
+- Turn it on in Settings
+- Change this in Settings
 
 ## 30. Live steps and the time zone (6b)
 
@@ -1294,3 +1294,16 @@ Never shown: tool or field names, ids, what was searched for, memory, or a refus
 - Where your business is. Your lists' times, what your assistant calls today, and Repeat weekly use it.
 
 Hindi for all of the bot page's lines is in `botPage/copy/hi.ts`, marked "needs review".
+
+## 31. TF1 round 2 polish (needs approval)
+
+**What it knows → the learned facts' heading, by where they came from:**
+- From your website / From your documents / From your website and documents
+
+**Change your assistant → History, for changes made elsewhere** (listed, never undone):
+- Done elsewhere
+- Live or paused
+- Removed from who may chat
+- Helpline numbers confirmed
+- Checkup card, the time label for screen readers (B-8): Time to answer
+- Settings → Safety, the pack in use in the chooser (Sahyog P2): In use now

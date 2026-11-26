@@ -169,6 +169,10 @@ export const BUILD_COPY = {
     uploaded: "Added {n} documents. Reading them now.",
     uploadedOne: "Added {title}. Reading it now.",
     uploadFailed: "I couldn't add those files. Try again.",
+    // COPY: needs approval (TF1 round 2)
+    documentRead: "I've read {title}. It's ready.",
+    // COPY: needs approval (TF1 round 2)
+    documentFailed: "I couldn't read {title}. Try adding it again.",
     pendingEdit:
       "You're editing {field} in the form and haven't finished. Replace what you typed with this change?",
     replace: "Replace it",

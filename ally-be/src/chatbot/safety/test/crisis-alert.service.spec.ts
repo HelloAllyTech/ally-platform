@@ -163,7 +163,10 @@ describe('CrisisAlertService', () => {
         dedupeKey: 'holding:c1',
         channel: 'whatsapp',
       });
-      expect(holding[0].payload.text).toContain('findahelpline.com');
+      // TF1 round 2 (approved 25 Nov): the crisis reply just gave the numbers; not repeated.
+      expect(holding[0].payload.text).toBe(
+        'Someone from the team will see this and reply as soon as they can.',
+      );
       expect(holding[0].notBefore.getTime()).toBeGreaterThan(NOW.getTime());
 
       const again = harness({ first: false, prevLevel: 1, level: 1 });
@@ -208,9 +211,8 @@ describe('CrisisAlertService', () => {
       const text = h.outbox.enqueue.mock.calls
         .map((c) => c[0])
         .find((i) => i.kind === 'crisis_holding').payload.text as string;
-      expect(text).toContain('Team ka koi vyakti');
-      expect(text.indexOf('1800-000')).toBeLessThan(
-        text.indexOf('findahelpline.com'),
+      expect(text).toBe(
+        'Team ka koi vyakti ise dekhega aur jitni jaldi ho sake jawab dega.',
       );
     });
   });

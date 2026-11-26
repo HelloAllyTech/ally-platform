@@ -270,7 +270,7 @@ export class InboxController {
       key: 'InboxController.counts',
       route: 'GET /v1/inbox/counts',
     });
-    return this.inbox.counts(staffScope);
+    return this.inbox.counts(staffScope, query.chatbotId);
   }
 
   @Get('events')

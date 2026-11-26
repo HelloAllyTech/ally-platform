@@ -180,8 +180,6 @@ describe('Builder session visibility — every reader is accounted for', () => {
       "set_success_measure reads and writes one plan's record by id, inside that plan's own turn",
     'builder/service/builder-outcome.service.ts':
       'injects the repository for its sweep; returns nothing to a viewer',
-    'product-roadmap/cutover/roadmap-cutover.service.ts':
-      "Owner-only switch-on: the preview names live direct sessions (id, status, creator) and a run files an idea for each and moves old drafts; never returns a session's content",
     'product-roadmap/plan/plan-session.store.ts':
       'plan reads by id; every list scopes its own WHERE to the author or to shared plans (product-roadmap/plan/*)',
     'builder/service/builder-pull-request.service.ts':

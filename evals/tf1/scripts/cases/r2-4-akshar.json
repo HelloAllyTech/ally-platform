@@ -1,0 +1,30 @@
+{
+  "tag": "akshar",
+  "pdf": "pdfs/4-akshar-literacy-volunteer-handbook.pdf",
+  "template": "Staff and volunteer onboarding",
+  "answers": [
+    {
+      "kind": "skip"
+    },
+    {
+      "kind": "textarea",
+      "value": "Rota, centre assignment, induction: Rohit Srivastava, volunteers@akshar-lko.example\nLeave, payroll, police verification: HR, hr@akshar-lko.example\nSafeguarding: Farah Naqvi, +91 522 400 9911"
+    },
+    {
+      "kind": "yesno",
+      "value": "Yes"
+    }
+  ],
+  "audience": "Adults only",
+  "contact": "+91 522 400 9911",
+  "invite": [
+    "shehbaz.sayed+a@helloally.ai",
+    "shehbaz.sayed+b@helloally.ai",
+    "+919800000032"
+  ],
+  "name": "Akshar Literacy Foundation R2",
+  "knowsChecks": [
+    "police verification",
+    "safeguarding"
+  ]
+}

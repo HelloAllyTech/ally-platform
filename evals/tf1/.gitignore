@@ -1,1 +1,3 @@
 runs/owner-state.json
+runs/*-state*.json
+runs/round2/*.json

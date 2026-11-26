@@ -1,4 +1,5 @@
 import { DEFAULT_WHATSAPP_SETTINGS } from 'src/whatsapp/type/whatsapp-settings.type';
+import { crisisHelplines } from '../../engine/crisis-helplines';
 import {
   ChatbotSettingsService,
   cleanOverride,
@@ -84,6 +85,81 @@ describe('ChatbotSettingsService', () => {
     expect(view.defaults.declineText).toBe(global.declineText);
     expect(view.overrides).toEqual({ declineText: 'Ask HR.' });
     expect(view.effective.declineText).toBe('Ask HR.');
+  });
+
+  it("never gives an assistant the staff number's helpline (TF1 round 2, Sahyog N-1)", async () => {
+    const staff = new ChatbotSettingsService(
+      {
+        findOne: jest.fn().mockResolvedValue({
+          value: { ...global, helplineNumbers: 'Tele-MANAS 14416' },
+        }),
+      } as never,
+      chatbotRepository as never,
+    );
+    const none = await staff.getForChatbot({ settings: {} } as never);
+    expect(none.helplineNumbers).toBe('');
+    expect(crisisHelplines(none)).toBe('');
+    const own = await staff.getForChatbot({
+      settings: {
+        helplineNumbers: '+91 141 400 7110',
+        helplineSource: 'owner',
+        helplineConfirmedAt: '2026-11-25T10:00:00.000Z',
+      },
+    } as never);
+    expect(crisisHelplines(own)).toBe('+91 141 400 7110');
+  });
+
+  describe('the helpline number (TF1 round 2, S-1)', () => {
+    const SAATHI =
+      '+91 20 4860 2525 (calls and WhatsApp chat on the same number). Open every day 10 am to 10 pm, including Sundays and public holidays.';
+    const stored = () =>
+      chatbotRepository.update.mock.calls[0][1].settings as Record<
+        string,
+        unknown
+      >;
+
+    it('stores only the numbers the owner typed', async () => {
+      await service.updateChatbotSettings(
+        { id: 'bot-1' },
+        { helplineNumbers: SAATHI, helplineConfirm: true },
+        { byOwner: true },
+      );
+      expect(stored()).toMatchObject({
+        helplineNumbers: '+91 20 4860 2525',
+        helplineSource: 'owner',
+      });
+    });
+
+    it('refuses text with no number the owner just typed', async () => {
+      await expect(
+        service.updateChatbotSettings(
+          { id: 'bot-1' },
+          { helplineNumbers: 'Open 10 am to 10 pm' },
+          { byOwner: true },
+        ),
+      ).rejects.toMatchObject({
+        response: { errorCode: 'helpline_no_number' },
+      });
+      expect(chatbotRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('saving another setting cleans a stored value but never confirms it', async () => {
+      const settings = {
+        helplineNumbers: SAATHI,
+        helplineSource: 'template' as const,
+        helplineConfirmedAt: null,
+      };
+      await service.updateChatbotSettings(
+        { id: 'bot-1', settings },
+        { ...settings, retentionDays: 30 } as never,
+        { byOwner: true },
+      );
+      expect(stored()).toMatchObject({
+        helplineNumbers: '+91 20 4860 2525',
+        helplineSource: 'template',
+      });
+      expect(stored().helplineConfirmedAt ?? null).toBeNull();
+    });
   });
 
   it('stores the cleaned changes on the bot', async () => {

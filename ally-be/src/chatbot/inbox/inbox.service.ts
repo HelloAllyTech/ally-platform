@@ -6,11 +6,21 @@ import { ChatbotMemberRole } from '../enum/chatbot.enum';
 import { ConversationChannel } from '../enum/conversation.enum';
 import { WHATSAPP_WINDOW_MS } from '../handover/handover';
 import { ChatbotAccessService } from '../service/chatbot-access.service';
+import { ERASED_TEXT } from '../privacy/erased';
 
 /** "Live now": a message in the last this many minutes. */
 const LIVE_MINUTES = 15;
 /** Chats per page of the list. */
 const INBOX_PAGE = 50;
+
+/**
+ * SQL: conversation `c` was erased by the person ("Forget me"): its messages are blanked to the
+ * erased placeholder (`privacy/erased.ts`) and nothing the person wrote is left. The reply that
+ * confirms the erasure, sent after it, doesn't make it a chat again.
+ */
+const ERASED_CHAT = `(EXISTS (SELECT 1 FROM chatbot_messages e WHERE e.conversation_id = c.id AND e.text = '${ERASED_TEXT}')
+   AND NOT EXISTS (SELECT 1 FROM chatbot_messages e WHERE e.conversation_id = c.id
+                    AND e.direction = 'inbound' AND e.text IS DISTINCT FROM '${ERASED_TEXT}'))`;
 
 export type InboxView = 'needs_person' | 'live' | 'all';
 
@@ -110,7 +120,8 @@ export class InboxService {
                     AND m."createdAt" > COALESCE(r.read_at, 'epoch')) AS unread,
                 (c.safety_at IS NOT NULL AND c.safety_at > COALESCE(r.read_at, 'epoch')) AS safety_unread,
                 (c.needs_person_since IS NOT NULL AND c.handled_by_user_id IS NULL) AS waiting,
-                COUNT(*) OVER (PARTITION BY COALESCE(c.contact_id, c.id)) AS chats,
+                -- TF1 round 2 (Sahyog P2): chats the person erased ("Forget me") aren't counted.
+                COUNT(*) FILTER (WHERE NOT ${ERASED_CHAT}) OVER (PARTITION BY COALESCE(c.contact_id, c.id)) AS chats,
                 ROW_NUMBER() OVER (
                   PARTITION BY COALESCE(c.contact_id, c.id)
                   ORDER BY (c.safety_at IS NOT NULL AND c.safety_at > COALESCE(r.read_at, 'epoch')) DESC,
@@ -137,12 +148,17 @@ export class InboxService {
   }
 
   /** Unread chats and the two lists the nav and the notifications need: the reconnect snapshot. */
-  async counts(scope?: string[]): Promise<{
+  async counts(
+    scope?: string[],
+    chatbotId?: string,
+  ): Promise<{
     unread: number;
     needsPerson: number;
     safety: number;
   }> {
-    const ids = scope ?? (await this.scope());
+    const all = scope ?? (await this.scope());
+    // An Inbox held to one assistant counts that assistant's chats only, as its list does.
+    const ids = chatbotId ? all.filter((id) => id === chatbotId) : all;
     if (!ids.length) return { unread: 0, needsPerson: 0, safety: 0 };
     const [row] = (await this.dataSource.query(
       `SELECT
@@ -209,6 +225,7 @@ export class InboxService {
                     ORDER BY m."createdAt" DESC LIMIT 1) AS preview
              FROM chatbot_conversations c
             WHERE c.contact_id = $1 AND c.chatbot_id = $2 AND c.id <> $3
+              AND NOT ${ERASED_CHAT}
             ORDER BY c.last_message_at DESC LIMIT 20`,
           [conversation.contact_id, chatbotId, conversationId],
         )) as Record<string, unknown>[])

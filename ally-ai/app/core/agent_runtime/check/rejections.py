@@ -26,6 +26,10 @@ class Rejection(StrEnum):
     REACH_TEAM = "reach_team"
     #: Q4 H8: it offered to look up a record it has no list for (wording for review).
     NO_LOOKUP = "no_lookup"
+    #: TF1 round 2: it stated a rule without the condition the information gives.
+    CONDITION_DROPPED = "condition_dropped"
+    #: TF1 round 2 (Sahyog N-2): it said whether the person qualifies.
+    ELIGIBILITY_VERDICT = "eligibility_verdict"
 
 
 def rejection_feedback(
@@ -99,6 +103,17 @@ REJECTIONS: Dict[Rejection, str] = {
         "find_ or create_ tool returned. Look it up with find first and offer only "
         "what it shows, citing it; say something is booked only after create or "
         "update did it, citing that."
+    ),
+    Rejection.ELIGIBILITY_VERDICT: (
+        "It said whether this person qualifies, is approved or will get it. This "
+        "assistant never decides that: give the criteria from the information, "
+        "citing them, and say who decides (the team, the board or the office)."
+    ),
+    Rejection.CONDITION_DROPPED: (
+        "It stated a rule without the condition the information gives it (an "
+        "'unless', 'only if', 'except' or 'until'). Say the condition too, in the "
+        "same sentence, citing it: without it the answer says something the "
+        "organisation doesn't."
     ),
     Rejection.NO_LOOKUP: (
         "It offered to look up their application, case or order. You can't see "

@@ -97,6 +97,9 @@ export const BUDGET_COPY = {
     setAside: "Set aside",
     used: "Used",
     left: "Left",
+    // COPY: needs approval (TF1 round 2)
+    /** N-12: what replies still running hold, so Set aside − Used − Held = Left adds up. */
+    held: "Held for replies in progress",
     free: "Your free balance",
   },
   noBudget: {
@@ -238,8 +241,14 @@ export const ACCESS_COPY = {
     empty: "Nobody is on the list yet. Until you add someone, nobody can chat.",
     columns: { who: "Who", kind: "Kind", status: "Status" },
     kinds: { phone: "Phone", email: "Email", user: "Ally user", organisation: "Organisation" },
-    matched: "Matched",
-    never: "Never matched",
+    // COPY: needs approval (TF1 round 2). Signed in: they proved this email or number to the
+    // assistant. Invited: on the list, not seen yet.
+    matched: "Signed in",
+    never: "Invited",
+    // COPY: needs approval (TF1 round 2)
+    removeConfirm: (who: string) => `Remove ${who}? They can't chat any more.`,
+    removeYes: "Remove",
+    removeCancel: "Cancel",
     remove: (who: string) => `Remove ${who}`,
     removeFailed: "Couldn't remove them. Try again.",
     loadFailed: "Couldn't load the list. Refresh to try again.",

@@ -57,6 +57,11 @@ body {
 .bp-heading:focus {
   outline: none;
 }
+/* TF1 round 2: a whole-page message (an off link) reads as a heading, not a poster. */
+.bp-error-heading {
+  font-size: clamp(26px, 4.5vw, 34px);
+  line-height: 1.15;
+}
 
 /* ── Cover ── */
 .bp-cover-image {
@@ -275,6 +280,16 @@ body {
   color: var(--brand-muted);
   background: var(--ally-sunken);
 }
+/* TF1 round 2 (Saathi B-2): "Remove" beside the name the assistant keeps. */
+.bp-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--brand-accent, inherit);
+  text-decoration: underline;
+  cursor: pointer;
+}
 .bp-thread {
   flex: 1;
   min-height: 0;
@@ -316,6 +331,15 @@ body {
   background: var(--brand-accent);
   color: var(--brand-on-accent);
   border-bottom-right-radius: 8px;
+}
+/* TF1 round 2 (Sahyog N-14): a message that didn't reach us. */
+.bp-bubble--unsent {
+  opacity: 0.6;
+}
+.bp-unsent {
+  margin: 0;
+  font: 400 13px/1.4 var(--ally-font-ui);
+  color: var(--brand-muted, var(--brand-ink));
 }
 .bp-sources {
   display: flex;

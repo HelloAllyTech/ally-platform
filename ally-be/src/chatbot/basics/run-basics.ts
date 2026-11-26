@@ -48,6 +48,7 @@ import { HandoverService } from '../handover/handover.service';
 import { ChatbotSettingsService } from '../service/chatbot-settings.service';
 import { ConversationService } from '../service/conversation.service';
 import { MemoryService } from '../memory/memory.service';
+import { ChatPrivacyService } from '../privacy/chat-privacy.service';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import {
   PLATFORM_BASICS,
@@ -119,6 +120,7 @@ async function main(): Promise<void> {
   const engine = app.get(ChatbotEngineService, { strict: false });
   const handover = app.get(HandoverService, { strict: false });
   const memory = app.get(MemoryService, { strict: false });
+  const privacy = app.get(ChatPrivacyService, { strict: false });
   const conversations = app.get(ConversationService, { strict: false });
   const settingsService = app.get(ChatbotSettingsService, { strict: false });
   const created: { contactIds: string[]; conversationIds: string[] } = {
@@ -355,6 +357,19 @@ async function main(): Promise<void> {
               conversation.id,
               decision,
             );
+            // TF1 round 2 (Saathi B-2): the name step the bot page runs before storing a reply.
+            const named = await privacy?.nameNotice({
+              chatbot,
+              contactId: contact.id,
+              decision,
+              text,
+            });
+            if (named) {
+              decision = {
+                ...decision,
+                body: `${decision.body}\n\n${named.notice}`,
+              };
+            }
             await conversations.appendMessage(conversation.id, {
               channel: ConversationChannel.WEB,
               direction: WaMessageDirection.OUTBOUND,

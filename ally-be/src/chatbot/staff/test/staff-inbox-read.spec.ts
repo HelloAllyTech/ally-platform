@@ -57,6 +57,7 @@ describe('Inbox thread under a staff view', () => {
     await run(() => controller.list({ chatbotId: BOT }));
     expect(inbox.list).toHaveBeenCalledWith({ chatbotId: BOT }, [BOT]);
     await run(() => controller.counts({ chatbotId: BOT }));
-    expect(inbox.counts).toHaveBeenCalledWith([BOT]);
+    // TF1 round 2: the counts are held to the assistant asked about, as the list is.
+    expect(inbox.counts).toHaveBeenCalledWith([BOT], BOT);
   });
 });

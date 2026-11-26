@@ -32,9 +32,10 @@ def mood_section(
     text = load_and_format(UPSET_PROMPT_PATH, prompts=prompts).strip()
     persona = bot.get("persona") or {}
     pack = persona.get("safety_pack")
-    helplines = (bot.get("support_helplines") or "").strip() or DEFAULT_HELPLINES.get(
-        pack, ""
-    )
+    # TF1 round 2 (Sahyog N-1): "you can reach {organisation} on …" carries only the
+    # organisation's own confirmed line. The default (Tele-MANAS) is a national number,
+    # never the organisation's: it is given, labelled as itself, in `numbers` below.
+    helplines = (bot.get("support_helplines") or "").strip()
     if pack in HEALTH_PACKS and helplines:
         support = load_and_format(
             UPSET_SUPPORT_PROMPT_PATH,

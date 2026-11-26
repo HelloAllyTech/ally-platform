@@ -634,8 +634,8 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     id: 'product-roadmap',
     name: 'Product roadmap, votes and the opportunity copilot',
     whatItIs:
-      'Roadmap opportunities with votes, the copilot that interviews someone into a filed ' +
-      'opportunity, the hand-off that opens a Builder session from one, and the plan ' +
+      'Roadmap ideas (opportunities) with votes, the copilot that interviews someone from a ' +
+      'private draft to a submitted idea, the hand-off that opens a plan session from one, and the plan ' +
       'foundations (who may plan, the plan event log and the plan spend ledger).',
     reuseWhen:
       'A request concerns filing, prioritising or voting on product work, or planning an ' +
@@ -645,7 +645,7 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
       'ally-be:src/public-roadmap',
       'ally-be:src/product-planning',
     ],
-    adminRoute: '/product-roadmap',
+    adminRoute: '/roadmap',
     keywords: [
       'roadmap',
       'opportunity',

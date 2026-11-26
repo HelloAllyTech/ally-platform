@@ -2,6 +2,7 @@ import { SafetyPackId } from '../../bot-draft/enum/bot-draft.enum';
 import { ListFieldType } from '../enum/list.enum';
 import type { ReadyMadeList } from '../lists/ready-made-lists';
 import { listDefinition } from './template-lists';
+import { helplineLines, phonesIn } from '../engine/phone-text';
 import type {
   SetupQuestion,
   StarterCase,
@@ -208,6 +209,50 @@ const NEGATIVE =
 
 export const isNegative = (line: string): boolean => NEGATIVE.test(line);
 
+/** Days or times ("Mon–Sat 9:30–5:30", "Tue to Sat 10 am to 4 pm", "daily", "24x7"). */
+/** A bare range ("5 to 12") is an age as often as a time: a time needs a colon or am/pm. */
+const HOURS =
+  /\b(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)(?:day)?\b|\bdaily\b|\bweekdays?\b|\b24\s*[x/]\s*7\b|\d{1,2}(?::\d{2}\s*(?:am|pm)?|\s*(?:am|pm))\s*(?:[-–—]|to)\s*\d{1,2}|\d{1,2}\s*(?:[-–—]|to)\s*\d{1,2}(?::\d{2}|\s*(?:am|pm)\b)/i;
+/** A cost said outright ("Free", "No charge", "₹200"). */
+const COST =
+  /^(?:free(?: of (?:charge|cost))?|no (?:charge|fee|cost)|(?:₹|rs\.?)\s?\d[\d,]*)\b/i;
+
+/**
+ * TF1 round 2, N-4 (Sahyog: a place's phone landed in Hours, its Phone empty): a part that is
+ * plainly a phone number, days and times, or a cost goes to the detail of that kind, wherever it
+ * sits in the line. The first part is always the entry's name.
+ */
+function kindOf(
+  definition: ReadyMadeList,
+  part: string,
+  taken: Record<string, unknown>,
+): { key: string; value: string } | null {
+  const free = (key: string) =>
+    definition.fields.some((f) => f.key === key) && taken[key] === undefined;
+  const phoneField = definition.fields.find(
+    (f) => f.type === ListFieldType.PHONE,
+  );
+  const [phone] = phonesIn(part);
+  if (phone && phoneField && taken[phoneField.key] === undefined) {
+    const rest = part.replace(phone, '').replace(/[^\p{L}]/gu, '');
+    if (rest.length <= 12) return { key: phoneField.key, value: phone };
+  }
+  if (free('hours') && part.length <= 80 && HOURS.test(part)) {
+    return { key: 'hours', value: part };
+  }
+  if (free('cost') && COST.test(part.trim())) {
+    return { key: 'cost', value: part };
+  }
+  return null;
+}
+
+/** "Malviya Nagar centre" → "Malviya Nagar": the place a location's name is for. */
+const placeOf = (name: string): string =>
+  name
+    .replace(/\b(?:centre|center|office|branch|clinic|camp|hub|site)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 function entriesFrom(
   definition: ReadyMadeList,
   columns: string[],
@@ -216,15 +261,37 @@ function entriesFrom(
   return itemsOf(text, { commas: false })
     .slice(0, 50)
     .map((line) => {
-      const parts = partsOf(line);
+      const all = partsOf(line);
       const values: Record<string, unknown> = {};
-      columns.forEach((key, i) => {
+      const parts = all.filter((part, i) => {
+        if (i === 0) return true;
+        const kind = kindOf(definition, part, values);
+        if (!kind) return true;
+        const value = valueFor(definition, kind.key, kind.value);
+        if (value === undefined) return true;
+        values[kind.key] = value;
+        return false;
+      });
+      const open = columns.filter((key) => values[key] === undefined);
+      open.forEach((key, i) => {
         const part =
-          i === columns.length - 1 ? parts.slice(i).join(' - ') : parts[i];
+          i === open.length - 1 ? parts.slice(i).join(' - ') : parts[i];
         if (!part) return;
         const value = valueFor(definition, key, part);
         if (value !== undefined) values[key] = value;
       });
+      // The area a place is in, when its name says it and its address agrees.
+      const area = placeOf(String(values.name ?? ''));
+      if (
+        definition.fields.some((f) => f.key === 'area') &&
+        values.area === undefined &&
+        area.length >= 4 &&
+        String(values.address ?? '')
+          .toLowerCase()
+          .includes(area.toLowerCase())
+      ) {
+        values.area = area;
+      }
       for (const field of definition.fields) {
         if (
           field.required &&
@@ -278,6 +345,127 @@ function fill(
   return missing ? null : out;
 }
 
+const NOT_DISTINCTIVE = new Set(
+  'help with from your their this that also only each other services service people'.split(
+    ' ',
+  ),
+);
+
+const wordsOf = (text: string): string[] =>
+  text
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w.length >= 4 && !NOT_DISTINCTIVE.has(w));
+
+/** Two words are the same word when they share their first six letters ("aid"/"aids" too). */
+const sameWord = (a: string, b: string): boolean => {
+  const k = Math.min(6, a.length, b.length);
+  return a.slice(0, k) === b.slice(0, k);
+};
+
+/** Where in `text` the first of `words` appears, or -1. */
+function firstOf(text: string, words: string[]): number {
+  const found = text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .findIndex((w) => w.length >= 3 && words.some((n) => sameWord(w, n)));
+  return found;
+}
+
+/**
+ * TF1 round 2, N-4 (Sahyog: every service's "Documents to bring" held all four services'
+ * documents): one answer covering several entries, split per entry. Each line, sentence or
+ * clause goes to the entry it names, by a word of its name no other entry's name has (a
+ * "Physiotherapy: …" label first, else the first such word in it); a piece naming none is for
+ * every entry. Null when no piece names an entry: the whole text is for every entry.
+ */
+export function splitPerEntry(
+  names: string[],
+  text: string,
+): (string | null)[] | null {
+  const words = names.map(wordsOf);
+  const distinctive = words.map((own, i) =>
+    own.filter(
+      (w) =>
+        !words.some((other, j) => j !== i && other.some((o) => sameWord(o, w))),
+    ),
+  );
+  const pieces = text
+    .split(/\r?\n|(?<=[.!?])\s+(?=\p{Lu})|;\s*/u)
+    .map((p) => p.replace(/^\s*(?:[-•*]|\d+[.)])\s+/, '').trim())
+    .filter(Boolean);
+  const owner = (piece: string): { index: number; text: string } | null => {
+    const label = /^([^:]{2,60}):\s*(.+)$/s.exec(piece);
+    const tries: [string, string][] = label
+      ? [
+          [label[1], label[2]],
+          [piece, piece],
+        ]
+      : [[piece, piece]];
+    for (const [where, rest] of tries) {
+      let best: { index: number; at: number } | null = null;
+      distinctive.forEach((own, index) => {
+        const at = firstOf(where, own);
+        if (at >= 0 && (!best || at < best.at)) best = { index, at };
+      });
+      if (best) return { index: (best as { index: number }).index, text: rest };
+    }
+    return null;
+  };
+  const owned = pieces.map(owner);
+  if (!owned.some(Boolean)) return null;
+  const sentence = (p: string) => {
+    const t = p.trim().replace(/[.;,]+$/, '');
+    return `${t.charAt(0).toUpperCase()}${t.slice(1)}.`;
+  };
+  return names.map((_, i) => {
+    const mine = pieces
+      .map((piece, k) =>
+        owned[k] === null
+          ? piece
+          : owned[k]!.index === i
+            ? owned[k]!.text
+            : null,
+      )
+      .filter((p): p is string => Boolean(p));
+    return mine.length ? mine.map(sentence).join(' ') : null;
+  });
+}
+
+/**
+ * TF1 round 2, N-13: a checkup question reads with a short name ("Is a disability certificate
+ * free?", not "Is Help with a disability certificate (UDID card) free?").
+ */
+export function shortName(name: string): string {
+  let short = name
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/^\s*help (?:with|for|in|applying for)\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (short.split(' ').length > 5) {
+    short = short.split(/,|\s[-–—]\s|\s(?:for|to|with)\s/i)[0].trim();
+  }
+  if (short.split(' ').length > 5) {
+    short = short.split(' ').slice(0, 5).join(' ');
+  }
+  return short || name;
+}
+
+/**
+ * TF1 round 2, N-13 (Sahyog: "Is Help with a disability certificate (UDID card) free?" failed on
+ * a right answer, "Yes, our services are free"): a fact whose detail isn't in the list falls back
+ * to "says it doesn't have it", but the assistant's information may well have it. A reply that
+ * gives it from the information passes too; the grader still fails anything invented.
+ */
+function eitherFact(primary: string, fallback: string): string {
+  const said = primary.replace(/:?\s*\{[^}]+\}.*$/, '').trim();
+  if (!said || said === primary) return fallback;
+  const rest = fallback.charAt(0).toLowerCase() + fallback.slice(1);
+  // COPY: needs approval (TF1 round 2)
+  return `${said} as your information gives it, or ${rest}`;
+}
+
 /** Packs a template can ask for, strictest first, for picking the strictest asked. */
 const PACK_ORDER: SafetyPackId[] = [
   SafetyPackId.MENTAL_HEALTH,
@@ -316,6 +504,7 @@ export function planInstall(
   let languages: string[] | null = null;
   let channels: string[] | null = null;
   const skipped: string[] = [];
+  const perEntry: { list: string; field: string; text: string }[] = [];
 
   for (const q of template.setup) {
     const text = answered(q);
@@ -329,7 +518,8 @@ export function planInstall(
           facts.push(`${q.ask} ${text}`);
           break;
         case 'helpline':
-          helpline = text.slice(0, 200);
+          // TF1 round 2, S-1: only the numbers, never the sentence around them.
+          helpline = helplineLines(text) || null;
           break;
         case 'entries': {
           const definition = installed.get(to.list);
@@ -351,6 +541,11 @@ export function planInstall(
         case 'field': {
           const definition = installed.get(to.list);
           if (!definition) break;
+          const type = definition.fields.find((f) => f.key === to.field)?.type;
+          if (type === ListFieldType.TEXT || type === ListFieldType.LONG_TEXT) {
+            // Split per entry once the entries are known (N-4).
+            perEntry.push({ list: to.list, field: to.field, text });
+          }
           const value = valueFor(definition, to.field, text);
           if (value !== undefined) {
             sameOnEvery[to.list] = {
@@ -399,6 +594,44 @@ export function planInstall(
     }
   }
 
+  // N-4: one answer for every entry ("what to bring"), split per entry when it names them.
+  for (const { list, field, text } of perEntry) {
+    const rows = fromAnswers[list] ?? [];
+    const definition = installed.get(list)!;
+    const title = definition.settings?.title_field ?? 'name';
+    const names = rows.map((r) => String(r[title] ?? ''));
+    const split = rows.length > 1 ? splitPerEntry(names, text) : null;
+    if (!split) continue;
+    rows.forEach((row, i) => {
+      const value = split[i]
+        ? valueFor(definition, field, split[i])
+        : undefined;
+      if (value !== undefined) row[field] = value;
+    });
+    const same = { ...sameOnEvery[list] };
+    delete same[field];
+    sameOnEvery[list] = same;
+  }
+  // N-4: "Physiotherapy - children, Malviya Nagar only": the place an entry names is its Where.
+  const places = Object.entries(fromAnswers)
+    .filter(([, rows]) => rows.some((r) => r.address !== undefined))
+    .flatMap(([, rows]) => rows.map((r) => String(r.name ?? '')))
+    .filter((name) => placeOf(name).length >= 4);
+  for (const { use, definition } of lists) {
+    if (!definition.fields.some((f) => f.key === 'where')) continue;
+    for (const row of fromAnswers[use.key] ?? []) {
+      if (row.where !== undefined) continue;
+      const said = Object.entries(row)
+        .filter(([k]) => k !== 'name')
+        .map(([, v]) => String(v).toLowerCase())
+        .join(' ');
+      const named = places.filter((p) =>
+        said.includes(placeOf(p).toLowerCase()),
+      );
+      if (named.length) row.where = named.join(', ').slice(0, 200);
+    }
+  }
+
   const entries: InstallPlan['entries'] = {};
   for (const { use } of lists) {
     const own = fromAnswers[use.key] ?? [];
@@ -438,16 +671,26 @@ export function planInstall(
     return first ? shown(installed.get(list), key, first[key]) : null;
   };
 
+  // N-13: a question names an entry by its short name.
+  const asked = (token: string): string | null => {
+    const value = lookup(token);
+    const [list, key] = token.split('.');
+    const title = installed.get(list)?.settings?.title_field ?? 'name';
+    return value !== null && key === title ? shortName(value) : value;
+  };
+
   const cases: PlannedCase[] = [];
   for (const c of template.checkups) {
     if (c.needs && !installed.has(c.needs)) continue;
-    const question = fill(c.send, lookup);
+    const question = fill(c.send, asked);
     if (question === null) continue;
     const factsFilled = c.facts.flatMap((f) => {
       const [primary, fallback] = f.split(' || ');
       const done = fill(primary, lookup);
       if (done !== null) return [done];
-      return fallback ? [fill(fallback, lookup) ?? fallback] : [];
+      return fallback
+        ? [eitherFact(primary, fill(fallback, lookup) ?? fallback)]
+        : [];
     });
     cases.push({
       id: c.id,

@@ -36,7 +36,8 @@ export interface ChangeEntry {
 export interface HistoryEntry {
   id: string;
   at: string;
-  kind: "edit" | "change";
+  /** `activity`: go live, pause, an access-list removal, a helpline confirmation; never undone. */
+  kind: "edit" | "change" | "activity";
   origin: "panel" | "hand";
   who: string | null;
   fields: { field: string; before?: unknown; after: unknown }[];

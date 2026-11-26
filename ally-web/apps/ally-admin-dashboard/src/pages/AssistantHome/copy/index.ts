@@ -90,6 +90,10 @@ export const HOME = {
   },
   knows: {
     website: "From your website",
+    // COPY: needs approval (TF1 round 2)
+    fromDocuments: "From your documents",
+    // COPY: needs approval (TF1 round 2)
+    fromBoth: "From your website and documents",
     notes: "Your notes",
     documents: "Documents",
     correct: "Correct this",
@@ -257,6 +261,8 @@ export const HOME = {
     notRight: "This isn't right for my business",
     choose: "Which safety rules fit your business?",
     lessStrict: "Less strict",
+    // COPY: needs approval (TF1 round 2): the pack in use, preselected in the chooser.
+    inUse: "In use now",
     reasonLabel: "Why is this right for your business?",
     reasonHint:
       "These rules are less strict than the ones you have now. Your reason is kept with the change, and your checkup will show it.",

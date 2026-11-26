@@ -28,7 +28,6 @@ import { RoadmapIdeaNoticeService } from 'src/product-planning/service/roadmap-i
 import { RoadmapRoleService } from 'src/product-planning/service/roadmap-role.service';
 import { roleAtLeast } from 'src/product-planning/util/roadmap-role.util';
 import { RoadmapNotificationService } from '../service/roadmap-notification.service';
-import { RoadmapStrategyGoalService } from '../service/roadmap-strategy-goal.service';
 import { PlanSession, PlanSessionStore } from '../plan/plan-session.store';
 import { PlanStageService } from '../plan/plan-stage.service';
 import { PlanCloseReadinessService } from '../plan/plan-close-readiness.service';
@@ -116,7 +115,6 @@ export class RoadmapReviewService implements OnModuleDestroy {
     private readonly events: PlanEventService,
     private readonly inbox: RoadmapInboxService,
     private readonly broadcast: RoadmapNotificationService,
-    private readonly strategyGoals: RoadmapStrategyGoalService,
     private readonly builderSessions: BuilderSessionService,
     private readonly ideaNotices: RoadmapIdeaNoticeService,
     /** Start planning's opening turn (audit rec 1). Optional so fixtures without it still build. */
@@ -937,8 +935,6 @@ export class RoadmapReviewService implements OnModuleDestroy {
         fields: ['reviewState'],
       });
     }
-    // Accepting moves an idea onto the ranked board.
-    this.strategyGoals.invalidate(userId);
 
     return signReviewUndo(
       {

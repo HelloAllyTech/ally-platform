@@ -11,6 +11,7 @@ import { ChatbotMessageFeedback } from '../../chatbot/entity/chatbot-message-fee
 import { ChatbotMemberRole } from '../../chatbot/enum/chatbot.enum';
 import { ChatbotAccessService } from '../../chatbot/service/chatbot-access.service';
 import { assistantZone } from '../../chatbot/agent-tools/list-tools';
+import { ERASED_TEXT } from '../../chatbot/privacy/erased';
 import { LoggerService } from '../../logger/logger.service';
 import { scheduledTaskRegistry } from '../../scheduler/registry/scheduled-task.registry';
 import { WaUnansweredStatus } from '../../whatsapp/enum/whatsapp.enum';
@@ -94,6 +95,9 @@ WITH bots AS (
     JOIN bots b ON b.chatbot_id = c.chatbot_id
    WHERE m."createdAt" >= (($2::date)::timestamp AT TIME ZONE b.tz) AT TIME ZONE 'UTC'
      AND m."createdAt" <  (($3::date)::timestamp AT TIME ZONE b.tz) AT TIME ZONE 'UTC'
+     -- TF1 round 2 (Sahyog P2): a message the person erased ("Forget me") is not counted: its
+     -- citations are gone, so it read as an answer not from your information.
+     AND m.text IS DISTINCT FROM '${ERASED_TEXT}'
 ), waits AS (
   -- Chats that needed a person (asked, declined twice, passed on, or a crisis flag) on that day,
   -- and the minutes until a person's first reply. Unanswered ones are left out, not counted as 0.
@@ -323,6 +327,29 @@ export class ScorecardService implements OnModuleInit {
     return assistantZone(row?.settings);
   }
 
+  /**
+   * Conversations someone wrote in during `[from, to)` (the assistant's days), each counted once:
+   * a chat that ran over two days is one conversation, not two, so the sum of the daily counts
+   * isn't used for a period's total.
+   */
+  async conversationsBetween(
+    chatbotId: string,
+    zone: string,
+    from: string,
+    to: string,
+  ): Promise<number> {
+    const [row] = (await this.dataSource.query(
+      `SELECT COUNT(DISTINCT m.conversation_id)::int AS n
+         FROM chatbot_messages m JOIN chatbot_conversations c ON c.id = m.conversation_id
+        WHERE c.chatbot_id = $1 AND m.direction = 'inbound'
+          AND m.text IS DISTINCT FROM '${ERASED_TEXT}'
+          AND m."createdAt" >= (($3::date)::timestamp AT TIME ZONE $2) AT TIME ZONE 'UTC'
+          AND m."createdAt" < (($4::date)::timestamp AT TIME ZONE $2) AT TIME ZONE 'UTC'`,
+      [chatbotId, zone, from, to],
+    )) as { n: number | string }[];
+    return Number(row?.n ?? 0);
+  }
+
   /** `[from, to)` for one assistant: stored days, with today worked out now. */
   async days(chatbotId: string, from: string, to: string, now = new Date()) {
     const today = dayOf(now, await this.zoneOf(chatbotId));
@@ -363,7 +390,8 @@ export class ScorecardService implements OnModuleInit {
   /** The Overview: this week and last (Mon–Sun), the 7-day trend and what needs the owner. */
   async view(chatbotId: string, now = new Date()) {
     await this.access.assert(chatbotId, ChatbotMemberRole.VIEWER);
-    const today = dayOf(now, await this.zoneOf(chatbotId));
+    const zone = await this.zoneOf(chatbotId);
+    const today = dayOf(now, zone);
     const thisWeek = weekStart(today);
     const lastWeek = addDays(thisWeek, -7);
     const trendFrom = addDays(today, -6);
@@ -371,11 +399,20 @@ export class ScorecardService implements OnModuleInit {
     const days = await this.days(chatbotId, from, addDays(today, 1), now);
     const between = (a: string, b: string) =>
       days.filter((d) => d.day >= a && d.day < b);
-    const [unansweredAll, bookingAll, unhappyAll, latest] = await Promise.all([
+    const [
+      unansweredAll,
+      bookingAll,
+      unhappyAll,
+      latest,
+      thisWeekChats,
+      lastWeekChats,
+    ] = await Promise.all([
       this.openUnanswered(chatbotId),
       this.openUnanswered(chatbotId, true),
       this.openThumbsDown(chatbotId),
       this.checkup.latestFor(chatbotId).catch(() => null),
+      this.conversationsBetween(chatbotId, zone, thisWeek, addDays(today, 1)),
+      this.conversationsBetween(chatbotId, zone, lastWeek, thisWeek),
     ]);
     // Ally staff without the owner's grant get the counts, never the customers' words.
     const quote = await this.access.mayReadCustomerText(chatbotId);
@@ -393,8 +430,15 @@ export class ScorecardService implements OnModuleInit {
               thumbsDown: unhappyAll.length,
             },
           }),
-      thisWeek: sumDays(between(thisWeek, addDays(today, 1))),
-      lastWeek: sumDays(between(lastWeek, thisWeek)),
+      // A week's conversations are counted once each, not summed day by day.
+      thisWeek: {
+        ...sumDays(between(thisWeek, addDays(today, 1))),
+        conversations: thisWeekChats,
+      },
+      lastWeek: {
+        ...sumDays(between(lastWeek, thisWeek)),
+        conversations: lastWeekChats,
+      },
       trend: between(trendFrom, addDays(today, 1)).map((d) => ({
         day: d.day,
         answeredPct: d.answers
@@ -431,35 +475,38 @@ export class ScorecardService implements OnModuleInit {
     const inWindow = (col: string) =>
       `${col} >= (($3::date)::timestamp AT TIME ZONE $2) AT TIME ZONE 'UTC'
        AND ${col} < (($4::date)::timestamp AT TIME ZONE $2) AT TIME ZONE 'UTC'`;
-    const [people, channels, languages, asked] = await Promise.all([
-      this.dataSource.query(
-        `SELECT COUNT(DISTINCT c.contact_id)::int AS n
+    const [conversations, people, channels, languages, asked] =
+      await Promise.all([
+        // The period's conversations, each counted once (a chat over two days is one).
+        this.conversationsBetween(chatbotId, zone, from, to),
+        this.dataSource.query(
+          `SELECT COUNT(DISTINCT c.contact_id)::int AS n
            FROM chatbot_messages m JOIN chatbot_conversations c ON c.id = m.conversation_id
           WHERE c.chatbot_id = $1 AND m.direction = 'inbound' AND ${inWindow('m."createdAt"')}`,
-        window,
-      ) as Promise<{ n: number }[]>,
-      this.dataSource.query(
-        `SELECT c.channel AS key, COUNT(DISTINCT c.contact_id)::int AS count
+          window,
+        ) as Promise<{ n: number }[]>,
+        this.dataSource.query(
+          `SELECT c.channel AS key, COUNT(DISTINCT c.contact_id)::int AS count
            FROM chatbot_messages m JOIN chatbot_conversations c ON c.id = m.conversation_id
           WHERE c.chatbot_id = $1 AND m.direction = 'inbound' AND ${inWindow('m."createdAt"')}
           GROUP BY c.channel`,
-        window,
-      ) as Promise<{ key: string; count: number }[]>,
-      this.dataSource.query(
-        `SELECT m.language AS key, COUNT(DISTINCT c.contact_id)::int AS count
+          window,
+        ) as Promise<{ key: string; count: number }[]>,
+        this.dataSource.query(
+          `SELECT m.language AS key, COUNT(DISTINCT c.contact_id)::int AS count
            FROM chatbot_messages m JOIN chatbot_conversations c ON c.id = m.conversation_id
           WHERE c.chatbot_id = $1 AND m.direction = 'inbound' AND m.language IS NOT NULL
             AND ${inWindow('m."createdAt"')}
           GROUP BY m.language`,
-        window,
-      ) as Promise<{ key: string; count: number }[]>,
-      this.dataSource.query(
-        `SELECT q.question_text AS text, q.reason, c.contact_id AS "contactId"
+          window,
+        ) as Promise<{ key: string; count: number }[]>,
+        this.dataSource.query(
+          `SELECT q.question_text AS text, q.reason, c.contact_id AS "contactId"
            FROM wa_unanswered_questions q JOIN chatbot_conversations c ON c.id = q.conversation_id
           WHERE c.chatbot_id = $1 AND ${inWindow('q."createdAt"')}`,
-        window,
-      ) as Promise<UnansweredInput[]>,
-    ]);
+          window,
+        ) as Promise<UnansweredInput[]>,
+      ]);
     const sum = (pick: (d: DayStats) => number) =>
       days.reduce((n, d) => n + pick(d), 0);
     const answers = sum((d) => d.answers);
@@ -469,7 +516,6 @@ export class ScorecardService implements OnModuleInit {
       .map((d) => d.handoverWaitP50)
       .filter((w): w is number => w !== null)
       .sort((a, b) => a - b);
-    const conversations = sum((d) => d.conversations);
     return {
       range,
       timeZone: zone,

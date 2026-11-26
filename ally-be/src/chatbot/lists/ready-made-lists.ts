@@ -584,7 +584,9 @@ export const READY_MADE: ReadyMadeItem[] = [
         key: 'callback_requests',
         name: 'Callback requests',
         agent_read: true,
-        settings: { title_field: 'reason', person_field: 'requester' },
+        // TF1 round 2 (Saathi B-4): the card and the list say who asked (name, else email), not
+        // the phone; and the day they asked for ("tomorrow evening").
+        settings: { title_field: 'requester', person_field: 'requester' },
         fields: [
           field('phone', 'Phone', ListFieldType.PHONE, {
             ...required,
@@ -596,6 +598,7 @@ export const READY_MADE: ReadyMadeItem[] = [
             ...agent,
             health_never_store: true,
           }),
+          field('preferred_day', 'Preferred day', ListFieldType.DATE, agent),
           select(
             'preferred_time',
             'Preferred time',

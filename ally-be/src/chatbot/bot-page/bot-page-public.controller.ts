@@ -140,6 +140,17 @@ export class BotPagePublicController {
   }
 
   @Public()
+  @Post(':slug/me/forget-name')
+  @HttpCode(200)
+  @ApiOperation({
+    summary:
+      'Remove the name the assistant keeps for this visitor (TF1 round 2)',
+  })
+  forgetName(@Param('slug') slug: string, @Req() req: Request) {
+    return this.service.forgetName(slug, req);
+  }
+
+  @Public()
   @Post(':slug/handover')
   @ApiOperation({
     summary: 'Talk to a person: ask the team to join this chat (chunk 11a)',

@@ -1034,6 +1034,15 @@ describe('CourseCopilotEditToolsService', () => {
       expect(itemRow('I-qz').content.settings.passScore).toBe(100);
     });
 
+    it('rounds a pass score to a whole percent and reads "80%"', async () => {
+      // A scenario quiz's save refuses a fractional pass mark.
+      await rule('I-qz', { passScore: 70.5 });
+      expect(itemRow('I-qz').completionCriteria.passScore).toBe(71);
+      expect(itemRow('I-qz').content.settings.passScore).toBe(71);
+      await rule('I-qz', { passScore: '80%' });
+      expect(itemRow('I-qz').completionCriteria.passScore).toBe(80);
+    });
+
     it('does not invent settings on a quiz that has none', async () => {
       store.item('I-qz').content = { questions: [] };
       await rule('I-qz', { passScore: 85 });

@@ -60,6 +60,8 @@ export const CHECKUP_CONTROLS = {
     why: "Why",
     passages: "Where it looked",
     time: "{s} s to answer",
+    /** TF1 round 2 (Saathi B-8): the label for screen readers (the raw "{s}" showed before). */
+    timeLabel: "Time to answer",
     history: "Last checkups",
     nothing: "Nothing yet",
   },

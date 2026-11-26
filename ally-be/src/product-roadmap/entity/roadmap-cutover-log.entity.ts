@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-/** What one cutover run moved (RoadmapCutoverService.run). */
+/** What one cutover run moved (the retired RoadmapCutoverService.run). */
 export interface RoadmapCutoverCounts {
   /** `roadmap_idea_drafts` rows copied into private plan drafts. */
   draftsMoved: number;
@@ -23,6 +23,11 @@ export interface RoadmapCutoverCounts {
  * who switched Roadmap on, when, what moved, and the Builder and Owner lists
  * they confirmed (§3.3). Platform-wide, so no tenant. Append-only: a second
  * run (after a rollback, say) adds a row rather than editing the first.
+ *
+ * The cutover itself is retired (it ran in production on 2026-11-20) and
+ * nothing reads or writes this table now. The entity stays, unregistered in any
+ * module, as the record of the table's shape until the audit rows are exported
+ * and a migration drops it.
  */
 @Entity('roadmap_cutover_log')
 @Index('idx_roadmap_cutover_log_at', ['at'])

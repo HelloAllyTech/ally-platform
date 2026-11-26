@@ -20,7 +20,8 @@ import { SpecialistValidationError } from './specialist.types';
  * repair pass. The ceiling is not spend — a call pays for what it uses.
  */
 export const SPECIALIST_MAX_TOKENS = {
-  BLUEPRINT: 24_000,
+  // Sized for a 100-item course: about 400 tokens of JSON per item, plus reasoning.
+  BLUEPRINT: 64_000,
   ARTICLE: 12_000,
   QUIZ: 12_000,
   ANNOTATION: 14_000,

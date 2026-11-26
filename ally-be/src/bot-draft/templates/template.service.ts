@@ -1,4 +1,5 @@
 import { realName } from '../name-placeholders';
+import { withTemplateVoice } from '../../chatbot/voice/template-voices';
 import { syncDraftPack } from '../safety-pack/sync-draft-pack';
 import {
   BadRequestException,
@@ -381,6 +382,10 @@ export class TemplateService {
           notice: template.memory ? (template.memory_notice ?? null) : null,
         };
       }
+      // TF1 round 2 (Saathi B-13): the template's voice for every fixed text a person sees,
+      // never over a text the owner changed.
+      const voice = withTemplateVoice(settings.voice, template.id);
+      if (voice) settings.voice = voice;
       if (plan.helpline && (setup || !settings.helplineNumbers?.trim())) {
         settings.helplineNumbers = plan.helpline;
         // Q4 G7: a template's answer isn't used in crisis replies until the owner confirms it.

@@ -2,10 +2,7 @@ import { RoadmapOpportunityStage } from '../../enum/roadmap-opportunity.enum';
 import {
   effectiveMonthOf,
   isMonthPinned,
-  isValidMonthKey,
   monthKeyOf,
-  monthKeyRange,
-  shiftMonthKey,
 } from '../../util/roadmap-month.util';
 
 const { NEW, PRIORITISED, RELEASED, ARCHIVED } = RoadmapOpportunityStage;
@@ -16,64 +13,6 @@ describe('monthKeyOf', () => {
     expect(monthKeyOf(new Date('2026-01-01T00:00:00Z'))).toBe('2026-01');
     // THE BUG THIS PREVENTS: '2026-9' fails CHK_roadmap_opps_planned_month outright.
     expect(monthKeyOf(new Date('2026-12-31T23:59:59Z'))).toBe('2026-12');
-  });
-});
-
-describe('shiftMonthKey', () => {
-  it('steps within a year', () => {
-    expect(shiftMonthKey('2026-05', 1)).toBe('2026-06');
-    expect(shiftMonthKey('2026-05', -1)).toBe('2026-04');
-    expect(shiftMonthKey('2026-05', 0)).toBe('2026-05');
-  });
-
-  it('crosses the year boundary in both directions', () => {
-    // THE CASE THAT BREAKS A NAIVE IMPLEMENTATION: month arithmetic done on the string, or on a
-    // Date built from local time, produces '2026-13' and '2026-00' here.
-    expect(shiftMonthKey('2026-12', 1)).toBe('2027-01');
-    expect(shiftMonthKey('2026-01', -1)).toBe('2025-12');
-    expect(shiftMonthKey('2026-01', -13)).toBe('2024-12');
-    expect(shiftMonthKey('2026-12', 13)).toBe('2028-01');
-  });
-
-  it('produces keys that always pass the CHECK constraint', () => {
-    for (let delta = -30; delta <= 30; delta++) {
-      expect(isValidMonthKey(shiftMonthKey('2026-06', delta))).toBe(true);
-    }
-  });
-
-  it('is not affected by a 31st-of-the-month anchor', () => {
-    // Anchoring on day 1 is why this works. Shifting a 31 January date by one month in JS lands
-    // in March, which would silently skip February as a lane.
-    expect(shiftMonthKey('2026-01', 1)).toBe('2026-02');
-    expect(shiftMonthKey('2026-03', -1)).toBe('2026-02');
-  });
-});
-
-describe('monthKeyRange', () => {
-  it('is inclusive of both ends', () => {
-    expect(monthKeyRange('2026-08', '2026-11')).toEqual([
-      '2026-08',
-      '2026-09',
-      '2026-10',
-      '2026-11',
-    ]);
-  });
-
-  it('returns a single month when from equals to', () => {
-    expect(monthKeyRange('2026-08', '2026-08')).toEqual(['2026-08']);
-  });
-
-  it('spans a year boundary', () => {
-    expect(monthKeyRange('2026-11', '2027-02')).toEqual([
-      '2026-11',
-      '2026-12',
-      '2027-01',
-      '2027-02',
-    ]);
-  });
-
-  it('returns nothing for an inverted range rather than looping forever', () => {
-    expect(monthKeyRange('2026-11', '2026-08')).toEqual([]);
   });
 });
 
@@ -139,30 +78,5 @@ describe('effectiveMonthOf', () => {
     expect(
       effectiveMonthOf(RELEASED, new Date('2026-06-01T00:30:00Z'), null),
     ).toBe('2026-06');
-  });
-});
-
-describe('isValidMonthKey', () => {
-  it('accepts every real month', () => {
-    for (let month = 1; month <= 12; month++) {
-      expect(isValidMonthKey(`2026-${String(month).padStart(2, '0')}`)).toBe(
-        true,
-      );
-    }
-  });
-
-  it('rejects malformed keys, matching CHK_roadmap_opps_planned_month', () => {
-    for (const bad of [
-      '2026-13',
-      '2026-00',
-      '2026-0',
-      '26-01',
-      '2026-1',
-      '2026/01',
-      '',
-      'x',
-    ]) {
-      expect(isValidMonthKey(bad)).toBe(false);
-    }
   });
 });

@@ -322,7 +322,9 @@ const UPDATE_BLUEPRINT: AgentToolDefinition = {
   name: 'update_blueprint',
   description:
     'JSON-patch the blueprint while the trainer reviews it (reorder, add, remove, retype, ' +
-    'retitle, change a completion rule). Paths like /sections/1/items/2/title. New items need ' +
+    "retitle, change a completion rule). Paths like /sections/1/items/2/title; an item's rule " +
+    'is /sections/1/items/2/rule. A scenario quiz (SJT) rule is {passScore}: 0 = explore, 75 = ' +
+    'only a positive ending passes (a mixed ending scores below 75). New items need ' +
     '{id (any unique string), type, title, purpose, objectiveRefs, estimatedMinutes, source, ' +
     'spec}. The result echoes the re-estimated blueprint and any problems blocking approval.',
   input_schema: {

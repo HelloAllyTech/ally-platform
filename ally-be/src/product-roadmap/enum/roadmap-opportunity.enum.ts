@@ -95,48 +95,6 @@ export enum RoadmapOpportunitySource {
 export const PM_AGENT_AUTHOR_NAME = 'Product Manager Agent';
 
 /**
- * How the board groups its lanes.
- *
- * MONTH is the default and the original board — lanes are calendar months and a card's lane is
- * derived (`effectiveMonthOf`). The other three group by a plain column, which is what makes
- * them draggable: dropping a card in a lane writes that column, exactly as editing the field in
- * the drawer does.
- *
- * That difference is the whole reason the released/archived pinning rule has no equivalent here.
- * A shipped card is pinned in MONTH because its lane comes from `releasedAt`, a stamped fact
- * with no writable counterpart — asking to drag it out is asking to restate when it shipped.
- * Stage, goal and owner are all editable at any stage today, so a board that refused what the
- * drawer allows would just be a worse way to do the same edit.
- */
-export enum RoadmapBoardGroupBy {
-  MONTH = 'month',
-  STAGE = 'stage',
-  PRODUCT_GOAL = 'productGoal',
-  OWNER = 'owner',
-  /**
-   * Who FILED the opportunity. Read-only lanes: unlike the other groupings, a card cannot be
-   * dragged between them, because createdBy is a historical fact rather than an assignment —
-   * see RoadmapBoardService.move, which refuses it.
-   */
-  CREATED_BY = 'createdBy',
-}
-
-/**
- * Image types a reference image may be uploaded as.
- *
- * The presign endpoint gates on this rather than on a bare `image/*` prefix, and SVG is
- * deliberately NOT here even though the blog accepts it: an SVG is a document that can carry
- * script, these are rendered inline in the admin dashboard, and nothing anyone attaches to an
- * opportunity — a screenshot, a mock, a photo of a whiteboard — needs to be one.
- */
-export enum RoadmapReferenceImageContentType {
-  JPEG = 'image/jpeg',
-  PNG = 'image/png',
-  WEBP = 'image/webp',
-  GIF = 'image/gif',
-}
-
-/**
  * The Owner's review of a submitted idea (plans/roadmap-builder-merge D10, §2.1a).
  * A fact on the opportunity, not a stage: deriveItemStage reads it.
  *

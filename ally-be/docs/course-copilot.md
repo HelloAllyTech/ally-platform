@@ -148,7 +148,7 @@ in AWS form, so they do not render locally — the same as the course editor's o
 | `COURSE_COPILOT_BUILD_CONCURRENCY` | 4 | |
 | `OPENAI_IMAGE_MODEL` / `CHARACTER_IMAGE_DEFAULT_PROVIDER` + `LEARN_MEDIA_PUBLIC_S3_BUCKET` | — | Images are skipped with a reason without them |
 
-Limits (sections 8, items 40, new cases 2, images 12, languages per roleplay 4, two
+Limits (sections 20, items 100, items per section 30, new cases 2, images 12, languages per roleplay 4, two
 active CREATE sessions per user) are in `constants/course-copilot.constants.ts` and enforced in code. New roleplays
 have no limit of their own; the item limits and the session budget bound them.
 
