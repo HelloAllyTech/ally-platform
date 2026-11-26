@@ -96,6 +96,7 @@ def test_deploy_units_share_one_lock_and_never_use_actions() -> None:
         "bug-hunter-poll.timer",
         "bug-hunter-worker.service",
         "provision.sh",
+        "update.sh",
         "README.md",
     }
     for name in ("bug-hunter-daily.service", "bug-hunter-poll.service"):
@@ -106,6 +107,12 @@ def test_deploy_units_share_one_lock_and_never_use_actions() -> None:
     assert "03:30:00 Asia/Kolkata" in units["bug-hunter-daily.timer"]
     systemd = "".join(v for k, v in units.items() if k.startswith("bug-hunter-"))
     assert "--live" not in systemd  # dry run until the rollout
+    # the daily job pulls master first; the worker restarts itself on new code
+    assert "ExecStartPre=+/opt/ally-platform/bug-hunter/deploy/update.sh" in (
+        units["bug-hunter-daily.service"]
+    )
+    assert "Restart=always" in units["bug-hunter-worker.service"]
+    assert "checkout --quiet --detach" in units["update.sh"]
 
 
 def test_report_details_come_from_the_run(config, tmp_path) -> None:

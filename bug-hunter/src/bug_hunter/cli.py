@@ -1449,8 +1449,7 @@ def daily_sources(
         return HttpGitHubReader(token)
 
     def ci():
-        found, cursors = ci_failures.collect(github(), state, sig.apps)
-        return found, cursors, []
+        return ci_failures.collect(github(), state, sig.apps)
 
     def iss():
         return issues.collect(github(), state, sig.apps, sig.org, sig.issue_label)
@@ -1703,10 +1702,36 @@ def worker_cmd(
             )
             return
         typer.echo(f"worker started (checks every {interval:.0f}s; Ctrl-C stops it)")
+        started_at = _checkout_head()
         try:
-            work_loop(one, interval_s=interval, log=typer.echo)
+            work_loop(
+                one,
+                interval_s=interval,
+                log=typer.echo,
+                code_changed=lambda: _checkout_head() not in (None, started_at),
+            )
         except KeyboardInterrupt:
             typer.echo("worker stopped")
+
+
+def _checkout_head() -> str | None:
+    """The commit the bug hunter's checkout is on (None outside a git checkout)."""
+    import subprocess
+
+    from bug_hunter.config import PACKAGE_ROOT
+
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(PACKAGE_ROOT), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    return out.stdout.strip() or None
 
 
 def _open_pr_action(config):

@@ -320,3 +320,24 @@ def test_a_ux_signal_bug_runs_in_issue_mode() -> None:
     b.reported_by = "monitoring"
     c = b.candidate()
     assert (c.source, c.reported_by, c.app) == ("issue", "monitoring", "ally-be")
+
+
+def test_work_loop_stops_between_bugs_when_the_code_changed() -> None:
+    from bug_hunter.queue.worker import WorkResult
+
+    calls, logs = [], []
+    changed = iter([False, False, True])
+
+    def once():
+        calls.append(1)
+        return WorkResult("ran", 1, "done", cost_usd=0.5)
+
+    work_loop(
+        once,
+        max_iterations=10,
+        sleep=lambda s: None,
+        log=logs.append,
+        code_changed=lambda: next(changed),
+    )
+    assert len(calls) == 2  # never interrupted a run; stopped before the third
+    assert logs[-1] == "new code in the checkout: stopping to restart on it"

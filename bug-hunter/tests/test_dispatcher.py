@@ -107,6 +107,19 @@ def test_run_cap_spend_cap_seen_keys_and_rollout(config) -> None:
     assert plan.runs_before == 1
 
 
+def test_sources_take_turns_so_one_noisy_source_cannot_take_every_slot() -> None:
+    from bug_hunter.signals.dispatcher import interleave
+
+    picked = interleave(
+        [cand("ci_failure", f"c{i}") for i in range(5)]
+        + [cand("commit_sweep", "s1"), cand("error_log", "l1")]
+        + [cand("error_log", "l2", severity="high")]
+    )
+    # priority order within each turn, severity order within a source
+    assert [c.key for c in picked][:3] == ["c0", "l2", "s1"]
+    assert [c.key for c in picked][3:] == ["c1", "l1", "c2", "c3", "c4"]
+
+
 def test_paused_runs_nothing(config) -> None:
     plan = run_daily(
         config,
