@@ -660,6 +660,26 @@ _NO_CODES = (
     "competency's name or by the behaviour itself."
 )
 
+#: ally-be's total-length check (`DEBRIEF_MAX_WORDS`, `SHORT_DEBRIEF_MAX_WORDS` in
+#: debrief-cards.util.ts): words before "Practise this next". The check is only
+#: advisory there, and 24 of 68 live debriefs between 11-17 and 11-26 broke it
+#: because nothing told the Writer the total, only each card's own limit.
+DEBRIEF_MAX_WORDS = 220
+SHORT_DEBRIEF_MAX_WORDS = 120
+
+
+def _length_line(short: bool) -> str:
+    """Code-owned: the total the cards must stay within, whatever the prompt says."""
+    limit = SHORT_DEBRIEF_MAX_WORDS if short else DEBRIEF_MAX_WORDS
+    return (
+        f"LENGTH: the opening, the important moment, what_worked and "
+        f"work_on_this together are at most {limit} words (practise_next, the "
+        "reflective question and the progress note are not counted). Each "
+        "card's own limit still applies. Add up the words before you answer; "
+        "when over, write fewer cards or shorter ones."
+    )
+
+
 #: At most this many "Try the following:" items (ally-be TRY_NEXT_MAX).
 TRY_NEXT_MAX = 3
 
@@ -1144,6 +1164,7 @@ async def write(
         "learner finds the moment."
     )
     checked.append(_NO_CODES)
+    checked.append(_length_line(short))
     practice_lines, course = _practice_instruction(practice_options)
     checked += practice_lines
     if assessment:

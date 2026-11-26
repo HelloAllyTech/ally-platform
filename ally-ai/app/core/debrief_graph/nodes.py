@@ -22,7 +22,12 @@ from app.core.debrief.cue_strength import (
 )
 from app.core.debrief_graph import inputs as body
 from app.core.debrief_graph.agent_logs import code_log, origin_of
+from app.core.debrief_graph.anchor_repair import describe as describe_anchor_repair
+from app.core.debrief_graph.anchor_repair import reanchor_quotes
 from app.core.debrief_graph.budget import budget_left, estimate_step_cost_usd
+from app.core.debrief_graph.claim_repair import UNSUPPORTED_PROGRESS_CLAIM
+from app.core.debrief_graph.claim_repair import describe as describe_claim_repair
+from app.core.debrief_graph.claim_repair import strip_unsupported_progress_claims
 from app.core.debrief_graph.constants import (
     DEFAULT_ADVISORY_CHECKS,
     DEFAULT_DEADLINE_MS,
@@ -310,9 +315,7 @@ def floor_data_agent(state: State, ctx: Ctx, agent: str) -> Dict[str, Any]:
     return {**applied, "agent_ok": {agent: True}, "steps": [record], "logs": [log]}
 
 
-async def after_reading(
-    state: State, runtime: Runtime[Ctx]
-) -> Command[
+async def after_reading(state: State, runtime: Runtime[Ctx]) -> Command[
     Literal[
         "progress_reader",
         "guidance_lookup",
@@ -664,6 +667,11 @@ async def checks(
     recipe = body.recipe(state, ctx)
     estimated = state.get("estimated", 0.0)
     t0 = ctx.clock()
+    # A quote the Writer anchored to the wrong turn number is pointed at the turn
+    # it is really in, before the checks read it (only when its words are there).
+    anchored_cards, anchors_fixed = reanchor_quotes(cur["cards"], ctx.transcript)
+    if anchors_fixed:
+        cur = {**cur, "cards": anchored_cards}
     check_input = {
         "cards": cur["cards"],
         "safety": state["safety"],
@@ -726,6 +734,11 @@ async def checks(
                     "failures": fails,
                     "advisory": sorted(advisory),
                     "weight": weight,
+                    **(
+                        {"anchorRepair": describe_anchor_repair(anchors_fixed)}
+                        if anchors_fixed
+                        else {}
+                    ),
                 },
                 round_=rnd,
                 attention=bool(blocking),
@@ -784,6 +797,7 @@ async def score_draft(
     advisory = set(state.get("advisory") or [])
     res = (state.get("results") or {}).get(f"evaluator#{rnd}")
     evaluation = None
+    repair_note = None
     if res:
         ev = res["evaluation"]
         # A missed cue holds the debrief only when it is clear; one that every
@@ -795,6 +809,17 @@ async def score_draft(
             (state.get("safety") or {}).get("risk_cues") or [],
             ctx.risk_cue["word_list_raises"],
         )
+        # An unsupported progress claim is cut out in code: the deadline often
+        # leaves no time for the Reviser, and removing a sentence adds no claim.
+        before_claims = sum(
+            1 for h in hard_fails if h.get("code") == UNSUPPORTED_PROGRESS_CLAIM
+        )
+        repaired_cards, hard_fails, claims_removed = strip_unsupported_progress_claims(
+            cur["cards"], hard_fails
+        )
+        if claims_removed:
+            cur = {**cur, "cards": repaired_cards}
+            repair_note = describe_claim_repair(claims_removed, before_claims)
         evaluation = {
             "overall": compute_overall(
                 {d["dimension"]: d["score"] for d in ev["dimensions"]},
@@ -857,6 +882,7 @@ async def score_draft(
             "draftMeetsBar": meets_bar(draft, advisory, pass_score),
             "bestRound": best["round"],
             "next": goto,
+            **({"claimRepair": repair_note} if repair_note else {}),
         },
         round_=rnd,
         attention=not meets_bar(draft, advisory, pass_score),
