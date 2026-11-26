@@ -1,12 +1,12 @@
 import type { ReplyLanguage } from '../chatbot/engine/reply-language';
 
 /**
- * Every new fixed text from chunk WA-A, in one place (listed for approval in
- * `docs/agents-v2/TEXTS-WA-A.md`). The person-facing lines exist in English, Hindi and Hinglish,
+ * Every new fixed text from chunk WA-A, in one place (approved 26 Nov in
+ * `docs/agents-v2/TEXTS-WA-A.md`; Hindi and Hinglish await a native speaker's review). The person-facing lines exist in English, Hindi and Hinglish,
  * like every other fixed reply (`reply-language.ts`); other languages fall back to English.
  */
 
-// COPY: needs approval
+// COPY: approved 26 Nov (TEXTS-WA-A.md)
 /** A voice note that couldn't be transcribed, or is over 2 minutes. */
 export const VOICE_NOTE_FAILED: Record<ReplyLanguage, string> = {
   en: "Sorry, I couldn't understand that voice note. Could you type your message instead?",
@@ -15,7 +15,7 @@ export const VOICE_NOTE_FAILED: Record<ReplyLanguage, string> = {
     'Maaf kijiye, main yeh voice note samajh nahi paaya. Kya aap apna message type karke bhej sakte hain?',
 };
 
-// COPY: needs approval
+// COPY: approved 26 Nov (TEXTS-WA-A.md)
 /** An image or document: kept for the team, not read by the assistant (yet). */
 export const FILE_NOT_READ: Record<ReplyLanguage, string> = {
   en: "Thanks, I've received your file, but I can't read files yet. Could you tell me in a message what you need?",
@@ -24,7 +24,7 @@ export const FILE_NOT_READ: Record<ReplyLanguage, string> = {
     'Dhanyavaad, aapki file mil gayi hai, lekin main abhi files nahi padh sakta. Kya aap message mein bata sakte hain ki aapko kya chahiye?',
 };
 
-// COPY: needs approval
+// COPY: approved 26 Nov (TEXTS-WA-A.md)
 /** The invite-only refusal on a customer assistant, after the crisis check. */
 export const INVITE_ONLY: Record<
   ReplyLanguage,
@@ -38,19 +38,19 @@ export const INVITE_ONLY: Record<
   },
   hi: {
     withContact:
-      'यह सहायक केवल आमंत्रण पर है। कृपया {organisation} से {contact} पर संपर्क करें।',
+      'यह सहायक केवल आमंत्रित लोगों के लिए है। कृपया {organisation} से {contact} पर संपर्क करें।',
     withoutContact:
-      'यह सहायक केवल आमंत्रण पर है। कृपया {organisation} से संपर्क करें।',
+      'यह सहायक केवल आमंत्रित लोगों के लिए है। कृपया {organisation} से संपर्क करें।',
   },
   'hi-latn': {
     withContact:
-      'Yeh assistant sirf invitation par hai. Kripya {organisation} se {contact} par sampark karein.',
+      'Yeh assistant sirf invite kiye gaye logon ke liye hai. Kripya {organisation} se {contact} par sampark karein.',
     withoutContact:
-      'Yeh assistant sirf invitation par hai. Kripya {organisation} se sampark karein.',
+      'Yeh assistant sirf invite kiye gaye logon ke liye hai. Kripya {organisation} se sampark karein.',
   },
 };
 
-// COPY: needs approval
+// COPY: approved 26 Nov (TEXTS-WA-A.md)
 /**
  * Why a WhatsApp send failed, in plain words for the team in the Inbox, by Meta's error code
  * (https://developers.facebook.com/docs/whatsapp/cloud-api/support/error-codes). English only:
@@ -82,7 +82,7 @@ export const FAILED_SEND_REASONS: Record<number, string> = {
   100: 'WhatsApp rejected the format of this message.',
 };
 
-// COPY: needs approval
+// COPY: approved 26 Nov (TEXTS-WA-A.md)
 export const FAILED_SEND_FALLBACK =
   "WhatsApp couldn't send it. Try again, and contact Ally if it keeps failing.";
 

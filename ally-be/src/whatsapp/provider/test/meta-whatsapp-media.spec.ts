@@ -180,7 +180,12 @@ describe('MetaWhatsAppProvider media (WA-A)', () => {
       ],
       ['a GIF image', { kind: 'image', mimeType: 'image/gif' }, /type/],
       ['a zip document', { mimeType: 'application/zip' }, /type/],
-      ['a document over 100 MB', { sizeBytes: 101 * 1024 * 1024 }, /size/],
+      // Ally's cap, one constant (Meta allows 100 MB; files are held in memory).
+      [
+        'a document over 25 MB',
+        { sizeBytes: WHATSAPP_MEDIA_LIMITS.document.maxBytes + 1 },
+        /size/,
+      ],
       [
         'a caption over 1024 characters',
         { caption: 'x'.repeat(1025) },

@@ -152,6 +152,30 @@ describe('WhatsAppInboundService: voice notes, images and documents (WA-A)', () 
     },
   );
 
+  it('in a Hinglish chat, a failed voice note gets the Hinglish line (earlier turns first)', async () => {
+    const h = await build({ status: 'failed', transcript: '' });
+    h.messageFind.mockResolvedValue([
+      {
+        direction: 'outbound',
+        body: 'Namaste! Kaise madad karun?',
+        createdAt: new Date(2),
+      },
+      {
+        direction: 'inbound',
+        body: 'mujhe kal ka appointment chahiye',
+        createdAt: new Date(1),
+      },
+    ]);
+    await h.service.handle(recorded('voice-note-en'));
+    expect(sent(h)).toEqual([VOICE_NOTE_FAILED['hi-latn']]);
+  });
+
+  it('with no earlier turns, the WhatsApp locale decides; else English', async () => {
+    const h = await build({ status: 'failed', transcript: '' });
+    await h.service.handle(recorded('voice-note-en'));
+    expect(sent(h)).toEqual([VOICE_NOTE_FAILED.en]);
+  });
+
   it('a PDF with no words: kept for the team, and "can\'t read files yet"', async () => {
     const h = await build(null);
     h.meta.downloadMedia.mockResolvedValue({

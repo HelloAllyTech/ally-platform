@@ -101,6 +101,8 @@ export interface InboundHarness {
   /** Every message row saved, inbound and outbound. */
   savedMessages: Record<string, unknown>[];
   messageUpdates: jest.Mock;
+  /** WA-A: the wa_messages repository's `find` (history), to give a test earlier turns. */
+  messageFind: jest.Mock;
   /** The inbox's after-decision hook (chunk 11a); a pass-through. */
   handover: { afterDecision: jest.Mock };
 }
@@ -317,6 +319,7 @@ export async function buildInboundHarness({
     aiService,
     savedMessages,
     messageUpdates,
+    messageFind: messageRepository.find,
     handover,
   };
 }

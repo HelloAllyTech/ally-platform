@@ -64,14 +64,22 @@ export interface WhatsAppMedia {
   filename?: string;
 }
 
-/** Meta's limits for media sends (Cloud API "supported media types"). */
+/**
+ * The largest document Ally sends or receives on WhatsApp: 25 MB. Meta allows 100 MB, but the
+ * Inbox's upload (multer, in memory) and Meta's download (`downloadMedia`) both hold the whole
+ * file in memory, so one limit, used by the send check, the Inbox upload, the download cap and
+ * the Inbox's hint, keeps a large file from filling the process. Raise it only with streaming.
+ */
+export const WHATSAPP_DOCUMENT_MAX_BYTES = 25 * 1024 * 1024;
+
+/** Meta's limits for media sends (Cloud API "supported media types"), with Ally's document cap. */
 export const WHATSAPP_MEDIA_LIMITS = {
   image: {
     maxBytes: 5 * 1024 * 1024,
     mimeTypes: ['image/jpeg', 'image/png'],
   },
   document: {
-    maxBytes: 100 * 1024 * 1024,
+    maxBytes: WHATSAPP_DOCUMENT_MAX_BYTES,
     mimeTypes: [
       'application/pdf',
       'text/plain',

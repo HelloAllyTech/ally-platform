@@ -177,7 +177,7 @@ describe('ChatbotEngineService: credits and blocked states (stage 6)', () => {
       h.turn('मुझे अपॉइंटमेंट चाहिए', 'hi'),
     );
     expect(decision.body).toMatch(
-      /^यह सहायक केवल आमंत्रण पर है। कृपया Sunrise Clinic से .*98765.* पर संपर्क करें।/,
+      /^यह सहायक केवल आमंत्रित लोगों के लिए है। कृपया Sunrise Clinic से .*98765.* पर संपर्क करें।/,
     );
     expect(decision.body).toContain('14416');
   });

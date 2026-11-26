@@ -1,6 +1,6 @@
 # WA-A: new fixed texts, for approval
 
-Every fixed text chunk WA-A adds, in one place. Nothing here has been approved yet. The code holds them in:
+Every fixed text chunk WA-A adds, in one place. **Approved by Shehbaz on 26 Nov 2026**, with the changes noted below (now in the code). The code holds them in:
 
 - `ally-be/src/whatsapp/wa-a-copy.ts`: the texts people see, and the failed-send reasons
 - `ally-web/apps/ally-admin-dashboard/src/pages/Inbox/copy.ts`: `INBOX_WA`, the Inbox labels
@@ -10,7 +10,7 @@ Each is marked `COPY: needs approval`.
 
 Hindi and Hinglish are drafts for the internal launch, like BT1's. A native speaker should check them, and also the masculine forms (पाया, सकता), which TF1 and BT1 used too.
 
-Mark each row **OK**, or write the change in the last column.
+The rows below are the approved texts.
 
 ## 1. What people see on WhatsApp
 
@@ -18,9 +18,9 @@ Mark each row **OK**, or write the change in the last column.
 
 This one line covers a failed transcription, an empty one, a note over 2 minutes, and audio that couldn't be downloaded from Meta. The note is always kept, and the team can play it in the Inbox.
 
-The language comes from the person's WhatsApp locale (Hindi if it starts with `hi`). Otherwise the line is in English, because there is no text yet to tell their language from.
+The language comes from the person's earlier turns in this conversation (`replyLanguageOf`: Devanagari is Hindi; two or more Hinglish words are Hinglish). Only when there are none, from their WhatsApp locale (Hindi if it starts with `hi`); otherwise English. *(Changed at approval.)*
 
-| Lang | Text | OK / change |
+| Lang | Text | Status |
 |---|---|---|
 | en | Sorry, I couldn't understand that voice note. Could you type your message instead? | |
 | hi | माफ़ कीजिए, मैं यह वॉइस नोट समझ नहीं पाया। क्या आप अपना संदेश लिखकर भेज सकते हैं? | |
@@ -28,9 +28,9 @@ The language comes from the person's WhatsApp locale (Hindi if it starts with `h
 
 ### 1b. A photo or document with no words (`FILE_NOT_READ`)
 
-The file is kept for the team. If the person adds a caption, the caption is answered like a typed message instead, with the crisis check first.
+The file is kept for the team. If the person adds a caption, the caption is answered like a typed message instead, with the crisis check first. The language follows the same rule as 1a.
 
-| Lang | Text | OK / change |
+| Lang | Text | Status |
 |---|---|---|
 | en | Thanks, I've received your file, but I can't read files yet. Could you tell me in a message what you need? | |
 | hi | धन्यवाद, आपकी फ़ाइल मिल गई है, लेकिन मैं अभी फ़ाइलें नहीं पढ़ सकता। क्या आप संदेश में बता सकते हैं कि आपको क्या चाहिए? | |
@@ -44,11 +44,11 @@ This goes on every channel, after the keyword crisis check, and is followed by t
 
 `{contact}` is the first phone number or email in the organisation's own sources. It is never a helpline. With no contact, the line without one is used.
 
-| Lang | With a contact | Without | OK / change |
+| Lang | With a contact | Without | Status |
 |---|---|---|---|
 | en | This assistant is by invitation. Please contact {organisation} at {contact}. | This assistant is by invitation. Please contact {organisation}. | |
-| hi | यह सहायक केवल आमंत्रण पर है। कृपया {organisation} से {contact} पर संपर्क करें। | यह सहायक केवल आमंत्रण पर है। कृपया {organisation} से संपर्क करें। | |
-| hi-latn | Yeh assistant sirf invitation par hai. Kripya {organisation} se {contact} par sampark karein. | Yeh assistant sirf invitation par hai. Kripya {organisation} se sampark karein. | |
+| hi | यह सहायक केवल आमंत्रित लोगों के लिए है। कृपया {organisation} से {contact} पर संपर्क करें। | यह सहायक केवल आमंत्रित लोगों के लिए है। कृपया {organisation} से संपर्क करें। | changed at approval |
+| hi-latn | Yeh assistant sirf invite kiye gaye logon ke liye hai. Kripya {organisation} se {contact} par sampark karein. | Yeh assistant sirf invite kiye gaye logon ke liye hai. Kripya {organisation} se sampark karein. | changed at approval |
 
 Example (en, India): "This assistant is by invitation. Please contact Sunrise Clinic at +91 98765 43210. If you're in danger, call 112 now. If you're thinking of harming yourself, call Tele-MANAS on 14416 (free, 24×7). Or find a helpline near you at https://findahelpline.com"
 
@@ -56,7 +56,7 @@ Example (en, India): "This assistant is by invitation. Please contact Sunrise Cl
 
 Each reason appears after "Not delivered:". The keys are Meta's error codes.
 
-| Meta code | Text | OK / change |
+| Meta code | Text | Status |
 |---|---|---|
 | 131047 | More than 24 hours have passed since they last wrote, so WhatsApp only allows an approved template now. | |
 | 131026 | WhatsApp couldn't deliver it. The number may not be on WhatsApp, or their app may need updating. | |
@@ -78,7 +78,7 @@ Each reason appears after "Not delivered:". The keys are Meta's error codes.
 
 ## 3. Inbox labels (`INBOX_WA`)
 
-| Key | Text | OK / change |
+| Key | Text | Status |
 |---|---|---|
 | delivery.sent | Sent | |
 | delivery.delivered | Delivered | |
@@ -92,7 +92,7 @@ Each reason appears after "Not delivered:". The keys are Meta's error codes.
 | openFile | Open {name} | |
 | photo | Photo (the image's alt text when it has no caption) | |
 | attach | Attach a file | |
-| attachHint | JPEG or PNG up to 5 MB, PDF or Office document up to 25 MB. Your text goes with it. | |
+| attachHint | JPEG or PNG up to {imageMb} MB, PDF or Office document up to {documentMb} MB. Your text goes with it. (5 and 25: one limit, `WHATSAPP_DOCUMENT_MAX_BYTES`, see the notes) | |
 | removeFile | Remove | |
 | addButtons | Add reply buttons | |
 | buttonsHint | Up to 3 buttons, 20 characters each. A tap comes back as its words. | |
@@ -100,7 +100,7 @@ Each reason appears after "Not delivered:". The keys are Meta's error codes.
 
 ## 4. Errors the team can see when sending a file (ally-be)
 
-| Where | Text | OK / change |
+| Where | Text | Status |
 |---|---|---|
 | Wrong type (`file_type`) | WhatsApp takes JPEG or PNG images, PDFs and Office documents. | |
 | Too large (`file_size`) | That file is too large for WhatsApp (up to {n} MB). | |
@@ -111,7 +111,7 @@ Each reason appears after "Not delivered:". The keys are Meta's error codes.
 
 These go into the agent's prompt as the tool's description. They follow the convention used for `hand_over`.
 
-| Part | Text | OK / change |
+| Part | Text | Status |
 |---|---|---|
 | Description | Send the person one of the organisation's own documents from your sources, as a file, when they ask for it (a form, a brochure, a price list). Only a document in your sources, never anything else. In your reply, say in one short line that the file is on its way; it is sent just after your reply. If it says there is no such file, tell them which documents you can send. | |
 | `title` | The title of the document to send, exactly as it appears in your sources. | |

@@ -14,6 +14,7 @@ import {
   WhatsAppProvider,
   whatsappInteractiveFits,
   whatsappMediaProblem,
+  WHATSAPP_DOCUMENT_MAX_BYTES,
 } from '../type/whatsapp-provider.interface';
 
 /** A file on an incoming message, as Meta sends it. */
@@ -34,7 +35,7 @@ const MEDIA_TYPES = new Set(['audio', 'image', 'document'] as const);
 type MediaType = 'audio' | 'image' | 'document';
 
 /** Files larger than this are not downloaded (the message is still kept and answered). */
-export const MAX_MEDIA_DOWNLOAD_BYTES = 25 * 1024 * 1024;
+export const MAX_MEDIA_DOWNLOAD_BYTES = WHATSAPP_DOCUMENT_MAX_BYTES;
 
 /**
  * What to do about the Meta error codes a go-live actually hits.

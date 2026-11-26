@@ -73,6 +73,11 @@ export class WaMediaService {
     conversationId: string;
     creds: WaNumberCredentials | null;
     locale?: string | null;
+    /**
+     * What the person said earlier in this conversation: the fixed lines follow its language
+     * (`replyLanguageOf`), and the WhatsApp locale only when there is none.
+     */
+    earlier?: string;
     /** The shared store's copy of the message; the attachment is written once it lands. */
     copied?: Promise<boolean>;
   }): Promise<MediaOutcome | null> {
@@ -115,7 +120,7 @@ export class WaMediaService {
     } else {
       outcome = {
         kind: 'reply',
-        body: FILE_NOT_READ[replyLanguageOf('', input.locale)],
+        body: FILE_NOT_READ[replyLanguageOf(input.earlier ?? '', input.locale)],
         handledBy: WaHandledBy.FILE_NOT_READ,
       };
     }
@@ -233,7 +238,7 @@ export class WaMediaService {
   }
 
   private async transcribe(
-    input: { inboundId: string; locale?: string | null },
+    input: { inboundId: string; locale?: string | null; earlier?: string },
     attachment: WaAttachment,
     file: Buffer | null,
   ): Promise<MediaOutcome> {
@@ -241,7 +246,9 @@ export class WaMediaService {
       attachment.transcriptError = reason;
       return {
         kind: 'reply',
-        body: VOICE_NOTE_FAILED[replyLanguageOf('', input.locale)],
+        body: VOICE_NOTE_FAILED[
+          replyLanguageOf(input.earlier ?? '', input.locale)
+        ],
         handledBy: WaHandledBy.VOICE_FAILED,
       };
     };

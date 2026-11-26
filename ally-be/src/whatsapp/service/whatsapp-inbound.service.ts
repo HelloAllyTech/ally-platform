@@ -298,6 +298,11 @@ export class WhatsAppInboundService {
           conversationId: conversation.id,
           creds: number.creds ?? null,
           locale: contact.locale,
+          // Their earlier words in this chat set the language of a fixed line (TEXTS-WA-A 1a/1b).
+          earlier: (await this.recentHistory(conversation.id).catch(() => []))
+            .filter((turn) => turn.role === 'user')
+            .map((turn) => turn.content)
+            .join(' '),
           copied: sharedCopy,
         });
         if (outcome?.kind === 'reply') {

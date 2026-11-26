@@ -5,7 +5,7 @@ import { Button } from "@components/button";
 import { Input } from "@components/input";
 import { ButtonVariant } from "@components/types";
 
-import { fill, INBOX_WA } from "./copy";
+import { fill, INBOX_WA, TEAM_FILE_LIMITS_MB } from "./copy";
 
 /**
  * WA-A §3: WhatsApp's ticks on a message sent to the person: one for sent, two for delivered, two
@@ -129,7 +129,13 @@ export const ReplyExtras: React.FC<{
         </Button>
       </p>
     ) : (
-      <label className="ally-link ally-small ally-inbox__attach" title={INBOX_WA.attachHint}>
+      <label
+        className="ally-link ally-small ally-inbox__attach"
+        title={fill(INBOX_WA.attachHint, {
+          imageMb: String(TEAM_FILE_LIMITS_MB.image),
+          documentMb: String(TEAM_FILE_LIMITS_MB.document),
+        })}
+      >
         {INBOX_WA.attach}
         <Input
           type="file"

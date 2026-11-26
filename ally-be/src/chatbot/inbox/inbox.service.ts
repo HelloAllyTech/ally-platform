@@ -15,11 +15,14 @@ import {
   WA_MEDIA_SIGNED_SECONDS,
   waAttachmentsOf,
 } from '../../whatsapp/media/wa-attachment';
-import { WHATSAPP_MEDIA_LIMITS } from '../../whatsapp/type/whatsapp-provider.interface';
+import {
+  WHATSAPP_DOCUMENT_MAX_BYTES,
+  WHATSAPP_MEDIA_LIMITS,
+} from '../../whatsapp/type/whatsapp-provider.interface';
 import type { TeamMedia } from '../handover/handover.service';
 
-/** WA-A: the largest file the team can send from the Inbox (Meta allows documents to 100 MB). */
-export const TEAM_FILE_MAX_BYTES = 25 * 1024 * 1024;
+/** WA-A: the largest file the team can send from the Inbox: WhatsApp's document cap (25 MB). */
+export const TEAM_FILE_MAX_BYTES = WHATSAPP_DOCUMENT_MAX_BYTES;
 import { failedSendReason } from '../../whatsapp/wa-a-copy';
 
 /** "Live now": a message in the last this many minutes. */
@@ -338,10 +341,7 @@ export class InboxService {
           'WhatsApp takes JPEG or PNG images, PDFs and Office documents.',
       });
     }
-    const max = Math.min(
-      WHATSAPP_MEDIA_LIMITS[kind].maxBytes,
-      TEAM_FILE_MAX_BYTES,
-    );
+    const max = WHATSAPP_MEDIA_LIMITS[kind].maxBytes;
     if (!(file.size > 0) || file.size > max) {
       throw new BadRequestException({
         errorCode: 'file_size',
