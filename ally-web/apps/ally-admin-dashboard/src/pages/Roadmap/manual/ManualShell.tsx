@@ -29,7 +29,12 @@ import { ManualHome } from "./components/ManualHome";
 import { MapPanel } from "./components/MapPanel";
 import { PageSkeleton, PageView } from "./components/PageView";
 import { SearchPalette } from "./components/SearchPalette";
-import { MANUAL_STATE_POLL_MS, StateBanner, StateFooter } from "./components/StateBanner";
+import {
+  MANUAL_RUN_POLL_MS,
+  MANUAL_STATE_POLL_MS,
+  StateBanner,
+  StateFooter,
+} from "./components/StateBanner";
 import { ManualMessage } from "./components/StateViews";
 import { TreeRail } from "./components/TreeRail";
 import { useManualChatStream } from "./hooks/useManualChatStream";
@@ -82,10 +87,17 @@ export const ManualShell: React.FC<{ slug: string | null }> = ({ slug }) => {
     [pages],
   );
   const visible = usePageVisible();
+  // Slow while idle; every few seconds while the weekly agent is running, so the settings drawer
+  // (spend, "held for a run in progress") follows the run instead of showing it as stuck.
+  const [statePollMs, setStatePollMs] = useState(MANUAL_STATE_POLL_MS);
   const { data: manualState } = useGetManualStateQuery(undefined, {
-    pollingInterval: visible ? MANUAL_STATE_POLL_MS : 0,
+    pollingInterval: visible ? statePollMs : 0,
     skipPollingIfUnfocused: true,
   });
+  const agentRunning = manualState?.agentState === "running";
+  useEffect(() => {
+    setStatePollMs(agentRunning ? MANUAL_RUN_POLL_MS : MANUAL_STATE_POLL_MS);
+  }, [agentRunning]);
   // The page title for the change-log heading, from the cache the reader already filled.
   const { data: pageDetail } = useGetManualPageQuery(slug ?? "", { skip: !slug });
 
