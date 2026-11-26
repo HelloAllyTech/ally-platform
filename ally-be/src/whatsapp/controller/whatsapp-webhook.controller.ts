@@ -1,3 +1,4 @@
+import { WaStatusService } from '../service/wa-status.service';
 import { WhatsAppPricingService } from 'src/billing/service/whatsapp-pricing.service';
 import {
   Controller,
@@ -54,6 +55,8 @@ export class WhatsAppWebhookController {
     private readonly inboundProducer: WhatsAppInboundProducer,
     private readonly numberService: WhatsAppBusinessNumberService,
     @Optional() private readonly pricing?: WhatsAppPricingService,
+    // WA-A §3: sent, delivered, read and failed, stored per outgoing message.
+    @Optional() private readonly statuses?: WaStatusService,
   ) {}
 
   /**
@@ -104,6 +107,7 @@ export class WhatsAppWebhookController {
     res.status(HttpStatus.OK).send();
     // CR1: Meta's fee for each billable message an assistant sent. After the response, never awaited.
     void this.pricing?.recordStatuses(req.body);
+    void this.statuses?.record(req.body);
 
     try {
       const messages = this.provider.parseInbound(req.body);
@@ -179,6 +183,7 @@ export class WhatsAppWebhookController {
     res.status(HttpStatus.OK).send();
     // CR1: Meta's fee for each billable message an assistant sent. After the response, never awaited.
     void this.pricing?.recordStatuses(req.body);
+    void this.statuses?.record(req.body);
 
     try {
       const messages: InboundWhatsAppMessage[] = this.provider

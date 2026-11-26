@@ -76,6 +76,10 @@ export enum WaMessageStatus {
   QUEUED = 'queued',
   PROCESSING = 'processing',
   SENT = 'sent',
+  /** WA-A §3: Meta reported it delivered to the person's phone. */
+  DELIVERED = 'delivered',
+  /** WA-A §3: Meta reported the person read it. */
+  READ = 'read',
   FAILED = 'failed',
   /** Deliberately not replied to — opted out, blocked, or the bot is off. */
   DISCARDED = 'discarded',

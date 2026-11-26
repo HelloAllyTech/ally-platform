@@ -1,7 +1,12 @@
 import { LateCrisisService } from '../late-crisis.service';
 
 describe('LateCrisisService (WA-A §0a)', () => {
-  const AT_RISK = { is_crisis: true, confidence: 0.9, signal: 'end it' };
+  const AT_RISK = {
+    is_crisis: true,
+    confidence: 0.9,
+    signal: 'end it',
+    failed: false,
+  };
   const turn = (over: Record<string, unknown> = {}) => ({
     chatbot: { id: 'bot-1', name: 'Sukoon' },
     conversationId: 'conv-1',

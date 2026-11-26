@@ -43,6 +43,7 @@ import { WHATSAPP_PROVIDER } from './type/whatsapp-provider.interface';
 import { WhatsAppConnectorType } from './service/whatsapp-connector-type.service';
 import { WaSharedStoreWriter } from './shared-store/wa-shared-store.writer';
 import { ChatbotModule } from '../chatbot/chatbot.module';
+import { WaStatusService } from './service/wa-status.service';
 import { Chatbot } from '../chatbot/entity/chatbot.entity';
 import { Connector } from '../chatbot/entity/connector.entity';
 
@@ -94,6 +95,8 @@ import { Connector } from '../chatbot/entity/connector.entity';
     WhatsAppBusinessNumberController,
   ],
   providers: [
+    // WA-A §3: delivery status per outgoing message.
+    WaStatusService,
     WhatsAppRateLimitService,
     WhatsAppIdentityService,
     WhatsAppPhoneMappingService,

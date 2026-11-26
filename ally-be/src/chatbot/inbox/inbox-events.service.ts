@@ -11,7 +11,7 @@ import { RedisService } from '../../redis/service/redis.service';
  */
 export interface InboxEvent {
   /** `members`: the team changed; `removedUserIds` re-read their bots at once (Stage 1b). */
-  type: 'message' | 'state' | 'safety' | 'read' | 'members';
+  type: 'message' | 'state' | 'safety' | 'read' | 'members' | 'status';
   chatbotId: string;
   conversationId: string;
   [key: string]: unknown;

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
@@ -7,6 +7,13 @@ import { ConversationChannel } from '../enum/conversation.enum';
 import { WHATSAPP_WINDOW_MS } from '../handover/handover';
 import { ChatbotAccessService } from '../service/chatbot-access.service';
 import { ERASED_TEXT } from '../privacy/erased';
+import { S3Service } from '../../aws/service/s3.service';
+import { AppConfigService } from '../../config/config.service';
+import {
+  WA_MEDIA_SIGNED_SECONDS,
+  waAttachmentsOf,
+} from '../../whatsapp/media/wa-attachment';
+import { failedSendReason } from '../../whatsapp/wa-a-copy';
 
 /** "Live now": a message in the last this many minutes. */
 const LIVE_MINUTES = 15;
@@ -63,6 +70,9 @@ export class InboxService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly access: ChatbotAccessService,
+    // WA-A: signed links to voice notes, images and documents. Optional for the specs.
+    @Optional() private readonly s3?: S3Service,
+    @Optional() private readonly appConfig?: AppConfigService,
   ) {}
 
   /** The assistants whose chats the caller can see: the ones they are a member of. */
@@ -205,10 +215,13 @@ export class InboxService {
     if (!conversation) return null;
     const messages = (await this.dataSource.query(
       `SELECT m.id, m.role, m.text, m.citations, m.handled_by, m."createdAt" AS at,
-              m.sent_by_user_id, su.name AS sent_by_name, f.rating, f.reason
+              m.sent_by_user_id, su.name AS sent_by_name, f.rating, f.reason,
+              m.attachments, m.status, ds.status AS delivery, ds.error_code
          FROM chatbot_messages m
          LEFT JOIN users su ON su.id = m.sent_by_user_id
          LEFT JOIN chatbot_message_feedback f ON f.message_id = m.id
+         LEFT JOIN wa_message_statuses ds ON ds.provider_message_id = m.provider_message_id
+                                          AND m.channel = 'whatsapp'
         WHERE m.conversation_id = $1
         ORDER BY m."createdAt" ASC
         LIMIT 500`,
@@ -262,21 +275,57 @@ export class InboxService {
               new Date(lastInbound).getTime() + WHATSAPP_WINDOW_MS,
             ).toISOString()
           : null,
-      messages: messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        text: m.text,
-        citations: m.citations ?? [],
-        handledBy: m.handled_by,
-        at: m.at,
-        sentBy:
-          m.sent_by_user_id === null
-            ? null
-            : { id: m.sent_by_user_id, name: m.sent_by_name ?? null },
-        rating: m.rating ?? null,
-        ratingReason: m.reason ?? null,
-      })),
+      messages: await Promise.all(
+        messages.map(async (m) => ({
+          id: m.id,
+          role: m.role,
+          text: m.text,
+          citations: m.citations ?? [],
+          handledBy: m.handled_by,
+          at: m.at,
+          sentBy:
+            m.sent_by_user_id === null
+              ? null
+              : { id: m.sent_by_user_id, name: m.sent_by_name ?? null },
+          rating: m.rating ?? null,
+          ratingReason: m.reason ?? null,
+          // WA-A §3: what WhatsApp says happened to a message sent to the person.
+          ...deliveryOf(m),
+          // WA-A §1–2: voice notes (with their transcript), images and documents, as short links.
+          attachments: await this.signed(m.attachments),
+        })),
+      ),
     };
+  }
+
+  /** Each stored file with a short-lived link for the dashboard; no link when it wasn't stored. */
+  private async signed(value: unknown) {
+    const attachments = waAttachmentsOf(value);
+    if (!attachments.length) return [];
+    const bucket = this.appConfig?.s3.audioBucket;
+    return Promise.all(
+      attachments.map(async (a) => ({
+        kind: a.kind,
+        mimeType: a.mimeType,
+        filename: a.filename ?? null,
+        caption: a.caption ?? null,
+        voice: Boolean(a.voice),
+        transcript: a.transcript ?? null,
+        transcriptError: a.transcriptError ?? null,
+        durationSec: a.durationSec ?? null,
+        url:
+          a.key && bucket && this.s3
+            ? await this.s3
+                .generatePresignedUrl({
+                  bucket,
+                  key: a.key,
+                  operation: 'get',
+                  expiresIn: WA_MEDIA_SIGNED_SECONDS,
+                })
+                .catch(() => null)
+            : null,
+      })),
+    );
   }
 
   /** Opening a chat marks it read for you (and keeps it out of the owners' "nobody opened" email). */
@@ -374,5 +423,27 @@ function toItem(row: Record<string, unknown>): InboxItem {
     safety: Boolean(row.safety_at),
     contactId: (row.contact_id as string | null) ?? null,
     chats: Number(row.chats ?? 1),
+  };
+}
+
+/**
+ * A WhatsApp message's delivery (WA-A §3): `sent`, `delivered`, `read` or `failed` with Meta's
+ * reason in plain words. The callback's state wins over the row's own (`queued`, `sent`).
+ */
+function deliveryOf(m: Record<string, unknown>): {
+  status: string | null;
+  failedReason: string | null;
+} {
+  const status =
+    (m.delivery as string | null) ??
+    (['sent', 'delivered', 'read', 'failed'].includes(String(m.status))
+      ? String(m.status)
+      : null);
+  return {
+    status,
+    failedReason:
+      status === 'failed'
+        ? failedSendReason(m.error_code == null ? null : Number(m.error_code))
+        : null,
   };
 }

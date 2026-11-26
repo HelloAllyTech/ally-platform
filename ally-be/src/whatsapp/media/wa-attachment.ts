@@ -1,0 +1,42 @@
+/**
+ * A file on a WhatsApp message (WA-A), stored on `chatbot_messages.attachments`. The object lives
+ * in the private audio bucket under `wa-media/`, and goes with the conversation's retention.
+ * Audio is never sent to a model; only its transcript is.
+ */
+export type WaAttachmentKind = 'audio' | 'image' | 'document';
+
+export interface WaAttachment {
+  kind: WaAttachmentKind;
+  /** The S3 key, under `wa-media/`. Absent when the download failed (the message is still kept). */
+  key?: string | null;
+  mimeType: string;
+  sizeBytes?: number | null;
+  filename?: string | null;
+  caption?: string | null;
+  /** A voice note recorded in WhatsApp (as opposed to an audio file). */
+  voice?: boolean;
+  /** Audio: the transcript, and the language the speech provider heard. */
+  transcript?: string | null;
+  language?: string | null;
+  durationSec?: number | null;
+  /** Audio: why there is no transcript (`failed`, `too_long`, `download_failed`). */
+  transcriptError?: string | null;
+  /** Meta's media id, for the record. */
+  mediaId?: string | null;
+}
+
+export const WA_MEDIA_PREFIX = 'wa-media/';
+
+/** Signed links last 10 minutes: long enough to play or open, short enough not to share. */
+export const WA_MEDIA_SIGNED_SECONDS = 600;
+
+/** The attachments on a message, read leniently: anything malformed is dropped. */
+export function waAttachmentsOf(value: unknown): WaAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (a): a is WaAttachment =>
+      Boolean(a) &&
+      typeof a === 'object' &&
+      ['audio', 'image', 'document'].includes((a as WaAttachment).kind),
+  );
+}
