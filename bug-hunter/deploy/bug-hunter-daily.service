@@ -15,7 +15,8 @@ Type=oneshot
 User=bughunter
 WorkingDirectory=/opt/ally-platform/bug-hunter
 EnvironmentFile=/etc/bug-hunter/env
-ExecStartPre=/usr/bin/git -C /opt/ally-platform fetch --quiet origin master
+# "+" runs it as root: it checks out master, installs packages and units (update.sh)
+ExecStartPre=+/opt/ally-platform/bug-hunter/deploy/update.sh
 ExecStart=/usr/bin/flock -n /var/lib/bug-hunter/run.lock /opt/bug-hunter/venv/bin/bug-hunter daily --with-lenses --max-cost-usd 3
 ExecStartPost=/opt/bug-hunter/venv/bin/bug-hunter approvals expire
 TimeoutStartSec=6h

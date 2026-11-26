@@ -112,6 +112,24 @@ class DailyPlan:
         return "\n".join(lines) + "\n"
 
 
+def interleave(candidates: list[Candidate]) -> list[Candidate]:
+    """Order for the run slots and the backlog: sources take turns (in priority order,
+    each source's own candidates by severity), so one noisy source (a red CI job, a
+    burst of log errors) cannot take every slot from the others."""
+    by_source: dict[str, list[Candidate]] = {}
+    for c in sorted(
+        candidates, key=lambda c: (c.priority, SEVERITY.get(c.severity_hint, 2))
+    ):
+        by_source.setdefault(c.source, []).append(c)
+    queues = list(by_source.values())
+    out: list[Candidate] = []
+    while any(queues):
+        for q in queues:
+            if q:
+                out.append(q.pop(0))
+    return out
+
+
 def run_daily(
     config: BugHunterConfig,
     state: SignalState,
@@ -166,7 +184,7 @@ def run_daily(
             plan.skipped.append((key, f"{c.app} not in the rollout apps"))
         else:
             fresh.append(c)
-    fresh.sort(key=lambda c: (c.priority, SEVERITY.get(c.severity_hint, 2)))
+    fresh = interleave(fresh)
     if queue is not None and not dry_run:
         from bug_hunter.queue.store import Bug
 

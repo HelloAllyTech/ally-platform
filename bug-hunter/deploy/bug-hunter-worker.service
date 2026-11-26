@@ -13,8 +13,9 @@ User=bughunter
 WorkingDirectory=/opt/ally-platform/bug-hunter
 EnvironmentFile=/etc/bug-hunter/env
 ExecStart=/opt/bug-hunter/venv/bin/bug-hunter worker --interval 30
-# A crash restarts it; an abandoned run is recovered on start (chunk 10).
-Restart=on-failure
+# Always restarted: after a crash (an abandoned run is recovered on start, chunk 10)
+# and after it stops itself between bugs because the daily job pulled new code.
+Restart=always
 RestartSec=60
 Nice=10
 

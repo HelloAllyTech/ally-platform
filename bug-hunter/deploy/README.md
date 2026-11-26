@@ -34,7 +34,15 @@ incus exec bughunter -- bash /root/provision.sh
 `provision.sh` installs Docker, `gh`, Python 3.12 and Poetry; creates the `bughunter`
 user; clones `ally-platform` to `/opt/ally-platform`; installs the package from
 `poetry.lock` with the `vm` extra into `/opt/bug-hunter/venv`; and installs (but does
-not enable) the units. Re-run it to update the code.
+not enable) the units.
+
+Updates are automatic: before each night's sweep the daily job runs `deploy/update.sh`
+as root, which checks out `origin/master`, runs `poetry install` when the lockfile
+changed and reinstalls the units when `deploy/` changed. The worker notices the new
+commit between bugs, exits, and systemd starts it again on the new code; a run in
+progress is never cut short. To update right away, run
+`sudo /opt/ally-platform/bug-hunter/deploy/update.sh` (re-running `provision.sh` also
+works).
 
 ## 2. The database
 

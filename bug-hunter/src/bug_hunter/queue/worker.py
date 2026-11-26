@@ -226,12 +226,20 @@ def work_loop(
     max_iterations: int | None = None,
     sleep: Callable[[float], None] = time.sleep,
     log: Callable[[str], None] = print,
+    code_changed: Callable[[], bool] | None = None,
 ) -> None:
     """Run ``once`` forever (or ``max_iterations`` times). A run that finished goes
-    straight to the next bug; otherwise wait ``interval_s``."""
+    straight to the next bug; otherwise wait ``interval_s``.
+
+    ``code_changed`` is asked between bugs, never during one: when the checkout has
+    moved on (the daily job pulls master), the loop returns so the service manager
+    starts the worker again on the new code, without cutting a paid run short."""
     n = 0
     while max_iterations is None or n < max_iterations:
         n += 1
+        if code_changed is not None and code_changed():
+            log("new code in the checkout: stopping to restart on it")
+            return
         try:
             result = once()
         except Exception as exc:  # noqa: BLE001 - one bad iteration never stops it
