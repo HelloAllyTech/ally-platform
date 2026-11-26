@@ -1,6 +1,13 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// FileUpload reads this flag once, when it loads. A developer's local .env may
+// set it to skip the 16:9 check, which would make the aspect-ratio tests below
+// fail on their machine only — so pin it before anything imports the component.
+vi.hoisted(() => {
+  vi.stubEnv("VITE_BYPASS_COVER_IMAGE_VALIDATION", "false");
+});
+
 // Mock constants early - plain mock with ReportGenerationStatus for transitive imports (report-section)
 vi.mock("@constants", () => ({
   ReportGenerationStatus: {
