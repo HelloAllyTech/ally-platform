@@ -281,6 +281,30 @@ export function claimsBriefReady(text: string | null | undefined): boolean {
 }
 
 /**
+ * Prose that tells the trainer the build is under way. Only the Approve button in the plan
+ * panel starts a build; the model has no tool for it, so while the plan awaits approval any
+ * such claim is untrue (a trainer was told "Building the course draft now" and nothing ran).
+ */
+const CLAIMS_BUILD_STARTED =
+  /\b(building (the|your) (course|draft)|started (the )?build(ing)?|(the )?build (has )?(started|begun|is (now )?(running|under ?way))|creating (the|your) (course )?draft now|i(?:['’]ll| will| am|['’]m) (now )?(build|create)(ing)? (the|your) (course|draft))\b/i;
+
+export function claimsBuildStarted(text: string | null | undefined): boolean {
+  const value = String(text ?? '');
+  const match = CLAIMS_BUILD_STARTED.exec(value);
+  if (!match) return false;
+  const before = value.slice(Math.max(0, match.index - 30), match.index);
+  // "Once you approve, I will build the course" is a condition, not a claim.
+  const sentence =
+    value
+      .slice(0, match.index)
+      .split(/[.!?\n]/)
+      .pop() ?? '';
+  return !NOT_A_CLAIM.test(before) && !BUILD_CONDITION.test(sentence);
+}
+
+const BUILD_CONDITION = /\b(once|when|after|if|as soon as|until)\b/i;
+
+/**
  * What a free-text question may ask for: something only the trainer can type (a link, a name,
  * a number, their own wording). Everything else is a choice.
  */

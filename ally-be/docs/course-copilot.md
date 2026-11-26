@@ -147,10 +147,40 @@ in AWS form, so they do not render locally — the same as the course editor's o
 | `COURSE_COPILOT_IMAGE_COST_USD` | 0.10 | Flat per image |
 | `COURSE_COPILOT_BUILD_CONCURRENCY` | 4 | |
 | `OPENAI_IMAGE_MODEL` / `CHARACTER_IMAGE_DEFAULT_PROVIDER` + `LEARN_MEDIA_PUBLIC_S3_BUCKET` | — | Images are skipped with a reason without them |
+| `COURSE_PILOT_STAGES` | false | Course Pilot stage machine (below) and the B2/B3 transfer check |
+| `COURSE_PILOT_CRITIC` | false | Course Pilot blueprint critic (below) |
 
 Limits (sections 20, items 100, items per section 30, new cases 2, images 12, languages per roleplay 4, two
 active CREATE sessions per user) are in `constants/course-copilot.constants.ts` and enforced in code. New roleplays
 have no limit of their own; the item limits and the session budget bound them.
+
+## Course Pilot (behind switches, off by default)
+
+Phases 1 and 3 of the Course Pilot architecture plan, each behind its own env switch so production
+behaves as before until one is turned on.
+
+- **Stage machine** (`COURSE_PILOT_STAGES`, `src/course-copilot/util/course-pilot-stages.util.ts`). The interview's
+  stages live in code: intake → learners → outcomes and skill targets → assessment → time and
+  language → final check → blueprint. The stage is *derived* from the brief (the first stage whose
+  exit check fails), so changing an earlier answer simply puts the interview back in that stage.
+  Each stage has its own tool belt and question limit (12 in the whole interview); `propose_blueprint`
+  exists only after the trainer confirms the brief on a card code writes (`brief.final`; the
+  confirmation is matched to a hash of what the card shows, so changing any of it reopens the
+  check). State: `course_copilot_sessions.metadata.coursePilot` (questions per stage, the pending
+  confirm card, the confirmed hash, stage history).
+- **Transfer check** (same switch, `src/course-copilot/util/course-pilot-transfer.util.ts`). Practice items carry
+  `spec.transfer` (`practised` / `new-similar` / `new-harder`) and `spec.targetSkills`; a B2 skill
+  target needs a `new-similar` practice and a B3 one a `new-harder` practice, each after a practised
+  one. Told to the planner up front, checked in code, repaired once; shown to the trainer as a
+  warning, never a block.
+- **Blueprint critic** (`COURSE_PILOT_CRITIC`, `src/course-copilot/service/specialists/blueprint-critic.specialist.ts`, prompt
+  `course_copilot_blueprint_critic`). A separate model checks each proposed plan against the brief
+  and Learning Design principles; blocking findings get one planner repair round, kept only if it is
+  no worse. Adds about 100 s per plan; its report is in `metadata.coursePilot.critic`.
+- **Evals** (`scripts/course-pilot-evals/`): `run.mjs` plays 10 fixed course requests end to end with
+  a simulated trainer; `plan-eval.mjs` plans the same briefs with and without the critic or transfer
+  check and scores them with an independent judge (`judge.mjs`); `manual-tests.mjs` runs test cases
+  2-8 of the manual test plan. All need the local stack and the seeded test accounts.
 
 ## Departures from the plan (plans/course-copilot-plan.md)
 

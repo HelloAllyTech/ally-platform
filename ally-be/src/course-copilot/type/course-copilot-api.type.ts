@@ -140,6 +140,24 @@ export interface CourseCopilotPlanningContext {
   exampleCourse: string | null;
   /** Codes of the Learning Design principles the planner received. */
   principles: string[];
+  /** Course Pilot critic: what it found, whether the plan was repaired, and what is left. */
+  critic?: {
+    found: {
+      severity: 'blocking' | 'advisory';
+      criterion: string;
+      itemId?: string;
+      problem: string;
+      fix: string;
+    }[];
+    repaired: boolean;
+    remaining: {
+      severity: 'blocking' | 'advisory';
+      criterion: string;
+      itemId?: string;
+      problem: string;
+      fix: string;
+    }[];
+  };
 }
 
 /**

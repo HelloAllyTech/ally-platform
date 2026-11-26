@@ -190,6 +190,7 @@ export const COURSE_COPILOT_DEFAULT_ITEM_MINUTES: Record<string, number> = {
 export const COURSE_COPILOT_PROMPTS = {
   INTERVIEWER_SYSTEM: 'course_copilot_interviewer_system',
   BLUEPRINT_PLANNER: 'course_copilot_blueprint_planner',
+  BLUEPRINT_CRITIC: 'course_copilot_blueprint_critic',
   ARTICLE_WRITER: 'course_copilot_article_writer',
   QUIZ_WRITER: 'course_copilot_quiz_writer',
   JOURNAL_WRITER: 'course_copilot_journal_writer',
@@ -210,6 +211,7 @@ export const COURSE_COPILOT_PROMPTS = {
 export const COURSE_COPILOT_AI_TASKS = {
   INTERVIEW: 'course-copilot-interview',
   BLUEPRINT: 'course-copilot-blueprint',
+  BLUEPRINT_CRITIC: 'course-copilot-blueprint-critic',
   ARTICLE: 'course-copilot-article',
   QUIZ: 'course-copilot-quiz',
   JOURNAL: 'course-copilot-journal',

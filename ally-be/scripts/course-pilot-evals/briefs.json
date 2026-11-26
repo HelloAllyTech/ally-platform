@@ -1,0 +1,123 @@
+[
+  {
+    "id": "crisis-specific",
+    "firstMessage": "I want a 60 minute course in English for new helpline volunteers on handling callers in crisis, ending in a roleplay.",
+    "style": "cooperative",
+    "truth": {
+      "learners": "New helpline volunteers, no counselling background, first months on the phones",
+      "outcome": "Stay with a caller in crisis, ask directly about suicide and agree an immediate safety step",
+      "durationMinutes": 60,
+      "languages": ["en"],
+      "assessment": "roleplay"
+    }
+  },
+  {
+    "id": "vague-counsellors",
+    "firstMessage": "Can you help me make a course for our counsellors?",
+    "style": "cooperative",
+    "truth": {
+      "learners": "Qualified school counsellors with 1-3 years of experience",
+      "outcome": "Run a first session with a student who was referred for self-harm: build rapport, assess risk, plan next steps",
+      "durationMinutes": 90,
+      "languages": ["en"],
+      "assessment": "roleplay"
+    }
+  },
+  {
+    "id": "just-build-hindi",
+    "firstMessage": "Make a 30 minute course in Hindi on active listening for school teachers. Just build it with your defaults, don't ask me much.",
+    "style": "just-build",
+    "truth": {
+      "learners": "School teachers with no counselling training",
+      "outcome": "Listen to a distressed student without fixing: reflect feelings and ask open questions",
+      "durationMinutes": 30,
+      "languages": ["hi"],
+      "assessment": "any"
+    }
+  },
+  {
+    "id": "bullying-quiz",
+    "firstMessage": "Short course for school counsellors on responding to a bullying disclosure. 30 minutes, English, assess with a quiz.",
+    "style": "terse",
+    "truth": {
+      "learners": "School counsellors",
+      "outcome": "Respond to a student's bullying disclosure safely and agree what happens next",
+      "durationMinutes": 30,
+      "languages": ["en"],
+      "assessment": "quiz"
+    }
+  },
+  {
+    "id": "peer-listening-bilingual",
+    "firstMessage": "I run a peer support programme in colleges. I need a course on active listening for student peer supporters, in English and Hindi.",
+    "style": "cooperative",
+    "truth": {
+      "learners": "College student peer supporters, volunteers, no clinical training",
+      "outcome": "Hold a supportive listening conversation with a struggling peer and know when to refer",
+      "durationMinutes": 90,
+      "languages": ["en", "hi"],
+      "assessment": "journal"
+    }
+  },
+  {
+    "id": "bad-news-doctors",
+    "firstMessage": "A course for junior doctors on breaking bad news to families.",
+    "style": "cooperative",
+    "truth": {
+      "learners": "Junior doctors (residents) in hospitals",
+      "outcome": "Deliver bad news to a family using a structured approach and respond to emotion",
+      "durationMinutes": 120,
+      "languages": ["en"],
+      "assessment": "roleplay"
+    }
+  },
+  {
+    "id": "changes-mind",
+    "firstMessage": "I need a course for helpline volunteers on handling abusive or angry callers.",
+    "style": "cooperative",
+    "changeAtConfirm": "Actually, make it 30 minutes instead, my volunteers don't have more time.",
+    "truth": {
+      "learners": "Helpline volunteers, some months of experience",
+      "outcome": "De-escalate an angry caller and set a boundary while staying respectful",
+      "durationMinutes": 30,
+      "languages": ["en"],
+      "assessment": "roleplay"
+    }
+  },
+  {
+    "id": "detailed-first-message",
+    "firstMessage": "Course for community health workers on screening new mothers for postpartum depression. Learners: ASHA workers, low literacy, no prior mental health training. Outcome: ask the screening questions with warmth and refer when the score is high. Skills: empathy and risk assessment. 60 minutes in Hindi, assessed by a roleplay.",
+    "style": "cooperative",
+    "truth": {
+      "learners": "ASHA community health workers, low literacy, no prior mental health training",
+      "outcome": "Ask postpartum depression screening questions with warmth and refer when the score is high",
+      "durationMinutes": 60,
+      "languages": ["hi"],
+      "assessment": "roleplay"
+    }
+  },
+  {
+    "id": "you-decide",
+    "firstMessage": "We need something on burnout for our NGO field staff.",
+    "style": "you-decide",
+    "truth": {
+      "learners": "NGO field staff",
+      "outcome": "any",
+      "durationMinutes": "any",
+      "languages": ["en"],
+      "assessment": "any"
+    }
+  },
+  {
+    "id": "grief-support",
+    "firstMessage": "Help me build a course on supporting someone who is grieving, for our volunteers.",
+    "style": "terse",
+    "truth": {
+      "learners": "Hospice and community volunteers",
+      "outcome": "Stay present with a grieving person, avoid clichés, and offer practical support",
+      "durationMinutes": 60,
+      "languages": ["en"],
+      "assessment": "roleplay"
+    }
+  }
+]

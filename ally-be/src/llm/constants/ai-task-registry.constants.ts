@@ -3290,6 +3290,23 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
     promptOverride: 'course_copilot_course_meta',
   },
   {
+    id: 'course-copilot-blueprint-critic',
+    task: LlmTask.COURSE_COPILOT_BLUEPRINT_CRITIC,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Course Pilot checks a freshly planned blueprint before the trainer sees it (COURSE_PILOT_CRITIC)',
+    detail:
+      'One critic pass per proposed blueprint against the brief and Learning Design ' +
+      'principles (assessment, skill targets at A/B, progression, reflection, fit). ' +
+      'Blocking findings send the plan back to the planner once. At most 8 findings. JSON mode.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'course_copilot_blueprint_critic',
+  },
+  {
     id: 'course-copilot-review',
     task: LlmTask.COURSE_COPILOT_REVIEW,
     runtime: LlmRuntime.ALLY_BE,

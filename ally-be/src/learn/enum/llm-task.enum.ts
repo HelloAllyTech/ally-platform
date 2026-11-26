@@ -391,6 +391,7 @@ export enum LlmTask {
   // metadata.courseCopilotSessionId, which is what the session budget sums.
   COURSE_COPILOT_INTERVIEW = 'course_copilot_interview',
   COURSE_COPILOT_BLUEPRINT = 'course_copilot_blueprint',
+  COURSE_COPILOT_BLUEPRINT_CRITIC = 'course_copilot_blueprint_critic',
   COURSE_COPILOT_ARTICLE = 'course_copilot_article',
   COURSE_COPILOT_QUIZ = 'course_copilot_quiz',
   COURSE_COPILOT_JOURNAL = 'course_copilot_journal',

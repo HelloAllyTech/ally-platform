@@ -1165,6 +1165,18 @@ export class AppConfigService {
           10,
         ),
       ),
+      // Course Pilot stage machine (phase 1): interview stages, per-stage tools and question
+      // limits, and a trainer-confirmed brief before any blueprint. Off = today's interview.
+      stages:
+        String(
+          this.configService.get<string>('COURSE_PILOT_STAGES', 'false'),
+        ).toLowerCase() === 'true',
+      // Course Pilot blueprint critic: a separate check of each proposed plan, with one repair
+      // round on blocking findings. Off = the plan goes to the trainer as the planner wrote it.
+      critic:
+        String(
+          this.configService.get<string>('COURSE_PILOT_CRITIC', 'false'),
+        ).toLowerCase() === 'true',
       // Default per-session spend ceiling, USD. 0 = uncapped.
       sessionBudgetUsd: Number(
         this.configService.get<number>('COURSE_COPILOT_SESSION_BUDGET_USD', 15),
