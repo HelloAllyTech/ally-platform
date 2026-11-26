@@ -54,6 +54,7 @@ import { HandOverTool } from './agent-tools/hand-over.tool';
 import { ListConsentService } from './agent-tools/list-consent.service';
 import { ListToolsService } from './agent-tools/list-tools.service';
 import { AGENT_GATEWAY_TOOLS, AgentToolRegistry } from './agent-tools/tools';
+import { SendSourceFileTool } from './agent-tools/send-source-file.tool';
 import { ToolRun } from './entity/tool-run.entity';
 import { MemoryEntry } from './entity/memory-entry.entity';
 import { MemoryService } from './memory/memory.service';
@@ -205,10 +206,15 @@ import {
     AgentRunTokenService,
     AgentGatewayService,
     HandOverTool,
+    SendSourceFileTool,
     {
       provide: AGENT_GATEWAY_TOOLS,
-      useFactory: (handOver: HandOverTool) => [handOver],
-      inject: [HandOverTool],
+      // WA-A §2: send_source_file, opt-in per assistant like hand_over.
+      useFactory: (handOver: HandOverTool, sendFile: SendSourceFileTool) => [
+        handOver,
+        sendFile,
+      ],
+      inject: [HandOverTool, SendSourceFileTool],
     },
     AgentToolRegistry,
     ListToolsService,

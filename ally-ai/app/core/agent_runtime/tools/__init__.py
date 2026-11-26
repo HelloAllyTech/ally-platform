@@ -5,12 +5,13 @@ from __future__ import annotations
 from typing import Dict, List
 
 from app.core.agent_runtime.state import BotConfig
-from app.core.agent_runtime.tools import hand_over, search_knowledge
+from app.core.agent_runtime.tools import hand_over, search_knowledge, send_source_file
 from app.core.agent_runtime.tools.base import Tool, ToolContext, ToolResult
 from app.core.agent_runtime.tools.lists import list_tools
 
 REGISTRY: Dict[str, Tool] = {
-    tool.name: tool for tool in (search_knowledge.TOOL, hand_over.TOOL)
+    tool.name: tool
+    for tool in (search_knowledge.TOOL, hand_over.TOOL, send_source_file.TOOL)
 }
 
 

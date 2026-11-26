@@ -7,7 +7,11 @@ import { AppConfigService } from '../../config/config.service';
 import { LoggerService } from '../../logger/logger.service';
 import { replyLanguageOf } from '../../chatbot/engine/reply-language';
 import { WaHandledBy } from '../enum/whatsapp.enum';
-import { WA_MEDIA_PREFIX, type WaAttachment } from '../media/wa-attachment';
+import {
+  WA_MEDIA_PREFIX,
+  WA_MEDIA_SIGNED_SECONDS,
+  type WaAttachment,
+} from '../media/wa-attachment';
 import {
   InboundWhatsAppMessage,
   WHATSAPP_PROVIDER,
@@ -117,6 +121,115 @@ export class WaMediaService {
     }
     await this.attach(input, attachment);
     return outcome;
+  }
+
+  /**
+   * WA-A §2: the assistant's own source documents a run chose to send (`send_source_file`), after
+   * its reply: re-checked against this assistant's sources, signed for 10 minutes, and sent with
+   * `sendMedia` (Meta's limits checked there). At most 2 per run. Returns what went; never throws.
+   */
+  async sourceFilesFor(
+    runId: string,
+    chatbotId: string,
+  ): Promise<
+    {
+      id: string;
+      title: string;
+      bucket: string;
+      key: string;
+      fileName: string | null;
+      contentType: string;
+      sizeBytes: number;
+    }[]
+  > {
+    try {
+      const runs = (await this.dataSource.query(
+        `SELECT result FROM tool_runs
+          WHERE run_id = $1 AND chatbot_id = $2 AND tool = 'send_source_file' AND status = 'ok'
+          ORDER BY step LIMIT 2`,
+        [runId, chatbotId],
+      )) as { result: { document_id?: string } | null }[];
+      const ids = [
+        ...new Set(
+          runs
+            .map((r) => r.result?.document_id)
+            .filter((id): id is string => !!id),
+        ),
+      ];
+      if (!ids.length || !this.s3) return [];
+      const docs = (await this.dataSource.query(
+        `SELECT d.id, d.title, d.file_url, d.file_name, d.content_type, d.size_bytes
+           FROM kb_documents d
+          WHERE d.id = ANY($2::uuid[]) AND d.file_url IS NOT NULL AND d.archived_at IS NULL
+            AND (d.owner_chatbot_id = $1
+                 OR d.id IN (SELECT cd.document_id FROM chatbot_documents cd
+                              WHERE cd.chatbot_id = $1))`,
+        [chatbotId, ids],
+      )) as {
+        id: string;
+        title: string;
+        file_url: string;
+        file_name: string | null;
+        content_type: string | null;
+        size_bytes: string | number | null;
+      }[];
+      return docs.flatMap((d) => {
+        const at = this.s3!.parseS3Url(d.file_url);
+        return at
+          ? [
+              {
+                id: d.id,
+                title: d.title,
+                bucket: at.bucket,
+                key: at.key,
+                fileName: d.file_name,
+                contentType: d.content_type ?? 'application/pdf',
+                sizeBytes: Number(d.size_bytes ?? 0),
+              },
+            ]
+          : [];
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Source files not read for run ${runId}: ${error instanceof Error ? error.message : 'unknown'}`,
+      );
+      return [];
+    }
+  }
+
+  /** One source document to the person, by a 10-minute signed link. Throws like `sendMedia`. */
+  async sendSourceFile(
+    to: string,
+    doc: {
+      title: string;
+      bucket: string;
+      key: string;
+      fileName: string | null;
+      contentType: string;
+      sizeBytes: number;
+    },
+    creds: WaNumberCredentials | undefined,
+  ): Promise<{ providerMessageId: string }> {
+    if (!this.provider.sendMedia || !this.s3) {
+      throw new Error('Files cannot be sent from this environment');
+    }
+    const link = await this.s3.generatePresignedUrl({
+      bucket: doc.bucket,
+      key: doc.key,
+      operation: 'get',
+      expiresIn: WA_MEDIA_SIGNED_SECONDS,
+    });
+    return this.provider.sendMedia(
+      to,
+      {
+        kind: 'document',
+        link,
+        mimeType: doc.contentType,
+        sizeBytes: doc.sizeBytes,
+        filename: (doc.fileName ?? `${doc.title}.pdf`).slice(0, 240),
+      },
+      creds,
+    );
   }
 
   private async transcribe(

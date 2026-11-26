@@ -510,7 +510,12 @@ export class AgentRuntimeRunner {
           select: ['tool', 'step', 'input', 'result'],
           order: { step: 'ASC' },
         })
-      ).filter((row) => parseListToolName(row.tool)?.kind !== 'find');
+      ).filter(
+        (row) =>
+          parseListToolName(row.tool)?.kind !== 'find' &&
+          // WA-A: choosing a document to send changes nothing; it isn't an action taken.
+          row.tool !== 'send_source_file',
+      );
       if (!rows.length) return null;
       if (rows.some((row) => row.tool === 'hand_over')) {
         return { tool: 'hand_over' };

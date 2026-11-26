@@ -207,3 +207,50 @@ describe("WhatsAppInboundService: a tap on a team member's button (WA-A §3)", (
     );
   });
 });
+
+describe('WhatsAppInboundService: a source document after the reply (WA-A §2)', () => {
+  it('sends what the run chose, after the reply, as its own saved message', async () => {
+    const media = {
+      receive: jest.fn(),
+      sourceFilesFor: jest.fn().mockResolvedValue([
+        {
+          id: 'd1',
+          title: 'Registration form',
+          bucket: 'b',
+          key: 'kb/form.pdf',
+          fileName: 'registration.pdf',
+          contentType: 'application/pdf',
+          sizeBytes: 2048,
+        },
+      ]),
+      sendSourceFile: jest
+        .fn()
+        .mockResolvedValue({ providerMessageId: 'wamid.doc' }),
+    };
+    const h = await buildInboundHarness({
+      chatbot: agentBot,
+      agentAnswer: AGENT_ANSWER,
+      extraProviders: [{ provide: WaMediaService, useValue: media }],
+    });
+    await h.service.handle({
+      providerMessageId: 'wamid.ask',
+      from: '919876543210',
+      text: 'Can you send me the registration form?',
+      isUnsupportedMedia: false,
+      timestamp: new Date(),
+    });
+    expect(media.sourceFilesFor).toHaveBeenCalledWith('run-1', 'bot-1');
+    expect(media.sendSourceFile).toHaveBeenCalledWith(
+      '919876543210',
+      expect.objectContaining({ title: 'Registration form' }),
+      expect.anything(),
+    );
+    expect(media.sendSourceFile.mock.invocationCallOrder[0]).toBeGreaterThan(
+      h.provider.sendText.mock.invocationCallOrder[0],
+    );
+    expect(h.savedMessages[h.savedMessages.length - 1]).toMatchObject({
+      body: 'Registration form',
+      handledBy: 'source_file',
+    });
+  });
+});

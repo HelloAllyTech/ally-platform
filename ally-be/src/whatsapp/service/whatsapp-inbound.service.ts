@@ -646,6 +646,21 @@ export class WhatsAppInboundService {
         },
       );
       void this.afterReply(chatbot, conversation.id, decision, copied.copied);
+      // WA-A §2: a source document the run chose to send (`send_source_file`), after the reply.
+      if (
+        decision.agent?.runId &&
+        decision.handledBy !== WaHandledBy.CRISIS &&
+        !isFailedRun(decision.agent)
+      ) {
+        await this.sendSourceFiles(
+          decision.agent.runId,
+          chatbot.id,
+          contact,
+          conversation,
+          inboundId,
+          number.creds,
+        );
+      }
       // Stage 5: two sources disagreed; the owner gets a question naming them. The generic gap
       // row below is then ignored (one row per message).
       if (decision.conflict && this.answerConflict) {
@@ -687,6 +702,62 @@ export class WhatsAppInboundService {
         { status: WaMessageStatus.FAILED, errorMessage: message },
       );
       void this.sharedStore?.sync([inboundId], inboundId);
+    }
+  }
+
+  /**
+   * WA-A §2: send what a run's `send_source_file` chose, each as its own message saved like any
+   * other reply (so the Inbox shows it, with delivery ticks). After the reply has gone, so this
+   * never throws: a file that can't go is recorded as failed on its row and logged.
+   */
+  private async sendSourceFiles(
+    runId: string,
+    chatbotId: string,
+    contact: WaContact,
+    conversation: WaConversation,
+    inReplyToId: string,
+    creds: WaNumberCredentials | undefined,
+  ): Promise<void> {
+    if (!this.media) return;
+    const docs = await this.media.sourceFilesFor(runId, chatbotId);
+    for (const doc of docs) {
+      let rowId: string | undefined;
+      try {
+        const row = await this.messageRepository.save(
+          this.messageRepository.create({
+            conversationId: conversation.id,
+            contactId: contact.id,
+            direction: WaMessageDirection.OUTBOUND,
+            body: doc.title,
+            handledBy: WaHandledBy.SOURCE_FILE,
+            status: WaMessageStatus.QUEUED,
+            inReplyToId,
+          }),
+        );
+        rowId = row.id;
+        const { providerMessageId } = await this.media.sendSourceFile(
+          waAddressOf(contact),
+          doc,
+          creds,
+        );
+        await this.messageRepository.update(
+          { id: row.id },
+          { providerMessageId, status: WaMessageStatus.SENT },
+        );
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'unknown error';
+        this.logger.warn(`Source file not sent: ${reason}`);
+        if (rowId) {
+          await this.messageRepository
+            .update(
+              { id: rowId },
+              { status: WaMessageStatus.FAILED, errorMessage: reason },
+            )
+            .catch(() => undefined);
+        }
+      } finally {
+        if (rowId) void this.sharedStore?.sync([rowId]);
+      }
     }
   }
 

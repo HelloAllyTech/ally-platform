@@ -29,6 +29,8 @@ export enum WaHandledBy {
   VOICE_FAILED = 'voice_failed',
   /** WA-A: an image or document with no words: kept for the team; "can't read files yet". */
   FILE_NOT_READ = 'file_not_read',
+  /** WA-A: one of the assistant's own source documents, sent after its reply (`send_source_file`). */
+  SOURCE_FILE = 'source_file',
   /**
    * The number is not linked to an Ally account, so the corpus could not be scoped to an
    * organisation and no answer was attempted.
