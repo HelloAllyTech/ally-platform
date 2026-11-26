@@ -93,47 +93,58 @@ export function orderWorkQueue(input: {
       (p.kind !== 'section' || p.body?.trim()),
   );
 
-  const never = pages
-    .filter((p) => !p.verifiedAt)
-    .sort((a, b) => time(a.updatedAt) - time(b.updatedAt));
-  const stale = pages
-    .filter((p) => p.verifiedAt && time(p.verifiedAt) < staleBefore)
-    .sort((a, b) => time(a.verifiedAt) - time(b.verifiedAt));
-  const queued = new Set([...never, ...stale].map((p) => p.slug));
-  const codeChanged = pages
-    .filter((p) => !queued.has(p.slug))
-    .map((p) => {
-      const lastTouched = Math.max(time(p.updatedAt), time(p.verifiedAt));
-      const newest = Math.max(
-        0,
-        ...(p.surfaces ?? []).map((s) => {
-          const folder = MANUAL_SURFACE_FOLDERS[s];
-          return folder ? time(input.codeChangedAt.get(folder) ?? null) : 0;
-        }),
-      );
-      return { page: p, lag: newest - lastTouched };
-    })
-    .filter((x) => x.lag > 0)
-    .sort((a, b) => b.lag - a.lag)
-    .map((x) => x.page);
+  // Pages the agent tried lately (and could not finish) go behind the untried ones, so the same
+  // hard pages do not come first every run and starve the rest. They are retried, never dropped.
+  const triedAfter =
+    input.now.getTime() - MANUAL_WEEKLY_LIMITS.ATTEMPT_COOLDOWN_DAYS * DAY_MS;
+  const triedLately = (p: ManualPage) => time(p.lastAttemptAt) >= triedAfter;
+  const tiers = (list: ManualPage[]): ManualWorkItem[] => {
+    const never = list
+      .filter((p) => !p.verifiedAt)
+      .sort((a, b) => time(a.updatedAt) - time(b.updatedAt));
+    const stale = list
+      .filter((p) => p.verifiedAt && time(p.verifiedAt) < staleBefore)
+      .sort((a, b) => time(a.verifiedAt) - time(b.verifiedAt));
+    const queued = new Set([...never, ...stale].map((p) => p.slug));
+    const codeChanged = list
+      .filter((p) => !queued.has(p.slug))
+      .map((p) => {
+        const lastTouched = Math.max(time(p.updatedAt), time(p.verifiedAt));
+        const newest = Math.max(
+          0,
+          ...(p.surfaces ?? []).map((s) => {
+            const folder = MANUAL_SURFACE_FOLDERS[s];
+            return folder ? time(input.codeChangedAt.get(folder) ?? null) : 0;
+          }),
+        );
+        return { page: p, lag: newest - lastTouched };
+      })
+      .filter((x) => x.lag > 0)
+      .sort((a, b) => b.lag - a.lag)
+      .map((x) => x.page);
+    return [
+      ...never.map((page) => ({
+        kind: 'page' as const,
+        page,
+        why: 'never_verified' as const,
+      })),
+      ...stale.map((page) => ({
+        kind: 'page' as const,
+        page,
+        why: 'stale' as const,
+      })),
+      ...codeChanged.map((page) => ({
+        kind: 'page' as const,
+        page,
+        why: 'code_changed' as const,
+      })),
+    ];
+  };
 
   const all: ManualWorkItem[] = [
     ...proposals.map((proposal) => ({ kind: 'proposal' as const, proposal })),
-    ...never.map((page) => ({
-      kind: 'page' as const,
-      page,
-      why: 'never_verified' as const,
-    })),
-    ...stale.map((page) => ({
-      kind: 'page' as const,
-      page,
-      why: 'stale' as const,
-    })),
-    ...codeChanged.map((page) => ({
-      kind: 'page' as const,
-      page,
-      why: 'code_changed' as const,
-    })),
+    ...tiers(pages.filter((p) => !triedLately(p))),
+    ...tiers(pages.filter(triedLately)),
   ];
   return { items: all.slice(0, input.limit), more: all.length > input.limit };
 }
@@ -338,6 +349,14 @@ export class ManualWeeklyAgentService {
           }),
         );
         for (const slug of ctx.verified) touched.add(slug);
+        // A page the model actually worked on (not one the provider failed on) goes to the back of
+        // the queue for a while, finished or not, so the pages it cannot finish stop blocking the rest.
+        if (
+          item.kind === 'page' &&
+          (result.status === 'done' || result.status === 'iteration_cap')
+        ) {
+          await this.pages.markAttempted(item.page.slug).catch(() => undefined);
+        }
         applied += ctx.appliedProposals.length;
         const outcome: ManualItemOutcomeCode = ctx.appliedProposals.length
           ? 'applied'

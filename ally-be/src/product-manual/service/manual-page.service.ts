@@ -447,6 +447,14 @@ export class ManualPageService {
     }
   }
 
+  /** The weekly agent tried this page (finished or not): it queues behind untried pages for a while. */
+  async markAttempted(slug: string): Promise<void> {
+    await this.pages.update(
+      { slug, deletedAt: IsNull() },
+      { lastAttemptAt: new Date() },
+    );
+  }
+
   /** A tagged release went out: every "ships in next release" page is live now. */
   async markAllReleased(): Promise<number> {
     const result = await this.pages.update(

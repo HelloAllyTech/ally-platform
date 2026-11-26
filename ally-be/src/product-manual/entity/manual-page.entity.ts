@@ -70,6 +70,10 @@ export class ManualPage {
   @Column({ name: 'verified_ref', type: 'varchar', length: 80, nullable: true })
   verifiedRef?: string | null;
 
+  /** When the weekly agent last tried this page, finished or not. Pages tried lately queue last. */
+  @Column({ name: 'last_attempt_at', type: 'timestamptz', nullable: true })
+  lastAttemptAt?: Date | null;
+
   @Column({ name: 'created_by', type: 'int', nullable: true })
   createdBy?: number | null;
 
