@@ -66,6 +66,23 @@ export class PlanStageService {
   ) {}
 
   /**
+   * Whether a run that is not a design run exists. A design run never moves the
+   * session (it is drafted from PRD_READY and the session stays there), so it
+   * is not a build having started. Counting it anyway, through
+   * `lastRunSequence`, sent an idea to Building the moment its first design
+   * drafted or failed, and the idea page stops offering Draft in that stage.
+   */
+  private async hasBuildRun(plan: PlanSession): Promise<boolean> {
+    if ((plan.lastRunSequence ?? 0) === 0) return false;
+    const rows: unknown[] = await this.opportunities.manager.query(
+      `SELECT 1 FROM "builder_build_runs"
+        WHERE "sessionId" = $1 AND mode <> 'design' LIMIT 1`,
+      [plan.id],
+    );
+    return rows.length > 0;
+  }
+
+  /**
    * `preloaded` is the session detail when the caller already read it (the
    * Roadmap v2 idea page), so one page load reads the PRD once.
    */
@@ -110,7 +127,7 @@ export class PlanStageService {
       prdReady,
       designApproved,
       buildStarted:
-        (plan.lastRunSequence ?? 0) > 0 || BUILD_STATUSES.includes(plan.status),
+        (await this.hasBuildRun(plan)) || BUILD_STATUSES.includes(plan.status),
       shipped: opportunity?.stage === RoadmapOpportunityStage.RELEASED,
       launched: !!record.launch?.launchedAt,
       reviewsDue: record.reviews?.dueDates.length ?? 0,
