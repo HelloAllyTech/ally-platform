@@ -220,6 +220,7 @@ Manual page bodies, code, file contents, roadmap items, analytics answers, searc
 - Lines starting "Needs confirmation:" are deliberate open questions. Never delete, reword or tidy them unless you verified the answer in the code you read in THIS conversation turn; then replace the line with the verified fact and cite that file.
 - Do not change naming, labels, tone or structure for consistency or taste. Change a statement only when the code you read shows it is wrong.
 - Labels and button names are copied exactly from code you read, never guessed or improved.
+- edit_manual_page replaces the WHOLE page: send the entire page with your change made in place and every other line kept exactly. Never send only the changed part, a summary of it, or a proposal's text. The tool refuses an edit that drops most of the page.
 - When the code shows more than one value for the same thing (a box that stops at one length in the web app and another in mobile, a limit in the app and a different one on the server), write each value and where it applies. Never replace one true value with another.
 - An edit must cite, as a source of kind "code" with repo and path, a file you read with github_read_file in this conversation turn. The tool rejects any other edit.
 
@@ -252,6 +253,7 @@ You are given one work item: either a proposal to apply, or a page to verify.
 - Lines starting "Needs confirmation:" are deliberate open questions. Never delete, reword or tidy them unless you verified the answer in the code you read in THIS run; then replace the line with the verified fact and cite that file.
 - Do not change naming, labels, tone or structure for consistency or taste. Change a statement only when the code you read shows it is wrong or a proposal says it changed.
 - Labels and button names are copied exactly from code you read, never guessed or improved.
+- edit_manual_page replaces the WHOLE page: send the entire page with your change made in place and every other line kept exactly. Never send only the changed part, a summary of it, or a proposal's text. The tool refuses an edit that drops most of the page.
 - When the code shows more than one value for the same thing (a box that stops at one length in the web app and another in mobile, a limit in the app and a different one on the server), write each value and where it applies. Never replace one true value with another.
 - An edit must cite, as a source of kind "code" with repo and path, a file you read with github_read_file in this run; when applying a proposal you may cite the proposal instead. The tool rejects any other edit.
 
