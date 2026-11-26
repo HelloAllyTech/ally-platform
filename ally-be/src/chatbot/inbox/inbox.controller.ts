@@ -11,9 +11,13 @@ import {
   Post,
   Query,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiConsumes,
   ApiOperation,
   ApiProperty,
   ApiPropertyOptional,
@@ -22,6 +26,8 @@ import {
 } from '@nestjs/swagger';
 import { InjectDataSource } from '@nestjs/typeorm';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsIn,
   IsOptional,
   IsString,
@@ -31,6 +37,7 @@ import {
 } from 'class-validator';
 import type { Response } from 'express';
 import { DataSource } from 'typeorm';
+import { TEAM_FILE_MAX_BYTES } from './inbox.service';
 import { CallerScopedRoute } from '../../auth/decorators/caller-scoped-route.decorator';
 import { RequireFeatureToggle } from '../../auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from '../../authorization/constants/admin-feature-toggle.constants';
@@ -103,6 +110,25 @@ export const MEMORY_INVALID_MESSAGE = 'Write it in 1 to 200 characters.';
 
 export class InboxReplyDto {
   @ApiProperty() @IsString() @MinLength(1) @MaxLength(4000) text!: string;
+
+  /** WA-A §3: up to 3 reply buttons on WhatsApp (20 characters each); a tap reads as its title. */
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(20, { each: true })
+  buttons?: string[];
+}
+
+/** WA-A §3: a file the team sends on WhatsApp, with an optional caption. */
+export class InboxAttachmentDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  text?: string;
 }
 
 const userId = (): number => Number(ExecutionManager.getUserId() ?? 0);
@@ -431,6 +457,51 @@ export class InboxController {
       id,
       user ?? { id: userId(), name: null },
       dto.text,
+      new Date(),
+      { buttons: dto.buttons },
+    );
+  }
+
+  @Post('chatbots/:chatbotId/conversations/:id/attachments')
+  @ChatbotCan(ChatbotCapability.RESPOND, 'chatbotId')
+  @RequireFeatureToggle(FeatureToggleKey.WHATSAPP_BOT, EDIT)
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary:
+      "WA-A: send a file (JPEG/PNG up to 5 MB, PDF or Office document up to 25 MB) on the chat's WhatsApp, within 24 hours of their last message",
+  })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: TEAM_FILE_MAX_BYTES + 1, files: 1 },
+    }),
+  )
+  async attach(
+    @Param('chatbotId', ParseUUIDPipe) chatbotId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() dto: InboxAttachmentDto,
+  ) {
+    const { chatbot } = await this.access.assertCan(
+      chatbotId,
+      ChatbotCapability.RESPOND,
+    );
+    if (!file) throw new BadRequestException('Attach a file as "file".');
+    await this.agreement?.assertMayReply(
+      userId(),
+      await this.heldBy(chatbotId, id),
+    );
+    const media = await this.inbox.storeTeamFile(chatbotId, id, file);
+    const [user] = (await this.dataSource.query(
+      `SELECT id, name FROM users WHERE id = $1`,
+      [userId()],
+    )) as { id: number; name: string | null }[];
+    return this.handover.reply(
+      chatbot,
+      id,
+      user ?? { id: userId(), name: null },
+      dto.text ?? '',
+      new Date(),
+      { media },
     );
   }
 }

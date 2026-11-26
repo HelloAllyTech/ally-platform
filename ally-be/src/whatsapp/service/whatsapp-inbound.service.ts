@@ -35,6 +35,7 @@ import {
 } from './whatsapp-business-number.service';
 import { WhatsAppIdentityService } from './whatsapp-identity.service';
 import { WaMediaService } from './wa-media.service';
+import { TEAM_BUTTON_PREFIX } from '../media/wa-attachment';
 import { WhatsAppRateLimitService } from './whatsapp-rate-limit.service';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
@@ -329,6 +330,10 @@ export class WhatsAppInboundService {
         return;
       }
 
+      // WA-A §3: a tap on a button a team member added is their words (its title), not a BT1 tap.
+      const teamTap = Boolean(inbound.actionId?.startsWith(TEAM_BUTTON_PREFIX));
+      if (teamTap) inbound = { ...inbound, actionId: undefined };
+
       // ── 4. Rate limit ────────────────────────────────────────────────────
       const rateLimited = await this.handleRateLimit(
         number,
@@ -346,8 +351,8 @@ export class WhatsAppInboundService {
         conversation,
         inboundId,
         // BT1: a tapped button's title ("Cancel") is never STOP; an opted-out number's tap is
-        // still dropped.
-        inbound.actionId ? '' : inbound.text,
+        // still dropped. WA-A: nor is a tap on a team member's button.
+        inbound.actionId || teamTap ? '' : inbound.text,
         settings,
         startedAt,
         chatbot.id,

@@ -186,3 +186,24 @@ describe('WhatsAppInboundService: voice notes, images and documents (WA-A)', () 
     expect(request).not.toContain('JFIF');
   });
 });
+
+describe("WhatsAppInboundService: a tap on a team member's button (WA-A §3)", () => {
+  it('is read as its title, like typed words, never as a BT1 tap or STOP', async () => {
+    const h = await buildInboundHarness({
+      chatbot: agentBot,
+      agentAnswer: AGENT_ANSWER,
+    });
+    await h.service.handle({
+      providerMessageId: 'wamid.tap',
+      from: '919876543210',
+      text: 'Stop',
+      actionId: 'team-reply:1',
+      isUnsupportedMedia: false,
+      timestamp: new Date(),
+    });
+    expect(h.aiService.runAgent).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(h.aiService.runAgent.mock.calls[0][0])).toContain(
+      'Stop',
+    );
+  });
+});

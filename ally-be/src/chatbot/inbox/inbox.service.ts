@@ -1,4 +1,5 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
@@ -10,9 +11,15 @@ import { ERASED_TEXT } from '../privacy/erased';
 import { S3Service } from '../../aws/service/s3.service';
 import { AppConfigService } from '../../config/config.service';
 import {
+  WA_MEDIA_PREFIX,
   WA_MEDIA_SIGNED_SECONDS,
   waAttachmentsOf,
 } from '../../whatsapp/media/wa-attachment';
+import { WHATSAPP_MEDIA_LIMITS } from '../../whatsapp/type/whatsapp-provider.interface';
+import type { TeamMedia } from '../handover/handover.service';
+
+/** WA-A: the largest file the team can send from the Inbox (Meta allows documents to 100 MB). */
+export const TEAM_FILE_MAX_BYTES = 25 * 1024 * 1024;
 import { failedSendReason } from '../../whatsapp/wa-a-copy';
 
 /** "Live now": a message in the last this many minutes. */
@@ -295,6 +302,78 @@ export class InboxService {
           attachments: await this.signed(m.attachments),
         })),
       ),
+    };
+  }
+
+  /**
+   * WA-A §3: a file a team member attaches, checked against what WhatsApp accepts (type and size)
+   * and stored in the private bucket beside the chat's other files. The send itself is the
+   * handover's, with its holder and 24-hour checks.
+   */
+  async storeTeamFile(
+    chatbotId: string,
+    conversationId: string,
+    file: {
+      buffer: Buffer;
+      mimetype: string;
+      size: number;
+      originalname?: string;
+    },
+  ): Promise<TeamMedia> {
+    await this.access.assert(chatbotId, ChatbotMemberRole.VIEWER);
+    const mimeType = (file.mimetype || '').split(';')[0].trim().toLowerCase();
+    const kind = (
+      WHATSAPP_MEDIA_LIMITS.image.mimeTypes as readonly string[]
+    ).includes(mimeType)
+      ? ('image' as const)
+      : (
+            WHATSAPP_MEDIA_LIMITS.document.mimeTypes as readonly string[]
+          ).includes(mimeType)
+        ? ('document' as const)
+        : null;
+    if (!kind) {
+      throw new BadRequestException({
+        errorCode: 'file_type',
+        message:
+          'WhatsApp takes JPEG or PNG images, PDFs and Office documents.',
+      });
+    }
+    const max = Math.min(
+      WHATSAPP_MEDIA_LIMITS[kind].maxBytes,
+      TEAM_FILE_MAX_BYTES,
+    );
+    if (!(file.size > 0) || file.size > max) {
+      throw new BadRequestException({
+        errorCode: 'file_size',
+        message: `That file is too large for WhatsApp (up to ${Math.round(max / 1024 / 1024)} MB).`,
+      });
+    }
+    const bucket = this.appConfig?.s3.audioBucket;
+    if (!bucket || !this.s3) {
+      throw new BadRequestException({
+        errorCode: 'file_storage',
+        message: "Files can't be sent from this environment.",
+      });
+    }
+    const ext = (file.originalname?.split('.').pop() ?? 'bin')
+      .replace(/[^a-z0-9]/gi, '')
+      .slice(0, 8)
+      .toLowerCase();
+    const key = `${WA_MEDIA_PREFIX}${chatbotId}/${conversationId}/team-${randomUUID()}.${ext || 'bin'}`;
+    await this.s3.uploadStream({
+      Bucket: bucket,
+      Key: key,
+      Body: file.buffer,
+      ContentType: mimeType,
+    });
+    return {
+      kind,
+      key,
+      mimeType,
+      sizeBytes: file.size,
+      ...(file.originalname
+        ? { filename: file.originalname.slice(0, 240) }
+        : {}),
     };
   }
 

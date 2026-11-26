@@ -27,6 +27,12 @@ export interface WaAttachment {
 
 export const WA_MEDIA_PREFIX = 'wa-media/';
 
+/**
+ * WA-A §3: the id prefix of a reply button a team member added in the Inbox. A tap on one is read
+ * as its title, like typed words (never as BT1's action token, and never as STOP).
+ */
+export const TEAM_BUTTON_PREFIX = 'team-reply:';
+
 /** Signed links last 10 minutes: long enough to play or open, short enough not to share. */
 export const WA_MEDIA_SIGNED_SECONDS = 600;
 
