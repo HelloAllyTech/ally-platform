@@ -482,3 +482,20 @@ def test_log_groups_come_from_the_vm_env_not_the_public_repo() -> None:
     for bad in ("not json", '["/x"]', '{"ally-be": "/x"}', '{"nope": ["/x"]}'):
         with pytest.raises(ConfigError, match="BUGHUNTER_LOG_GROUPS"):
             load_config(env={"BUGHUNTER_LOG_GROUPS": bad})
+
+
+def test_every_pr_body_passes_the_repo_manual_check() -> None:
+    import re
+
+    from bug_hunter.config import PACKAGE_ROOT
+    from bug_hunter.graph.output import MANUAL_LINE
+    from bug_hunter.queue.actions import short_pr_body
+    from bug_hunter.reports.store import Report
+
+    wf = (PACKAGE_ROOT.parent / ".github/workflows/manual-trailer.yml").read_text()
+    pattern = re.search(r"grep -Eiq '(.+?)'; then", wf).group(1)
+    pattern = pattern.replace("[:space:]", r"\s")  # POSIX class -> Python
+    report = Report("2026-11-26", "reported", "ally-web", "k", "suggested_fix", "t")
+    body = short_pr_body(report)
+    assert MANUAL_LINE in body.splitlines()
+    assert any(re.match(pattern, line, re.I) for line in body.splitlines())

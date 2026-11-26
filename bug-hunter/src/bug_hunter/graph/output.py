@@ -5,6 +5,14 @@ from __future__ import annotations
 
 from bug_hunter.graph.state import BugState
 
+# The repo's Product Manual check (.github/workflows/manual-trailer.yml) fails a PR
+# without a Manual line. A Bug Hunter fix restores behaviour the manual already
+# describes, so it never proposes a manual change; a person can edit the line.
+MANUAL_LINE = (
+    "Manual: none — Bug Hunter bug fix: restores the intended behaviour, "
+    "no new screen, label, setting or flow"
+)
+
 
 def pr_title(state: BugState) -> str:
     title = state.finding.title if state.finding else "bug fix"
@@ -52,6 +60,8 @@ def pr_body(state: BugState) -> str:
             "hunter learns from it.",
             "",
             f"_Run `{state.run_id}` · bug-hunter v2_",
+            "",
+            MANUAL_LINE,
         ]
     )
 

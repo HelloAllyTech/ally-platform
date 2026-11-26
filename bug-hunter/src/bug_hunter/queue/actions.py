@@ -23,6 +23,7 @@ from typing import Any, Callable
 
 from bug_hunter.graph.github import GitHubClient
 from bug_hunter.graph.nodes.approve import slug_for
+from bug_hunter.graph.output import MANUAL_LINE
 from bug_hunter.graph.risk import topic_hits
 from bug_hunter.reports.store import Report
 from bug_hunter.tools.git import branch_name
@@ -77,6 +78,8 @@ def short_pr_body(report: Report) -> str:
         "",
         "Opened by Bug Hunter from its suggested fix, at an admin's request. "
         "A person decides the merge.",
+        "",
+        MANUAL_LINE,
     ]
     return "\n".join(lines)
 
