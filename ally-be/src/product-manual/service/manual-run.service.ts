@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { MANUAL_RUN_ADVISORY_LOCK } from '../constants/manual-agent.constants';
-import { ManualRun, ManualRunStatus } from '../entity/manual-run.entity';
+import {
+  ManualRun,
+  ManualRunItemOutcome,
+  ManualRunStatus,
+} from '../entity/manual-run.entity';
 
 export type ManualRunTrigger = 'scheduled' | 'manual';
 
@@ -78,12 +82,18 @@ export class ManualRunService {
   /** Keep the row's spend current, so the month's open reservation shrinks as the run spends. */
   async progress(
     id: string,
-    patch: { spentUsd: number; pagesTouched: number; proposalsApplied: number },
+    patch: {
+      spentUsd: number;
+      pagesTouched: number;
+      proposalsApplied: number;
+      itemLog?: ManualRunItemOutcome[];
+    },
   ): Promise<void> {
     await this.runs.update(id, {
       spentUsd: patch.spentUsd.toFixed(4),
       pagesTouched: patch.pagesTouched,
       proposalsApplied: patch.proposalsApplied,
+      ...(patch.itemLog ? { itemLog: patch.itemLog } : {}),
     });
   }
 
@@ -97,6 +107,7 @@ export class ManualRunService {
       proposalsApplied: number;
       summary?: string | null;
       error?: string | null;
+      itemLog?: ManualRunItemOutcome[];
     },
   ): Promise<void> {
     await this.runs.update(id, {
@@ -109,6 +120,7 @@ export class ManualRunService {
       proposalsApplied: patch.proposalsApplied,
       summary: patch.summary ?? null,
       error: patch.error ? patch.error.slice(0, 2000) : null,
+      ...(patch.itemLog ? { itemLog: patch.itemLog } : {}),
       finishedAt: new Date(),
     });
   }

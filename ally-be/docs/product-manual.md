@@ -191,6 +191,12 @@ newest code in the matching surface. For each: read the page, read the code it d
 Stops cleanly when the cap is reached; leaves a one-paragraph summary on the run and on
 `manual_settings.last_run`. `POST /admin/run` runs the same code.
 
+Each work item is handed the page text, the likely code folders for its surfaces and a step budget
+(`MANUAL_WEEKLY_LIMITS`: 12 steps, at most 4 code lookups), so no step is spent reading the page. A page is
+"checked" only when the agent calls `mark_verified` or makes an edit. Each item's outcome is kept in
+`manual_runs.item_log` and returned as `itemLog` by `GET /admin/runs`; the first production run verified
+nothing at 8 steps a page and only totals were stored, so the reason could not be read back.
+
 ## Frontend (ally-web admin dashboard)
 
 The admin dashboard's page lives in the `pages/Roadmap/manual/` folder of `ally-web`. Carbon + IBM Plex

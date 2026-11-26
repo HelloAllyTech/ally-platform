@@ -12,6 +12,7 @@ import {
 } from '../service/manual-weekly-agent.service';
 import { ManualSchedulerRegistrationService } from '../service/manual-scheduler-registration.service';
 import type { ManualLoopRequest } from '../service/manual-agent-core';
+import { MANUAL_WEEKLY_LIMITS } from '../constants/manual-agent.constants';
 
 const NOW = new Date('2026-11-23T02:00:00Z'); // a Monday, 07:30 IST
 const daysAgo = (n: number) => new Date(NOW.getTime() - n * 86_400_000);
@@ -202,6 +203,7 @@ function setup(
     core,
     requests,
     tools,
+    pages,
     proposalsMock: proposals,
   };
 }
@@ -274,7 +276,13 @@ describe('ManualWeeklyAgentService', () => {
     expect(requests[0].messages[0].content).toContain('proposal prop-1');
     expect(requests[1].messages[0].content).toContain('slug b');
     expect(requests.every((r) => r.gate === requests[0].gate)).toBe(true);
-    expect(requests[0].maxIterations).toBe(8);
+    expect(requests[0].maxIterations).toBe(
+      MANUAL_WEEKLY_LIMITS.MAX_ITERATIONS_PER_PAGE,
+    );
+    // The first production run verified nothing at 8 steps a page; keep real headroom.
+    expect(MANUAL_WEEKLY_LIMITS.MAX_ITERATIONS_PER_PAGE).toBeGreaterThanOrEqual(
+      12,
+    );
     expect(runs.finish).toHaveBeenCalledWith(
       'run-1',
       expect.objectContaining({
@@ -289,6 +297,72 @@ describe('ManualWeeklyAgentService', () => {
         note: 'Summary paragraph.',
       }),
       expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    );
+  });
+
+  it('puts the page text, likely code folders and a step budget in the work item', async () => {
+    const { service, requests, pages } = setup();
+    pages.list.mockResolvedValue([
+      page('a'),
+      page('b', { surfaces: ['admin'], body: 'THE-PAGE-BODY-TEXT' }),
+    ]);
+    await service.run({ trigger: 'scheduled', triggeredBy: null });
+    const item = String(requests[1].messages[0].content);
+    expect(item).toContain('slug b');
+    expect(item).toContain('THE-PAGE-BODY-TEXT');
+    expect(item).toContain(
+      'Likely code folders: ally-web/apps/ally-admin-dashboard',
+    );
+    expect(item).toContain(
+      `you have about ${MANUAL_WEEKLY_LIMITS.MAX_ITERATIONS_PER_PAGE} steps`,
+    );
+    expect(item).toContain(
+      `at most ${MANUAL_WEEKLY_LIMITS.MAX_CODE_LOOKUPS_PER_PAGE} code lookups`,
+    );
+    expect(item).toContain('do not read it again');
+    expect(item).toContain('do not guess and do not mark the page');
+  });
+
+  it('cuts a very long page and says so, so one page cannot eat the step budget', async () => {
+    const { service, requests, pages } = setup();
+    const long =
+      'x'.repeat(MANUAL_WEEKLY_LIMITS.MAX_PAGE_CHARS_IN_ITEM) + 'TAIL-MARKER';
+    pages.list.mockResolvedValue([page('a'), page('b', { body: long })]);
+    await service.run({ trigger: 'scheduled', triggeredBy: null });
+    const item = String(requests[1].messages[0].content);
+    expect(item).toContain('[the rest of the page is not shown]');
+    expect(item).not.toContain('TAIL-MARKER');
+  });
+
+  it('records each item’s outcome and how its loop ended on the run row', async () => {
+    const { service, runs, core } = setup();
+    core.run.mockImplementation(async function* () {
+      return {
+        status: 'iteration_cap',
+        text: '',
+        iterations: 12,
+        costUsd: 0.0063,
+      };
+    } as never);
+    await service.run({ trigger: 'manual', triggeredBy: 7 });
+    const patch = runs.finish.mock.calls[0][1];
+    expect(patch.itemLog).toHaveLength(2);
+    expect(patch.itemLog[0]).toEqual({
+      item: expect.stringContaining('Proposal'),
+      outcome: 'not_finished',
+      status: 'iteration_cap',
+      iterations: 12,
+      costUsd: 0.0063,
+    });
+    expect(patch.itemLog[1]).toMatchObject({
+      item: 'Page "b"',
+      outcome: 'not_finished',
+      status: 'iteration_cap',
+    });
+    // The log is also saved as the run goes, so a running run shows its items.
+    expect(runs.progress).toHaveBeenCalledWith(
+      'run-1',
+      expect.objectContaining({ itemLog: expect.any(Array) }),
     );
   });
 

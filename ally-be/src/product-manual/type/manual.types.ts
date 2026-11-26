@@ -8,6 +8,7 @@ import type {
   ManualReleaseState,
 } from '../entity/manual-page.entity';
 import type { ManualRevision } from '../entity/manual-revision.entity';
+import type { ManualRunItemOutcome } from '../entity/manual-run.entity';
 import type { ManualLastRun } from '../entity/manual-settings.entity';
 import type {
   ManualProposalKind,
@@ -183,6 +184,8 @@ export type RunRow = {
   summary: string | null;
   error: string | null;
   triggeredBy: number | null;
+  /** One line per work item: what came of it, and how the model loop ended. */
+  itemLog: ManualRunItemOutcome[];
   startedAt: string;
   finishedAt: string | null;
 };

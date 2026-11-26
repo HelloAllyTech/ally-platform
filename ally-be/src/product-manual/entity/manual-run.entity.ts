@@ -2,6 +2,23 @@ import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 export type ManualRunStatus = 'running' | 'done' | 'failed' | 'skipped';
 
+export type ManualItemOutcomeCode =
+  | 'applied'
+  | 'dismissed'
+  | 'edited'
+  | 'checked'
+  | 'not_finished';
+
+/** One work item's result on a run: enough to see why a page did not finish. No page text. */
+export interface ManualRunItemOutcome {
+  item: string;
+  outcome: ManualItemOutcomeCode;
+  /** How the model loop ended: done, iteration_cap, aborted, provider_failed, budget. */
+  status: string;
+  iterations: number;
+  costUsd: number;
+}
+
 /** One weekly (or run-now) pass of the manual agent. At most one `running` row exists at a time. */
 @Entity('manual_runs')
 export class ManualRun {
@@ -47,6 +64,9 @@ export class ManualRun {
 
   @Column({ type: 'text', nullable: true })
   error?: string | null;
+
+  @Column({ name: 'item_log', type: 'jsonb', default: () => "'[]'" })
+  itemLog!: ManualRunItemOutcome[];
 
   @Column({ name: 'triggered_by', type: 'int', nullable: true })
   triggeredBy?: number | null;
