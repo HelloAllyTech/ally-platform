@@ -8,6 +8,9 @@ import { formatDate, formatRelativeTime } from "@utils";
 /** How often `GET /state` is read while the tab is visible. */
 export const MANUAL_STATE_POLL_MS = 60_000;
 
+/** How often state and the run list are read while the weekly agent is running, so the drawer is live. */
+export const MANUAL_RUN_POLL_MS = 5_000;
+
 /** When the weekly agent last finished (or ran), if the state says. */
 export const lastCheckedAt = (state: ManualState | undefined): string | null => {
   const run = state?.lastRun;

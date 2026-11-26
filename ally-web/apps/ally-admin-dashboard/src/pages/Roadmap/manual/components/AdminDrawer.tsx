@@ -28,6 +28,7 @@ import { ApiEndpoints, en } from "@constants";
 import type { ManualImportPage, ManualImportResult, ManualState } from "@types";
 import { formatDate, formatRelativeTime } from "@utils";
 
+import { MANUAL_RUN_POLL_MS } from "./StateBanner";
 import { mcpEndpoint, testConnection } from "../../../ContextLibrary/insightsFormat";
 import { AGENT_TARGETS, KEY_PLACEHOLDER, snippetFor } from "../utils/agentConnect";
 import { IMPORT_MAX_FILE_BYTES, chunkImportPages, parseImportBundle } from "../utils/importBundle";
@@ -138,9 +139,25 @@ const SettingsSection: React.FC<{ state: ManualState | undefined }> = ({ state }
   );
 };
 
-const RunsSection: React.FC<{ running: boolean }> = ({ running }) => {
+export const RunsSection: React.FC<{ running: boolean }> = ({ running }) => {
   const copy = en.productManual.admin;
-  const { data: runs = [], isLoading } = useGetManualRunsQuery();
+  // The list was read once and never again, so a run that finished still read "running, $0.00" and
+  // "$5.00 held". Read it fresh on open, every few seconds while a run is going, and once more when
+  // it stops (the last poll can be up to one interval old).
+  const {
+    data: runs = [],
+    isLoading,
+    refetch,
+  } = useGetManualRunsQuery(undefined, {
+    pollingInterval: running ? MANUAL_RUN_POLL_MS : 0,
+    skipPollingIfUnfocused: true,
+    refetchOnMountOrArgChange: true,
+  });
+  const wasRunning = useRef(running);
+  useEffect(() => {
+    if (wasRunning.current && !running) void refetch();
+    wasRunning.current = running;
+  }, [running, refetch]);
   const [run, { isLoading: starting }] = useRunManualAgentNowMutation();
   const runNow = async () => {
     try {
