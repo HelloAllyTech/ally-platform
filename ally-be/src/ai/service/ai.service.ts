@@ -826,6 +826,26 @@ export class AiService {
    * redactBody=true: the payload is the person's question.
    */
   /**
+   * WA-A §1: the transcript of a WhatsApp voice note. One attempt, 25 s (ally-ai's own providers
+   * time out at 20 s), inside the inbound message's SQS window. The audio goes to a speech
+   * provider only, never a language model. Throws on failure; the caller sends the fixed
+   * "please type it" line and keeps the message. No Slack alert: a failed note is answered.
+   */
+  async transcribeVoiceNote(
+    audio: Buffer,
+    mimeType: string,
+  ): Promise<VoiceNoteTranscript> {
+    return this.postKnowledge<
+      VoiceNoteTranscript,
+      { audio_base64: string; mime_type: string }
+    >(
+      ENDPOINTS.VOICE_NOTE_TRANSCRIBE,
+      { audio_base64: audio.toString('base64'), mime_type: mimeType },
+      { timeoutMs: 25_000, alertOnFailure: false },
+    );
+  }
+
+  /**
    * Which memory lines a health assistant may keep (chunk 8a). One attempt, 5s: it runs after the
    * reply, and the caller keeps nothing when it fails or times out. The body is what the person
    * said, so it is never logged.
@@ -1771,4 +1791,13 @@ export class AiService {
       true, // isLearnService — routes to ally-ai-learn
     );
   }
+}
+
+/** WA-A: what ally-ai's voice-note route answers. */
+export interface VoiceNoteTranscript {
+  status: 'ok' | 'too_long' | 'failed';
+  transcript: string;
+  language?: string | null;
+  duration_sec?: number | null;
+  provider?: string | null;
 }

@@ -34,6 +34,7 @@ import {
   WhatsAppBusinessNumberService,
 } from './whatsapp-business-number.service';
 import { WhatsAppIdentityService } from './whatsapp-identity.service';
+import { WaMediaService } from './wa-media.service';
 import { WhatsAppRateLimitService } from './whatsapp-rate-limit.service';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
@@ -188,6 +189,8 @@ export class WhatsAppInboundService {
     // BT1: taps (list rows, reply buttons, typed numbers) and a reply's chips and cards.
     @Optional() private readonly actions?: ActionsService,
     @Optional() private readonly parts?: ActionPartsService,
+    // WA-A: voice notes, images and documents. Optional for the specs: without it, as before.
+    @Optional() private readonly media?: WaMediaService,
   ) {}
 
   async handle(inbound: InboundWhatsAppMessage): Promise<void> {
@@ -268,6 +271,48 @@ export class WhatsAppInboundService {
         // switch numbers.
         await this.discard(inboundId, 'ABUSE_BLOCKED: the contact is blocked');
         return;
+      }
+
+      // WA-A §1–2: a voice note is downloaded, kept and transcribed, and its transcript answered
+      // like a typed message from here on (consent, the crisis check first, then the agent); an
+      // image or document is kept for the team and answered from its caption, or with the fixed
+      // "can't read files yet". A failed transcription gets the fixed "please type it" line.
+      if (inbound.media && this.media) {
+        // A reply always follows (the transcript's answer, or a fixed line): dots while it's heard.
+        if (settings.showTyping !== false) {
+          void this.provider
+            .showTypingIndicator?.(inbound.providerMessageId, number.creds)
+            ?.catch(() => undefined);
+        }
+        const outcome = await this.media.receive({
+          inbound,
+          inboundId,
+          chatbotId: chatbot.id,
+          conversationId: conversation.id,
+          creds: number.creds ?? null,
+          locale: contact.locale,
+          copied: sharedCopy,
+        });
+        if (outcome?.kind === 'reply') {
+          await this.reply(
+            contact,
+            conversation,
+            inboundId,
+            outcome.body,
+            outcome.handledBy,
+            startedAt,
+          );
+          return;
+        }
+        if (outcome?.kind === 'text') {
+          inbound = { ...inbound, text: outcome.text };
+          // The words go on the message, so history and the Inbox read them as said.
+          await this.messageRepository.update(
+            { id: inboundId },
+            { body: outcome.text },
+          );
+          void this.sharedStore?.sync([inboundId], inboundId);
+        }
       }
 
       // Media has no text to answer, and this check comes before the rate limit so a worker sending

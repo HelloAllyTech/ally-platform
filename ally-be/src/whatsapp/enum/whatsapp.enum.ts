@@ -23,8 +23,12 @@ export enum WaHandledBy {
   CLARIFIED = 'clarified',
   /** Rate limited. */
   RATE_LIMITED = 'rate_limited',
-  /** An image, audio note or document — nothing we can read. */
+  /** A video, sticker, location or contact card — nothing we can read. */
   UNSUPPORTED_MEDIA = 'unsupported_media',
+  /** WA-A: a voice note that couldn't be transcribed or is over 2 minutes; asked to type it. */
+  VOICE_FAILED = 'voice_failed',
+  /** WA-A: an image or document with no words: kept for the team; "can't read files yet". */
+  FILE_NOT_READ = 'file_not_read',
   /**
    * The number is not linked to an Ally account, so the corpus could not be scoped to an
    * organisation and no answer was attempted.

@@ -1,5 +1,11 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import { S3Service } from '../../aws/service/s3.service';
+import { AppConfigService } from '../../config/config.service';
+import {
+  deleteWaMedia,
+  waMediaKeysOf,
+} from '../../whatsapp/media/wa-attachment';
 import { DataSource, EntityManager } from 'typeorm';
 import { LoggerService } from '../../logger/logger.service';
 import { AlertOutboxService } from '../safety/alert-outbox.service';
@@ -73,6 +79,9 @@ export class CustomerErasureService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     @Optional() private readonly outbox?: AlertOutboxService,
+    // WA-A: the person's stored voice notes, images and documents are deleted too.
+    @Optional() private readonly s3?: S3Service,
+    @Optional() private readonly appConfig?: AppConfigService,
   ) {}
 
   async eraseEndPerson(
@@ -203,6 +212,17 @@ export class CustomerErasureService {
     ids: string[],
     counts: ErasureCounts,
   ): Promise<void> {
+    // WA-A: the files their messages point at go first (best effort; the references go below).
+    const withFiles = (await m.query(
+      `SELECT attachments FROM chatbot_messages
+        WHERE conversation_id = ANY($1::uuid[]) AND attachments IS NOT NULL`,
+      [ids],
+    )) as { attachments: unknown }[];
+    await deleteWaMedia(
+      this.s3,
+      this.appConfig?.s3.audioBucket,
+      waMediaKeysOf(Array.isArray(withFiles) ? withFiles : []),
+    );
     counts.messages = affectedOf(
       await m.query(
         `UPDATE chatbot_messages

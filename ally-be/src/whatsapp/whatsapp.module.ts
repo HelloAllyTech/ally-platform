@@ -44,6 +44,7 @@ import { WhatsAppConnectorType } from './service/whatsapp-connector-type.service
 import { WaSharedStoreWriter } from './shared-store/wa-shared-store.writer';
 import { ChatbotModule } from '../chatbot/chatbot.module';
 import { WaStatusService } from './service/wa-status.service';
+import { WaMediaService } from './service/wa-media.service';
 import { Chatbot } from '../chatbot/entity/chatbot.entity';
 import { Connector } from '../chatbot/entity/connector.entity';
 
@@ -97,6 +98,8 @@ import { Connector } from '../chatbot/entity/connector.entity';
   providers: [
     // WA-A §3: delivery status per outgoing message.
     WaStatusService,
+    // WA-A §1–2: voice notes (transcribed), images and documents in.
+    WaMediaService,
     WhatsAppRateLimitService,
     WhatsAppIdentityService,
     WhatsAppPhoneMappingService,

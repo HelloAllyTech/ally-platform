@@ -10,8 +10,13 @@ export interface InboundWhatsAppMessage {
   from: string;
   /** Message text. Empty for media, which the pipeline answers with an explanation. */
   text: string;
-  /** True when the message was an image, audio note, document or location. */
+  /**
+   * True when the message carries nothing the pipeline handles: a video, sticker, location or
+   * contact card (WA-A: voice notes, images and documents come as `media` instead).
+   */
   isUnsupportedMedia: boolean;
+  /** WA-A: a voice note, audio file, image or document; `text` is its caption, if any. */
+  media?: InboundWhatsAppMedia;
   /** Provider timestamp when supplied, else receipt time. */
   timestamp: Date;
   /**
@@ -26,6 +31,80 @@ export interface InboundWhatsAppMessage {
    */
   actionId?: string;
 }
+
+/** WA-A: a file on an incoming message, as Meta describes it (fetched with `downloadMedia`). */
+export interface InboundWhatsAppMedia {
+  kind: 'audio' | 'image' | 'document';
+  /** Meta's media id: `GET /{id}` gives a short-lived download URL. */
+  id: string;
+  mimeType: string;
+  sha256?: string;
+  filename?: string;
+  caption?: string;
+  /** A voice note recorded in WhatsApp, not an audio file. */
+  voice?: boolean;
+}
+
+/**
+ * WA-A §2: an image or document to send, by a link Meta fetches (a short-lived signed URL).
+ * `whatsappMediaFits` checks Meta's limits before anything is sent.
+ */
+export interface WhatsAppMedia {
+  kind: 'image' | 'document';
+  link: string;
+  mimeType: string;
+  sizeBytes: number;
+  caption?: string;
+  /** Documents: the name the person sees. */
+  filename?: string;
+}
+
+/** Meta's limits for media sends (Cloud API "supported media types"). */
+export const WHATSAPP_MEDIA_LIMITS = {
+  image: {
+    maxBytes: 5 * 1024 * 1024,
+    mimeTypes: ['image/jpeg', 'image/png'],
+  },
+  document: {
+    maxBytes: 100 * 1024 * 1024,
+    mimeTypes: [
+      'application/pdf',
+      'text/plain',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ],
+  },
+  caption: 1024,
+  filename: 240,
+} as const;
+
+/** Why a media send would be refused by Meta, or null when it fits. */
+export function whatsappMediaProblem(media: WhatsAppMedia): string | null {
+  const limits = WHATSAPP_MEDIA_LIMITS[media.kind];
+  if (!limits) return 'unsupported kind';
+  const mime = media.mimeType.split(';')[0].trim().toLowerCase();
+  if (!(limits.mimeTypes as readonly string[]).includes(mime)) {
+    return `type ${mime} is not accepted for ${media.kind}`;
+  }
+  if (!(media.sizeBytes > 0) || media.sizeBytes > limits.maxBytes) {
+    return `size ${media.sizeBytes} is over ${limits.maxBytes} bytes`;
+  }
+  if ((media.caption ?? '').length > WHATSAPP_MEDIA_LIMITS.caption) {
+    return 'caption too long';
+  }
+  if ((media.filename ?? '').length > WHATSAPP_MEDIA_LIMITS.filename) {
+    return 'filename too long';
+  }
+  if (!/^https:\/\//.test(media.link)) return 'link must be https';
+  return null;
+}
+
+export const whatsappMediaFits = (media: WhatsAppMedia): boolean =>
+  whatsappMediaProblem(media) === null;
 
 /**
  * BT1: an interactive message (Meta's list message or reply buttons), inside the 24-hour window
@@ -170,6 +249,26 @@ export interface WhatsAppProvider {
     message: WhatsAppInteractive,
     creds?: WaNumberCredentials,
   ): Promise<{ providerMessageId: string }>;
+
+  /**
+   * WA-A §2: send an image or document by link, checked against Meta's limits first. Optional:
+   * a provider without it can't send files. Throws like `sendText`.
+   */
+  sendMedia?(
+    to: string,
+    media: WhatsAppMedia,
+    creds?: WaNumberCredentials,
+  ): Promise<{ providerMessageId: string }>;
+
+  /**
+   * WA-A §1: the bytes of a file someone sent (Meta: `GET /{media-id}`, then its URL with the
+   * token). Throws when it can't be fetched or is over `maxBytes`.
+   */
+  downloadMedia?(
+    mediaId: string,
+    creds?: WaNumberCredentials,
+    maxBytes?: number,
+  ): Promise<{ data: Buffer; mimeType: string; sizeBytes: number }>;
 
   /**
    * Mark an inbound message read and show "typing…" while the answer is prepared.

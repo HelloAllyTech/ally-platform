@@ -9,20 +9,31 @@ import {
   WhatsAppConnectionCheck,
   WaNumberCredentials,
   WhatsAppInteractive,
+  WhatsAppMedia,
   WhatsAppProvider,
   whatsappInteractiveFits,
+  whatsappMediaProblem,
 } from '../type/whatsapp-provider.interface';
 
-/** Message types that carry no readable text. */
-const UNSUPPORTED_TYPES = new Set([
-  'image',
-  'audio',
-  'video',
-  'document',
-  'sticker',
-  'location',
-  'contacts',
-]);
+/** A file on an incoming message, as Meta sends it. */
+interface MetaMedia {
+  id?: string;
+  mime_type?: string;
+  sha256?: string;
+  filename?: string;
+  caption?: string;
+  voice?: boolean;
+}
+
+/** Message types the pipeline doesn't handle (WA-A: voice notes, images and documents it does). */
+const UNSUPPORTED_TYPES = new Set(['video', 'sticker', 'location', 'contacts']);
+
+/** WA-A: the media types kept and shown in the Inbox (a voice note is also transcribed). */
+const MEDIA_TYPES = new Set(['audio', 'image', 'document'] as const);
+type MediaType = 'audio' | 'image' | 'document';
+
+/** Files larger than this are not downloaded (the message is still kept and answered). */
+export const MAX_MEDIA_DOWNLOAD_BYTES = 25 * 1024 * 1024;
 
 /**
  * What to do about the Meta error codes a go-live actually hits.
@@ -206,6 +217,9 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
               timestamp?: string;
               text?: { body?: string };
               button?: { text?: string };
+              audio?: MetaMedia;
+              image?: MetaMedia;
+              document?: MetaMedia;
               interactive?: {
                 button_reply?: { id?: string; title?: string };
                 list_reply?: { id?: string; title?: string };
@@ -246,6 +260,28 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
             message.interactive?.list_reply?.title ??
             '';
 
+          // WA-A: a voice note, image or document is kept (and a voice note transcribed); its
+          // caption, if any, is the person's words.
+          const raw = MEDIA_TYPES.has(type as MediaType)
+            ? message[type as MediaType]
+            : undefined;
+          const media = raw?.id
+            ? {
+                kind: type as MediaType,
+                id: String(raw.id),
+                mimeType: String(raw.mime_type ?? 'application/octet-stream'),
+                ...(raw.sha256 ? { sha256: String(raw.sha256) } : {}),
+                ...(raw.filename
+                  ? { filename: String(raw.filename).slice(0, 240) }
+                  : {}),
+                ...(raw.caption?.trim()
+                  ? { caption: raw.caption.trim().slice(0, 1024) }
+                  : {}),
+                ...(raw.voice ? { voice: true } : {}),
+              }
+            : undefined;
+          const said = (text || media?.caption || '').trim();
+
           // BT1: a tap on our own list row or reply button carries its action token as the id.
           const actionId =
             message.interactive?.button_reply?.id ??
@@ -253,9 +289,15 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
           out.push({
             providerMessageId: message.id,
             from: this.normalisePhone(message.from),
-            text: text.trim(),
+            text: said,
             ...(actionId ? { actionId } : {}),
-            isUnsupportedMedia: !text.trim() && UNSUPPORTED_TYPES.has(type),
+            ...(media ? { media } : {}),
+            // A media message with no id (nothing to fetch) is still unsupported, as before.
+            isUnsupportedMedia:
+              !said &&
+              !media &&
+              (UNSUPPORTED_TYPES.has(type) ||
+                MEDIA_TYPES.has(type as MediaType)),
             timestamp: message.timestamp
               ? new Date(Number(message.timestamp) * 1000)
               : new Date(),
@@ -301,6 +343,72 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
             },
           };
     return this.postMessage(to, { type: 'interactive', interactive }, creds);
+  }
+
+  /**
+   * WA-A §2: an image or document by link (a short-lived signed URL Meta fetches), checked against
+   * Meta's limits first: a file that doesn't fit is never sent.
+   */
+  async sendMedia(
+    to: string,
+    media: WhatsAppMedia,
+    creds?: WaNumberCredentials,
+  ): Promise<{ providerMessageId: string }> {
+    const problem = whatsappMediaProblem(media);
+    if (problem) {
+      throw new Error(`The file is outside WhatsApp limits: ${problem}`);
+    }
+    const body: Record<string, unknown> = { link: media.link };
+    if (media.caption?.trim()) body.caption = media.caption.trim();
+    if (media.kind === 'document' && media.filename) {
+      body.filename = media.filename;
+    }
+    return this.postMessage(
+      to,
+      { type: media.kind, [media.kind]: body },
+      creds,
+    );
+  }
+
+  /**
+   * WA-A §1: a file someone sent. Meta's media id gives a URL valid for 5 minutes, fetched with the
+   * same token; capped at `maxBytes` so a large document never fills memory.
+   */
+  async downloadMedia(
+    mediaId: string,
+    creds?: WaNumberCredentials,
+    maxBytes = MAX_MEDIA_DOWNLOAD_BYTES,
+  ): Promise<{ data: Buffer; mimeType: string; sizeBytes: number }> {
+    const resolved = this.creds(creds);
+    if (!resolved.accessToken) {
+      throw new Error('WhatsApp is not configured (no access token).');
+    }
+    const info = await this.graph<{
+      url?: string;
+      mime_type?: string;
+      file_size?: number;
+    }>(resolved, 'get', encodeURIComponent(mediaId), 'the media lookup');
+    if (!info?.url) throw new Error('Meta returned no URL for the media');
+    if (Number(info.file_size) > maxBytes) {
+      throw new Error(`The file is over ${maxBytes} bytes`);
+    }
+    let response: { data: ArrayBuffer; headers?: Record<string, unknown> };
+    try {
+      response = await axios.get<ArrayBuffer>(info.url, {
+        headers: { Authorization: `Bearer ${resolved.accessToken}` },
+        responseType: 'arraybuffer',
+        maxContentLength: maxBytes,
+        timeout: 15_000,
+      });
+    } catch (error) {
+      throw new MetaGraphError('the media download', error);
+    }
+    const data = Buffer.from(response.data);
+    return {
+      data,
+      mimeType: String(info.mime_type ?? 'application/octet-stream'),
+      sizeBytes: data.length,
+    };
   }
 
   async sendText(
