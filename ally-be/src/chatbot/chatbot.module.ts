@@ -33,6 +33,7 @@ import { ConversationService } from './service/conversation.service';
 import { AlertOutboxService } from './safety/alert-outbox.service';
 import { AssistantsMonitoringService } from './safety/assistants-monitoring.service';
 import { CrisisAlertService } from './safety/crisis-alert.service';
+import { LateCrisisService } from './safety/late-crisis.service';
 import { GoLiveController } from './safety/go-live.controller';
 import { GoLiveGateService } from './safety/go-live-gate.service';
 import { GoLiveBackfillService } from './safety/go-live-backfill.service';
@@ -194,6 +195,8 @@ import {
     AssistantsMonitoringService,
     CrisisAlertService,
     CrisisBackfillService,
+    // WA-A §0a: a crisis verdict that arrives after the reply still flags and alerts.
+    LateCrisisService,
     // Safety core (stage 4): the go-live gate on every path, and the D10 backfill.
     SafetyStateService,
     GoLiveGateService,

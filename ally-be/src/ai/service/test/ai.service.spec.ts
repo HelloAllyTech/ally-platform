@@ -142,6 +142,49 @@ describe('AiService', () => {
     });
   });
 
+  describe('checkWhatsAppCrisis with onLate (WA-A §0a)', () => {
+    afterEach(() => jest.useRealTimers());
+
+    it('times the turn out at 6 s, keeps listening, and hands a late verdict to onLate', async () => {
+      jest.useFakeTimers();
+      const verdict = { is_crisis: true, confidence: 0.9, signal: 'end it' };
+      const post = jest
+        .spyOn(service as any, 'postKnowledge')
+        .mockImplementation(
+          () =>
+            new Promise((resolve) => setTimeout(() => resolve(verdict), 9_000)),
+        );
+      const onLate = jest.fn();
+      const check = service.checkWhatsAppCrisis({ message: 'x' } as never, {
+        onLate,
+      });
+      const outcome = check.then(
+        () => 'resolved',
+        (error: Error) => error.name,
+      );
+      await jest.advanceTimersByTimeAsync(6_000);
+      expect(await outcome).toBe('AiUpstreamError');
+      expect(onLate).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(3_000);
+      expect(onLate).toHaveBeenCalledWith(verdict);
+      // One request, listening for up to 36 s; no paid retry.
+      expect(post).toHaveBeenCalledTimes(1);
+      expect((post.mock.calls[0][2] as { timeoutMs: number }).timeoutMs).toBe(
+        36_000,
+      );
+    });
+
+    it('resolves as before when the verdict comes in time', async () => {
+      const verdict = { is_crisis: false, confidence: 0.1, signal: '' };
+      jest.spyOn(service as any, 'postKnowledge').mockResolvedValue(verdict);
+      const onLate = jest.fn();
+      await expect(
+        service.checkWhatsAppCrisis({ message: 'x' } as never, { onLate }),
+      ).resolves.toEqual(verdict);
+      expect(onLate).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getNudge', () => {
     const mockChatHistory = [
       { role: 'user', content: 'Hello' },

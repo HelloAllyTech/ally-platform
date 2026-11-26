@@ -741,6 +741,7 @@ export class AiService {
    */
   async checkWhatsAppCrisis(
     request: CrisisCheckRequest,
+    { onLate }: { onLate?: (verdict: CrisisCheckResponse) => void } = {},
   ): Promise<CrisisCheckResponse> {
     // Chunk H1: one attempt of up to 6 s (24 Nov; it was 4 s, which cut slow verdicts off under
     // load), and a quick retry only inside what is left of 6 s, so a finished reply never waits
@@ -754,9 +755,49 @@ export class AiService {
         request,
         { timeoutMs },
       );
+    // WA-A §0a: with `onLate`, the first request keeps listening past the budget. The turn still
+    // gets a timeout at `attemptMs`, as before, and a verdict that answers later reaches `onLate`
+    // (the engine flags and alerts on an at-risk one), with no second paid call.
+    const firstAttempt = (): Promise<CrisisCheckResponse> => {
+      if (!onLate) return attempt(attemptMs);
+      const long = attempt(attemptMs + CRISIS_CHECK_LIMITS.lateListenMs);
+      return new Promise<CrisisCheckResponse>((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          settled = true;
+          reject(
+            new AiUpstreamError(
+              `Crisis check timed out after ${attemptMs}ms; still listening`,
+              ErrorCode.AI_SERVICE_TIMEOUT,
+            ),
+          );
+          long.then(
+            (verdict) => {
+              if (verdict && !verdict.failed) onLate(verdict);
+            },
+            () => undefined,
+          );
+        }, attemptMs);
+        timer.unref?.();
+        long.then(
+          (verdict) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(verdict);
+          },
+          (error: unknown) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            reject(error);
+          },
+        );
+      });
+    };
     let first: { verdict: CrisisCheckResponse } | { error: unknown };
     try {
-      const verdict = await attempt(attemptMs);
+      const verdict = await firstAttempt();
       if (!verdict?.failed) return verdict;
       first = { verdict };
     } catch (error) {

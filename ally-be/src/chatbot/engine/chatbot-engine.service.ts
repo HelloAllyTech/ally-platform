@@ -32,6 +32,7 @@ import { crisisLevelOf } from '../../ai/dto/knowledge.dto';
 import { AiService } from '../../ai/service/ai.service';
 import { LoggerService } from '../../logger/logger.service';
 import { NotificationErrorType } from '../../notification/type/notification.error.type';
+import { LateCrisisService } from '../safety/late-crisis.service';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import {
   WaHandledBy,
@@ -369,6 +370,8 @@ export class ChatbotEngineService {
     @Optional() private readonly answerConflict?: AnswerConflictService,
     // BT1: a Confirm or Keep it tap is answered in code. Optional for the engine's specs.
     @Optional() private readonly actions?: ActionsService,
+    // WA-A §0a: flags a chat when the crisis verdict comes after the reply. Optional for the specs.
+    @Optional() private readonly lateCrisis?: LateCrisisService,
   ) {}
 
   /**
@@ -850,13 +853,30 @@ export class ChatbotEngineService {
         channel: turn.channel?.type,
       }),
     );
+    // WA-A §0a: a crisis verdict that answers after its wait still counts. When the reply already
+    // sent was not the crisis reply, an at-risk late verdict flags the chat and alerts the team.
+    let lateVerdict: (verdict: CrisisCheckResponse) => void = () => undefined;
+    const late = new Promise<CrisisCheckResponse>((resolve) => {
+      lateVerdict = resolve;
+    });
     try {
-      const decision = await this.answer(turn, live);
+      const decision = await this.answer(turn, live, lateVerdict);
       this.logger.info(
         stageLine(runKey, startedAt, 'engine_answer_end', {
           handled_by: decision.handledBy,
         }),
       );
+      if (decision.handledBy !== WaHandledBy.CRISIS && this.lateCrisis) {
+        void late.then((verdict) => {
+          if (!verdict?.is_crisis) return;
+          this.logger.info(
+            stageLine(runKey, startedAt, 'crisis_late_verdict', {
+              level: crisisLevelOf(verdict) ?? 'none',
+            }),
+          );
+          return this.lateCrisis?.flag(turn, verdict);
+        });
+      }
       return decision;
     } catch (error) {
       this.logger.info(
@@ -922,6 +942,7 @@ export class ChatbotEngineService {
   private async answer(
     turn: ChatTurn,
     live?: LiveReply,
+    onLate?: (verdict: CrisisCheckResponse) => void,
   ): Promise<ChatbotDecision> {
     const { settings } = turn;
     const runKey = stageRunIdFor(turn.providerMessageId);
@@ -953,8 +974,11 @@ export class ChatbotEngineService {
     const classifier = settings.crisisClassifierEnabled
       ? crisisAsk.history?.length
         ? Promise.allSettled([
-            this.aiService.checkWhatsAppCrisis(crisisAsk),
-            this.aiService.checkWhatsAppCrisis({ message: turn.text, prompts }),
+            this.aiService.checkWhatsAppCrisis(crisisAsk, { onLate }),
+            this.aiService.checkWhatsAppCrisis(
+              { message: turn.text, prompts },
+              { onLate },
+            ),
           ]).then(([withHistory, alone]) => {
             const value = (
               r: PromiseSettledResult<CrisisCheckResponse | null>,
@@ -967,7 +991,7 @@ export class ChatbotEngineService {
             }
             return moreSevere(value(withHistory), value(alone));
           })
-        : this.aiService.checkWhatsAppCrisis(crisisAsk)
+        : this.aiService.checkWhatsAppCrisis(crisisAsk, { onLate })
       : Promise.resolve(null);
     const classified = settle(classifier);
     // When the classifier fails (chunk H1): the emergency keyword rules decide. A match is an

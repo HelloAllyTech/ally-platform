@@ -129,6 +129,7 @@ export const makeEngine = ({
   listTools,
   limits,
   blockedCrisis,
+  lateCrisis,
   canChat = true,
 }: {
   aiService: EngineAiService;
@@ -148,6 +149,8 @@ export const makeEngine = ({
   limits?: { checkTurn: jest.Mock; releaseTurn?: jest.Mock };
   /** Stage 6 (R1): records a crisis keyword on a blocked turn. */
   blockedCrisis?: { markBlockedCrisis: jest.Mock };
+  /** WA-A §0a: flags a chat when the crisis verdict comes after the reply. */
+  lateCrisis?: { flag: jest.Mock };
   /** Whether the sender is on the bot's list (the access gate). */
   canChat?: boolean;
 }): ChatbotEngineService =>
@@ -179,4 +182,8 @@ export const makeEngine = ({
     conversations as never,
     limits as never,
     blockedCrisis as never,
+    undefined,
+    undefined,
+    undefined,
+    lateCrisis as never,
   );
