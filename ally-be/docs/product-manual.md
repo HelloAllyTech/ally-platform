@@ -248,6 +248,11 @@ These came from running the agents against the real model, not from reading code
    tidy them unless they verified the answer in code. No renaming, retoning or restructuring for taste.
 4. Tools that are not configured are not offered; a failing tool call is never retried with the same input.
 5. A draft proposed in chat is a card in the tray; nothing reaches the roadmap until the user presses Save.
+6. **An edit can't drop most of a page.** `edit_manual_page` replaces the whole body, and the fourth production run
+   applied a proposal by sending the proposal's own text as the body: a 5,222-character page became 830. An edit to a
+   page of 8+ lines (or 600+ characters) is now refused unless at least 60% of its non-empty lines survive and it keeps
+   at least half its length (`pageLossRefusal` in `src/product-manual/util/manual-edit-guard.util.ts`). Small pages are
+   free to rewrite; a real change (a row, a paragraph, a section) passes. Revert and import do not go through the tool.
 
 ## Operating it
 

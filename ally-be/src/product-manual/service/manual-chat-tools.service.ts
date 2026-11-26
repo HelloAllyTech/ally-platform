@@ -20,6 +20,7 @@ import type {
   ManualAuthorKind,
   ManualSourceRef,
 } from '../entity/manual-revision.entity';
+import { pageLossRefusal } from '../util/manual-edit-guard.util';
 import { isValidSlug } from '../util/manual-slug.util';
 import { ManualPageService } from './manual-page.service';
 import { ManualProposalService } from './manual-proposal.service';
@@ -313,15 +314,18 @@ export class ManualChatToolsService {
         name: 'edit_manual_page',
         description:
           'Replace an existing page body with a corrected version. Read the page first; send the ' +
-          'WHOLE new body; change only what is wrong or missing. Needs a one-sentence reason a ' +
-          'reader of the change log can follow, and at least one source.',
+          'WHOLE new body with your change made in place and every other line kept exactly; never ' +
+          "only the changed part or a proposal's text (an edit that drops most of the page is " +
+          'refused). Change only what is wrong or missing. Needs a one-sentence reason a reader of ' +
+          'the change log can follow, and at least one source.',
         input_schema: {
           type: 'object',
           properties: {
             slug: { type: 'string' },
             newBody: {
               type: 'string',
-              description: 'The full new markdown body',
+              description:
+                'The ENTIRE page after your change: all unchanged lines kept exactly, your change made in place',
             },
             reason: { type: 'string' },
             sources: SOURCES_SCHEMA,
@@ -821,6 +825,10 @@ export class ManualChatToolsService {
         error: `No page "${slug}". Use create_manual_page for a new topic.`,
       };
     }
+    // An edit replaces the whole page: refuse one that would drop most of it (a fragment, or a
+    // proposal's own text, sent as the body).
+    const loss = pageLossRefusal(existing.body ?? '', newBody);
+    if (loss) return { ok: false, error: loss };
     const rejected = this.scrubbed(
       newBody,
       input.title,

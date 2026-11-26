@@ -853,3 +853,82 @@ describe('ManualChatToolsService weekly lookup budget and trace', () => {
     expect(JSON.stringify(ctx.trace)).not.toContain('a <mark>b</mark>');
   });
 });
+
+describe('ManualChatToolsService page protection', () => {
+  const longBody = Array.from(
+    { length: 12 },
+    (_, i) => `Line ${i + 1}: some words here.`,
+  ).join('\n\n');
+  const withBody = (pages: any, body: string) =>
+    pages.getBySlug.mockResolvedValue({ ...page('running-a-roleplay'), body });
+
+  it('refuses a fragment sent in place of a long page, and writes nothing', async () => {
+    const { tools, pages } = setup();
+    withBody(pages, longBody);
+    const outcome = await tools.execute(
+      'edit_manual_page',
+      {
+        ...edit,
+        newBody:
+          'Summary: a proposal.\n\nDetail: its text.\n\nPR: fix/something',
+      },
+      chatCtx(),
+    );
+    expect(outcome.ok).toBe(false);
+    expect(JSON.parse(outcome.modelResult).error).toMatch(
+      /remove most of the page.*WHOLE page/s,
+    );
+    expect(pages.write).not.toHaveBeenCalled();
+  });
+
+  it('lets a one-line change to a long page through', async () => {
+    const { tools, pages } = setup();
+    withBody(pages, longBody);
+    const outcome = await tools.execute(
+      'edit_manual_page',
+      {
+        ...edit,
+        newBody: longBody.replace('Line 3: some', 'Line 3 (fixed): some'),
+      },
+      chatCtx(),
+    );
+    expect(outcome.ok).toBe(true);
+    expect(pages.write).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses the same fragment from the weekly agent applying a proposal', async () => {
+    const { tools, pages } = setup();
+    withBody(pages, longBody);
+    const ctx = newToolContext({
+      mode: 'weekly',
+      userId: null,
+      ref: 'run-1',
+      editsAllowed: true,
+      proposal: { id: 'prop-1', kind: 'edit', summary: 's' } as never,
+    });
+    const outcome = await tools.execute(
+      'edit_manual_page',
+      {
+        slug: 'running-a-roleplay',
+        newBody: 'Summary: only the proposal text.',
+        reason: 'Applying the proposal.',
+        sources: [{ kind: 'pr', label: 'Proposal prop-1' }],
+      },
+      ctx,
+    );
+    expect(outcome.ok).toBe(false);
+    expect(pages.write).not.toHaveBeenCalled();
+    expect(ctx.trace[0]).toMatchObject({ tool: 'edit_manual_page', ok: false });
+  });
+
+  it('still lets a small page be rewritten freely', async () => {
+    const { tools, pages } = setup(); // the default page body is a single short line
+    const outcome = await tools.execute(
+      'edit_manual_page',
+      { ...edit, newBody: 'A completely different short body.' },
+      chatCtx(),
+    );
+    expect(outcome.ok).toBe(true);
+    expect(pages.write).toHaveBeenCalledTimes(1);
+  });
+});
