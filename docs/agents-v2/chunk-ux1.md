@@ -37,7 +37,7 @@ A redesign can't be judged while the product gives wrong or unsafe answers. Befo
 2. For each step record: screens visited, clicks, seconds of waiting, what the user must find on their own, and every place the text or numbers disagree.
 3. Map every finding in the report (S, B, P2 and "What it was like to use") to a journey step and to the `DESIGN.md` principle it breaks.
 4. List the ingredients that already work and should be reused rather than rebuilt (for example the go-live checklist, the crisis check, Change history, the Confirm card).
-5. Write `docs/agents-v2/UX1-AUDIT.md` with the screenshots, a table per journey, and the top 10 problems ranked by how often a real owner or person would hit them and how badly.
+5. Write `docs/agents-v2/UX1-AUDIT.md` with the screenshots, a table per journey, and the top 10 problems ranked by how often a real owner or person would hit them and how badly. <!-- docs-path-lint: planned -->
 
 **Stop.**
 
@@ -100,7 +100,7 @@ Order by what hurts most:
 2. Before and after table for each Phase 2 target, with the numbers.
 3. Event tracking for the funnel, using whatever analytics the app already has (find it; don't add a vendor): template chosen, each "Get it ready" step done, went live, first visitor message, action confirmed, reply latency, reply withdrawn or declined. Report what exists and what you added.
 4. Prepare a moderated usability script for 5 owners from small NGOs and 5 people aged 18 to 25 (tasks, what to watch, what to ask). People run these sessions; Claude Code writes the script only.
-5. Write `docs/agents-v2/CHUNK-UX1-NOTES.md`: what changed, the numbers, what's left.
+5. Write `docs/agents-v2/CHUNK-UX1-NOTES.md`: what changed, the numbers, what's left. <!-- docs-path-lint: planned -->
 
 ## Rules
 
