@@ -115,9 +115,10 @@ const Transcription: FC<TranscriptionProps> = ({
     }
   }, [selectedMessageId, selectedStartIndex, selectedEndIndex]);
   const convertSecondsToTime = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes.toString().padStart(2, "0")}:${remainingSeconds.toFixed(0).toString().padStart(2, "0")}`;
+    const totalSeconds = Math.round(seconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainingSeconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
   const handleSelection = (index: number) => {
     if (!canSelect) return;
