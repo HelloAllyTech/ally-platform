@@ -83,6 +83,16 @@ describe('the name, saved before the reply', () => {
     ).toBeNull();
   });
 
+  it('WA-A §0b: a name given in the chat replaces a WhatsApp profile name, and is marked as given', async () => {
+    const { memory, query } = setup();
+    expect(
+      await memory.nameNow({ chatbot, contactId: CONTACT, text: "I'm Bilal" }),
+    ).toBe('Bilal');
+    const sql = query.mock.calls[0][0] as string;
+    expect(sql).toContain("OR display_name_source = 'whatsapp_profile'");
+    expect(sql).toContain("display_name_source = 'chat'");
+  });
+
   it('forget my name clears it and marks it forgotten', async () => {
     const { memory, query } = setup();
     expect(await memory.forgetName('bot-1', CONTACT)).toBe(true);

@@ -526,7 +526,8 @@ export class ListToolsService {
         await this.dataSource.query(
           // TF1 round 2: a name they typed is them giving it again, after "forget my name" too.
           `UPDATE chatbot_contacts
-              SET display_name = $3, name_forgotten_at = NULL, "updatedAt" = now()
+              SET display_name = $3, display_name_source = 'chat',
+                  name_forgotten_at = NULL, "updatedAt" = now()
             WHERE id = $1 AND chatbot_id = $2`,
           [
             ctx.contactId,

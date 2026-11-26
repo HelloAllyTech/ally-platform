@@ -314,11 +314,13 @@ export class WhatsAppInboundService {
         (await this.sharedStore?.contactIdFor(settings, contact, chatbot.id)) ??
         null;
       // TF1 B5: a WhatsApp contact with no name takes their WhatsApp profile name; a name they give
-      // in the chat (a booking's, or memory's) replaces it later.
+      // in the chat (a booking's, or memory's) replaces it later (WA-A §0b: marked as the profile's,
+      // so `nameNow` and memory may replace it; the profile never replaces a name they gave).
       if (sharedContactId && inbound.profileName?.trim()) {
         await this.chatbotRepository.manager
           ?.query(
-            `UPDATE chatbot_contacts SET display_name = $2, "updatedAt" = now()
+            `UPDATE chatbot_contacts
+                SET display_name = $2, display_name_source = 'whatsapp_profile', "updatedAt" = now()
               WHERE id = $1 AND (display_name IS NULL OR btrim(display_name) = '')
                 AND name_forgotten_at IS NULL`,
             [sharedContactId, inbound.profileName.trim().slice(0, 120)],
