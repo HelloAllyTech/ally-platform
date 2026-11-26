@@ -83,6 +83,8 @@ export const FeatureToggleKey = {
   // the VIEW_ADMIN_TRACK/EDIT_ADMIN_TRACK/DELETE_ADMIN_TRACK permissions,
   // mirroring how CONTENT_MANAGEMENT gates the Track pages.
   COMPONENT_LIBRARY: "component_library",
+  // Roadmap → Product Manual: the guide to the whole product, its chat and drafts tray. Mirrors ally-be.
+  PRODUCT_MANUAL: "product_manual",
 } as const;
 
 export type FeatureToggleKeyType = (typeof FeatureToggleKey)[keyof typeof FeatureToggleKey];
@@ -236,6 +238,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
     FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
   [FeatureToggleKey.PRODUCT_ROADMAP]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
   [FeatureToggleKey.PRODUCT_ROADMAP_MANAGE]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
+  [FeatureToggleKey.PRODUCT_MANUAL]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
 
   [FeatureToggleKey.AGENT_TEST_CASES]: FEATURE_TOGGLE_SECTIONS.TESTING,
   [FeatureToggleKey.ROLEPLAY_SESSION_LOGS]: FEATURE_TOGGLE_SECTIONS.TESTING,

@@ -1,6 +1,5 @@
-import React, { useContext, useSyncExternalStore } from "react";
+import React from "react";
 
-import { ReactReduxContext } from "react-redux";
 import { Link, useLocation } from "react-router-dom";
 
 import { FeatureToggleKey, Permissions, ROUTES, en } from "@constants";
@@ -8,9 +7,10 @@ import { hasFeature, hasPermissions } from "@utils";
 
 import { NewIdeaButton } from "./NewIdeaButton";
 import { RoadmapConceptsButton, RoadmapMoreMenu, RoleTabKey, tabLabel } from "./RoadmapAreaNav";
+import { useRoadmapAccess } from "../hooks/useRoadmapAccess";
 import { useRoadmapRole } from "../RoadmapGate";
 
-type TopTab = "queue" | "drafts" | "bugs" | "updates" | RoleTabKey;
+type TopTab = "queue" | "drafts" | "bugs" | "updates" | "manual" | RoleTabKey;
 
 /** Which tab the URL is on. Anything under /roadmap that is not one of the others is the Queue. */
 const tabFor = (pathname: string): TopTab => {
@@ -20,21 +20,8 @@ const tabFor = (pathname: string): TopTab => {
   if (pathname.startsWith(ROUTES.ROADMAP_AGENT)) return "agent";
   if (pathname.startsWith(ROUTES.ROADMAP_SETTINGS)) return "settings";
   if (pathname.startsWith(ROUTES.ROADMAP_MEASURES)) return "measures";
+  if (pathname.startsWith(ROUTES.ROADMAP_MANUAL)) return "manual";
   return "queue";
-};
-
-/**
- * What the signed-in person may open, read from the store when there is one. The Roadmap pages are
- * always inside it; a page rendered alone (a test, a preview) has no store and so no extra tabs.
- */
-const useAccess = (): { permissions: string[]; features: string[] } => {
-  const store = useContext(ReactReduxContext)?.store;
-  const state = useSyncExternalStore(
-    store ? store.subscribe : () => () => undefined,
-    () => store?.getState().user,
-    () => undefined,
-  );
-  return { permissions: state?.permissions ?? [], features: state?.features ?? [] };
 };
 
 /** Where a role tab's own link goes. */
@@ -63,11 +50,13 @@ export const RoadmapTopNav: React.FC<{
 }> = ({ phone, phoneTitle, phoneTrailing, withNewIdea = false }) => {
   const { role } = useRoadmapRole();
   const { pathname } = useLocation();
-  const { permissions, features } = useAccess();
+  const { permissions, features } = useRoadmapAccess();
   // Product updates sits here now, for whoever could open it from the sidebar before.
   const canSeeUpdates =
     hasPermissions(permissions, [Permissions.EDIT_BLOG]) &&
     hasFeature(features, FeatureToggleKey.PRODUCT_UPDATES);
+  // The Product Manual, for whoever holds its toggle (default on for every admin tier).
+  const canSeeManual = hasFeature(features, FeatureToggleKey.PRODUCT_MANUAL);
   const copy = en.roadmapV2;
   const active = tabFor(pathname);
   const roleTab =
@@ -110,6 +99,7 @@ export const RoadmapTopNav: React.FC<{
                   en.nav.items.productUpdates ?? "Product updates",
                   ROUTES.PRODUCT_UPDATES,
                 )}
+              {canSeeManual && tab("manual", en.productManual.tab, ROUTES.ROADMAP_MANUAL)}
               {/* The page you are on from the menu (Agent, Settings, Measures) takes a tab of its own,
                   so you always see where you are. */}
               {roleTab && tab(roleTab, tabLabel(roleTab), roleTabTarget(roleTab))}

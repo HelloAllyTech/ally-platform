@@ -546,6 +546,15 @@ out which meaning is in play before you change anything.
 **Code:** `ally-be/src/pm-agent/` · `ally-web/apps/ally-admin-dashboard/src/pages/PmAgent/`
 **Deep doc:** [PM Agent](https://github.com/HelloAllyTech/ally-platform/blob/master/ally-be/docs/pm-agent.md)
 
+### Product Manual
+<!-- concept: product-manual -->
+**Is:** A read-only, searchable guide to the whole product for Ally staff (admin → Roadmap → Product Manual), with a chat grounded in it and a weekly agent that keeps it current.
+**Also called:** the manual, `product-manual`, `manual_pages` · **Not to be confused with:** the developer wiki (this site — public, for engineers); the [Context Library](#context-library) (retrieval for agents); the [Roadmap](#roadmap) it sits under.
+**Composed of:** Pages and revisions, `[[links]]`, full-text search and a map, all in the database; the text is never in git or the wiki because the repo is public. `ManualPageService.write()` is the single writer: it scrubs secrets, writes a revision and rebuilds links, and marks the page "ships in next release" until a release goes out. Coding agents file proposals through a key-gated MCP endpoint; the weekly agent applies them and a chat agent edits live, each edit one revert away. Spend shares one IST-monthly budget read from `llm_usage`; see [AI task registry](#ai-task-registry). Chat can save a draft to the [Roadmap](#roadmap) and ask the [Analytics Agent](#analytics-agent) when the caller holds that toggle.
+**Status:** Live — gate: `FeatureToggleKey.PRODUCT_MANUAL` (defaultEnabled; read, search, chat) plus a [Roadmap](#roadmap) role and `builder_settings.roadmapV2Enabled`; admin routes `FeatureToggleKey.PRODUCT_ROADMAP_MANAGE`. The weekly agent is Dark: `manual_settings.enabled` defaults false. The manual is empty until an admin imports content.
+**Code:** `ally-be/src/product-manual/` · `ally-web/apps/ally-admin-dashboard/src/pages/Roadmap/manual/`
+**Deep doc:** [Product Manual contract](https://github.com/HelloAllyTech/ally-platform/blob/master/ally-be/docs/product-manual.md) · [DATA_SCHEMA §3.26](https://github.com/HelloAllyTech/ally-platform/blob/master/ally-be/DATA_SCHEMA.md)
+
 ### Bug Hunter
 <!-- concept: bug-hunter -->
 **Is:** A find-and-fix agent: it takes a bug, investigates it, reproduces it with a failing test, writes a fix, verifies and reviews it, and leaves a suggested fix or a draft PR. Merge and Release are always a person's click.

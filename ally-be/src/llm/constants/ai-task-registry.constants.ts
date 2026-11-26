@@ -2235,6 +2235,50 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configuredBy: 'LLM_REASONING_MODEL',
     promptOverride: 'pm_agent_lessons',
   },
+  // Product Manual (src/product-manual, docs/product-manual.md). The system prompts are code
+  // constants (src/product-manual/constants/manual-agent.constants.ts), not Skills Store rows, so
+  // there is no promptOverride: the model is the tier's unless the resolver is given one. Both
+  // labels start `product_manual_`, which is how the manual's one monthly budget sums them.
+  {
+    id: 'product-manual-chat',
+    task: LlmTask.PRODUCT_MANUAL_CHAT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'A staff member sends a message in the Product Manual chat (admin → Roadmap → Product Manual)',
+    detail:
+      'A tool loop of at most 10 lookups plus one closing pass per message, 4,000 output tokens a ' +
+      'pass, each pass one llm_usage row. It searches and reads the manual first, then the code on ' +
+      'master through Builder’s GitHub read tools, the roadmap, and the Analytics Agent for callers ' +
+      'holding analytics_agent (that call is the analytics agent’s own row). It may edit or add a ' +
+      'manual page live and put rough ideas in the drafts tray; edits are withheld once the month’s ' +
+      'manual budget is used up, reading and answering are not. Prompt and page outline ride in two ' +
+      'cached system blocks; a failing provider retries the pass once on the tier model.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+  },
+  {
+    id: 'product-manual-agent',
+    task: LlmTask.PRODUCT_MANUAL_AGENT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Weekly on Mondays (07:30 IST), or Run now in the Product Manual settings, while the weekly ' +
+      'agent is switched on and the month has budget',
+    detail:
+      'Applies open manual proposals (from coding agents and the chat), then checks pages against the ' +
+      'code on master: at most 25 work items a run and 8 passes of 4,000 output tokens each, then one ' +
+      '600-token summary call. Every pass first reserves its worst-case cost inside a per-run cap ' +
+      '(the smaller of what is left this month and a quarter of the monthly budget); a pass that ' +
+      'cannot reserve is not made and the run stops cleanly. Writes go through the single page ' +
+      'writer, so every change is a revision in the change log.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+  },
   {
     id: 'foundational-skills-judge',
     task: LlmTask.FOUNDATIONAL_SKILLS_ASSESSMENT,

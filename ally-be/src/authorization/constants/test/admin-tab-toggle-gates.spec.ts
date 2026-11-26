@@ -15,6 +15,7 @@ import { BuilderEvalController } from 'src/builder/eval/controller/builder-eval.
 import { RoadmapOpportunityController } from 'src/product-roadmap/controller/roadmap-opportunity.controller';
 import { RoadmapAdminController } from 'src/product-roadmap/controller/roadmap-admin.controller';
 import { RoadmapCollaborationController } from 'src/product-roadmap/controller/roadmap-collaboration.controller';
+import { ManualController } from 'src/product-manual/controller/manual.controller';
 import { UserController } from 'src/user/controller/user.controller';
 import { AuthorizationController } from 'src/authorization/controller/authorization.controller';
 import { SimulationCreditsController } from 'src/learn/controller/simulation-credits.controller';
@@ -233,6 +234,13 @@ const SURFACES: {
       'updateView',
       'removeView',
     ],
+    open: {},
+  },
+  // Product Manual: the reader. Nothing else calls these routes.
+  {
+    key: FeatureToggleKey.PRODUCT_MANUAL,
+    controller: ManualController,
+    gated: ['tree', 'page', 'find', 'map', 'changeLog', 'revert', 'state'],
     open: {},
   },
   // Users: organizations and their users. Routes behind

@@ -79,6 +79,19 @@ Setup: create a read-only key in the admin dashboard under **Context Library →
 Code**, then export `ALLY_CONTEXT_LIBRARY_URL` and `ALLY_CONTEXT_LIBRARY_KEY`. Details:
 [Working with the Context Library](https://tech.helloally.ai/#/wiki/contributing/planning-with-context-library.md).
 
+## Keep the Product Manual current
+
+The **Product Manual** (admin → Roadmap → Product Manual) is Ally's guide to the whole product for
+non-technical staff. It lives **only in the database** — never write manual text into this repo, the
+wiki or a PR; the repo is public. When your change alters what a person can see or do (a screen, label,
+route, role or toggle gate, setting, notification, limit, or the way a feature works), call the
+`product-manual` MCP's `propose_manual_change` tool (after `search_manual` / `read_manual_page` to find the
+page it affects). You propose; you never edit a page — a weekly agent applies proposals. Then put
+**one** line in the PR description: `Manual: proposal <id>` (the tool returns it), or
+`Manual: none — <why nothing a user sees changed>`. A CI check requires that line (no AI, no token cost).
+Setup: create an agent key in the Product Manual's settings drawer, then export `ALLY_PRODUCT_MANUAL_URL`
+and `ALLY_PRODUCT_MANUAL_KEY` (this root `.mcp.json` reads both). Details: [`ally-be/docs/product-manual.md`](ally-be/docs/product-manual.md).
+
 ## Common Patterns Across Repos
 
 ### Authentication

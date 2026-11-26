@@ -6,11 +6,13 @@ import { toast } from "sonner";
 
 import { CarbonToggle, OverflowMenu, OverflowMenuItem } from "@ally-ui-mono/ui-shared";
 import { useGetRoadmapPreferencesQuery, useSetRoadmapPreferencesMutation } from "@api";
-import { ROUTES, en } from "@constants";
+import { FeatureToggleKey, ROUTES, en } from "@constants";
 import type { RoadmapRole } from "@types";
+import { hasFeature } from "@utils";
 
 import { requestShortcuts, useRoadmapFrame } from "../RoadmapFrame";
 import { CONCEPTS_WIKI_URL, ConceptsButton } from "./ConceptsLink";
+import { useRoadmapAccess } from "../hooks/useRoadmapAccess";
 import { canSeeAgent, canSeeMeasures, canSeeSettings } from "../utils/redirects";
 
 export type RoleTabKey = "agent" | "settings" | "measures";
@@ -137,7 +139,14 @@ export const MoreSheetContent: React.FC<{ role: RoadmapRole; onNavigate: () => v
 }) => {
   const copy = en.roadmapV2Tools;
   const { openWhatMoved } = useRoadmapFrame();
-  const tabs = roleTabsFor(role);
+  const { features } = useRoadmapAccess();
+  // The Product Manual has no room in the phone's bottom bar: it lives here, before the role tabs.
+  const tabs = [
+    ...(hasFeature(features, FeatureToggleKey.PRODUCT_MANUAL)
+      ? [{ key: "manual", to: ROUTES.ROADMAP_MANUAL, label: en.productManual.tab }]
+      : []),
+    ...roleTabsFor(role).map(tab => ({ ...tab, label: tabLabel(tab.key) })),
+  ];
   return (
     <div className="flex flex-col gap-4">
       {tabs.length > 0 && (
@@ -149,7 +158,7 @@ export const MoreSheetContent: React.FC<{ role: RoadmapRole; onNavigate: () => v
               onClick={onNavigate}
               className="flex min-h-12 items-center rounded border border-border-light px-4 text-base text-typography-900"
             >
-              {tabLabel(tab.key)}
+              {tab.label}
             </NavLink>
           ))}
         </nav>
