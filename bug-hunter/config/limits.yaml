@@ -18,7 +18,7 @@ signals:
   issues: true
   error_logs: true
   commit_sweep: true
-  apps: [ally-be, ally-web, ally-ai, ally-ai-learn, ally-mobile]   # rollout: dry-run -> [ally-be] -> all
+  apps: [ally-be, ally-web, ally-ai, ally-ai-learn, ally-mobile]   # rollout: live for all five since 2026-11-26
   org: HelloAllyTech          # issue signals only from issues opened or labelled `bug` by members
   issue_label: bug
   reports_repo: HelloAllyTech/bug-hunter-reports   # private; nothing about findings goes to ally-platform

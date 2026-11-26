@@ -6,7 +6,7 @@
 #   BUGHUNTER_CHECKPOINT_DB_URL, AWS read-only CloudWatch credentials,
 #   BUGHUNTER_SPEND_BACKEND=db, BUGHUNTER_HOME=/var/lib/bug-hunter
 [Unit]
-Description=Bug Hunter v2 daily job (dry run until the rollout says otherwise)
+Description=Bug Hunter v2 daily job (live: fresh candidates go to the bug queue)
 After=network-online.target docker.service
 Wants=network-online.target
 
@@ -17,7 +17,7 @@ WorkingDirectory=/opt/ally-platform/bug-hunter
 EnvironmentFile=/etc/bug-hunter/env
 # "+" runs it as root: it checks out master, installs packages and units (update.sh)
 ExecStartPre=+/opt/ally-platform/bug-hunter/deploy/update.sh
-ExecStart=/usr/bin/flock -n /var/lib/bug-hunter/run.lock /opt/bug-hunter/venv/bin/bug-hunter daily --with-lenses --max-cost-usd 3
+ExecStart=/usr/bin/flock -n /var/lib/bug-hunter/run.lock /opt/bug-hunter/venv/bin/bug-hunter daily --live --with-lenses --max-cost-usd 3
 ExecStartPost=/opt/bug-hunter/venv/bin/bug-hunter approvals expire
 TimeoutStartSec=6h
 Nice=10

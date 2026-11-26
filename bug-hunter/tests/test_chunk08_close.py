@@ -105,8 +105,10 @@ def test_deploy_units_share_one_lock_and_never_use_actions() -> None:
         assert "EnvironmentFile=/etc/bug-hunter/env" in units[name]
         assert "User=bughunter" in units[name]
     assert "03:30:00 Asia/Kolkata" in units["bug-hunter-daily.timer"]
-    systemd = "".join(v for k, v in units.items() if k.startswith("bug-hunter-"))
-    assert "--live" not in systemd  # dry run until the rollout
+    # live since 2026-11-26 (user): the daily job queues, the worker runs by mode;
+    # the 15-minute poll stays a dry run
+    assert "daily --live --with-lenses" in units["bug-hunter-daily.service"]
+    assert "--live" not in units["bug-hunter-poll.service"]
     # the daily job pulls master first; the worker restarts itself on new code
     assert "ExecStartPre=+/opt/ally-platform/bug-hunter/deploy/update.sh" in (
         units["bug-hunter-daily.service"]
