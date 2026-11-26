@@ -438,6 +438,27 @@ export const BUILDER_ENGINE = 'opencode';
 /* ── Model tiering ──────────────────────────────────────────────────────── */
 
 /**
+ * The pro model for every tier that runs inside the opencode engine (the design
+ * run's designer and critic, the weekly repo-map job).
+ *
+ * NOT `gemini-2.5-pro`. opencode 1.18.32 still lists `google/gemini-2.5-pro` and
+ * `google/gemini-2.5-flash`, but refuses to run either: the phase dies in about
+ * two seconds with `ProviderModelNotFoundError: Model not found`, which the CLI
+ * prints as "Unexpected server error". Google's own API still serves both, so a
+ * key check passes and the failure looks like a runner fault. Every design run
+ * from 2026-11-26 failed that way until this default moved.
+ *
+ * `gemini-3.1-pro-preview` and `gemini-3-flash-preview` were run through
+ * opencode 1.18.32 on a GitHub runner and answered. `interview` and
+ * `mechanical` stay on 2.5 because ally-be calls Google directly for them,
+ * where 2.5 still works.
+ *
+ * Keep `scripts/builder/run-engine.sh` and `refresh-repo-map.sh` on the same id
+ * (`builder-engine-invocation.spec.ts` fails if they drift).
+ */
+export const BUILDER_ENGINE_PRO_MODEL = 'gemini-3.1-pro-preview';
+
+/**
  * The single source of model defaults, per role in the tiered loop. Env vars
  * (`BUILDER_INTERVIEW_MODEL`, `BUILDER_PLANNER_MODEL`, `BUILDER_CODER_MODEL`,
  * `BUILDER_VERIFIER_MODEL`) override via config; builder_settings overrides
@@ -455,16 +476,16 @@ export const BUILDER_ENGINE = 'opencode';
  * in half — the interview, the epic decomposition and every mechanical pass ran
  * on Claude because only one of the two code paths consulted the settings row.
  *
- * `gemini-2.5-pro` rather than a per-tier spread because Gemini publishes two
+ * One pro model rather than a per-tier spread because Gemini publishes two
  * general models, not five: pro where the answer's quality is the point, flash
  * where throughput is. Mapping "Opus vs Sonnet" onto that would be inventing a
  * distinction the vendor does not offer.
  */
 export const BUILDER_MODEL_DEFAULTS = {
   interview: 'gemini-2.5-pro',
-  planner: 'gemini-2.5-pro',
-  coder: 'gemini-2.5-pro',
-  verifier: 'gemini-2.5-pro',
+  planner: BUILDER_ENGINE_PRO_MODEL,
+  coder: BUILDER_ENGINE_PRO_MODEL,
+  verifier: BUILDER_ENGINE_PRO_MODEL,
   mechanical: 'gemini-2.5-flash',
 } as const;
 
