@@ -105,7 +105,6 @@ def test_deploy_units_share_one_lock_and_never_use_actions() -> None:
         assert "EnvironmentFile=/etc/bug-hunter/env" in units[name]
         assert "User=bughunter" in units[name]
     assert "03:30:00 Asia/Kolkata" in units["bug-hunter-daily.timer"]
-    systemd = "".join(v for k, v in units.items() if k.startswith("bug-hunter-"))
     # live since 2026-11-26 (user): the daily job queues, the worker runs by mode;
     # the 15-minute poll stays a dry run
     assert "daily --live --with-lenses" in units["bug-hunter-daily.service"]
