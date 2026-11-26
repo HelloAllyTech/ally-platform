@@ -1,5 +1,6 @@
 import { deriveItemStage } from 'src/product-planning/util/plan-stage.util';
 import {
+  buildStarted,
   ciState,
   itemStageFacts,
   latest,
@@ -243,5 +244,62 @@ describe('helpers', () => {
     expect(latest('2026-11-01', null, new Date('2026-11-05T00:00:00Z'))).toBe(
       '2026-11-05T00:00:00.000Z',
     );
+  });
+});
+
+describe('buildStarted', () => {
+  // A design run is drafted from PRD_READY and never moves the session, but it
+  // takes a run number. Counting that number sent an idea to Building the moment
+  // its first design drafted or failed, and the idea page stops offering Draft
+  // there (OPP-0938, 2026-11-26).
+  it('does not count a design run as a build', () => {
+    expect(
+      buildStarted(
+        session({
+          status: 'PRD_READY',
+          lastRunSequence: 2,
+          hasBuildRun: false,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('counts a run that is not a design run', () => {
+    expect(
+      buildStarted(
+        session({
+          status: 'PRD_READY',
+          lastRunSequence: 3,
+          hasBuildRun: true,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('still reads the session status, whatever the runs say', () => {
+    expect(
+      buildStarted(
+        session({ status: 'FAILED', lastRunSequence: 1, hasBuildRun: false }),
+      ),
+    ).toBe(true);
+  });
+
+  it('falls back to the run number where the runs were not read', () => {
+    expect(buildStarted(session({ lastRunSequence: 1 }))).toBe(true);
+    expect(buildStarted(session({ lastRunSequence: 0 }))).toBe(false);
+  });
+
+  it('keeps an idea whose only runs are design runs out of Building', () => {
+    const stage = stageOf(
+      opp(),
+      session({
+        leadUserId: null,
+        status: 'PRD_READY',
+        planStage: 'design',
+        lastRunSequence: 2,
+        hasBuildRun: false,
+      }),
+    );
+    expect(stage.statusParts).not.toMatchObject({ stage: 'building' });
   });
 });
