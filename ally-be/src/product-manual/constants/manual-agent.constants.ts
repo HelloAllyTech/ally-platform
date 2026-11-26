@@ -47,8 +47,16 @@ export const MANUAL_CHAT_LIMITS = {
 export const MANUAL_WEEKLY_LIMITS = {
   /** Work items (proposals + pages) one run looks at. */
   MAX_PAGES_PER_RUN: 25,
-  /** Tool iterations spent on one work item. */
-  MAX_ITERATIONS_PER_PAGE: 8,
+  /**
+   * Tool iterations spent on one work item. The first production run with 8 verified nothing:
+   * a check is read the code, a few lookups, then decide, and the model used its steps up on
+   * lookups. The page text now arrives with the item, so none are spent reading it.
+   */
+  MAX_ITERATIONS_PER_PAGE: 12,
+  /** Most code lookups (search or read) the work item asks the model to make before deciding. */
+  MAX_CODE_LOOKUPS_PER_PAGE: 4,
+  /** Most characters of the page text put into the work item. */
+  MAX_PAGE_CHARS_IN_ITEM: 12_000,
   MAX_TOKENS: 4_000,
   PASS_TIMEOUT_MS: 120_000,
   /** A page verified longer ago than this is due for a check. */

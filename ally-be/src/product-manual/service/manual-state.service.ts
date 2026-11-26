@@ -32,6 +32,7 @@ export function toRunRow(run: ManualRun): RunRow {
     summary: run.summary ?? null,
     error: run.error ?? null,
     triggeredBy: run.triggeredBy ?? null,
+    itemLog: Array.isArray(run.itemLog) ? run.itemLog : [],
     startedAt: new Date(run.startedAt).toISOString(),
     finishedAt: run.finishedAt ? new Date(run.finishedAt).toISOString() : null,
   };
