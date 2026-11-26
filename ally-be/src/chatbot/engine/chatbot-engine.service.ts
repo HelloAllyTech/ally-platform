@@ -33,6 +33,7 @@ import { AiService } from '../../ai/service/ai.service';
 import { LoggerService } from '../../logger/logger.service';
 import { NotificationErrorType } from '../../notification/type/notification.error.type';
 import { LateCrisisService } from '../safety/late-crisis.service';
+import { INVITE_ONLY } from '../../whatsapp/wa-a-copy';
 import { PromptSharedService } from '../../prompt/service/prompt-shared.service';
 import {
   WaHandledBy,
@@ -916,9 +917,30 @@ export class ChatbotEngineService {
     }
     return {
       handledBy: WaHandledBy.UNIDENTIFIED,
-      body: this.blockedText(turn, 'REMOVED_FROM_LIST'),
+      body: await this.inviteOnlyText(turn),
       blocked: 'REMOVED_FROM_LIST',
     };
+  }
+
+  /**
+   * WA-A §4 (RC1 §4): an assistant that is by invitation says who to ask: "This assistant is by
+   * invitation. Please contact <organisation> at <contact>." (the phone or email in its own
+   * sources), then the crisis information, as always (D4). No list is revealed.
+   */
+  private async inviteOnlyText(turn: ChatTurn): Promise<string> {
+    const language = replyLanguageOf(turn.text, turn.language);
+    // The organisation's own phone or email from its sources only: never a helpline (the merged
+    // settings can hold the platform's default numbers), which is not who grants access.
+    const contact = contactFromSources(await this.businessFacts(turn));
+    const copy = INVITE_ONLY[language] ?? INVITE_ONLY.en;
+    const lead = (contact ? copy.withContact : copy.withoutContact)
+      .replace('{organisation}', turn.chatbot.name)
+      .replace('{contact}', contact ?? '');
+    return `${lead} ${fixedCrisisInformation(
+      crisisHelplines(turn.chatbot.settings) || null,
+      language,
+      isIndiaAssistant(turn.chatbot.settings),
+    )}`;
   }
 
   /**
