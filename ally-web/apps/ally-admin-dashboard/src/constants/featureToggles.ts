@@ -67,6 +67,8 @@ export const FeatureToggleKey = {
   PM_AGENT: "pm_agent",
   // The Context Library page: documents, entries and use-case grants. Mirrors ally-be.
   CONTEXT_LIBRARY: "context_library",
+  // Contacts: the team's shared mini CRM. Ships off; mirrors ally-be FeatureToggleKey.CRM_CONTACTS.
+  CRM_CONTACTS: "crm_contacts",
   COURSE_COPILOT: "course_copilot",
   // Ally guide: the Ally Console, the per-organisation Ally tab, and redacted
   // learner transcripts (per-person grant). Mirrors ally-be FeatureToggleKey.
@@ -142,6 +144,7 @@ export const buildSidebarItemFeatureKeyMap = (
     [sidebarItems.BUG_HUNTER_V2, FeatureToggleKey.BUG_HUNTER_V2_VERDICTS],
     [sidebarItems.BUILDER, FeatureToggleKey.BUILDER],
     [sidebarItems.PM_AGENT, FeatureToggleKey.PM_AGENT],
+    [sidebarItems.CRM_CONTACTS, FeatureToggleKey.CRM_CONTACTS],
     [sidebarItems.ANALYTICS, FeatureToggleKey.ANALYTICS],
     // DEBRIEFS is not here: the Analytics toggle OR the clinical advisor's, with a console
     // permission (utils/navigation.ts), as the console's routes require.
@@ -214,6 +217,7 @@ export const FEATURE_TOGGLE_KEY_TO_SECTION: Record<string, FeatureToggleSection>
   [FeatureToggleKey.BUG_HUNTER_V2_VERDICTS]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.BUILDER]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.PM_AGENT]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
+  [FeatureToggleKey.CRM_CONTACTS]: FEATURE_TOGGLE_SECTIONS.USER_AND_ORG_MANAGEMENT,
   [FeatureToggleKey.CONTEXT_LIBRARY]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.COURSE_COPILOT]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,
   [FeatureToggleKey.ALLY_GUIDE]: FEATURE_TOGGLE_SECTIONS.PLATFORM_CONFIG,

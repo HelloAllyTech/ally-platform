@@ -119,6 +119,7 @@ const buildTable = (): RouteMetaEntry[] => {
     { path: ROUTES.PRODUCT_UPDATES, title: i.productUpdates, section: "create", fullBleed: true },
     // People
     { path: ROUTES.USER_MANAGEMENT, title: i.users, section: "people" },
+    { path: ROUTES.CRM_CONTACTS, title: i.contacts, section: "people" },
     {
       path: ROUTES.ORGANIZATION_DETAIL(":id"),
       title: p.organization,

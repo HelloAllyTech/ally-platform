@@ -34,7 +34,14 @@ import {
   Terminal,
   Tools,
 } from "@icons";
-import { Compass, LayoutTemplate, LibraryBig, ShieldCheck, TrendingUp } from "lucide-react";
+import {
+  Compass,
+  ContactRound,
+  LayoutTemplate,
+  LibraryBig,
+  ShieldCheck,
+  TrendingUp,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -348,6 +355,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onMobile
       // Catalog (Component Library's) or Document (Blog's), which sit nearby in the nav.
       case SIDEBAR_ITEMS.CONTEXT_LIBRARY:
         return <LibraryBig size={20} strokeWidth={1.5} aria-hidden />;
+      // A person on a card: the team's list of people it knows, distinct from Users (accounts).
+      case SIDEBAR_ITEMS.CRM_CONTACTS:
+        return <ContactRound size={20} strokeWidth={1.5} aria-hidden />;
       case SIDEBAR_ITEMS.ROADMAP_V2:
         return <Roadmap size={20} />;
       case SIDEBAR_ITEMS.USER_INTERVIEWS:

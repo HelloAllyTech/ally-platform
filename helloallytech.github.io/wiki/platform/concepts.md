@@ -53,6 +53,7 @@ out which meaning is in play before you change anything.
 | Term | Meanings |
 |---|---|
 | **Skill** | a prompt in the [Skills Store](#skills-store) · an [AI Lab](#ai-lab) Skill (lab-only template) · the Studio "Skill Version" picker (a main-agent prompt variant) · a foundational [helping skill](#helping-skills) · an [Ally Guide](#ally-guide) skill · a [skill experiment](#auto-improve) · one of the five [SJT](#sjt) skills · a Claude Code skill (`.claude/skills/`) |
+| **Contacts** | the admin console's internal [Contacts](#contacts) list (people the Ally team knows; code `crm`, tables `crm_contacts`) · a WhatsApp number list an [Assistant](#assistants) sends to (`ListController.searchContacts`) · the Meta provider's `contacts` payload |
 | **Track** | in the UI, "Tracks" = the legacy pathway ([Track](#track), code `scenario-path`) · in code, `track`/`tracks` = Track 2.0 = what the UI calls a [Course](#course) |
 | **Simulation / Roleplay / Scenario** | the authored definition is a [Scenario](#scenario); one learner's run of it is a [Roleplay session](#roleplay-session); "Simulation Studio" is the [authoring hub](#simulation-studio) |
 | **Session** | [Roleplay session](#roleplay-session) (`scenario_sessions`) · [Builder](#builder) session · [Course Copilot](#course-copilot) session · a sign-in session |
@@ -616,6 +617,14 @@ out which meaning is in play before you change anything.
 **Status:** Live — gate: `FeatureToggleKey.LOGS` (platformOnly) for the page; cloud shipping off by default (`ENABLE_AUDIT_LOGS_TO_CLOUDWATCH` in ally-be, `HIPAA_AUDIT.ENABLED` in ally-ai)
 **Code:** `ally-be/src/audit/` · `ally-be/src/logs/` · `ally-be/src/observability/` · `ally-web/apps/ally-admin-dashboard/src/pages/Logs/` · `ally-ai/app/core/phi_logger.py` · `ally-ai/app/core/phi_events.py`
 **Deep doc:** [Architecture](architecture.md)
+
+### Contacts
+<!-- concept: contacts -->
+**Is:** The Ally team's own minimal shared CRM in the admin console: a list of people (full name, organization, job title, notes), a conversation log under each, and one relationship manager per contact. Everyone with access sees and edits the same list.
+**Also called:** CRM, the Contacts tab, `crm_contacts` · **Not to be confused with:** [Users](#user) (accounts on the platform) and a WhatsApp contact list (see [Overloaded terms](#overloaded-terms)).
+**Composed of:** `crm_contacts` and `crm_contact_logs` (platform-wide, not tenant-scoped; deleting a contact deletes its log). The relationship manager is chosen from the holders of the toggle, checked server-side, so the choices are exactly the people who can use the tab. The "already in the list" suggestions while typing a name come from `GET /v1/crm/contacts/match`.
+**Status:** Dark — gate: `FeatureToggleKey.CRM_CONTACTS` (platformOnly; ships off, granted per person in Admin User Management, never backfilled)
+**Code:** `ally-be/src/crm/` · `ally-web/apps/ally-admin-dashboard/src/pages/Contacts/`
 
 ## Plumbing
 

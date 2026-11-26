@@ -32,6 +32,7 @@ export * from "./componentTemplates";
 export * from "./courseDiscussion";
 export * from "./blog";
 export * from "./productUpdates";
+export * from "./crm";
 export * from "./aiLab";
 export * from "./builder";
 export * from "./pmAgent";

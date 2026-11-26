@@ -166,6 +166,7 @@ const buildNavigationItems = (): NavigationItem[] => {
       path: ROUTES.MOBILE_RELEASES,
       section: "product",
     },
+    { id: S.CRM_CONTACTS, label: l.contacts, path: ROUTES.CRM_CONTACTS, section: "people" },
     {
       id: S.CONTEXT_LIBRARY,
       label: l.contextLibrary,

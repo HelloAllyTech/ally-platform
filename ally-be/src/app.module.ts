@@ -83,6 +83,7 @@ import { ProductPlanningModule } from './product-planning/product-planning.modul
 import { LogsModule } from './logs/logs.module';
 import { PostHogModule } from './posthog/posthog.module';
 import { ChangelogModule } from './changelog/changelog.module';
+import { CrmModule } from './crm/crm.module';
 import { ProductUpdatesModule } from './product-updates/product-updates.module';
 import { PublicRoadmapModule } from './public-roadmap/public-roadmap.module';
 import { UxSignalsModule } from './ux-signals/ux-signals.module';
@@ -178,6 +179,7 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     LogsModule,
     ChangelogModule,
     ProductUpdatesModule,
+    CrmModule,
     PublicRoadmapModule,
     UxSignalsModule,
     FoundationalSkillsModule,

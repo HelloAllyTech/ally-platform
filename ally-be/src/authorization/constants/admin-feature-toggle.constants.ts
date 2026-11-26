@@ -152,6 +152,11 @@ export enum FeatureToggleKey {
   COURSE_COPILOT = 'course_copilot',
   CONTEXT_LIBRARY = 'context_library',
 
+  // Contacts: the team's minimal shared CRM (people, their conversation log,
+  // one relationship manager each). Ships OFF and is granted person by person
+  // in Admin User Management — no backfill, no default.
+  CRM_CONTACTS = 'crm_contacts',
+
   // Ally guide (plans/ally-guide/plan.md §10.5). ALLY_GUIDE is the Ally
   // Console (settings, releases, traces) and reaches every organisation;
   // ALLY_GUIDE_ORG is the per-organisation Ally tab (crisis lines, supervisor
@@ -557,6 +562,17 @@ export const FEATURE_TOGGLES: FeatureToggleDefinition[] = [
     // Every collection, every organisation's entries and Settings. An admin restricted to some
     // organisations reaches their organisations' entries through the organisation routes
     // instead, under the Ally organisation-settings toggle (ContextLibraryOrgController).
+    platformOnly: true,
+  },
+  {
+    key: FeatureToggleKey.CRM_CONTACTS,
+    label: 'Contacts',
+    description:
+      'Keep the team’s shared list of key contacts: who they are, who on the team looks after the relationship, and a log of notable conversations. Everyone with this switched on sees and edits the same list, and can be named a contact’s relationship manager.',
+    // Inert, like every key added after the role-collapse cutover: nobody holds it
+    // until granted from Admin User Management.
+    legacyGrants: SDA_ONLY,
+    // One list for the whole team, not scoped to any organisation.
     platformOnly: true,
   },
   {

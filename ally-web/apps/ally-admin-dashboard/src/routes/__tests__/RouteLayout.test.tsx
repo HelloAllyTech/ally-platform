@@ -112,6 +112,7 @@ vi.mock("@pages", () => ({
   BugHunter: () => <div>BugHunterPage</div>,
   Builder: () => <div>BuilderPage</div>,
   PmAgentFeed: () => <div>PmAgentFeedPage</div>,
+  Contacts: () => <div>ContactsPage</div>,
   BuilderRoom: () => <div>BuilderRoomPage</div>,
   BuilderSession: () => <div>BuilderSessionPage</div>,
   BuilderSettings: () => <div>BuilderSettingsPage</div>,
@@ -241,6 +242,14 @@ describe("RouteLayout", () => {
     render(<RouteLayout />);
     expect(screen.getByText("PmAgentFeedPage")).toBeInTheDocument();
     expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toBe(FeatureToggleKey.PM_AGENT);
+  });
+
+  it("renders Contacts at /contacts, gated on the crm_contacts toggle", () => {
+    privateLayoutCalls.props.length = 0;
+    window.history.pushState({}, "", ROUTES.CRM_CONTACTS);
+    render(<RouteLayout />);
+    expect(screen.getByText("ContactsPage")).toBeInTheDocument();
+    expect(privateLayoutCalls.props.at(-1)?.requiredFeature).toBe(FeatureToggleKey.CRM_CONTACTS);
   });
 
   it("renders the Builder tab (Now · Rules · History) at /builder", () => {

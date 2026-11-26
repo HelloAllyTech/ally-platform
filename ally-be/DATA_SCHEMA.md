@@ -1297,6 +1297,15 @@ Not tenant-scoped on purpose: public entries are readable by every signed-in use
 | `directory_collections` | PK `id`, `owner_id`, `name`, `slug`, `published`, `settings` (jsonb), `custom_domain`, `domain_verification_token`, `domain_verified_at` | A saved view with a public page at `/d/<slug>`. `lower(slug)` and `lower(custom_domain)` are unique. The page answers 404 until `published`; a domain answers only once `domain_verified_at` is set (TXT record `_ally-directory.<domain>`). |
 | `directory_collection_entries` | PK `id`, `collection_id`, `entry_id` (both FK, cascade) | Unique per pair. A collection shows its public entries plus the owner's own private ones. |
 
+### 3.26 Contacts (`crm`)
+
+The Ally team's shared mini CRM in the admin console. **Not multi-tenant**: one list for the whole team, gated by the `crm_contacts` admin feature toggle (ships off, granted per person; never backfilled). Migration `1988500000000-CreateCrmContacts`.
+
+| Table | Key columns | Notes |
+| --- | --- | --- |
+| `crm_contacts` | PK `id` (uuid), `full_name`, `organization`, `job_title`, `notes` (text), `relationship_manager_id` (FK `users`, `ON DELETE SET NULL`, idx), `created_by`, `updated_by` | One person the team knows. Names are not unique on purpose: two people can share a name, so the admin form only *suggests* existing matches while typing. `relationship_manager_id` is the single person coordinating with the contact; the server only accepts a current holder of the `crm_contacts` toggle (checked on change, not on every edit). Index on `lower(full_name)` serves the A to Z list and the duplicate check. |
+| `crm_contact_logs` | PK `id` (uuid), `contact_id` (FK `crm_contacts`, `ON DELETE CASCADE`), `occurred_on` (date), `summary` (text), `author_id` (FK `users`, `ON DELETE SET NULL`) | A key event or conversation, readable by everyone with the toggle. Idx `(contact_id, occurred_on DESC)`. Deleting a contact deletes its log. |
+
 ---
 
 ## 4. Weaviate (vector DB — `ally-ai`)
@@ -1381,6 +1390,7 @@ stores share a key rather than matching on content); `Conversation.chat_id` ↔ 
 | Which of a tenant's _own users_ may see a given course/case/simulation                                      | `tenant_cohorts`, `tenant_cohort_members`, `*_cohort_restrictions` — remember absence of a restriction row means visible tenant-wide                                                                                                                                                                             |
 | A public landing page, its draft versus its live copy, or which image addresses are allowed                | `landing_pages` (`config` vs `published_config`); uploads under the assets bucket's `landing-pages/` prefix |
 | Which admin tabs/features a platform admin can see                                                          | `admin_feature_toggles`                                                                                                                                                                                                                                                                                          |
+| A contact the team tracks, its conversation log, or who looks after the relationship | `crm_contacts` (`relationship_manager_id`) + `crm_contact_logs` |
 | The PM Agent's cards, their audit trail, or why an accepted card is stuck                                   | `pm_agent_cards` + `pm_agent_card_events`; filing is `pm_agent_outbox` (`lastError`) and `pm_agent_cards.needsYouReason` / `roadmapFiling`; where it landed is `roadmap_opportunities` by `roadmapOpportunityId` |
 | A training simulation run + its score                                                                       | `scenario_sessions` (+ `_details`, `_messages`, `_events`, `_feedbacks`)                                                                                                                                                                                                                                         |
 | Whether a roleplay ran as a voice call or a text chat, and who may use text chat                            | `scenario_sessions.interactionMode`; the org switch is a `preference` row `TEXT_CHAT_ROLEPLAY_ENABLED`, the per-scenario offer is `scenarios.metadata.textChatEnabled`                                                                                                                                           |
