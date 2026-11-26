@@ -35,6 +35,9 @@ pr:
   # otherwise it asks in Needs you, where an admin may press Open PR. pr: every
   # passing run opens one (not used).
   output_mode: auto
+  # strict gate's confidence floor (user, 2026-11-26): medium and high both open a
+  # draft PR when every other condition holds; low still asks
+  min_confidence: medium
   repo: HelloAllyTech/ally-platform
 sandbox:
   cpus: 2

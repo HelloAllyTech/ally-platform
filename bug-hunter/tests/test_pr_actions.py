@@ -125,6 +125,35 @@ def test_each_failed_condition_is_named(over, words) -> None:
     assert len(blockers) == 1 and words in blockers[0]
 
 
+def test_a_medium_floor_lets_medium_through_but_never_low() -> None:
+    def floor(state):
+        return strict_gate_blockers(
+            state,
+            max_lines=80,
+            max_prs_per_day=3,
+            prs_today=0,
+            min_confidence="medium",
+        )
+
+    assert floor(_ready(confidence="medium")) == []
+    assert floor(_ready(confidence="high")) == []
+    assert floor(_ready(confidence="low")) == [
+        "confidence is low, not medium or higher"
+    ]
+    assert floor(_ready(confidence=None)) == [
+        "confidence is unknown, not medium or higher"
+    ]
+    # the floor relaxes confidence only; every other condition still holds
+    risky = _ready(confidence="medium", risk_level="medium")
+    assert "risk is medium" in floor(risky)[0]
+
+
+def test_the_shipped_config_takes_medium_confidence(config) -> None:
+    from bug_hunter.config import load_config
+
+    assert load_config().limits.pr.min_confidence == "medium"
+
+
 def test_big_diffs_security_findings_and_the_daily_cap_ask_a_person() -> None:
     big = _ready()
     big.patch.lines_changed = 81

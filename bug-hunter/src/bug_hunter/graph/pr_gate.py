@@ -14,10 +14,16 @@ from bug_hunter.graph.state import BugState
 _OPEN_COUNTEREXAMPLE = ("kept", "failed")
 # Findings that never become a public PR, from either path (CONTEXT.md rule 8).
 _NEVER_PUBLIC = ("security",)
+_RANK = {"low": 0, "medium": 1, "high": 2}
 
 
 def strict_gate_blockers(
-    state: BugState, *, max_lines: int, max_prs_per_day: int, prs_today: int
+    state: BugState,
+    *,
+    max_lines: int,
+    max_prs_per_day: int,
+    prs_today: int,
+    min_confidence: str = "high",
 ) -> list[str]:
     blockers: list[str] = []
     v = state.verification
@@ -31,8 +37,9 @@ def strict_gate_blockers(
         c.status in _OPEN_COUNTEREXAMPLE for c in state.counterexamples
     ):
         blockers.append("a reviewer counterexample is still open")
-    if state.confidence != "high":
-        blockers.append(f"confidence is {state.confidence or 'unknown'}, not high")
+    if _RANK.get(state.confidence or "", -1) < _RANK[min_confidence]:
+        want = "high" if min_confidence == "high" else f"{min_confidence} or higher"
+        blockers.append(f"confidence is {state.confidence or 'unknown'}, not {want}")
     if state.risk_level != "low":
         blockers.append(f"risk is {state.risk_level or 'unknown'}, not low")
     if state.patch is None or state.patch.lines_changed > max_lines:
