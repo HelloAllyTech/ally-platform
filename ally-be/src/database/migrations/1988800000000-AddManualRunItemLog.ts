@@ -7,8 +7,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * items, spent $0.16 and verified none; the row held only the totals, so the reason could not be
  * read back. A page's text never goes in this column.
  */
-export class AddManualRunItemLog1988700000000 implements MigrationInterface {
-  name = 'AddManualRunItemLog1988700000000';
+export class AddManualRunItemLog1988800000000 implements MigrationInterface {
+  name = 'AddManualRunItemLog1988800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
