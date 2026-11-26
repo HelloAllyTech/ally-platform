@@ -323,6 +323,40 @@ describe('ManualWeeklyAgentService', () => {
     expect(item).toContain('do not guess and do not mark the page');
   });
 
+  it('gives each work item its own lookup budget and saves the tool trace on the item log', async () => {
+    const { service, runs, core, tools } = setup();
+    expect(tools.getToolDefinitions).not.toHaveBeenCalled();
+    tools.execute.mockImplementation(
+      async (name: string, _input: unknown, ctx: any) => {
+        ctx.trace.push(
+          name === 'github_search_code'
+            ? { tool: name, ok: false, note: 'rate limited' }
+            : { tool: name, ok: true },
+        );
+        return { ok: true, modelResult: '{}', summary: '' };
+      },
+    );
+    core.run.mockImplementation(async function* (request: ManualLoopRequest) {
+      await request.execute('search_manual', {});
+      await request.execute('github_search_code', {});
+      return { status: 'done', text: '', iterations: 2, costUsd: 0.001 };
+    } as never);
+    await service.run({ trigger: 'manual', triggeredBy: 7 });
+    expect(tools.getToolDefinitions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lookupBudget: {
+          code: MANUAL_WEEKLY_LIMITS.MAX_CODE_LOOKUPS_PER_PAGE,
+          manual: MANUAL_WEEKLY_LIMITS.MAX_MANUAL_LOOKUPS_PER_PAGE,
+        },
+      }),
+    );
+    const log = runs.finish.mock.calls[0][1].itemLog;
+    expect(log[0].tools).toEqual([
+      'search_manual',
+      'github_search_code!rate limited',
+    ]);
+  });
+
   it('cuts a very long page and says so, so one page cannot eat the step budget', async () => {
     const { service, requests, pages } = setup();
     const long =
@@ -353,6 +387,7 @@ describe('ManualWeeklyAgentService', () => {
       status: 'iteration_cap',
       iterations: 12,
       costUsd: 0.0063,
+      tools: [],
     });
     expect(patch.itemLog[1]).toMatchObject({
       item: 'Page "b"',

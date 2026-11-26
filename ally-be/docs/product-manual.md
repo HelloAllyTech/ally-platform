@@ -194,8 +194,14 @@ Stops cleanly when the cap is reached; leaves a one-paragraph summary on the run
 Each work item is handed the page text, the likely code folders for its surfaces and a step budget
 (`MANUAL_WEEKLY_LIMITS`: 12 steps, at most 4 code lookups), so no step is spent reading the page. A page is
 "checked" only when the agent calls `mark_verified` or makes an edit. Each item's outcome is kept in
-`manual_runs.item_log` and returned as `itemLog` by `GET /admin/runs`; the first production run verified
+`manual_runs.item_log` (with the ordered list of tools it called) and returned as `itemLog` by `GET /admin/runs`; the first production run verified
 nothing at 8 steps a page and only totals were stored, so the reason could not be read back.
+
+The lookup limits are enforced in code, not left to the prompt: after 4 code lookups or 3 manual lookups for a
+page (`MAX_CODE_LOOKUPS_PER_PAGE`, `MAX_MANUAL_LOOKUPS_PER_PAGE`) a further lookup is refused with an instruction to
+decide (edit citing a file read, `mark_verified`, or stop and say what could not be found). Every attempt counts,
+including a failing one; edits, `mark_verified` and proposal tools are never limited. The second production run
+(12 steps, prompt-only limit) used every step on 22 of 25 pages and checked none.
 
 ## Frontend (ally-web admin dashboard)
 
