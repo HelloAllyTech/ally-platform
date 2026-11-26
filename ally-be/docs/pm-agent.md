@@ -431,6 +431,7 @@ repos (vulture) and the TypeScript repos, `ally-be` and `ally-web` (knip), for u
 `x-api-key` guarded (`ApiAuthGuard`, the platform `API_KEY`), in its own controller (`PmAgentDeadCodeController`), and only
 stores evidence: one `pm_agent_signals` row per module (`source = 'dead_code'`, key = module path), counts and up to 40 items in `metrics`.
 A module is one reviewable directory: `ally-be/src/<module>` for ally-be, a feature folder for ally-web, four path segments for the Python repos.
+Each item line says how the finding was reached: `[knip: import graph]` (no file imports it) or `[vulture: name match]` (the name is never referenced); whole files list first. The tool tells the agent to verify by that method (search for who *imports* a file, not for its exported name, since another file can export the same name) and returns `totalUnused` (the module total) apart from `itemsListed` (the items shown), fitted whole to `DEAD_CODE_LIMITS.SNAPSHOT_MAX_CHARS`, so a card can quote both and the critic can ground them.
 Known limit: it is static analysis, so it cannot see dynamic dispatch (the knip configs list the entry points this codebase loads by glob or by name, but a new loader pattern shows up as false candidates); the lane's caller check is the safeguard.
 
 - **A refresh** updates counts and `lastSeenAt`, never `status`: a module already used for a card, or dismissed, stays decided.

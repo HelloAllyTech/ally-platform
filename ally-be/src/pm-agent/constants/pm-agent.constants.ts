@@ -101,4 +101,9 @@ export const DEAD_CODE_LIMITS = {
   TITLE_MAX: 200,
   ITEMS_MAX: 40,
   ITEM_MAX: 200,
+  /**
+   * One module's snapshot as the agent reads it (JSON characters). Items are dropped whole to
+   * fit; the snapshot says how many were listed against the module total.
+   */
+  SNAPSHOT_MAX_CHARS: 3000,
 } as const;

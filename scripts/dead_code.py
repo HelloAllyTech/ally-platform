@@ -66,8 +66,11 @@ def load_json(path: Path, default):
     return json.loads(path.read_text()) if path.exists() else default
 
 
-def finding(repo: str, kind: str, path: str, name: str, line: int | None = None) -> dict:
+def finding(
+    repo: str, kind: str, path: str, name: str, line: int | None = None, scanner: str = ""
+) -> dict:
     # No line number in the id: it changes every time someone edits above the symbol.
+    # `scanner` is evidence only (it says how the finding was reached); not part of the id.
     return {
         "id": f"{repo}|{kind}|{path}|{name}",
         "repo": repo,
@@ -75,6 +78,7 @@ def finding(repo: str, kind: str, path: str, name: str, line: int | None = None)
         "path": path,
         "name": name,
         "line": line,
+        "scanner": scanner,
     }
 
 
@@ -100,7 +104,9 @@ def scan_vulture(repo: str, cfg: dict) -> list[dict]:
         m = VULTURE_RE.match(raw.strip())
         if m and m["kind"] in PY_KINDS:
             found.append(
-                finding(repo, m["kind"], f"{repo}/{m['path']}", m["name"], int(m["line"]))
+                finding(
+                    repo, m["kind"], f"{repo}/{m['path']}", m["name"], int(m["line"]), "vulture"
+                )
             )
     return found
 
@@ -140,10 +146,12 @@ def parse_knip(data: dict, repo: str) -> list[dict]:
     for issue in data.get("issues", []):
         path = f"{repo}/{issue['file']}"
         for item in issue.get("files", []):
-            found.append(finding(repo, "file", f"{repo}/{item['name']}", "(whole file)"))
+            found.append(
+                finding(repo, "file", f"{repo}/{item['name']}", "(whole file)", None, "knip")
+            )
         for bucket, kind in KNIP_BUCKETS:
             for item in issue.get(bucket, []):
-                found.append(finding(repo, kind, path, item["name"], item.get("line")))
+                found.append(finding(repo, kind, path, item["name"], item.get("line"), "knip"))
     return found
 
 
@@ -212,6 +220,24 @@ ITEM_MAX = 200
 GROUP_DEPTH = 4  # repo/app/core/<module>: deep enough to be one PR, shallow enough to be few
 
 
+# How each scanner reached a finding. The PM Agent's agent re-checks findings before it
+# proposes a cleanup, and the right check depends on this: a knip finding came from the
+# import graph (so search for who IMPORTS the file or symbol, not for its name), a vulture
+# finding came from matching names (so search for the name, and for dynamic use of it).
+SCANNER_HOW = {"knip": "import graph", "vulture": "name match"}
+
+
+def describe_item(f: dict, module_key: str) -> str:
+    """One evidence line: what is unused, where (relative to its module), and how we know."""
+    rel = f["path"][len(module_key) + 1 :] if f["path"].startswith(module_key + "/") else f["path"]
+    how = SCANNER_HOW.get(f.get("scanner", ""), "")
+    tag = f" [{f['scanner']}: {how}]" if how else ""
+    if f["kind"] == "file":
+        # knip's "unused file": no other file in the project imports it.
+        return f"file {rel}: no file imports it{tag}"[:ITEM_MAX]
+    return f"{f['kind']} {f['name']} in {rel}{tag}"[:ITEM_MAX]
+
+
 def group_by_module(
     found: list[dict], depth: int = GROUP_DEPTH, depths: dict[str, int] | None = None
 ) -> list[dict]:
@@ -220,21 +246,27 @@ def group_by_module(
     `depths` overrides the depth per repo (`group_depth` in the config): a NestJS module is
     ally-be/src/<module> (3 segments), a web feature folder is ally-web/apps/<app>/src/
     <area>/<feature> (6), while the Python repos are fine at the default.
+
+    `count` is the module's TOTAL; `items` lists at most ITEMS_MAX of them, whole files first
+    (one unused file is the biggest, safest deletion). The consumer must not quote `count` as
+    the number of items it can see.
     """
     groups: dict[str, dict] = {}
     for f in found:
         d = (depths or {}).get(f["repo"], depth)
         key = "/".join(f["path"].split("/")[:-1][:d]) or f["repo"]
         g = groups.setdefault(
-            key, {"key": key, "repo": f["repo"], "count": 0, "kinds": Counter(), "items": []}
+            key,
+            {"key": key, "repo": f["repo"], "count": 0, "kinds": Counter(), "_found": []},
         )
         g["count"] += 1
         g["kinds"][f["kind"]] += 1
-        g["items"].append(f"{f['kind']} {f['name']} ({f['path']})"[:ITEM_MAX])
+        g["_found"].append(f)
     out = []
     for g in groups.values():
         g["kinds"] = dict(g["kinds"])
-        g["items"] = g["items"][:ITEMS_MAX]
+        ordered = sorted(g.pop("_found"), key=lambda f: (f["kind"] != "file", f["path"], f["name"]))
+        g["items"] = [describe_item(f, g["key"]) for f in ordered[:ITEMS_MAX]]
         out.append(g)
     # Biggest first, so if the cap bites it drops the smallest modules, not the worst.
     return sorted(out, key=lambda g: (-g["count"], g["key"]))[:GROUPS_MAX]

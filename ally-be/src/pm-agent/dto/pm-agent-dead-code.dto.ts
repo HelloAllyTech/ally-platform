@@ -30,7 +30,10 @@ export class DeadCodeGroupDto {
   @MaxLength(60)
   repo!: string;
 
-  @ApiProperty({ description: 'Number of unused items found in the module.' })
+  @ApiProperty({
+    description:
+      'Total unused items in the module (items lists at most 40 of them).',
+  })
   @IsInt()
   @Min(1)
   count!: number;
@@ -45,7 +48,10 @@ export class DeadCodeGroupDto {
 
   @ApiProperty({
     description:
-      'Up to 40 lines, "kind name (path)". Bounded; not a code dump.',
+      'Up to 40 lines, whole files first, e.g. "file a.ts: no file imports it [knip: import graph]" ' +
+      'or "function f in b.py [vulture: name match]". Paths are relative to the module. ' +
+      'The tag says how the finding was reached, which decides how the agent verifies it. ' +
+      'Bounded; not a code dump.',
     type: [String],
   })
   @IsArray()

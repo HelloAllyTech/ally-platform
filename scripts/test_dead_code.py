@@ -67,5 +67,47 @@ class GroupByModuleTest(unittest.TestCase):
         )
 
 
+class EvidenceItemTest(unittest.TestCase):
+    """What the PM Agent's agent reads: how each finding was reached, and honest counts."""
+
+    def test_scanners_tag_their_findings(self):
+        found = dead_code.parse_knip(SAMPLE, "ally-be")
+        self.assertTrue(found and all(f["scanner"] == "knip" for f in found))
+        v = dead_code.finding("ally-ai", "function", "ally-ai/app/a.py", "f", 3, "vulture")
+        self.assertEqual(v["scanner"], "vulture")
+
+    def test_scanner_is_not_part_of_the_id(self):
+        a = dead_code.finding("r", "function", "r/a.py", "f", 1, "vulture")
+        b = dead_code.finding("r", "function", "r/a.py", "f", 9)
+        self.assertEqual(a["id"], b["id"])  # baseline entries must not churn
+
+    def test_whole_file_line_says_import_graph_and_is_relative_to_module(self):
+        f = dead_code.finding("w", "file", "w/src/constants/demographics.ts", "(whole file)", None, "knip")
+        line = dead_code.describe_item(f, "w/src/constants")
+        self.assertEqual(line, "file demographics.ts: no file imports it [knip: import graph]")
+
+    def test_symbol_line_names_the_symbol_and_the_check_to_use(self):
+        f = dead_code.finding("a", "function", "a/app/x/y.py", "helper", 4, "vulture")
+        self.assertEqual(
+            dead_code.describe_item(f, "a/app/x"), "function helper in y.py [vulture: name match]"
+        )
+
+    def test_untagged_finding_still_renders(self):
+        f = dead_code.finding("a", "class", "a/app/x.py", "K")
+        self.assertEqual(dead_code.describe_item(f, "a/app"), "class K in x.py")
+
+    def test_count_is_the_total_and_items_are_capped_whole_files_first(self):
+        found = [
+            dead_code.finding("w", "export", f"w/src/m/f{i}.ts", f"e{i}", i, "knip")
+            for i in range(60)
+        ] + [dead_code.finding("w", "file", "w/src/m/dead.ts", "(whole file)", None, "knip")]
+        (g,) = dead_code.group_by_module(found, depths={"w": 3})
+        self.assertEqual(g["count"], 61)
+        self.assertEqual(len(g["items"]), dead_code.ITEMS_MAX)
+        self.assertTrue(g["items"][0].startswith("file dead.ts"))
+        self.assertTrue(all(len(i) <= dead_code.ITEM_MAX for i in g["items"]))
+        self.assertNotIn("_found", g)
+
+
 if __name__ == "__main__":
     unittest.main()

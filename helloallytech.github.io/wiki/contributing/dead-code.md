@@ -13,7 +13,7 @@ Unused code costs every reader, human or agent, who has to work out whether it m
 
 1. **Scan.** One scanner per repo, tuned to that repo's frameworks. Only deletable things are reported: functions, classes, methods, imports (Python); files, exports, types (TypeScript). Never variables, enum members, duplicate exports or dependency lists.
 2. **Ratchet.** `scripts/dead-code-baseline.json` lists today's known dead code. A finding not in it is new, and fails the PR check. Old debt never blocks anyone.
-3. **Publish.** Every Monday the `Dead code` workflow groups the findings by module and sends them to the PM Agent (`POST /v1/pm-agent/signals/dead-code`, platform service key). The PM Agent's `code_health` lane can turn a module into a card, and an admin accepting the card files the roadmap ticket: one ticket per module. The roadmap is the cleanup queue. Nothing is filed automatically, and nothing is filed while the PM Agent is off.
+3. **Publish.** Every Monday the `Dead code` workflow groups the findings by module and sends them to the PM Agent (`POST /v1/pm-agent/signals/dead-code`, platform service key). The PM Agent's `code_health` lane can turn a module into a card, and an admin accepting the card files the roadmap ticket: one ticket per module. The roadmap is the cleanup queue. Each item says how the scanner reached it (`[knip: import graph]` or `[vulture: name match]`), and the agent verifies by that method before proposing a cleanup. Nothing is filed automatically, and nothing is filed while the PM Agent is off.
 
 ## Commands
 

@@ -22,6 +22,7 @@ import { TrackDropoffAnalyticsService } from 'src/analytics/service/track-dropof
 import { UsageLevelAnalyticsService } from 'src/analytics/service/usage-level-analytics.service';
 import { RoadmapProductGoalRepository } from 'src/product-roadmap/repository/roadmap-taxonomy.repository';
 import {
+  DEAD_CODE_LIMITS,
   DEAD_CODE_SIGNAL_FRESH_DAYS,
   DEAD_CODE_SIGNAL_SOURCE,
   PM_PLATFORM_USER_ID,
@@ -37,6 +38,7 @@ import {
   PmToolContext,
   PmToolOutcome,
 } from '../pipeline/pm-pipeline.types';
+import { buildDeadCodeSnapshot } from '../util/dead-code-snapshot.util';
 import { compact, fence } from '../util/fence.util';
 import { relevance } from '../util/text-similarity.util';
 import { PM_DELEGATED_TOOLS, PmTool } from './pm-lane-definitions';
@@ -120,10 +122,17 @@ const OWN_TOOLS: Record<string, AgentToolDefinition> = {
   [PmTool.DEAD_CODE_LIST]: {
     name: PmTool.DEAD_CODE_LIST,
     description:
-      'Modules with unused code, from the weekly dead-code report: module path, repo, item count, ' +
-      'counts by kind and up to 40 items. Each module is its own evidence item. Static analysis ' +
-      'finds candidates, not proof: dynamic dispatch can hide real use, so read the code before ' +
-      'proposing deletion. Propose one module per card.',
+      'Modules with unused code, from the weekly dead-code report: module path, repo, totalUnused ' +
+      '(the module total), itemsListed (how many items are shown) and counts by kind. Each ' +
+      'module is its own evidence item. Static analysis finds candidates, not proof, so check ' +
+      'each item before proposing deletion, by the method its tag names. [knip: import graph]: ' +
+      'no file imports it, so search for who IMPORTS the file or symbol (its path, with and ' +
+      'without the extension, and any alias such as @constants), NOT for its exported name: ' +
+      'another file can export the same name, and a match on that name does not show use. ' +
+      '[vulture: name match]: the name is never referenced, so search for the name and for ' +
+      'dynamic use of it (getattr, registries, decorators, __subclasses__). A whole file ' +
+      'knip lists is the strongest finding. Quote totalUnused and itemsListed exactly; never ' +
+      'quote the total as the items you can see. Propose one module per card.',
     input_schema: {
       type: 'object',
       properties: {
@@ -510,14 +519,10 @@ export class PmLaneToolsService implements PmToolbox {
     const refs: PmEvidenceRef[] = [];
     const parts: string[] = [];
     for (const row of picked) {
-      const snapshot = {
-        module: row.key,
-        repo: row.metrics?.repo ?? null,
-        count: count(row),
-        kinds: row.metrics?.kinds ?? {},
-        items: row.metrics?.items ?? [],
-        lastSeenAt: row.lastSeenAt,
-      };
+      const snapshot = buildDeadCodeSnapshot(
+        row,
+        DEAD_CODE_LIMITS.SNAPSHOT_MAX_CHARS,
+      );
       const ref = await this.record(ctx.runId, {
         source: DEAD_CODE_SIGNAL_SOURCE,
         kind: 'finding',
@@ -531,7 +536,9 @@ export class PmLaneToolsService implements PmToolbox {
           'tool_data',
           { evidence_id: ref.id, source: ref.source, label: ref.label },
           JSON.stringify(snapshot),
-          2500,
+          // The snapshot is already fitted to SNAPSHOT_MAX_CHARS; the fence cap is only a
+          // backstop, so it never cuts an item list mid-JSON.
+          DEAD_CODE_LIMITS.SNAPSHOT_MAX_CHARS + 200,
         ),
       );
     }
