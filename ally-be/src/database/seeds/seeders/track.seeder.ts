@@ -11,6 +11,7 @@ import { TrackItemProgress } from '../../../track/entity/track-item-progress.ent
 import { TrackQuizAttempt } from '../../../track/entity/track-quiz-attempt.entity';
 import { TrackJournalEntry } from '../../../track/entity/track-journal-entry.entity';
 import {
+  ArticleExperience,
   TrackItemType,
   TrackStatus,
   TrackItemCompletionCriteria,
@@ -691,5 +692,310 @@ export async function seedTracks(
 
   log(
     'track enrollments: 4 learners (completed / in-progress / just-started / not-started)',
+  );
+
+  await seedReadingExperiencesTrack(ds, adminUserId);
+  await seedCardsThenOtherTypesTrack(ds, adminUserId);
+}
+
+const READING_TRACK_TITLE = 'Reading Experiences (QA)';
+const READING_LEARNER_EMAIL = 'learner@example.com';
+
+/**
+ * A small track for exercising the article players end to end: two Cards
+ * articles in a row (the second must open after "Mark as read" → Continue on
+ * the first), then a Magazine and a Classic article in a second section. `learner@example.com`
+ * is enrolled at the first item, so a local run can click straight through.
+ */
+async function seedReadingExperiencesTrack(
+  ds: DataSource,
+  adminUserId: number,
+): Promise<void> {
+  const trackRepo = getRepo(ds, Track);
+  const sectionRepo = getRepo(ds, TrackSection);
+  const itemRepo = getRepo(ds, TrackItem);
+  const enrollmentRepo = getRepo(ds, TrackEnrollment);
+  const progressRepo = getRepo(ds, TrackItemProgress);
+  const userRepo = getRepo(ds, User);
+
+  const track = await upsert(
+    trackRepo,
+    { title: READING_TRACK_TITLE },
+    {
+      description:
+        'Local QA track: Cards, Magazine and Classic articles back to back, to check that each one hands over to the next.',
+      status: TrackStatus.ACTIVE,
+      isGlobal: true,
+      totalItems: 4,
+      estimatedDurationMinutes: 10,
+      createdBy: adminUserId,
+      updatedBy: adminUserId,
+    },
+  );
+  // Two sections so the last item of the first one raises the section
+  // celebration before the learner moves on.
+  const sections = [
+    await upsert(
+      sectionRepo,
+      { trackId: track.id, title: 'Reading' },
+      { order: 1 },
+    ),
+    await upsert(
+      sectionRepo,
+      { trackId: track.id, title: 'More reading' },
+      { order: 2 },
+    ),
+  ];
+
+  const body = (heading: string): string =>
+    `<h2>${heading}: part one</h2><p>The first thing to notice is how the client describes the problem, not how you would.</p>` +
+    `<h2>${heading}: part two</h2><p>Reflect what you heard before offering anything back.</p>` +
+    `<h2>${heading}: part three</h2><p>Leave room for silence; it is rarely as long as it feels.</p>`;
+
+  const articles: Array<{
+    title: string;
+    experience: ArticleExperience;
+  }> = [
+    { title: 'Cards article one', experience: ArticleExperience.CARDS },
+    { title: 'Cards article two', experience: ArticleExperience.CARDS },
+    { title: 'Magazine article', experience: ArticleExperience.MAGAZINE },
+    { title: 'Classic article', experience: ArticleExperience.CLASSIC },
+  ];
+
+  const items: TrackItem[] = [];
+  for (const [index, article] of articles.entries()) {
+    items.push(
+      await upsert(
+        itemRepo,
+        { trackId: track.id, title: article.title },
+        {
+          trackSectionId: sections[index < 2 ? 0 : 1].id,
+          type: TrackItemType.ARTICLE,
+          order: (index % 2) + 1,
+          content: {
+            html: body(article.title),
+            experience: article.experience,
+            takeaways: ['Reflect before you advise.', 'Let silence work.'],
+          } as TrackItemContent,
+          completionCriteria: {
+            minReadSeconds: 0,
+          } as TrackItemCompletionCriteria,
+        },
+      ),
+    );
+  }
+
+  const learner = await userRepo.findOne({
+    where: { email: READING_LEARNER_EMAIL },
+  });
+  if (learner) {
+    const enrollment = await upsert(
+      enrollmentRepo,
+      { trackId: track.id, userId: learner.id },
+      {
+        tenantId: learner.tenantId,
+        startedAt: daysAgo(1),
+        completedItems: 0,
+        lastActivityAt: daysAgo(1),
+      },
+    );
+    for (const [index, item] of items.entries()) {
+      await upsert(
+        progressRepo,
+        { trackEnrollmentId: enrollment.id, trackItemId: item.id },
+        {
+          userId: learner.id,
+          status:
+            index === 0 ? SessionItemStatus.UNLOCKED : SessionItemStatus.LOCKED,
+        },
+      );
+    }
+  }
+
+  log(
+    `tracks: 1 ("${READING_TRACK_TITLE}", ${items.length} articles; ${READING_LEARNER_EMAIL} enrolled)`,
+  );
+}
+
+const HANDOVER_TRACK_TITLE = 'Cards Then Other Types (QA)';
+
+/**
+ * A Cards article followed by each other item type in turn, so the hand-over
+ * from a finished Cards article can be checked for every kind of next item:
+ * video, quiz, journal, and an article that carries a discussion thread.
+ * `learner@example.com` is enrolled at the first item.
+ */
+async function seedCardsThenOtherTypesTrack(
+  ds: DataSource,
+  adminUserId: number,
+): Promise<void> {
+  const trackRepo = getRepo(ds, Track);
+  const sectionRepo = getRepo(ds, TrackSection);
+  const itemRepo = getRepo(ds, TrackItem);
+  const enrollmentRepo = getRepo(ds, TrackEnrollment);
+  const progressRepo = getRepo(ds, TrackItemProgress);
+  const userRepo = getRepo(ds, User);
+
+  const track = await upsert(
+    trackRepo,
+    { title: HANDOVER_TRACK_TITLE },
+    {
+      description:
+        'Local QA track: a Cards article before a video, a quiz, a journal and a discussion article.',
+      status: TrackStatus.ACTIVE,
+      isGlobal: true,
+      totalItems: 8,
+      estimatedDurationMinutes: 15,
+      createdBy: adminUserId,
+      updatedBy: adminUserId,
+    },
+  );
+  const section = await upsert(
+    sectionRepo,
+    { trackId: track.id, title: 'Hand-overs' },
+    { order: 1 },
+  );
+
+  const cards = (title: string): TrackItemContent =>
+    ({
+      html: `<h2>${title}: one</h2><p>Reflect before you advise.</p><h2>${title}: two</h2><p>Let silence work.</p>`,
+      experience: ArticleExperience.CARDS,
+      takeaways: ['Reflect before you advise.'],
+    }) as TrackItemContent;
+
+  const specs: Array<{
+    title: string;
+    type: TrackItemType;
+    content: TrackItemContent;
+    completionCriteria?: TrackItemCompletionCriteria;
+    hasDiscussion?: boolean;
+  }> = [
+    {
+      title: 'Cards → video',
+      type: TrackItemType.ARTICLE,
+      content: cards('Cards → video'),
+      completionCriteria: { minReadSeconds: 0 } as TrackItemCompletionCriteria,
+    },
+    {
+      title: 'Video after cards',
+      type: TrackItemType.VIDEO,
+      content: {
+        source: VideoSource.S3,
+        url: 'https://cdn.helloally.ai/onboarding/platform-walkthrough.mp4',
+        durationSeconds: 60,
+      } as TrackItemContent,
+      completionCriteria: { watchPct: 90 } as TrackItemCompletionCriteria,
+    },
+    {
+      title: 'Cards → quiz',
+      type: TrackItemType.ARTICLE,
+      content: cards('Cards → quiz'),
+      completionCriteria: { minReadSeconds: 0 } as TrackItemCompletionCriteria,
+    },
+    {
+      title: 'Quiz after cards',
+      type: TrackItemType.QUIZ,
+      content: {
+        settings: {
+          passScore: 70,
+          maxAttempts: null,
+          shuffleQuestions: false,
+          shuffleOptions: false,
+          showExplanations: QuizShowExplanations.AFTER_SUBMIT,
+        },
+        questions: [
+          {
+            id: 'q1',
+            type: QuizQuestionType.TRUE_FALSE,
+            prompt: 'Filling every silence with a question is good practice.',
+            correctAnswer: false,
+          },
+        ],
+      } as QuizContent as TrackItemContent,
+      completionCriteria: { passScore: 70 } as TrackItemCompletionCriteria,
+    },
+    {
+      title: 'Cards → journal',
+      type: TrackItemType.ARTICLE,
+      content: cards('Cards → journal'),
+      completionCriteria: { minReadSeconds: 0 } as TrackItemCompletionCriteria,
+    },
+    {
+      title: 'Journal after cards',
+      type: TrackItemType.JOURNAL,
+      content: {
+        prompts: [
+          {
+            id: 'prompt-1',
+            prompt: 'What stood out for you in that article?',
+            required: true,
+          },
+        ],
+      } as TrackItemContent,
+    },
+    {
+      title: 'Cards → discussion article',
+      type: TrackItemType.ARTICLE,
+      content: cards('Cards → discussion article'),
+      completionCriteria: { minReadSeconds: 0 } as TrackItemCompletionCriteria,
+    },
+    {
+      title: 'Article with discussion',
+      type: TrackItemType.ARTICLE,
+      content: {
+        html: '<h2>Discussion article</h2><p>Talk it through below.</p>',
+      } as TrackItemContent,
+      completionCriteria: { minReadSeconds: 0 } as TrackItemCompletionCriteria,
+      hasDiscussion: true,
+    },
+  ];
+
+  const items: TrackItem[] = [];
+  for (const [index, spec] of specs.entries()) {
+    items.push(
+      await upsert(
+        itemRepo,
+        { trackId: track.id, title: spec.title },
+        {
+          trackSectionId: section.id,
+          type: spec.type,
+          order: index + 1,
+          content: spec.content,
+          completionCriteria: spec.completionCriteria,
+          hasDiscussion: spec.hasDiscussion ?? false,
+        },
+      ),
+    );
+  }
+
+  const learner = await userRepo.findOne({
+    where: { email: READING_LEARNER_EMAIL },
+  });
+  if (learner) {
+    const enrollment = await upsert(
+      enrollmentRepo,
+      { trackId: track.id, userId: learner.id },
+      {
+        tenantId: learner.tenantId,
+        startedAt: daysAgo(1),
+        completedItems: 0,
+        lastActivityAt: daysAgo(1),
+      },
+    );
+    for (const [index, item] of items.entries()) {
+      await upsert(
+        progressRepo,
+        { trackEnrollmentId: enrollment.id, trackItemId: item.id },
+        {
+          userId: learner.id,
+          status:
+            index === 0 ? SessionItemStatus.UNLOCKED : SessionItemStatus.LOCKED,
+        },
+      );
+    }
+  }
+
+  log(
+    `tracks: 1 ("${HANDOVER_TRACK_TITLE}", ${items.length} items; ${READING_LEARNER_EMAIL} enrolled)`,
   );
 }
