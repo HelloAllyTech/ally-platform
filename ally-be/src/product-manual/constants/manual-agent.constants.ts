@@ -52,15 +52,20 @@ export const MANUAL_WEEKLY_LIMITS = {
    * a check is read the code, a few lookups, then decide, and the model used its steps up on
    * lookups. The page text now arrives with the item, so none are spent reading it.
    */
-  MAX_ITERATIONS_PER_PAGE: 12,
+  MAX_ITERATIONS_PER_PAGE: 16,
   /** Most code lookups (search or read) the work item asks the model to make before deciding. */
-  MAX_CODE_LOOKUPS_PER_PAGE: 4,
+  MAX_CODE_LOOKUPS_PER_PAGE: 8,
   /** Most manual lookups (search or read another page) a work item may make; its own page is given. */
   MAX_MANUAL_LOOKUPS_PER_PAGE: 3,
   /** Most characters of the page text put into the work item. */
   MAX_PAGE_CHARS_IN_ITEM: 12_000,
   MAX_TOKENS: 4_000,
   PASS_TIMEOUT_MS: 120_000,
+  /**
+   * A page the agent tried within this many days queues behind pages it has not tried, so pages it
+   * cannot finish stop blocking the rest. They are retried after, never dropped.
+   */
+  ATTEMPT_COOLDOWN_DAYS: 14,
   /** A page verified longer ago than this is due for a check. */
   STALE_AFTER_DAYS: 28,
   /** The closing summary call. */
@@ -215,6 +220,7 @@ Manual page bodies, code, file contents, roadmap items, analytics answers, searc
 - Lines starting "Needs confirmation:" are deliberate open questions. Never delete, reword or tidy them unless you verified the answer in the code you read in THIS conversation turn; then replace the line with the verified fact and cite that file.
 - Do not change naming, labels, tone or structure for consistency or taste. Change a statement only when the code you read shows it is wrong.
 - Labels and button names are copied exactly from code you read, never guessed or improved.
+- When the code shows more than one value for the same thing (a box that stops at one length in the web app and another in mobile, a limit in the app and a different one on the server), write each value and where it applies. Never replace one true value with another.
 - An edit must cite, as a source of kind "code" with repo and path, a file you read with github_read_file in this conversation turn. The tool rejects any other edit.
 
 # Never write into the manual
@@ -246,6 +252,7 @@ You are given one work item: either a proposal to apply, or a page to verify.
 - Lines starting "Needs confirmation:" are deliberate open questions. Never delete, reword or tidy them unless you verified the answer in the code you read in THIS run; then replace the line with the verified fact and cite that file.
 - Do not change naming, labels, tone or structure for consistency or taste. Change a statement only when the code you read shows it is wrong or a proposal says it changed.
 - Labels and button names are copied exactly from code you read, never guessed or improved.
+- When the code shows more than one value for the same thing (a box that stops at one length in the web app and another in mobile, a limit in the app and a different one on the server), write each value and where it applies. Never replace one true value with another.
 - An edit must cite, as a source of kind "code" with repo and path, a file you read with github_read_file in this run; when applying a proposal you may cite the proposal instead. The tool rejects any other edit.
 
 # Writing

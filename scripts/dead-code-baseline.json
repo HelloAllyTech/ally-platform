@@ -157,6 +157,7 @@
  "ally-be|export|ally-be/src/course-copilot/constants/course-copilot.constants.ts|COURSE_COPILOT_DEFAULT_BUDGET_USD",
  "ally-be|export|ally-be/src/course-copilot/constants/course-copilot.constants.ts|COURSE_COPILOT_DEFAULT_IMAGE_COST_USD",
  "ally-be|export|ally-be/src/course-copilot/util/course-copilot-data.util.ts|searchTokens",
+ "ally-be|export|ally-be/src/course-copilot/util/course-pilot-stages.util.ts|coursePilotStage",
  "ally-be|export|ally-be/src/debrief/constants/debrief-schedule.constants.ts|DEBRIEF_SCHEDULE_KEYS",
  "ally-be|export|ally-be/src/debrief/util/debrief-agents-config.util.ts|parseGuidanceTools",
  "ally-be|export|ally-be/src/debrief/util/debrief-changes.util.ts|languagesInWords",

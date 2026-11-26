@@ -93,6 +93,30 @@ describe('orderWorkQueue', () => {
     expect(more).toBe(false);
   });
 
+  it('puts pages tried in the last 14 days behind untried ones, and retries them after', () => {
+    const pages = [
+      page('stuck-new', { lastAttemptAt: daysAgo(2) }),
+      page('untried-b', { updatedAt: daysAgo(5) }),
+      page('retry-old', { lastAttemptAt: daysAgo(20), updatedAt: daysAgo(30) }),
+      page('untried-a', { updatedAt: daysAgo(9) }),
+    ];
+    const { items } = orderWorkQueue({
+      proposals: [],
+      pages,
+      codeChangedAt: new Map(),
+      now: NOW,
+      limit: 25,
+    });
+    expect(items.map((i) => (i.kind === 'page' ? i.page.slug : '?'))).toEqual([
+      // untried first (a tried-20-days-ago page is due again, so it is "untried" and oldest-updated first)
+      'retry-old',
+      'untried-a',
+      'untried-b',
+      // then the stuck page, never dropped
+      'stuck-new',
+    ]);
+  });
+
   it('caps the queue and says more is waiting', () => {
     const pages = Array.from({ length: 30 }, (_, i) => page(`p${i}`));
     const { items, more } = orderWorkQueue({
@@ -159,7 +183,10 @@ function setup(
       },
     ]),
   };
-  const pages = { list: jest.fn().mockResolvedValue([page('a'), page('b')]) };
+  const pages = {
+    list: jest.fn().mockResolvedValue([page('a'), page('b')]),
+    markAttempted: jest.fn().mockResolvedValue(undefined),
+  };
   const tools = {
     getToolDefinitions: jest.fn().mockReturnValue([]),
     codeSearchAvailable: jest.fn().mockReturnValue(true),
@@ -355,6 +382,29 @@ describe('ManualWeeklyAgentService', () => {
       'search_manual',
       'github_search_code!rate limited',
     ]);
+  });
+
+  it('marks a worked-on page as attempted, finished or not, but not one the provider failed on', async () => {
+    const { service, core, pages } = setup();
+    pages.list.mockResolvedValue([page('a'), page('b')]);
+    let n = 0;
+    core.run.mockImplementation(async function* () {
+      n += 1;
+      // call 1 = proposal item (not a page), call 2 = page "b"
+      return n === 2
+        ? { status: 'iteration_cap', text: '', iterations: 16, costUsd: 0.01 }
+        : { status: 'done', text: '', iterations: 1, costUsd: 0.001 };
+    } as never);
+    await service.run({ trigger: 'manual', triggeredBy: 7 });
+    expect(pages.markAttempted).toHaveBeenCalledWith('b');
+    expect(pages.markAttempted).not.toHaveBeenCalledWith('a'); // covered by the proposal item
+
+    const second = setup();
+    second.core.run.mockImplementation(async function* () {
+      return { status: 'provider_failed', text: '', iterations: 1, costUsd: 0 };
+    } as never);
+    await second.service.run({ trigger: 'manual', triggeredBy: 7 });
+    expect(second.pages.markAttempted).not.toHaveBeenCalled();
   });
 
   it('cuts a very long page and says so, so one page cannot eat the step budget', async () => {
