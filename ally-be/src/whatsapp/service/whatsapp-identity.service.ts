@@ -126,6 +126,9 @@ export class WhatsAppIdentityService {
     contact: WaContact,
     requiredTenantId: string | null = null,
   ): Promise<WaContact> {
+    // WA-A §4: a person known only by their business-scoped ID has no number to match, so they're
+    // unrecognised here (as an unmapped number is); never matched on the ID's digits.
+    if (!contact.phoneE164) return contact;
     const mapped = await this.mappingService.resolve(contact.phoneE164);
     // The mapping's own `userId` is a snapshot for attribution and may be null — a mapped
     // number often belongs to someone with no Ally account at all, which is the case mappings

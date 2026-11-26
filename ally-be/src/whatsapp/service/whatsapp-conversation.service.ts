@@ -479,6 +479,7 @@ export class WhatsAppConversationService {
         // A placeholder rather than null: the column is unique and NOT NULL, and reusing the id keeps
         // the row identifiable for audit without holding the number.
         phoneE164: `${ERASED_PHONE_PREFIX}${contactId}`,
+        bsuid: null,
         phoneLast4: '0000',
         locale: null,
         // The organisation link goes with the number. It names a specific worker at a specific

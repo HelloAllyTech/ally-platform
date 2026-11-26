@@ -368,7 +368,7 @@ export class AssistantRetentionService {
         store: 'wa_contacts',
         table: 'wa_contacts',
         from: `FROM wa_contacts x CROSS JOIN p
-              WHERE x.phone_e164 NOT LIKE p.prefix || '%'
+              WHERE COALESCE(x.phone_e164, '') NOT LIKE p.prefix || '%'
                 AND EXISTS (SELECT 1 FROM wa_conversations w0 WHERE w0.contact_id = x.id)
                 AND NOT EXISTS (
                   SELECT 1 FROM wa_conversations wc
@@ -376,7 +376,7 @@ export class AssistantRetentionService {
                     LEFT JOIN chatbot_conversations c ON c.id = wc.id
                    WHERE wc.contact_id = x.id
                      AND (wc.last_message_at >= ${waCutoff} OR ${EXEMPT('c')}))`,
-        set: `phone_e164 = (SELECT prefix FROM p) || id::text, phone_last4 = '0000', locale = NULL,
+        set: `phone_e164 = (SELECT prefix FROM p) || id::text, bsuid = NULL, phone_last4 = '0000', locale = NULL,
               user_id = NULL, tenant_id = NULL, identified_at = NULL, identity_source = NULL, "updatedAt" = now()`,
       },
       {

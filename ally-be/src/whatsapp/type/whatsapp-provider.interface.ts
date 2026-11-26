@@ -6,8 +6,13 @@ export interface InboundWhatsAppMessage {
   profileName?: string;
   /** The provider's message id. The dedupe key — see WaMessage. */
   providerMessageId: string;
-  /** Sender in E.164, without the leading '+'. Normalised by the provider adapter. */
+  /**
+   * Sender in E.164, without the leading '+'. Normalised by the provider adapter. Empty when Meta
+   * sent only the person's business-scoped user ID (WA-A §4): then `fromUserId` is set.
+   */
   from: string;
+  /** WA-A §4: Meta's business-scoped user ID (`from_user_id`, e.g. `IN.1349…`), when sent. */
+  fromUserId?: string;
   /** Message text. Empty for media, which the pipeline answers with an explanation. */
   text: string;
   /**

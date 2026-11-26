@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import axios, { AxiosRequestConfig } from 'axios';
 import { Request } from 'express';
 import { AppConfigService } from 'src/config/config.service';
+import { isBusinessScopedId } from '../util/wa-address';
 import { LoggerService } from 'src/logger/logger.service';
 import {
   InboundWhatsAppMessage,
@@ -209,10 +210,15 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         changes?: {
           value?: {
             metadata?: { phone_number_id?: string };
-            contacts?: { wa_id?: string; profile?: { name?: string } }[];
+            contacts?: {
+              wa_id?: string;
+              user_id?: string;
+              profile?: { name?: string };
+            }[];
             messages?: {
               id?: string;
               from?: string;
+              from_user_id?: string;
               type?: string;
               timestamp?: string;
               text?: { body?: string };
@@ -239,16 +245,20 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         // number answers for, so a reply never reaches a worker from a number they never wrote to.
         const addressedTo = change?.value?.metadata?.phone_number_id;
         // TF1 B5: the sender's profile name, by their WhatsApp id.
-        const profiles = new Map(
-          (change?.value?.contacts ?? [])
-            .filter((c) => c?.wa_id && c.profile?.name?.trim())
-            .map((c) => [
-              String(c.wa_id),
-              c.profile!.name!.trim().slice(0, 120),
-            ]),
-        );
+        // WA-A §4: keyed by number and by business-scoped ID, whichever Meta sent.
+        const profiles = new Map<string, string>();
+        for (const c of change?.value?.contacts ?? []) {
+          const name = c?.profile?.name?.trim();
+          if (!name) continue;
+          if (c.wa_id) profiles.set(String(c.wa_id), name.slice(0, 120));
+          if (c.user_id) profiles.set(String(c.user_id), name.slice(0, 120));
+        }
         for (const message of change?.value?.messages ?? []) {
-          if (!message?.id || !message?.from) continue;
+          // WA-A §4 (RC1 §4b): a message with only Meta's business-scoped user ID (a person with a
+          // WhatsApp username) is kept and answered, never dropped.
+          const fromUserId = String(message?.from_user_id ?? '').trim();
+          if (!message?.id || (!message?.from && !fromUserId)) continue;
+          const sender = message.from ?? fromUserId;
 
           const type = message.type ?? 'text';
           // A quick-reply button or list selection is a text answer as far as the bot is concerned,
@@ -288,7 +298,8 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
             message.interactive?.list_reply?.id;
           out.push({
             providerMessageId: message.id,
-            from: this.normalisePhone(message.from),
+            from: message.from ? this.normalisePhone(message.from) : '',
+            ...(fromUserId ? { fromUserId: fromUserId.slice(0, 140) } : {}),
             text: said,
             ...(actionId ? { actionId } : {}),
             ...(media ? { media } : {}),
@@ -302,8 +313,8 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
               ? new Date(Number(message.timestamp) * 1000)
               : new Date(),
             ...(addressedTo ? { phoneNumberId: addressedTo } : {}),
-            ...(profiles.get(message.from)
-              ? { profileName: profiles.get(message.from) }
+            ...(profiles.get(sender)
+              ? { profileName: profiles.get(sender) }
               : {}),
           });
         }
@@ -446,7 +457,8 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         {
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
-          to,
+          // WA-A §4: a person known by their business-scoped user ID is addressed as `recipient`.
+          ...(isBusinessScopedId(to) ? { recipient: to } : { to }),
           ...content,
         },
         {

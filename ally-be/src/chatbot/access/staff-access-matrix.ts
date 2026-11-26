@@ -215,6 +215,8 @@ export const STAFF_NEVER_CONVERSATION_ACTIONS: Readonly<
     enforcedBy: 'respond',
   },
   'InboxController.reply': { action: 'Reply', enforcedBy: 'respond' },
+  // WA-A §3: sending a file on the chat's WhatsApp is a reply.
+  'InboxController.attach': { action: 'Send a file', enforcedBy: 'respond' },
   'InboxController.forgetLine': {
     action: 'Forget a memory line',
     enforcedBy: 'build',

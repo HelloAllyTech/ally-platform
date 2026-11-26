@@ -98,4 +98,32 @@ describe('WhatsAppInboundService: the typing indicator', () => {
 
     expect(provider.showTypingIndicator).not.toHaveBeenCalled();
   });
+
+  describe('on a long turn (WA-A §4)', () => {
+    afterEach(() => jest.useRealTimers());
+
+    it('re-sends typing every 20 s until the reply goes, then stops', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+      const { service, provider, aiService } = await build();
+      let answer!: (v: unknown) => void;
+      aiService.runAgent.mockImplementation(
+        () => new Promise((resolve) => (answer = resolve)),
+      );
+      const handled = service.handle(inboundText('how do I get access?'));
+      for (let i = 0; i < 20 && !answer; i += 1) {
+        await jest.advanceTimersByTimeAsync(10);
+      }
+      expect(provider.showTypingIndicator).toHaveBeenCalledTimes(1);
+      await jest.advanceTimersByTimeAsync(20_000);
+      expect(provider.showTypingIndicator).toHaveBeenCalledTimes(2);
+      await jest.advanceTimersByTimeAsync(20_000);
+      expect(provider.showTypingIndicator).toHaveBeenCalledTimes(3);
+      answer(AGENT_ANSWER);
+      await jest.advanceTimersByTimeAsync(10);
+      await handled;
+      await jest.advanceTimersByTimeAsync(60_000);
+      expect(provider.showTypingIndicator).toHaveBeenCalledTimes(3);
+      expect(provider.sendText).toHaveBeenCalledTimes(1);
+    });
+  });
 });

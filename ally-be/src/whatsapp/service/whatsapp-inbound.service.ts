@@ -36,6 +36,7 @@ import {
 import { WhatsAppIdentityService } from './whatsapp-identity.service';
 import { WaMediaService } from './wa-media.service';
 import { TEAM_BUTTON_PREFIX } from '../media/wa-attachment';
+import { lastFourOf, waAddressOf } from '../util/wa-address';
 import { WhatsAppRateLimitService } from './whatsapp-rate-limit.service';
 import { ChatbotSettingsService } from 'src/chatbot/service/chatbot-settings.service';
 import { ChatbotReplyService } from 'src/chatbot/service/chatbot-reply.service';
@@ -143,6 +144,11 @@ function isRetryableSendFailure(error: unknown): boolean {
  * the failure and returns normally. Throwing after a send guarantees an SQS redelivery that answers
  * the same worker twice, which is the worst failure this pipeline has.
  */
+/** WA-A §4: how often "typing…" is re-sent on a long turn (Meta's bubble lasts about 25 s). */
+export const TYPING_REFRESH_MS = 20_000;
+/** WA-A §4: no bubble is kept up longer than this, whatever happens to the turn. */
+export const TYPING_MAX_MS = 60_000;
+
 @Injectable()
 export class WhatsAppInboundService {
   private readonly logger = LoggerService.getInstance(
@@ -431,7 +437,7 @@ export class WhatsAppInboundService {
         ((await this.conversations
           ?.holderOf(conversation.id)
           .catch(() => null)) ?? null) !== null;
-      if (!heldByPerson)
+      if (!heldByPerson) {
         void this.showTyping(
           inbound.providerMessageId,
           inbound.text,
@@ -439,7 +445,13 @@ export class WhatsAppInboundService {
           chatbot.id,
           settings,
           number.creds,
-        );
+        ).then((shown) => {
+          // WA-A §4 (Q4 D24): Meta's bubble lasts about 25 s; a long turn keeps it up until the
+          // reply goes (or a minute passes).
+          if (shown)
+            this.keepTyping(inboundId, inbound.providerMessageId, number.creds);
+        });
+      }
 
       // ── 6. Identity ──────────────────────────────────────────────────────
       // Who is asking, for the bot's "who can chat" list and per-organisation knowledge.
@@ -490,7 +502,7 @@ export class WhatsAppInboundService {
         ),
         isFirstMessage: contact.messageCount === 1,
         sender: {
-          externalId: contact.phoneE164,
+          externalId: waAddressOf(contact),
           label: `contact ending ${contact.phoneLast4}`,
           phone: contact.phoneE164,
           userId: identified.userId ?? null,
@@ -534,7 +546,7 @@ export class WhatsAppInboundService {
         (decision.blocked || decision.off) &&
         decision.handledBy !== WaHandledBy.CRISIS &&
         !(await this.rateLimitService.shouldNotify(
-          `${chatbot.id}:${contact.phoneE164}`,
+          `${chatbot.id}:${waAddressOf(contact)}`,
           decision.blocked
             ? `blocked:${decision.blocked}`
             : `off:${decision.off}`,
@@ -731,8 +743,8 @@ export class WhatsAppInboundService {
     startedAt: number,
   ): Promise<boolean> {
     const rateKey = number.id
-      ? `${number.id}:${contact.phoneE164}`
-      : contact.phoneE164;
+      ? `${number.id}:${waAddressOf(contact)}`
+      : waAddressOf(contact);
     const limit = await this.rateLimitService.check(rateKey, settings);
     if (limit.allowed) return false;
     const notify = await this.rateLimitService.shouldNotify(
@@ -870,6 +882,41 @@ export class WhatsAppInboundService {
    * message add nothing. Best effort: any failure, the keyword lookup's included, is swallowed — a
    * lookup that fails shows the dots, as before this setting existed.
    */
+  /** WA-A §4: the refresh timers of turns still being answered, by inbound message id. */
+  private readonly typing = new Map<string, NodeJS.Timeout>();
+
+  /**
+   * WA-A §4: re-send "typing…" every TYPING_REFRESH_MS while the reply is being written, so a turn
+   * longer than Meta's ~25 s bubble still shows it; stopped by the reply (`reply`) or after
+   * TYPING_MAX_MS. Never keeps the process alive.
+   */
+  private keepTyping(
+    inboundId: string,
+    providerMessageId: string,
+    creds: WaNumberCredentials | undefined,
+  ): void {
+    if (!this.provider.showTypingIndicator || this.typing.has(inboundId))
+      return;
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      if (Date.now() - startedAt >= TYPING_MAX_MS) {
+        this.stopTyping(inboundId);
+        return;
+      }
+      void this.provider
+        .showTypingIndicator?.(providerMessageId, creds)
+        ?.catch(() => undefined);
+    }, TYPING_REFRESH_MS);
+    timer.unref?.();
+    this.typing.set(inboundId, timer);
+  }
+
+  private stopTyping(inboundId: string): void {
+    const timer = this.typing.get(inboundId);
+    if (timer) clearInterval(timer);
+    this.typing.delete(inboundId);
+  }
+
   private async showTyping(
     providerMessageId: string,
     text: string,
@@ -877,8 +924,8 @@ export class WhatsAppInboundService {
     chatbotId: string,
     settings: WhatsAppBotSettings,
     creds: WaNumberCredentials | undefined,
-  ): Promise<void> {
-    if (settings.showTyping === false) return;
+  ): Promise<boolean> {
+    if (settings.showTyping === false) return false;
     let crisis = false;
     try {
       crisis = await this.templateService.isCrisisKeyword(
@@ -889,10 +936,11 @@ export class WhatsAppInboundService {
     } catch {
       // Unknown: show the dots, as before.
     }
-    if (crisis) return;
+    if (crisis) return false;
     await this.provider
       .showTypingIndicator?.(providerMessageId, creds)
       ?.catch(() => undefined);
+    return true;
   }
 
   private async recentHistory(
@@ -924,30 +972,58 @@ export class WhatsAppInboundService {
 
   // ─────────────────────────────────────────────────────────────── plumbing
 
+  /**
+   * The contact for this sender and business number: by phone when Meta sent one, else by their
+   * business-scoped user ID (WA-A §4). When both arrive, a contact found by one learns the other,
+   * so the same person stays one thread when Meta later sends only their ID.
+   */
   private async resolveContact(
     inbound: InboundWhatsAppMessage,
     businessNumberId: string | null,
   ): Promise<WaContact> {
     const now = new Date();
-    const existing = await this.contactRepository.findOne({
-      where: {
-        phoneE164: inbound.from,
-        businessNumberId: businessNumberId ?? IsNull(),
-      },
-    });
+    const phone = inbound.from || null;
+    const bsuid = inbound.fromUserId || null;
+    const scope = { businessNumberId: businessNumberId ?? IsNull() };
+    const existing =
+      (phone
+        ? await this.contactRepository.findOne({
+            where: { phoneE164: phone, ...scope },
+          })
+        : null) ??
+      (bsuid
+        ? await this.contactRepository.findOne({
+            where: { bsuid, ...scope },
+          })
+        : null);
     if (existing) {
+      const learned = {
+        ...(bsuid && !existing.bsuid ? { bsuid } : {}),
+        ...(phone && !existing.phoneE164
+          ? { phoneE164: phone, phoneLast4: lastFourOf(phone) }
+          : {}),
+      };
       await this.contactRepository.update(
         { id: existing.id },
-        { lastSeenAt: now, messageCount: existing.messageCount + 1 },
+        {
+          lastSeenAt: now,
+          messageCount: existing.messageCount + 1,
+          ...learned,
+        },
       );
-      return { ...existing, messageCount: existing.messageCount + 1 };
+      return {
+        ...existing,
+        ...learned,
+        messageCount: existing.messageCount + 1,
+      };
     }
 
     return this.contactRepository.save(
       this.contactRepository.create({
-        phoneE164: inbound.from,
+        phoneE164: phone,
+        bsuid,
         businessNumberId,
-        phoneLast4: inbound.from.slice(-4),
+        phoneLast4: lastFourOf(phone ?? bsuid ?? ''),
         consentStatus: WaConsentStatus.PENDING,
         firstSeenAt: now,
         lastSeenAt: now,
@@ -1020,10 +1096,10 @@ export class WhatsAppInboundService {
     creds: WaNumberCredentials,
   ): Promise<{ providerMessageId: string }> {
     if (!numbered) {
-      return this.provider.sendText(contact.phoneE164, body, creds);
+      return this.provider.sendText(waAddressOf(contact), body, creds);
     }
     const sent = await this.provider.sendText(
-      contact.phoneE164,
+      waAddressOf(contact),
       numbered.text,
       creds,
     );
@@ -1051,6 +1127,7 @@ export class WhatsAppInboundService {
       numbered?: { text: string; tokens: string[] } | null;
     } = {},
   ): Promise<{ copied: Promise<boolean> | undefined }> {
+    this.stopTyping(inReplyToId);
     const outbound = await this.messageRepository.save(
       this.messageRepository.create({
         conversationId: conversation.id,
@@ -1106,7 +1183,7 @@ export class WhatsAppInboundService {
         if (interactive) {
           try {
             ({ providerMessageId } = await this.provider.sendInteractive!(
-              contact.phoneE164,
+              waAddressOf(contact),
               interactive,
               creds,
             ));

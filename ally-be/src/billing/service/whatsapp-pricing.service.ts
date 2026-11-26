@@ -30,6 +30,7 @@ export function parseWhatsAppBillables(body: unknown): WhatsAppBillable[] {
             status?: string;
             timestamp?: string;
             recipient_id?: string;
+            recipient_user_id?: string;
             pricing?: {
               billable?: boolean;
               category?: string;
@@ -48,7 +49,9 @@ export function parseWhatsAppBillables(body: unknown): WhatsAppBillable[] {
         if (status.status === 'failed') continue;
         out.push({
           messageId: String(status.id).slice(0, 120),
-          recipient: String(status.recipient_id ?? ''),
+          recipient: String(
+            status.recipient_id ?? status.recipient_user_id ?? '',
+          ),
           category: String(status.pricing.category ?? 'service').toLowerCase(),
           pricingModel: status.pricing.pricing_model ?? null,
           at: status.timestamp
@@ -77,6 +80,9 @@ const DIAL_CODES: Array<[string, string]> = [
 ];
 
 export function countryOf(phone: string): string | null {
+  // WA-A §4: a business-scoped user ID starts with the person's country (`IN.1349…`).
+  const scoped = /^([A-Z]{2})\.[A-Za-z0-9]+$/.exec(String(phone ?? ''));
+  if (scoped) return scoped[1];
   const digits = String(phone ?? '').replace(/\D/g, '');
   for (const [code, country] of DIAL_CODES) {
     if (digits.startsWith(code)) return country;

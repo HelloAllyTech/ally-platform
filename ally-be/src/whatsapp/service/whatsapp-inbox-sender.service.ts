@@ -25,6 +25,7 @@ import {
   type WhatsAppProvider,
 } from '../type/whatsapp-provider.interface';
 import { WaSharedStoreWriter } from '../shared-store/wa-shared-store.writer';
+import { waAddressOf } from '../util/wa-address';
 import { WhatsAppBusinessNumberService } from './whatsapp-business-number.service';
 
 /**
@@ -166,7 +167,7 @@ export class WhatsAppInboxSender {
       if (!creds)
         throw new Error("This assistant's WhatsApp number is disconnected");
       const { providerMessageId } = await this.deliver(
-        contact.phoneE164,
+        waAddressOf(contact),
         request,
         creds,
       );

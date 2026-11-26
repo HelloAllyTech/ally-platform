@@ -204,17 +204,19 @@ export class WhatsAppRetentionService {
     for (const { contactId } of stale) {
       const contact = await this.contactRepository.findOne({
         where: { id: contactId },
-        select: ['id', 'phoneE164'],
+        select: ['id', 'phoneE164', 'bsuid'],
       });
       // Already erased, by this job or by an admin acting on a request. Skipping keeps the sweep
-      // idempotent and keeps the log count honest.
-      if (!contact || contact.phoneE164.startsWith(ERASED_PHONE_PREFIX))
+      // idempotent and keeps the log count honest. (WA-A: a contact known only by its
+      // business-scoped ID has no phone; it's erased the same way.)
+      if (!contact || contact.phoneE164?.startsWith(ERASED_PHONE_PREFIX))
         continue;
 
       await this.contactRepository.update(
         { id: contactId },
         {
           phoneE164: `${ERASED_PHONE_PREFIX}${contactId}`,
+          bsuid: null,
           phoneLast4: '0000',
           locale: null,
           // Cleared with the number, for the same reason: the pair names a specific worker at a

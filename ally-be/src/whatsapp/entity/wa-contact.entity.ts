@@ -39,8 +39,19 @@ export class WaContact extends BaseWithoutTenantEntity {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 64, name: 'phone_e164' })
-  phoneE164!: string;
+  /**
+   * Null only for a person Meta identifies by their business-scoped user ID alone (WA-A §4, a
+   * WhatsApp username): then `bsuid` is set. Use `waAddressOf(contact)` to send or key on them.
+   */
+  @Column({ type: 'varchar', length: 64, name: 'phone_e164', nullable: true })
+  phoneE164!: string | null;
+
+  /**
+   * Meta's business-scoped user ID (`from_user_id`, e.g. `IN.1349…`), when its webhooks send one
+   * (WA-A §4, RC1 §4b). Unique per business number, like the phone.
+   */
+  @Column({ type: 'varchar', length: 140, name: 'bsuid', nullable: true })
+  bsuid?: string | null;
 
   /**
    * The organisation number this contact wrote to (`wa_business_numbers.id`). Null for the
