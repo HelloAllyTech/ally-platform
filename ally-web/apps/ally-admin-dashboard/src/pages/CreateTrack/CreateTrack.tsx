@@ -188,6 +188,13 @@ export const CreateTrack: FC = () => {
     });
   };
 
+  const handleRenameSection = (sectionIndex: number, title: string) => {
+    formMethods.setValue(`sections.${sectionIndex}.title`, title, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
   const handleDuplicateSection = (sectionIndex: number) => {
     const copy = cloneSectionWithNewIds(getValues(`sections.${sectionIndex}`));
     sectionArray.insert(sectionIndex + 1, copy);
@@ -586,6 +593,7 @@ export const CreateTrack: FC = () => {
               onAddItemFromTemplate={handleAddItemFromTemplate}
               onDeleteSection={handleDeleteSection}
               onDuplicateSection={handleDuplicateSection}
+              onRenameSection={handleRenameSection}
               onReorderSections={isViewOnly ? () => undefined : handleReorderSections}
               onReorderItems={isViewOnly ? () => undefined : handleReorderItems}
             />

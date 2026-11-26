@@ -43,6 +43,8 @@ interface SectionNodeProps {
   ) => void;
   onDeleteSection: (sectionIndex: number) => void;
   onDuplicateSection: (sectionIndex: number) => void;
+  /** The trainer retyped the section's title, which learners see in place of "Section N". */
+  onRenameSection: (sectionIndex: number, title: string) => void;
   onReorderItems: (sectionIndex: number, from: number, to: number) => void;
 }
 
@@ -56,6 +58,7 @@ export const SectionNode: FC<SectionNodeProps> = ({
   onAddItemFromTemplate,
   onDeleteSection,
   onDuplicateSection,
+  onRenameSection,
   onReorderItems,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -110,9 +113,19 @@ export const SectionNode: FC<SectionNodeProps> = ({
         >
           <ArrowDown className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`} />
         </button>
-        <span className="text-sm font-medium text-typography-900 truncate flex-1">
-          {section.title?.trim() || `Section ${sectionIndex + 1}`}
-        </span>
+        <Tooltip
+          label="Learners see this name for the section, not a number. It stays with the section when you reorder."
+          align="top"
+        >
+          <input
+            type="text"
+            value={section.title ?? ""}
+            onChange={event => onRenameSection(sectionIndex, event.target.value)}
+            placeholder={`Section ${sectionIndex + 1}`}
+            aria-label={`Section ${sectionIndex + 1} title`}
+            className="min-w-0 flex-1 truncate rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium text-typography-900 placeholder:text-typography-500 hover:border-border-light focus:border-primary-500 focus:bg-white focus:outline-none"
+          />
+        </Tooltip>
         {sectionHasError && <WarningAlt className="w-3.5 h-3.5 text-destructive-500" />}
         <button
           type="button"

@@ -5,11 +5,18 @@ import { Provider } from "react-redux";
 import { store } from "@store";
 import { TrackPlayer } from "../TrackPlayer";
 import * as api from "@api";
+import { ANALYTICS_EVENTS, ANALYTICS_PROPS } from "@constants/analyticsEvents";
 import { TrackDetail, TrackItemStatus, TrackItemType } from "@types";
 
 // The quiz player fires confetti on a pass; jsdom has no canvas context,
 // so the real module throws inside a requestAnimationFrame callback.
 vi.mock("canvas-confetti", () => ({ default: vi.fn() }));
+
+const mockTrack = vi.hoisted(() => vi.fn());
+vi.mock("@hooks", async () => ({
+  ...(await vi.importActual<typeof import("@hooks")>("@hooks")),
+  useAnalytics: () => ({ track: mockTrack }),
+}));
 
 vi.mock("@api", async () => {
   const actual = await vi.importActual<typeof api>("@api");
@@ -134,6 +141,85 @@ describe("TrackPlayer", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Mark as read" })).toBeInTheDocument(),
     );
+  });
+
+  describe("section analytics", () => {
+    const twoSections = (): TrackDetail => ({
+      ...mockTrackDetail,
+      sections: [
+        {
+          ...mockTrackDetail.sections[0],
+          id: "s-a",
+          order: 1,
+          items: [
+            { ...mockTrackDetail.sections[0].items[0], id: "a1", order: 1 },
+            { ...mockTrackDetail.sections[0].items[0], id: "a2", order: 2 },
+          ],
+        },
+        {
+          ...mockTrackDetail.sections[0],
+          id: "s-b",
+          order: 2,
+          items: [{ ...mockTrackDetail.sections[0].items[0], id: "b1", order: 1 }],
+        },
+      ],
+    });
+
+    const renderAt = (itemId: string) => {
+      (api.useGetLearnTrackDetailQuery as vi.Mock).mockReturnValue({
+        data: twoSections(),
+        isError: false,
+        refetch: vi.fn(),
+      });
+      (api.useStartTrackItemMutation as vi.Mock).mockReturnValue(mockStartTrackItemMutation);
+      mockTrack.mockClear();
+      render(
+        <Provider store={store}>
+          <MemoryRouter initialEntries={[`/track/track1/${itemId}`]}>
+            <Routes>
+              <Route path="/track/:trackId/:itemId" element={<TrackPlayer />} />
+            </Routes>
+          </MemoryRouter>
+        </Provider>,
+      );
+    };
+
+    it("reports entering a section, with the course, section and its position", async () => {
+      renderAt("b1");
+      await waitFor(() =>
+        expect(mockTrack).toHaveBeenCalledWith(ANALYTICS_EVENTS.COURSE_SECTION_OPENED, {
+          [ANALYTICS_PROPS.COURSE_ID]: "track1",
+          [ANALYTICS_PROPS.SECTION_ID]: "s-b",
+          [ANALYTICS_PROPS.SECTION_INDEX]: 1,
+        }),
+      );
+    });
+
+    it("reports the first item of a section starting, once it has loaded", async () => {
+      renderAt("a1");
+      await waitFor(() =>
+        expect(mockTrack).toHaveBeenCalledWith(ANALYTICS_EVENTS.COURSE_SECTION_FIRST_ITEM_STARTED, {
+          [ANALYTICS_PROPS.COURSE_ID]: "track1",
+          [ANALYTICS_PROPS.SECTION_ID]: "s-a",
+          [ANALYTICS_PROPS.SECTION_INDEX]: 0,
+          [ANALYTICS_PROPS.ITEM_ID]: "a1",
+          [ANALYTICS_PROPS.ITEM_TYPE]: "ARTICLE",
+        }),
+      );
+    });
+
+    it("does not report a later item as the section's first", async () => {
+      renderAt("a2");
+      await screen.findByRole("button", { name: "Mark as read" });
+      expect(mockTrack).toHaveBeenCalledWith(
+        ANALYTICS_EVENTS.COURSE_SECTION_OPENED,
+        expect.objectContaining({ [ANALYTICS_PROPS.SECTION_ID]: "s-a" }),
+      );
+      expect(mockTrack).not.toHaveBeenCalledWith(
+        ANALYTICS_EVENTS.COURSE_SECTION_FIRST_ITEM_STARTED,
+        expect.anything(),
+      );
+    });
   });
 
   it("shows the discussion thread below the content when hasDiscussion is true", async () => {

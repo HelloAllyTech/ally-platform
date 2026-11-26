@@ -297,6 +297,54 @@ index is enough to see which ones land.
 | ---------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------- |
 | `COURSE_LANDING_FIRST_MOVE_CHOSEN` | `course_landing_first_move_chosen` | A reply was picked in the page's first move. Sends `course_id` and `reply_index` (0-based) | `pages/course-landing/CourseLanding.tsx` |
 
+### Course player sections (`/track/:trackId/item/:itemId`)
+
+How learners move through a course's sections. Both events send ids and the section's position
+only, never its title, so a renamed section keeps its history. `section_index` is 0-based. Web
+learner app only: the mobile app does not send product analytics yet, so its learners do not show up
+here.
+
+| Constant                            | Event Name                          | Description                                                                                                                                                                  | Fires at                             |
+| ----------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `COURSE_SECTION_OPENED`             | `course_section_opened`             | The learner entered a section: the player landed on any of its items. Once per arrival, not when moving within the section. Sends `course_id`, `section_id`, `section_index` | `pages/track-player/TrackPlayer.tsx` |
+| `COURSE_SECTION_FIRST_ITEM_STARTED` | `course_section_first_item_started` | The section's first item loaded for the learner. Once per item per player visit. Sends `course_id`, `section_id`, `section_index`, `item_id`, `item_type`                    | `pages/track-player/TrackPlayer.tsx` |
+
+#### Section to first item, within 24 hours
+
+The share of learners who opened a section and started its first item within 24 hours of opening it.
+Paste into PostHog SQL, set the dates and `course_id`, and run it once for the 2 weeks before a
+change and once for the 2 weeks after. Read it with one caveat: a learner who lands on the first item
+opens the section and starts it at the same moment, so the share only drops below 100% for learners
+who come into a section at a later item (resuming, or following a link).
+
+```sql
+WITH opened AS (
+  SELECT person_id, properties.section_id AS section_id, min(timestamp) AS opened_at
+  FROM events
+  WHERE event = 'course_section_opened'
+    AND properties.course_id = '<course_id>'
+    AND timestamp >= toDateTime('<from>') AND timestamp < toDateTime('<to>')
+  GROUP BY person_id, section_id
+),
+started AS (
+  SELECT person_id, properties.section_id AS section_id, min(timestamp) AS started_at
+  FROM events
+  WHERE event = 'course_section_first_item_started'
+    AND properties.course_id = '<course_id>'
+  GROUP BY person_id, section_id
+)
+SELECT
+  count() AS learners_who_opened,
+  countIf(started.started_at >= opened.opened_at
+          AND started.started_at <= opened.opened_at + INTERVAL 24 HOUR) AS started_within_24h,
+  round(100 * started_within_24h / learners_who_opened, 1) AS pct
+FROM opened
+LEFT JOIN started ON started.person_id = opened.person_id AND started.section_id = opened.section_id
+```
+
+Add `AND properties.section_id = '<section_id>'` to both `WHERE` clauses to look at one section, such
+as the Gatekeeper pre-assessment.
+
 ### Ally guided journey (`/journey/:trackId`)
 
 Ally's guided course experience (dark launch behind the guide kill switch). The events carry ids,

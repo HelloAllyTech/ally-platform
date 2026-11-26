@@ -141,6 +141,14 @@ export const ANALYTICS_EVENTS = {
   // course id and which reply was picked — never the reply text.
   COURSE_LANDING_FIRST_MOVE_CHOSEN: "course_landing_first_move_chosen",
 
+  // Course player sections. OPENED fires when the learner enters a section (the
+  // player lands on any of its items); FIRST_ITEM_STARTED fires when the section's
+  // first item has loaded. Both send ids and the section's position only. The
+  // share who start the first item within 24h of opening is the engagement
+  // measure for sections: see "Section to first item" in the tracked-events list.
+  COURSE_SECTION_OPENED: "course_section_opened",
+  COURSE_SECTION_FIRST_ITEM_STARTED: "course_section_first_item_started",
+
   // Ally's guided journey (`/journey/:trackId`). Never the learner's words,
   // and nothing about CARE or a crisis: those stay out of analytics entirely.
   GUIDED_JOURNEY_OPENED: "guided_journey_opened",
@@ -373,6 +381,10 @@ export const ANALYTICS_PROPS = {
   // Course landing page context
   COURSE_ID: "course_id",
   REPLY_INDEX: "reply_index",
+  // Course player sections: the section's id and its 0-based position in the course.
+  SECTION_ID: "section_id",
+  SECTION_INDEX: "section_index",
+  ITEM_TYPE: "item_type",
   // Ally's guided journey
   GUIDED_ENTRY: "entry",
   GUIDED_VERB: "verb",

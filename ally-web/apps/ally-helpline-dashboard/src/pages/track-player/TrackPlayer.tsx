@@ -9,6 +9,8 @@ import { NoResults } from "@assets";
 import { FallbackUI } from "@components";
 import { ErrorBoundary } from "@components/error-boundary/ErrorBoundary";
 import { ROUTES } from "@constants";
+import { ANALYTICS_EVENTS, ANALYTICS_PROPS } from "@constants/analyticsEvents";
+import { useAnalytics } from "@hooks";
 import {
   StartTrackItemResponse,
   TrackItemCompletionResult,
@@ -78,6 +80,26 @@ export const TrackPlayer: FC = () => {
   const [isPendingTrackCompletion, setIsPendingTrackCompletion] = useState(false);
 
   const nav = useTrackPlayerNavigation(track, trackId, itemId, justCompleted);
+  const { track: trackEvent } = useAnalytics();
+
+  // Section analytics. A section is "opened" when the player lands in it, and
+  // its first item "started" once that item has loaded. Each is sent once per
+  // arrival, not on every re-render or when the learner moves within a section.
+  const currentSectionId = nav.current?.sectionId;
+  const currentSectionIndex = nav.flat
+    .map(entry => entry.sectionId)
+    .filter((id, i, ids) => ids.indexOf(id) === i)
+    .indexOf(currentSectionId ?? "");
+  const openedSectionRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentSectionId || openedSectionRef.current === currentSectionId) return;
+    openedSectionRef.current = currentSectionId;
+    trackEvent(ANALYTICS_EVENTS.COURSE_SECTION_OPENED, {
+      [ANALYTICS_PROPS.COURSE_ID]: trackId,
+      [ANALYTICS_PROPS.SECTION_ID]: currentSectionId,
+      [ANALYTICS_PROPS.SECTION_INDEX]: currentSectionIndex,
+    });
+  }, [currentSectionId, currentSectionIndex, trackId, trackEvent]);
 
   // Direction-aware slide: +1 forward, -1 backward.
   const directionRef = useRef(1);
@@ -91,6 +113,9 @@ export const TrackPlayer: FC = () => {
 
   // Per-item start payload.
   const [payload, setPayload] = useState<StartTrackItemResponse | null>(null);
+  // Which item `payload` belongs to: for one render after navigating, the old
+  // item's payload is still here under the new item's id.
+  const [payloadItemId, setPayloadItemId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [isLoadingItem, setIsLoadingItem] = useState(false);
 
@@ -99,9 +124,11 @@ export const TrackPlayer: FC = () => {
     setIsLoadingItem(true);
     setLoadError(false);
     setPayload(null);
+    setPayloadItemId(null);
     try {
       const data = await startTrackItem({ itemId }).unwrap();
       setPayload(data);
+      setPayloadItemId(itemId);
     } catch {
       setLoadError(true);
     } finally {
@@ -112,6 +139,21 @@ export const TrackPlayer: FC = () => {
   useEffect(() => {
     loadItem();
   }, [loadItem]);
+
+  const firstItemReportedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const entry = nav.current;
+    if (!payload || payloadItemId !== itemId || !entry || entry.item.id !== itemId) return;
+    if (entry.indexInSection !== 0 || firstItemReportedRef.current === itemId) return;
+    firstItemReportedRef.current = itemId;
+    trackEvent(ANALYTICS_EVENTS.COURSE_SECTION_FIRST_ITEM_STARTED, {
+      [ANALYTICS_PROPS.COURSE_ID]: trackId,
+      [ANALYTICS_PROPS.SECTION_ID]: entry.sectionId,
+      [ANALYTICS_PROPS.SECTION_INDEX]: currentSectionIndex,
+      [ANALYTICS_PROPS.ITEM_ID]: itemId,
+      [ANALYTICS_PROPS.ITEM_TYPE]: payload.type,
+    });
+  }, [payload, payloadItemId, itemId, nav, trackId, currentSectionIndex, trackEvent]);
 
   const handleCompletion = useCallback(
     (result: TrackItemCompletionResult) => {
