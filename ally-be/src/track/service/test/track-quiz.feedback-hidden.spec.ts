@@ -103,6 +103,19 @@ describe('buildQuestionResult - feedbackHidden', () => {
     expect(result).not.toHaveProperty('correctAnswer');
   });
 
+  it('marks the row as not scored, so an older client reads no verdict as "no verdict" and not "pending grading"', () => {
+    const result = buildQuestionResult(
+      entry,
+      mcq({ showCorrectAnswer: false }),
+      true,
+      true,
+    );
+    // Older web tabs and the mobile app treat `correct: null` on a graded row
+    // as waiting for the AI grader, and park the learner on "Finish grading".
+    expect(result.graded).toBe(false);
+    expect(result.pointsPossible).toBe(0);
+  });
+
   it('still sends the verdict when feedback is not hidden', () => {
     const result = buildQuestionResult(
       entry,

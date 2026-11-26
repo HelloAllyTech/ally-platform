@@ -40,7 +40,7 @@ const hiddenResult = (overrides: Partial<QuizAttemptResult> = {}): QuizAttemptRe
   attemptsUsed: 1,
   maxAttempts: null,
   questions: [
-    { questionId: "mcq", correct: null, graded: true, pointsAwarded: 0, pointsPossible: 1 },
+    { questionId: "mcq", correct: null, graded: false, pointsAwarded: 0, pointsPossible: 0 },
   ],
   itemCompleted: true,
   unlockedItemIds: [],

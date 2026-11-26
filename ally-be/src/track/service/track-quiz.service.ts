@@ -86,11 +86,17 @@ export function buildQuestionResult(
     questionId: entry.questionId,
     // Nothing that says how the learner did leaves the server in an
     // assessment with no feedback: not the verdict, the points, the AI's
-    // comments or the key.
+    // comments or the key. The row also goes out as "not scored": a client
+    // from before `feedbackHidden` (an open web tab, the mobile app) reads
+    // `correct: null` on a graded row as "waiting for the AI grader" and
+    // parks the learner on "Finish grading". As ungraded it just shows no
+    // verdict, and Next works.
     correct: feedbackHidden ? null : entry.correct,
-    graded: entry.graded ?? (question ? isQuestionGraded(question) : true),
+    graded: feedbackHidden
+      ? false
+      : (entry.graded ?? (question ? isQuestionGraded(question) : true)),
     pointsAwarded: feedbackHidden ? 0 : entry.pointsAwarded,
-    pointsPossible: entry.pointsPossible,
+    pointsPossible: feedbackHidden ? 0 : entry.pointsPossible,
     ...(includeExplanations ? { explanation: question?.explanation } : {}),
     ...(entry.llm && !feedbackHidden
       ? { llmFeedback: entry.llm.feedback }
