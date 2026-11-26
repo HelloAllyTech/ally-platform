@@ -25,6 +25,16 @@ export class GrantCreditsDto {
   @IsUUID()
   accountId?: string;
 
+  @ApiPropertyOptional({
+    example: 'asha@example.org',
+    description:
+      'The person, by the email they sign in with, when they have no account yet (none until they build a chatbot); it is created',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(320)
+  email?: string;
+
   @ApiProperty({
     example: 20,
     description: 'Dollars; negative only for an adjustment',

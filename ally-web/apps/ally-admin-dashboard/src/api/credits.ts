@@ -107,6 +107,8 @@ export interface CreditAccountRow {
 export interface GrantCreditsInput {
   userId?: number;
   accountId?: string;
+  /** The person's sign-in email, for someone with no account yet; ally-be creates it. */
+  email?: string;
   amountUsd: number;
   kind: "grant" | "adjustment";
   note: string;

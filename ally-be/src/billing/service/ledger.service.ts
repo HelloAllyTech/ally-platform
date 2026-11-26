@@ -417,6 +417,31 @@ export class LedgerService implements UsageEventListener, OnModuleInit {
 
   // ── accounts ────────────────────────────────────────────────────────
 
+  /**
+   * Staff grants to someone who has never built a chatbot have no account to pick, so they
+   * name the person by the email they sign in with. Case-insensitive; never guesses between two.
+   */
+  private async userIdByEmail(
+    email: string,
+    manager: EntityManager,
+  ): Promise<number> {
+    const rows: Array<{ id: number }> = await manager.query(
+      `SELECT id FROM users WHERE lower(email) = lower($1) ORDER BY id LIMIT 2`,
+      [email.trim()],
+    );
+    if (!rows.length) {
+      throw new NotFoundException(
+        'No one signs in with that email. Check it, or create their login first.',
+      );
+    }
+    if (rows.length > 1) {
+      throw new ConflictException(
+        'More than one login uses that email. Grant from their account instead.',
+      );
+    }
+    return Number(rows[0].id);
+  }
+
   /** The builder's account, created on first use (every builder starts at $0, D1). */
   async accountFor(
     userId: number,
@@ -883,6 +908,8 @@ export class LedgerService implements UsageEventListener, OnModuleInit {
     input: {
       userId?: number;
       accountId?: string;
+      /** The person by sign-in email, for someone with no account yet. */
+      email?: string;
       amountUsd: number;
       kind: 'grant' | 'adjustment';
       note: string;
@@ -905,11 +932,18 @@ export class LedgerService implements UsageEventListener, OnModuleInit {
       );
     }
     const result = await this.dataSource.transaction(async (manager) => {
+      const userId =
+        input.userId ??
+        (input.email?.trim()
+          ? await this.userIdByEmail(input.email, manager)
+          : undefined);
       const accountId =
         input.accountId ??
-        (input.userId ? await this.accountFor(input.userId, manager) : null);
+        (userId ? await this.accountFor(userId, manager) : null);
       if (!accountId)
-        throw new BadRequestException('Name the account or the user.');
+        throw new BadRequestException(
+          'Name the account, the user or their email.',
+        );
       if (input.idempotencyKey) {
         const [done] = await manager.query(
           `SELECT id FROM credit_grants WHERE idempotency_key = $1`,

@@ -106,6 +106,81 @@ export const GrantForm: React.FC<{ accountId: string; ownerUserId?: number }> = 
   );
 };
 
+/**
+ * Grant to someone with no account yet (nobody has one until they build a chatbot or are
+ * granted credits): by the email they sign in with. ally-be finds the login, creates the
+ * account and grants; the page then opens their ledger.
+ */
+export const NewPersonGrant: React.FC<{ onGranted: (accountId: string) => void }> = ({
+  onGranted,
+}) => {
+  const [grant, { isLoading }] = useGrantCreditsMutation();
+  const [email, setEmail] = useState("");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const n = C.newPerson;
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const value = parseDollars(amount);
+    if (!email.trim()) return setError(n.needEmail);
+    if (value === null || Number.isNaN(value) || value <= 0) return setError(n.needAmount);
+    if (!note.trim()) return setError(n.needNote);
+    try {
+      const account = await grant({
+        email: email.trim(),
+        amountUsd: value,
+        kind: "grant",
+        note: note.trim(),
+      }).unwrap();
+      setError(null);
+      if (account.accountId) onGranted(account.accountId);
+    } catch (failure) {
+      setError(errorText(failure, n.failed));
+    }
+  };
+
+  return (
+    <Card title={n.title} testId="staff-new-person">
+      <p className="text-sm text-typography-600">{n.intro}</p>
+      <form onSubmit={submit} className="space-y-3" noValidate>
+        <label className="block text-sm">
+          {n.email}
+          <input
+            className={inputClass}
+            type="email"
+            autoComplete="off"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+          />
+        </label>
+        <label className="block text-sm">
+          {n.amount}
+          <input
+            className={inputClass}
+            inputMode="decimal"
+            value={amount}
+            onChange={e => setAmount(e.target.value)}
+          />
+        </label>
+        <label className="block text-sm">
+          {n.note}
+          <input className={inputClass} value={note} onChange={e => setNote(e.target.value)} />
+        </label>
+        <button type="submit" className={buttonClass} disabled={isLoading}>
+          {n.action}
+        </button>
+        {error && (
+          <p role="alert" className="text-sm text-red-700" data-testid="staff-new-person-error">
+            {error}
+          </p>
+        )}
+      </form>
+    </Card>
+  );
+};
+
 export const TransferForm: React.FC<{ budgets: { chatbotId: string; name: string | null }[] }> = ({
   budgets,
 }) => {
@@ -361,6 +436,7 @@ export const StaffCredits: React.FC<{ embedded?: boolean }> = ({ embedded = fals
               </div>
             )}
           </Card>
+          <NewPersonGrant onGranted={setOpen} />
           <CutoverCard />
         </>
       )}

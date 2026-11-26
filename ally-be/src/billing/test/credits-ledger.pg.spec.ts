@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import {
   closeTestDataSource,
@@ -392,6 +392,38 @@ describePg('Billing: credits ledger (Postgres)', () => {
     expect(await ledger.removalBlockedReason(bot, 2)).toMatch(
       /Move the budget/,
     );
+  });
+
+  it('a grant by email reaches someone who has never built, and creates their account', async () => {
+    await dataSource.query(
+      `INSERT INTO users (id, email, name, status, username, tenant_id)
+       VALUES (3, 'New.Person@example.test', 'New', 'active', 'new', 't1')`,
+    );
+    const result = await ledger.grant(
+      {
+        email: ' new.person@EXAMPLE.test ',
+        amountUsd: 5,
+        kind: 'grant',
+        note: 'pilot',
+      },
+      99,
+    );
+    const [account] = await dataSource.query(
+      `SELECT id FROM billing_accounts WHERE owner_user_id = 3`,
+    );
+    expect(result.accountId).toBe(account.id);
+    expect(await free(3)).toBe(5 * USD);
+    await expect(
+      ledger.grant(
+        {
+          email: 'nobody@example.test',
+          amountUsd: 5,
+          kind: 'grant',
+          note: 'x',
+        },
+        99,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('a negative adjustment cannot go below spent plus set aside', async () => {

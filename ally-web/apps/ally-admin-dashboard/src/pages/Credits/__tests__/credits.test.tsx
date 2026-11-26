@@ -236,6 +236,55 @@ describe("Ally admin credits", () => {
     );
   });
 
+  it("grants to someone with no account by their sign-in email, then opens their ledger", async () => {
+    h.grant.mockReturnValue(ok({ accountId: "a9" }));
+    render(<StaffCredits />);
+    const card = screen.getByTestId("staff-new-person");
+    fireEvent.click(screen.getByRole("button", { name: "Grant credits" }));
+    expect(screen.getByTestId("staff-new-person-error")).toHaveTextContent("sign in with");
+    fireEvent.change(screen.getByLabelText("Their sign-in email"), {
+      target: { value: " new@clinic.test " },
+    });
+    fireEvent.change(card.querySelector("input[inputmode=decimal]") as HTMLInputElement, {
+      target: { value: "10" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Grant credits" }));
+    expect(screen.getByTestId("staff-new-person-error")).toHaveTextContent("A note is required.");
+    expect(h.grant).not.toHaveBeenCalled();
+    fireEvent.change(card.querySelectorAll("input")[2], { target: { value: "Pilot" } });
+    fireEvent.click(screen.getByRole("button", { name: "Grant credits" }));
+    await waitFor(() =>
+      expect(h.grant).toHaveBeenCalledWith({
+        email: "new@clinic.test",
+        amountUsd: 10,
+        kind: "grant",
+        note: "Pilot",
+      }),
+    );
+    await waitFor(() => expect(screen.getByTestId("staff-ledger")).toBeInTheDocument());
+  });
+
+  it("says why when no one signs in with that email", async () => {
+    h.grant.mockReturnValue({
+      unwrap: () =>
+        Promise.reject({
+          data: {
+            message: "No one signs in with that email. Check it, or create their login first.",
+          },
+        }),
+    });
+    render(<StaffCredits />);
+    const card = screen.getByTestId("staff-new-person");
+    const inputs = card.querySelectorAll("input");
+    fireEvent.change(inputs[0], { target: { value: "nobody@clinic.test" } });
+    fireEvent.change(inputs[1], { target: { value: "5" } });
+    fireEvent.change(inputs[2], { target: { value: "Pilot" } });
+    fireEvent.click(screen.getByRole("button", { name: "Grant credits" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("staff-new-person-error")).toHaveTextContent("No one signs in"),
+    );
+  });
+
   it("moves a budget to another builder", async () => {
     h.transfer.mockReturnValue(ok());
     render(<StaffCredits />);

@@ -184,6 +184,19 @@ export const STAFF_CREDITS_COPY = {
     done: "Saved.",
     failed: "Couldn't save. Check the amount and try again.",
   },
+  newPerson: {
+    title: "Grant credits to someone not listed",
+    intro:
+      "People appear in Builder accounts once they build a chatbot or get credits. To give credits to someone before that, enter the email they sign in with.",
+    email: "Their sign-in email",
+    amount: "Amount in dollars",
+    note: "Note (required)",
+    action: "Grant credits",
+    needEmail: "Enter the email they sign in with.",
+    needAmount: "Enter an amount above $0.",
+    needNote: "A note is required.",
+    failed: "Couldn't grant. Check the email and try again.",
+  },
   transfer: {
     title: "Move a chatbot's budget",
     chatbot: "Chatbot",
