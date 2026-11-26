@@ -37,6 +37,27 @@ export interface InboxMessage {
   sentBy: { id: number; name: string | null } | null;
   rating: "up" | "down" | null;
   ratingReason: string | null;
+  /** WA-A §3: what WhatsApp says happened to a message sent to the person. */
+  status?: InboxDeliveryStatus | null;
+  /** WA-A §3: a failed send's reason in plain words. */
+  failedReason?: string | null;
+  /** WA-A: voice notes (with their transcript), images and documents, as short-lived links. */
+  attachments?: InboxAttachment[];
+}
+
+export type InboxDeliveryStatus = "sent" | "delivered" | "read" | "failed";
+
+export interface InboxAttachment {
+  kind: "audio" | "image" | "document";
+  mimeType: string;
+  filename: string | null;
+  caption: string | null;
+  voice: boolean;
+  transcript: string | null;
+  transcriptError: string | null;
+  durationSec: number | null;
+  /** Null when the file couldn't be stored (the message is still shown). */
+  url: string | null;
 }
 
 export interface InboxThread extends InboxItem {
@@ -131,13 +152,30 @@ export const inboxApi = baseAPI.injectEndpoints({
     }),
     replyInInbox: builder.mutation<
       { messageId: string },
-      { chatbotId: string; id: string; text: string }
+      { chatbotId: string; id: string; text: string; buttons?: string[] }
     >({
-      query: ({ chatbotId, id, text }) => ({
+      query: ({ chatbotId, id, text, buttons }) => ({
         url: ApiEndpoints.INBOX.REPLY(chatbotId, id),
         method: HttpMethod.POST,
-        body: { text },
+        body: buttons?.length ? { text, buttons } : { text },
       }),
+      invalidatesTags: [TAG_TYPES.INBOX],
+    }),
+    // WA-A §3: a file on the chat's WhatsApp, with an optional caption.
+    attachInInbox: builder.mutation<
+      { messageId: string },
+      { chatbotId: string; id: string; file: File; text?: string }
+    >({
+      query: ({ chatbotId, id, file, text }) => {
+        const body = new FormData();
+        body.append("file", file);
+        if (text?.trim()) body.append("text", text.trim());
+        return {
+          url: ApiEndpoints.INBOX.ATTACH(chatbotId, id),
+          method: HttpMethod.POST,
+          body,
+        };
+      },
       invalidatesTags: [TAG_TYPES.INBOX],
     }),
     // What the assistant remembers (chunk 8a). Tagged with the inbox, so a new reply refreshes it.
@@ -189,6 +227,7 @@ export const {
   useTakeOverMutation,
   useHandBackMutation,
   useReplyInInboxMutation,
+  useAttachInInboxMutation,
   useGetPersonMemoryQuery,
   useForgetMemoryLineMutation,
   useEditMemoryLineMutation,

@@ -58,6 +58,7 @@ vi.mock("@api", async importOriginal => ({
   useTakeOverMutation: () => [unwrapped(h.takeOver), { isLoading: false }],
   useHandBackMutation: () => [unwrapped(h.handBack), { isLoading: false }],
   useReplyInInboxMutation: () => [unwrapped(h.reply), { isLoading: false }],
+  useAttachInInboxMutation: () => [unwrapped(h.reply), { isLoading: false }],
   useAddCheckupCaseMutation: () => [vi.fn(), { isLoading: false }],
   useEditMemoryLineMutation: () => [vi.fn(), { isLoading: false }],
   useForgetMemoryLineMutation: () => [vi.fn(), { isLoading: false }],

@@ -1226,6 +1226,9 @@ export const ApiEndpoints = {
       `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/hand-back`,
     REPLY: (chatbotId: string, id: string) =>
       `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/messages`,
+    /** WA-A §3: a file on the chat's WhatsApp. */
+    ATTACH: (chatbotId: string, id: string) =>
+      `/v1/inbox/chatbots/${chatbotId}/conversations/${id}/attachments`,
     /** What the assistant remembers about one person (chunk 8a). */
     MEMORY: (chatbotId: string, contactId: string) =>
       `/v1/inbox/chatbots/${chatbotId}/contacts/${contactId}/memory`,

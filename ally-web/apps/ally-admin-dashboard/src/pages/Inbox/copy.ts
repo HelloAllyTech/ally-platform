@@ -120,3 +120,29 @@ export const channelLabel = (chat: { channel: string; source?: "widget" | null }
   chat.source === "widget"
     ? INBOX.channels.widget
     : INBOX.channels[chat.channel === "web" ? "web" : "whatsapp"];
+
+/**
+ * WA-A: delivery ticks, files and the reply's extras. COPY: needs approval
+ * (`docs/agents-v2/TEXTS-WA-A.md`); kept apart from INBOX until it is in the copy deck.
+ */
+export const INBOX_WA = {
+  delivery: {
+    sent: "Sent",
+    delivered: "Delivered",
+    read: "Read",
+    failed: "Not delivered",
+  },
+  voiceNote: "Voice note",
+  transcript: "Transcript",
+  noTranscript: "Couldn't be transcribed. They were asked to type it.",
+  tooLong: "Over 2 minutes, so not transcribed. They were asked to type it.",
+  fileNotStored: "The file couldn't be stored.",
+  openFile: "Open {name}",
+  photo: "Photo",
+  attach: "Attach a file",
+  attachHint: "JPEG or PNG up to 5 MB, PDF or Office document up to 25 MB. Your text goes with it.",
+  removeFile: "Remove",
+  addButtons: "Add reply buttons",
+  buttonsHint: "Up to 3 buttons, 20 characters each. A tap comes back as its words.",
+  buttonLabel: "Button {n}",
+};

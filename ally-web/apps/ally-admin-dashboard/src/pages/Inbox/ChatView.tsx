@@ -4,6 +4,7 @@ import {
   useGetInboxThreadQuery,
   useHandBackMutation,
   useReplyInInboxMutation,
+  useAttachInInboxMutation,
   useTakeOverMutation,
   useAddCheckupCaseMutation,
 } from "@api";
@@ -13,6 +14,7 @@ import { ButtonVariant } from "@components/types";
 
 import { channelLabel, fill, INBOX } from "./copy";
 import { MemoryPanel } from "./MemoryPanel";
+import { DeliveryTicks, MessageFiles, ReplyExtras, showsDelivery } from "./WaParts";
 import { useAgreementGate } from "../AssistantHome/agreement/context";
 import { PEOPLE } from "../AssistantHome/copy/people";
 import { TF1_COPY } from "../AssistantHome/copy/tf1";
@@ -97,7 +99,11 @@ export const ChatView: React.FC<{
   const agreement = useAgreementGate();
   const [handBack, handing] = useHandBackMutation();
   const [reply, replying] = useReplyInInboxMutation();
+  const [attach, attaching] = useAttachInInboxMutation();
   const [text, setText] = useState("");
+  // WA-A §3: a file, or up to 3 reply buttons, with a WhatsApp reply.
+  const [file, setFile] = useState<File | null>(null);
+  const [buttons, setButtons] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const end = useRef<HTMLDivElement>(null);
   const [adding, setAdding] = useState<string | null>(null);
@@ -280,7 +286,15 @@ export const ChatView: React.FC<{
                     )}
                   </p>
                 )}
-                <p className="ally-inbox__bubble">{m.text}</p>
+                {(m.text || !m.attachments?.length) && (
+                  <p className="ally-inbox__bubble">{m.text}</p>
+                )}
+                {m.attachments && m.attachments.length > 0 && (
+                  <MessageFiles attachments={m.attachments} />
+                )}
+                {showsDelivery(m, thread.channel) && (
+                  <DeliveryTicks status={m.status!} failedReason={m.failedReason} />
+                )}
                 {m.citations.length > 0 && (
                   <p className="ally-small ally-inbox__sources">
                     {m.citations
@@ -365,8 +379,23 @@ export const ChatView: React.FC<{
           className="ally-inbox__reply"
           onSubmit={async event => {
             event.preventDefault();
-            if (!text.trim()) return;
-            if (await run(() => reply({ chatbotId, id, text: text.trim() }).unwrap())) setText("");
+            if (!text.trim() && !file) return;
+            const labels = (buttons ?? []).map(b => b.trim()).filter(Boolean);
+            const sent = await run(() =>
+              file
+                ? attach({ chatbotId, id, file, text: text.trim() }).unwrap()
+                : reply({
+                    chatbotId,
+                    id,
+                    text: text.trim(),
+                    ...(labels.length ? { buttons: labels } : {}),
+                  }).unwrap(),
+            );
+            if (sent) {
+              setText("");
+              setFile(null);
+              setButtons(null);
+            }
           }}
         >
           {thread.replyWindowClosesAt && (
@@ -396,10 +425,21 @@ export const ChatView: React.FC<{
               }
             }}
           />
+          {thread.channel === "whatsapp" && (
+            <ReplyExtras
+              file={file}
+              onFile={setFile}
+              buttons={buttons}
+              onButtons={setButtons}
+              disabled={windowClosed}
+            />
+          )}
           <Button
             variant={ButtonVariant.PRIMARY}
             type="submit"
-            disabled={!text.trim() || replying.isLoading || windowClosed}
+            disabled={
+              (!text.trim() && !file) || replying.isLoading || attaching.isLoading || windowClosed
+            }
           >
             {INBOX.send}
           </Button>
