@@ -74,6 +74,33 @@ describe("splitArticleCards", () => {
     ]);
   });
 
+  it.each([
+    ["an empty paragraph", "<p></p>"],
+    ["a paragraph holding only a line break", "<p><br></p>"],
+    ["a paragraph holding only a non-breaking space", "<p>&nbsp;</p>"],
+    ["stray blank lines and empty paragraphs", "\n<p> </p>\n<p><br></p>"],
+  ])("adds no blank card after a question when only %s follows it", (_label, trailing) => {
+    const cards = splitArticleCards(
+      `<h2>One</h2><p>a</p>${marker("q1")}${trailing}`,
+      [question("q1")],
+      { hasEnd: false },
+    );
+    expect(shape(cards)).toEqual([
+      { kind: "cover" },
+      { kind: "section", title: "One", section: "One", html: "<p>a</p>", photo: null },
+      { kind: "question", id: "q1" },
+    ]);
+  });
+
+  it("keeps the card after a question when what follows is an image", () => {
+    const cards = splitArticleCards(
+      `<h2>One</h2><p>a</p>${marker("q1")}<p><img src="https://x.test/a.png" alt="A"></p>`,
+      [question("q1")],
+      { hasEnd: false },
+    );
+    expect(cards.map(card => card.kind)).toEqual(["cover", "section", "question", "section"]);
+  });
+
   it("drops a placeholder with no question, as the scrolling layouts do", () => {
     const cards = splitArticleCards(`<p>a</p>${marker("ghost")}<p>b</p>`, [], { hasEnd: false });
     expect(cards.map(c => c.kind)).toEqual(["cover", "section"]);

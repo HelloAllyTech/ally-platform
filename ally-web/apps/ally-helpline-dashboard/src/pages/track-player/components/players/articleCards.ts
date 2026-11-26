@@ -44,6 +44,20 @@ const serialize = (node: Node): string => {
   return "";
 };
 
+/** Elements that show something with no text of their own. */
+const MEDIA_SELECTOR = "img, picture, video, audio, iframe, svg, canvas, object, embed, hr, table";
+
+/**
+ * Whether markup would show the reader anything: text beyond whitespace
+ * (non-breaking spaces included), or media. An editor leaves `<p></p>`,
+ * `<p><br></p>` and `<p>&nbsp;</p>` behind, and none of them is a card.
+ */
+const hasVisibleContent = (html: string): boolean => {
+  const body = new DOMParser().parseFromString(html, "text/html").body;
+  if ((body.textContent ?? "").replace(/[\s\u00a0\u200b]+/g, "").length > 0) return true;
+  return body.querySelector(MEDIA_SELECTOR) !== null;
+};
+
 /**
  * A card's photo: its first block when that block is an image, or a
  * paragraph holding nothing but one. The image is taken out of the body.
@@ -99,7 +113,9 @@ export function splitArticleCards(
   let current: { title: string | null; html: string } | null = null;
 
   const flush = () => {
-    if (current && (current.title || current.html.trim())) {
+    // A card with a title is the reader's heading even when bare; one without
+    // is only worth showing if it has something to read.
+    if (current && (current.title || hasVisibleContent(current.html))) {
       const { html: body, photo } = liftPhoto(current.html);
       cards.push({
         kind: "section",
