@@ -1178,6 +1178,33 @@ export const BUILDER_CAPABILITIES: BuilderCapability[] = [
     keywords: ['github', 'workflow', 'pull request', 'release tag'],
   },
   {
+    id: 'product-manual',
+    name: 'Product Manual (staff guide to the whole product)',
+    whatItIs:
+      'A read-only, searchable, cross-linked guide to every part of the product for Ally staff, ' +
+      'kept only in the database. A chat answers from it and can fix a page when it finds the ' +
+      'manual wrong; coding agents propose changes and a weekly agent applies them; every change ' +
+      'is a revision in a visible change log; a tray saves rough ideas to the roadmap drafts.',
+    reuseWhen:
+      'A request wants to explain how a screen, role or setting works to staff, to keep that ' +
+      'explanation current when the product changes, or to answer "how does X work" questions ' +
+      'from a single grounded source instead of writing a new help page or wiki entry.',
+    extendVia:
+      'ManualPageService.write (the single writer: scrub, revision, links) and the proposal-scoped ' +
+      'MCP tools for coding agents; new pages are imported, never committed.',
+    modules: ['ally-be:src/product-manual'],
+    docs: ['ally-be:docs/product-manual.md'],
+    adminRoute: '/roadmap/manual',
+    keywords: [
+      'product manual',
+      'manual',
+      'how does it work',
+      'staff guide',
+      'documentation',
+      'help page',
+    ],
+  },
+  {
     id: 'pm-agent',
     name: 'PM Agent (AI product manager)',
     whatItIs:

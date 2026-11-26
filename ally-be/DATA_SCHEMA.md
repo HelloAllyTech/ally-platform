@@ -1315,7 +1315,7 @@ product for Ally staff, with a chat and a weekly agent that keep it current (con
 [`docs/product-manual.md`](docs/product-manual.md)). **Not multi-tenant** — it is platform-wide staff
 content, so no table carries a `tenant_id`. **The manual's text lives only in these tables, never in git
 or the wiki** (the repo is public); content arrives through `POST /v1/product-manual/admin/import`, never a
-migration or seed. Migration `1988500000000-CreateProductManual` creates all eight tables and seeds the
+migration or seed. Migration `1988600000000-CreateProductManual` creates all eight tables and seeds the
 settings singleton **OFF**. Every enum is a varchar with a CHECK constraint; columns are snake_case. Gate:
 the `product_manual` admin toggle (default on for every admin tier, so no backfill) plus a Roadmap v2 role.
 

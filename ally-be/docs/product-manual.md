@@ -208,7 +208,7 @@ ally-be/src/product-manual/
   product-manual-agent.module.ts   agents: chat (SSE), conversations, shared loop runner, weekly agent,
                                    scheduler registration, agent keys, MCP, run-now; imports the core module
   controller/  service/  dto/  constants/  util/  type/  test/
-ally-be/src/database/migrations/1988500000000-CreateProductManual.ts
+ally-be/src/database/migrations/1988600000000-CreateProductManual.ts
 ```
 
 ## Shapes the first draft left open
@@ -235,7 +235,7 @@ These came from running the agents against the real model, not from reading code
 
 ## Operating it
 
-- **Release order:** ally-be first (migration `1988500000000`), then the admin app. The agent starts **off**; an
+- **Release order:** ally-be first (migration `1988600000000`), then the admin app. The agent starts **off**; an
   admin turns it on in the manual's settings drawer. For verification work it needs `GITHUB_TOKEN`.
 - **Content** is imported, never committed: `POST /v1/product-manual/admin/import` with `{ pages: [...] }`.
 - **Coding agents:** create a key in the settings drawer, export `ALLY_PRODUCT_MANUAL_URL` and

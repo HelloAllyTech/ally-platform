@@ -11,7 +11,7 @@ describe('ManualScrubService', () => {
     const prose = [
       '# Running a roleplay',
       'A learner opens **Practice**, picks a case and talks for 5-10 minutes.',
-      'Roadmap item OPP-388 shipped in release 1.157.5; migration 1988500000000 added the tables.',
+      'Roadmap item OPP-388 shipped in release 1.157.5; migration 1988600000000 added the tables.',
       'Keys start with `pmk_…` and are shown once. See [[roles-and-access]].',
       'The task-based flow ask-a-question uses sk- as a prefix only in prose.',
     ].join('\n');

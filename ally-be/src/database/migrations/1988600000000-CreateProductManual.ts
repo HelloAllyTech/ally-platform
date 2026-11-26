@@ -16,8 +16,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *
  * varchar + CHECK rather than Postgres enums, matching the rest of the schema.
  */
-export class CreateProductManual1988500000000 implements MigrationInterface {
-  name = 'CreateProductManual1988500000000';
+export class CreateProductManual1988600000000 implements MigrationInterface {
+  name = 'CreateProductManual1988600000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
