@@ -551,11 +551,29 @@ export class CourseCopilotToolsService {
       case 'update_brief':
         return this.updateBrief(input, context);
       case 'list_competencies': {
-        const competencies = await this.library.listCompetencies(
-          input?.query ? String(input.query) : undefined,
-        );
+        const query = input?.query ? String(input.query).trim() : '';
+        const matches = query
+          ? await this.library.listCompetencies(query)
+          : await this.library.listCompetencies();
+        // The library is small and its names rarely match a trainer's words, so a search that
+        // matches nothing returns the whole list, as the roleplay interview's does. Searching
+        // word combinations one by one used up a whole turn's steps, leaving no question card.
+        const competencies =
+          query && !matches.length
+            ? await this.library.listCompetencies(undefined, 100)
+            : matches;
         return {
-          modelResult: { ok: true, competencies },
+          modelResult: {
+            ok: true,
+            competencies,
+            ...(query && !matches.length
+              ? {
+                  note:
+                    `Nothing is named "${query}"; these are all the competencies there are. ` +
+                    'Pick the closest by meaning instead of searching again.',
+                }
+              : {}),
+          },
           summary: `Looked up ${competencies.length} competencies`,
         };
       }

@@ -91,6 +91,7 @@ import { userWordsToApply } from 'src/llm-agent/runtime/agent-turn-words.util';
 import {
   claimsBriefReady,
   claimsBuildStarted,
+  promisesQuestion,
   claimsCourseChange,
   COURSE_COPILOT_RECEIPT_VOCABULARY,
   COURSE_COPILOT_TURN_RULES,
@@ -797,6 +798,21 @@ export class CourseCopilotOrchestratorService {
         // Course Pilot: every question is a short choice.
         const questionProblems = [
           ...courseCopilotQuestionProblems(ending),
+          ...(ending.name === COURSE_COPILOT_TURN_VOCABULARY.closingTool &&
+          promisesQuestion(message)
+            ? [
+                {
+                  key: 'promised_question_without_card',
+                  toModel:
+                    'Your message says a question is coming, but you ended the turn without one, ' +
+                    'so the trainer has nothing to answer. Ask it now with ask_trainer (one short ' +
+                    'choice card), or remove the promise. Do not list the lookups you ran: the ' +
+                    'trainer sees those already.',
+                  toUser:
+                    'Course Copilot said a question was coming but did not ask it.',
+                },
+              ]
+            : []),
           ...(context.session.status ===
             CourseCopilotSessionStatus.AWAITING_BLUEPRINT &&
           claimsBuildStarted(message)

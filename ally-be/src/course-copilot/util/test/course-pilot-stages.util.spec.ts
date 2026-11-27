@@ -262,7 +262,10 @@ describe('Course Pilot stages', () => {
   });
 });
 
-import { claimsBuildStarted } from '../course-copilot-turn.util';
+import {
+  claimsBuildStarted,
+  promisesQuestion,
+} from '../course-copilot-turn.util';
 
 describe('claimsBuildStarted', () => {
   it.each([
@@ -310,5 +313,25 @@ describe('renderBriefSummary', () => {
       assessment: { kind: 'quiz', threshold: 80 },
     });
     expect(text).toContain('Assessment: quiz, pass 80%');
+  });
+});
+
+describe('promisesQuestion', () => {
+  it('catches a reply that says a question is coming', () => {
+    expect(
+      promisesQuestion(
+        'Recorded the brief. Next question will set the terminal outcome and enabling outcomes.',
+      ),
+    ).toBe(true);
+    expect(promisesQuestion("I'll ask about the time budget next.")).toBe(true);
+  });
+
+  it('lets offers and plain replies through', () => {
+    expect(
+      promisesQuestion("If you'd like, I'll ask about the language too."),
+    ).toBe(false);
+    expect(
+      promisesQuestion('The plan is on the right. Approve it when ready.'),
+    ).toBe(false);
   });
 });

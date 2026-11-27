@@ -305,6 +305,26 @@ export function claimsBuildStarted(text: string | null | undefined): boolean {
 const BUILD_CONDITION = /\b(once|when|after|if|as soon as|until)\b/i;
 
 /**
+ * A reply that says a question is coming. Ending the turn with one instead of asking leaves the
+ * trainer with nothing to answer: "Next question will set the terminal outcome." with no card.
+ */
+const PROMISES_QUESTION =
+  /\b(next question|my next question|i(?:['’]ll| will) (?:now )?ask|let me ask|i(?:['’]ll| will) (?:then )?follow up with a question|(?:i(?:['’]ll| will)|let me) (?:now )?(?:check|confirm) with you)\b/i;
+
+export function promisesQuestion(text: string | null | undefined): boolean {
+  const value = String(text ?? '');
+  const match = PROMISES_QUESTION.exec(value);
+  if (!match) return false;
+  const sentence =
+    value
+      .slice(0, match.index)
+      .split(/[.!?\n]/)
+      .pop() ?? '';
+  // "If you'd like, I'll ask about…" is an offer, not a promise of a card now.
+  return !/\b(if|once|when|after)\b/i.test(sentence);
+}
+
+/**
  * What a free-text question may ask for: something only the trainer can type (a link, a name,
  * a number, their own wording). Everything else is a choice.
  */
