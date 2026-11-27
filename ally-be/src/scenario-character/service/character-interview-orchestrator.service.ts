@@ -417,7 +417,19 @@ export class CharacterInterviewOrchestratorService {
       userId,
       // Course Pilot stages need the validated loop (the legacy loop has no per-step belt).
       ...(validatedTurns && this.configService.characterInterview?.stages
-        ? { pilot: { asked: countCharacterStageQuestions(history) } }
+        ? {
+            pilot: {
+              asked: countCharacterStageQuestions(history),
+              adminWords: [
+                ...history
+                  .filter(
+                    (row) => row.role === CharacterInterviewMessageRole.USER,
+                  )
+                  .map((row) => row.content ?? ''),
+                userContent,
+              ].join('\n'),
+            },
+          }
         : {}),
     };
     // "You decide" / "use your defaults": recorded by code, so the stages decide instead of asking.

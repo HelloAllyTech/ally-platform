@@ -41,6 +41,7 @@ import {
   characterQuestionRefusal,
   characterSaveRefusal,
   draftAgainstBrief,
+  languagesNotNamed,
   resolveCharacterPilotStage,
 } from '../util/character-pilot-stages.util';
 
@@ -61,7 +62,11 @@ export interface InterviewToolExecutionContext {
    * Course Pilot stages (CHARACTER_PILOT_STAGES), when on: questions asked so far per stage,
    * counted from the transcript and kept up to date as this turn asks more.
    */
-  pilot?: { asked: Partial<Record<CharacterPilotStageId, number>> };
+  pilot?: {
+    asked: Partial<Record<CharacterPilotStageId, number>>;
+    /** Everything the admin said this interview (typed or picked): which languages they named. */
+    adminWords?: string;
+  };
 }
 
 /** What the interview has recorded about the character (record_character). */
@@ -957,6 +962,29 @@ export class CharacterInterviewToolsService {
       if (Object.keys(voices).length) patch.voices = voices;
     }
 
+    // Only languages the admin named (or one default when they named none).
+    if (patch.languageIds?.length && context.pilot) {
+      const rows = await this.dataSource
+        .getRepository(Languages)
+        .find({ select: { id: true, label: true } })
+        .catch(() => [] as Languages[]);
+      const labels = new Map(rows.map((row) => [String(row.id), row.label]));
+      const dropped = languagesNotNamed(
+        patch.languageIds,
+        labels,
+        context.pilot.adminWords ?? '',
+      );
+      if (dropped.length) {
+        patch.languageIds = patch.languageIds.filter(
+          (id) => !dropped.includes(id),
+        );
+        errors.push(
+          `Not recorded: ${dropped.map((id) => labels.get(id) ?? id).join(', ')} — the admin has ` +
+            'not named it. Record only languages they named or picked (one variant each); if ' +
+            'another language matters, ask with a languages card.',
+        );
+      }
+    }
     // A language with no voice in the catalogue needs none: without this, a character who
     // speaks only such a language could never leave the voice stage.
     if (patch.languageIds?.length) {
@@ -977,6 +1005,21 @@ export class CharacterInterviewToolsService {
       );
     }
     const current = characterBriefOf(context.session);
+    // A voice only for a recorded language: a dropped language must not come back as a voice.
+    if (patch.voices && context.pilot) {
+      const languages = new Set(patch.languageIds ?? current.languageIds ?? []);
+      const strays = Object.keys(patch.voices).filter(
+        (id) => !languages.has(id),
+      );
+      for (const id of strays) delete patch.voices[id];
+      if (strays.length) {
+        errors.push(
+          `Voices not recorded for language ${strays.join(', ')}: record that language first ` +
+            '(only if the admin named it).',
+        );
+      }
+      if (!Object.keys(patch.voices).length) delete patch.voices;
+    }
     const brief: CharacterPilotBrief = {
       ...current,
       ...patch,

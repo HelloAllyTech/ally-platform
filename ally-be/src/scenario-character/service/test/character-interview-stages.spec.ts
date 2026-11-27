@@ -1,4 +1,5 @@
 import {
+  languagesNotNamed,
   handsRestToAgent,
   CHARACTER_PILOT_MAX_QUESTIONS,
   characterQuestionRefusal,
@@ -257,5 +258,59 @@ describe('languages without voices, and "you decide"', () => {
     expect(
       characterQuestionRefusal(position, { kind: 'x', decideRest: true }),
     ).toMatch(/asked you to decide the rest yourself/);
+  });
+});
+
+describe('languagesNotNamed', () => {
+  const labels = new Map([
+    ['1', 'English (India)'],
+    ['2', 'Hindi (India)'],
+    ['5', 'Marathi (India)'],
+    ['13', 'English (US)'],
+  ]);
+
+  it('drops languages the admin never named', () => {
+    expect(
+      languagesNotNamed(
+        ['1', '5', '2'],
+        labels,
+        'A student in Pune who speaks English.',
+      ),
+    ).toEqual(['5', '2']);
+  });
+
+  it('keeps languages typed or picked on a card', () => {
+    expect(
+      languagesNotNamed(['1', '2'], labels, 'English (India) — Hindi (India)'),
+    ).toEqual([]);
+  });
+
+  it('allows one default language when none was named, and one variant per language', () => {
+    expect(
+      languagesNotNamed(['13', '2'], labels, 'A teen boy, bullied.'),
+    ).toEqual(['2']);
+    // None named: English is the default even when listed second.
+    expect(
+      languagesNotNamed(['2', '1'], labels, 'A grieving widower.'),
+    ).toEqual(['2']);
+    expect(
+      languagesNotNamed(['1', '13'], labels, 'She speaks English.'),
+    ).toEqual(['13']);
+  });
+});
+
+describe('draft languages must be the recorded ones', () => {
+  it('rejects a draft that adds a language the interview never recorded', () => {
+    expect(
+      draftAgainstBrief(
+        {
+          voices: { '1': 'v-en', '9': 'v-ml' },
+          languageCharacteristics: { '1': 'x', '9': 'y' },
+        },
+        { ...FULL, languageIds: ['1'] },
+      ),
+    ).toEqual([
+      'language 9 is not recorded: use only the recorded languages (1) in voices and languageCharacteristics',
+    ]);
   });
 });

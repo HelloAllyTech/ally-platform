@@ -174,6 +174,12 @@ function checkDraft(label, draft, recorded) {
     languages.length > 0 && voiced.length === languages.length,
     `languages ${languages.join(', ') || 'none'}; voices for ${voiced.join(', ') || 'none'}`,
   );
+  // The script names or picks exactly one language, so only one may be recorded.
+  check(
+    `${label}: only the language the admin named or picked was recorded`,
+    languages.length === 1,
+    `${languages.length} recorded`,
+  );
   check(
     `${label}: draft matches the record (name, age, gender)`,
     d.name === recorded.name &&

@@ -88,7 +88,8 @@ export const CHARACTER_PILOT_STAGES: readonly CharacterPilotStage[] = [
     goal:
       'The languages they speak and one voice per language. Call get_voices first; record ' +
       'languageIds and voices (languageId → voiceId) with record_character. English unless ' +
-      'the admin named others. Pick the voice yourself, and say which, when the admin asked you ' +
+      'the admin named others: record only languages they named or picked; to add one, ask ' +
+      'with a languages card. Pick the voice yourself, and say which, when the admin asked you ' +
       'to decide or one voice clearly fits; ask only when the choice is really theirs.',
     questions: 3,
     canSave: false,
@@ -275,6 +276,16 @@ export function draftAgainstBrief(
       ? (draft.languageCharacteristics as Record<string, unknown>)
       : {};
   const problems: string[] = [];
+  const recorded = new Set(languages);
+  const extra = [
+    ...new Set([...Object.keys(voices), ...Object.keys(characteristics)]),
+  ].filter((id) => !recorded.has(id));
+  if (extra.length) {
+    problems.push(
+      `language ${extra.join(', ')} is not recorded: use only the recorded languages ` +
+        `(${languages.join(', ')}) in voices and languageCharacteristics`,
+    );
+  }
   const unvoiced = new Set(brief.unvoicedLanguageIds ?? []);
   for (const id of languages) {
     if (!voices[id] && !unvoiced.has(id)) {
@@ -315,4 +326,45 @@ export function renderCharacterPilotStage(
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+/** "Hindi (India)" → "hindi": the language's name as an admin would type it. */
+const baseLanguageName = (label: string) =>
+  label
+    .replace(/\s*\(.*\)\s*$/, '')
+    .trim()
+    .toLowerCase();
+
+/**
+ * The recorded languages the admin never named, to drop. The agent added Hindi or a regional
+ * language for Indian characters unasked (languages right in 3 of 6 eval runs). A language counts
+ * as named when its name is in the admin's words — typed, or picked on a card (a pick arrives as
+ * their message). With none named, one language (the default) is allowed. One variant per
+ * language: "English" does not make English (India) and English (US) two languages.
+ */
+export function languagesNotNamed(
+  languageIds: string[],
+  labels: Map<string, string>,
+  adminWords: string,
+): string[] {
+  const words = adminWords.toLowerCase();
+  const named = (id: string) => {
+    const base = baseLanguageName(labels.get(id) ?? '');
+    return base.length > 0 && new RegExp(`\\b${base}\\b`).test(words);
+  };
+  const anyNamed = languageIds.some(named);
+  // None named: the one default is English when it is among them, else the first.
+  const fallback =
+    languageIds.find(
+      (id) => baseLanguageName(labels.get(id) ?? '') === 'english',
+    ) ?? languageIds[0];
+  const seen = new Set<string>();
+  const dropped: string[] = [];
+  languageIds.forEach((id) => {
+    const base = baseLanguageName(labels.get(id) ?? id);
+    const allowed = anyNamed ? named(id) : id === fallback;
+    if (!allowed || seen.has(base)) dropped.push(id);
+    else seen.add(base);
+  });
+  return dropped;
 }
