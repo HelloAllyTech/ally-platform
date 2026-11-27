@@ -11,6 +11,7 @@ import { AuditLoggerService } from 'src/audit/service/audit-logger.service';
 import { AUDIT_EVENTS } from 'src/audit/constants/audit-event.constants';
 import { LoggerService } from 'src/logger/logger.service';
 import { UserRepository } from '../repository/user.repository';
+import { UserService } from '../service/user.service';
 
 /**
  * Ally admin → Custom logins (CR1 Part B). A custom login is an Assistant owner: a user with the
@@ -26,6 +27,7 @@ export class CustomLoginService {
     private readonly users: UserRepository,
     private readonly groups: GroupService,
     private readonly dataSource: DataSource,
+    private readonly userService: UserService,
   ) {}
 
   async list(search?: string) {
@@ -80,6 +82,26 @@ export class CustomLoginService {
       details: { targetUserId: userId },
     });
     return { success: true };
+  }
+
+  /**
+   * Create a brand-new user directly as a custom login (Assistant owner). The
+   * user and the role are written in one transaction by
+   * `UserService.createCustomLoginUser`, which applies the same tenant and
+   * duplicate-email checks as `POST /v1/users`.
+   */
+  async create(
+    input: { name: string; email: string; tenantId: string },
+    actingUserId: number,
+  ) {
+    const user = await this.userService.createCustomLoginUser(input);
+    this.logger.info(`Custom login ${user.id} created by user ${actingUserId}`);
+    await this.auditLogger.log({
+      eventType: AUDIT_EVENTS.CUSTOM_LOGIN_CREATED,
+      userId: actingUserId,
+      details: { targetUserId: user.id },
+    });
+    return user;
   }
 
   async remove(userId: number, actingUserId: number) {

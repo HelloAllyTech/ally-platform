@@ -1204,6 +1204,88 @@ describe('UserService', () => {
     });
   });
 
+  describe('createCustomLoginUser', () => {
+    const input = {
+      name: 'Asha',
+      email: 'asha@example.com',
+      tenantId: 'test-tenant',
+    };
+
+    beforeEach(() => {
+      mockUsersRepository.findOne.mockResolvedValue(null);
+      mockTenantService.findById.mockResolvedValue({ id: 'test-tenant' });
+      mockGroupRepository.findOne = jest
+        .fn()
+        .mockResolvedValue({ id: 7, name: UserRole.ASSISTANT_OWNER });
+      (ExecutionManager.getUserId as jest.Mock).mockReturnValue('123');
+      mockPermissionsService.getUserPermissions.mockResolvedValue([
+        PERMISSIONS.SYSTEM_ACCESS,
+      ]);
+    });
+
+    it('creates the user and the ASSISTANT_OWNER membership in one transaction', async () => {
+      const result = await service.createCustomLoginUser(input);
+
+      expect(mockDataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(mockTxnUserRepo.save).toHaveBeenCalled();
+      expect(mockTxnUserGroupRepo.create).toHaveBeenCalledWith({
+        userId: 2,
+        groupId: 7,
+      });
+      expect(result.email).toBe(input.email);
+      expect(result.tenantId).toBe('test-tenant');
+    });
+
+    it('refuses a duplicate email', async () => {
+      mockUsersRepository.findOne.mockResolvedValue({ email: input.email });
+
+      await expect(service.createCustomLoginUser(input)).rejects.toThrow(
+        'Email already registered',
+      );
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('refuses a tenant that does not exist', async () => {
+      mockTenantService.findById.mockResolvedValue(null);
+
+      await expect(service.createCustomLoginUser(input)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('refuses a tenant-restricted platform admin', async () => {
+      mockPermissionsService.isMultiTenantAdmin.mockResolvedValue(true);
+
+      await expect(service.createCustomLoginUser(input)).rejects.toThrow(
+        'User is not authorized to add user',
+      );
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('refuses a caller without reach over the tenant', async () => {
+      mockPermissionsService.getUserPermissions.mockResolvedValue([
+        PERMISSIONS.EDIT_USER,
+      ]);
+
+      await expect(
+        service.createCustomLoginUser({ ...input, tenantId: 'other' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('is not creatable through the generic addUser path', async () => {
+      await expect(
+        service.addUser({
+          ...input,
+          roles: [UserRole.ASSISTANT_OWNER],
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockUsersRepository.save).not.toHaveBeenCalled();
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+  });
+
   describe('setWorkerType', () => {
     it('should persist the worker type while preserving other metadata keys', async () => {
       const userWithMetadata = {

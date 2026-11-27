@@ -15,7 +15,7 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { IsInt, Min } from 'class-validator';
+import { IsEmail, IsInt, IsNotEmpty, IsString, Min } from 'class-validator';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { TokenUser } from 'src/auth/type/auth.types';
@@ -27,6 +27,22 @@ export class AssignCustomLoginDto {
   @IsInt()
   @Min(1)
   userId!: number;
+}
+
+export class CreateCustomLoginDto {
+  @ApiProperty({ example: 'Asha Rao' })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @ApiProperty({ example: 'asha@example.com' })
+  @IsEmail({}, { message: 'Invalid email' })
+  email!: string;
+
+  @ApiProperty({ description: 'Tenant ID (UUID)' })
+  @IsString()
+  @IsNotEmpty()
+  tenantId!: string;
 }
 
 /** Ally admin → Custom logins (CR1 Part B). Same gate as the Ally admins screen. */
@@ -50,6 +66,14 @@ export class CustomLoginController {
   @Post()
   assign(@Body() dto: AssignCustomLoginDto, @CurrentUser() user: TokenUser) {
     return this.service.assign(dto.userId, user.id);
+  }
+
+  @ApiOperation({
+    summary: 'Create a new user directly as a custom login (Assistant owner)',
+  })
+  @Post('users')
+  create(@Body() dto: CreateCustomLoginDto, @CurrentUser() user: TokenUser) {
+    return this.service.create(dto, user.id);
   }
 
   @ApiOperation({ summary: 'Take the custom-login role away' })

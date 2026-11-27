@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  InternalServerErrorException,
   Injectable,
   Inject,
   forwardRef,
@@ -812,6 +813,106 @@ export class UserService {
     });
 
     this.captureLearnerInvited(savedUser, userId);
+
+    return {
+      id: savedUser.id,
+      name: savedUser.name,
+      email: savedUser.email,
+      username: savedUser.username,
+      phone: savedUser.phone,
+      externalId: savedUser.externalId,
+      status: savedUser.status,
+      metadata: savedUser.metadata,
+      tenantId: savedUser.tenantId,
+      createdAt: savedUser.createdAt,
+      updatedAt: savedUser.updatedAt,
+    };
+  }
+
+  /**
+   * Create a user directly as a custom login (ASSISTANT_OWNER). Internal, for
+   * CustomLoginService only: ASSISTANT_OWNER is platform-managed, so
+   * `addUser`'s `rejectPlatformManagedRoles` turns it away, and this method is
+   * not reachable from `POST /v1/users` (nothing in the controller calls it,
+   * and the role is fixed here, never read from the request).
+   *
+   * Same checks as `addUser` — tenant-restricted platform admins refused,
+   * tenant must be provisionable by the caller and exist, duplicate email
+   * refused — and user + role are written in one transaction, so a missing
+   * ASSISTANT_OWNER group or a failed write leaves no half-made account.
+   */
+  async createCustomLoginUser(input: {
+    name: string;
+    email: string;
+    tenantId: string;
+  }): Promise<AddUserResponseDto> {
+    const userIdStr = ExecutionManager.getUserId();
+    const userId = userIdStr ? Number(userIdStr) : undefined;
+
+    const isMultiTenantAdmin = userId
+      ? await this.permissionsService.isMultiTenantAdmin(userId)
+      : false;
+    if (isMultiTenantAdmin) {
+      throw new BadRequestException('User is not authorized to add user');
+    }
+
+    if (!input.tenantId) {
+      throw new BadRequestException('Tenant ID is required');
+    }
+    await this.assertTenantProvisionable(input.tenantId);
+    const tenant = await this.tenantService.findById(input.tenantId);
+    if (!tenant) {
+      throw new BadRequestException('Tenant is not valid');
+    }
+
+    const existingUser = await this.userRepository.findOne({
+      where: { email: input.email },
+      select: ['email'],
+    });
+    if (existingUser) {
+      throw new BadRequestException('Email already registered');
+    }
+
+    const group = await this.groupRepository.findOne({
+      where: { name: UserRole.ASSISTANT_OWNER },
+    });
+    if (!group) {
+      throw new InternalServerErrorException(
+        `The ${UserRole.ASSISTANT_OWNER} role does not exist`,
+      );
+    }
+
+    const savedUser = await this.dataSource.transaction(async (manager) => {
+      const userRepo = manager.getRepository(User);
+      const userGroupRepo = manager.getRepository(UserGroup);
+      const created = await userRepo.save(
+        userRepo.create({
+          email: input.email,
+          name: input.name,
+          status: UserStatus.ACTIVE,
+          metadata: {},
+          username: input.email,
+          tenantId: input.tenantId,
+          ...(userId ? { createdBy: userId, updatedBy: userId } : {}),
+        }),
+      );
+      await userGroupRepo.save(
+        userGroupRepo.create({ userId: created.id, groupId: group.id }),
+      );
+      return created;
+    });
+
+    this.auditLogger.log({
+      eventType: AUDIT_EVENTS.USER_CREATED,
+      tenantId: savedUser.tenantId,
+      userId: savedUser.id,
+      details: {
+        username: savedUser.username,
+        email: savedUser.email,
+        createdBy: userId,
+        updatedBy: userId,
+      },
+    });
 
     return {
       id: savedUser.id,
