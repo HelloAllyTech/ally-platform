@@ -48,6 +48,12 @@ export const CRISIS_CHECK_LIMITS = {
   budgetMs: 6_000,
   /** Less than this left: no retry, the keyword rules decide. */
   minRetryMs: 1_000,
+  /**
+   * WA-A §0a: how long past `attemptMs` a check keeps listening when the caller wants a late
+   * verdict. The turn never waits for it; an at-risk verdict that arrives in this time still
+   * flags the chat and alerts the team.
+   */
+  lateListenMs: 30_000,
 } as const;
 
 /** ally-ai's onboarding builder (chunk 20a). */

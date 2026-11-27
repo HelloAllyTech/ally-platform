@@ -35,12 +35,14 @@ vi.mock("@src/components/selectable-text/SelectableText", () => ({
 // Mock utils
 vi.mock("../utils", () => ({
   getFreshUserRange: vi.fn(),
-  splitByCommentRanges: (content: string, threads: any[]) => [{
-    text: content,
-    commentIds: [],
-    start: 0,
-    end: content.length,
-  }],
+  splitByCommentRanges: (content: string, threads: any[]) => [
+    {
+      text: content,
+      commentIds: [],
+      start: 0,
+      end: content.length,
+    },
+  ],
 }));
 
 // Repro for: Transcript timestamps show 00:60 near minute boundaries on Review Details

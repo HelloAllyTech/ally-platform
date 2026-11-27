@@ -505,3 +505,48 @@
     padding: 12px 16px 8px;
   }
 }
+
+/* WA-A: WhatsApp delivery ticks, files, and the reply's extras. */
+.ally-inbox__ticks {
+  margin-inline-start: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--ally-text-muted, #6b7280);
+}
+.ally-inbox__ticks--read {
+  color: var(--ally-link, #1d6fd8);
+}
+.ally-inbox__failed {
+  color: var(--ally-danger, #b42318);
+}
+.ally-inbox__file {
+  margin-top: 0.25rem;
+}
+.ally-inbox__file audio {
+  max-width: 100%;
+}
+.ally-inbox__image {
+  max-width: min(240px, 100%);
+  border-radius: 6px;
+}
+.ally-inbox__transcript {
+  font-style: italic;
+}
+.ally-inbox__extras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+}
+.ally-inbox__attach {
+  cursor: pointer;
+}
+.ally-inbox__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  border: 0;
+  padding: 0;
+}
+.ally-inbox__buttons .ally-input {
+  width: 10rem;
+}

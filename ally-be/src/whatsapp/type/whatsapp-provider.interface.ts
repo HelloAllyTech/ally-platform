@@ -6,12 +6,22 @@ export interface InboundWhatsAppMessage {
   profileName?: string;
   /** The provider's message id. The dedupe key — see WaMessage. */
   providerMessageId: string;
-  /** Sender in E.164, without the leading '+'. Normalised by the provider adapter. */
+  /**
+   * Sender in E.164, without the leading '+'. Normalised by the provider adapter. Empty when Meta
+   * sent only the person's business-scoped user ID (WA-A §4): then `fromUserId` is set.
+   */
   from: string;
+  /** WA-A §4: Meta's business-scoped user ID (`from_user_id`, e.g. `IN.1349…`), when sent. */
+  fromUserId?: string;
   /** Message text. Empty for media, which the pipeline answers with an explanation. */
   text: string;
-  /** True when the message was an image, audio note, document or location. */
+  /**
+   * True when the message carries nothing the pipeline handles: a video, sticker, location or
+   * contact card (WA-A: voice notes, images and documents come as `media` instead).
+   */
   isUnsupportedMedia: boolean;
+  /** WA-A: a voice note, audio file, image or document; `text` is its caption, if any. */
+  media?: InboundWhatsAppMedia;
   /** Provider timestamp when supplied, else receipt time. */
   timestamp: Date;
   /**
@@ -25,6 +35,85 @@ export interface InboundWhatsAppMessage {
    * tap on an interactive message; `text` is then its title.
    */
   actionId?: string;
+}
+
+/** WA-A: a file on an incoming message, as Meta describes it (fetched with `downloadMedia`). */
+export interface InboundWhatsAppMedia {
+  kind: 'audio' | 'image' | 'document';
+  /** Meta's media id: `GET /{id}` gives a short-lived download URL. */
+  id: string;
+  mimeType: string;
+  sha256?: string;
+  filename?: string;
+  caption?: string;
+  /** A voice note recorded in WhatsApp, not an audio file. */
+  voice?: boolean;
+}
+
+/**
+ * WA-A §2: an image or document to send, by a link Meta fetches (a short-lived signed URL).
+ * `whatsappMediaProblem` checks Meta's limits before anything is sent.
+ */
+export interface WhatsAppMedia {
+  kind: 'image' | 'document';
+  link: string;
+  mimeType: string;
+  sizeBytes: number;
+  caption?: string;
+  /** Documents: the name the person sees. */
+  filename?: string;
+}
+
+/**
+ * The largest document Ally sends or receives on WhatsApp: 25 MB. Meta allows 100 MB, but the
+ * Inbox's upload (multer, in memory) and Meta's download (`downloadMedia`) both hold the whole
+ * file in memory, so one limit, used by the send check, the Inbox upload, the download cap and
+ * the Inbox's hint, keeps a large file from filling the process. Raise it only with streaming.
+ */
+export const WHATSAPP_DOCUMENT_MAX_BYTES = 25 * 1024 * 1024;
+
+/** Meta's limits for media sends (Cloud API "supported media types"), with Ally's document cap. */
+export const WHATSAPP_MEDIA_LIMITS = {
+  image: {
+    maxBytes: 5 * 1024 * 1024,
+    mimeTypes: ['image/jpeg', 'image/png'],
+  },
+  document: {
+    maxBytes: WHATSAPP_DOCUMENT_MAX_BYTES,
+    mimeTypes: [
+      'application/pdf',
+      'text/plain',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ],
+  },
+  caption: 1024,
+  filename: 240,
+} as const;
+
+/** Why a media send would be refused by Meta, or null when it fits. */
+export function whatsappMediaProblem(media: WhatsAppMedia): string | null {
+  const limits = WHATSAPP_MEDIA_LIMITS[media.kind];
+  if (!limits) return 'unsupported kind';
+  const mime = media.mimeType.split(';')[0].trim().toLowerCase();
+  if (!(limits.mimeTypes as readonly string[]).includes(mime)) {
+    return `type ${mime} is not accepted for ${media.kind}`;
+  }
+  if (!(media.sizeBytes > 0) || media.sizeBytes > limits.maxBytes) {
+    return `size ${media.sizeBytes} is over ${limits.maxBytes} bytes`;
+  }
+  if ((media.caption ?? '').length > WHATSAPP_MEDIA_LIMITS.caption) {
+    return 'caption too long';
+  }
+  if ((media.filename ?? '').length > WHATSAPP_MEDIA_LIMITS.filename) {
+    return 'filename too long';
+  }
+  if (!/^https:\/\//.test(media.link)) return 'link must be https';
+  return null;
 }
 
 /**
@@ -170,6 +259,26 @@ export interface WhatsAppProvider {
     message: WhatsAppInteractive,
     creds?: WaNumberCredentials,
   ): Promise<{ providerMessageId: string }>;
+
+  /**
+   * WA-A §2: send an image or document by link, checked against Meta's limits first. Optional:
+   * a provider without it can't send files. Throws like `sendText`.
+   */
+  sendMedia?(
+    to: string,
+    media: WhatsAppMedia,
+    creds?: WaNumberCredentials,
+  ): Promise<{ providerMessageId: string }>;
+
+  /**
+   * WA-A §1: the bytes of a file someone sent (Meta: `GET /{media-id}`, then its URL with the
+   * token). Throws when it can't be fetched or is over `maxBytes`.
+   */
+  downloadMedia?(
+    mediaId: string,
+    creds?: WaNumberCredentials,
+    maxBytes?: number,
+  ): Promise<{ data: Buffer; mimeType: string; sizeBytes: number }>;
 
   /**
    * Mark an inbound message read and show "typing…" while the answer is prepared.

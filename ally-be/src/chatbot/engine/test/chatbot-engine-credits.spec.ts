@@ -156,12 +156,43 @@ describe('ChatbotEngineService: credits and blocked states (stage 6)', () => {
     noModel(h.aiService);
   });
 
+  it("WA-A §4: the refusal names the organisation's own contact from its sources", async () => {
+    const h = setup(null, { canChat: false });
+    (h.engine as any).documentRepository.manager = {
+      query: jest.fn(async (sql: string) =>
+        sql.includes('bot_drafts')
+          ? [
+              {
+                learned: {
+                  facts: [
+                    { section: 'location', text: 'Call us on +91 98765 43210' },
+                  ],
+                },
+              },
+            ]
+          : [],
+      ),
+    };
+    const decision = await h.engine.respond(
+      h.turn('मुझे अपॉइंटमेंट चाहिए', 'hi'),
+    );
+    expect(decision.body).toMatch(
+      /^यह सहायक केवल आमंत्रित लोगों के लिए है। कृपया Sunrise Clinic से .*98765.* पर संपर्क करें।/,
+    );
+    expect(decision.body).toContain('14416');
+  });
+
   it('a sender not on the list: invitation line plus crisis information, no model call (D4, R1)', async () => {
     const h = setup(null, { canChat: false });
     const decision = await h.engine.respond(h.turn());
     expect(decision.handledBy).toBe(WaHandledBy.UNIDENTIFIED);
     expect(decision.blocked).toBe('REMOVED_FROM_LIST');
-    expect(decision.body).toContain('by invitation only');
+    // WA-A §4: says who to ask; no contact in its sources, so the organisation alone.
+    expect(decision.body).toContain(
+      'This assistant is by invitation. Please contact Sunrise Clinic.',
+    );
+    // Never a helpline as "who to contact" (the platform default is in the merged settings).
+    expect(decision.body).not.toContain('99999');
     expect(decision.body).toContain(FIND_A_HELPLINE_URL);
     noModel(h.aiService);
     // No model was needed, so the turn's reservation goes back at once.

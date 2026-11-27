@@ -1,3 +1,4 @@
+import { waAddressOf } from '../util/wa-address';
 import { v5 as uuidv5 } from 'uuid';
 import type { AppendMessageInput } from 'src/chatbot/service/conversation.service';
 import {
@@ -42,10 +43,12 @@ export function contactIdsFor(
 
 /** The WhatsApp identity of a contact: the number, vouched for by Meta's delivery. */
 export function whatsappIdentityOf(
-  contact: Pick<WaContact, 'phoneE164' | 'firstSeenAt'>,
+  contact: Pick<WaContact, 'phoneE164' | 'firstSeenAt'> &
+    Partial<Pick<WaContact, 'bsuid'>>,
 ): { externalId: string; verified: boolean; verifiedAt: Date } {
   return {
-    externalId: contact.phoneE164,
+    // WA-A §4: their business-scoped ID when Meta sent no number.
+    externalId: waAddressOf(contact),
     verified: true,
     verifiedAt: contact.firstSeenAt,
   };

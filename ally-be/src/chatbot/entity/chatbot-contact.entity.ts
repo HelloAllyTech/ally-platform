@@ -32,4 +32,17 @@ export class ChatbotContact extends BaseWithoutTenantEntity {
    */
   @Column({ type: 'timestamp', name: 'name_forgotten_at', nullable: true })
   nameForgottenAt?: Date | null;
+
+  /**
+   * Where `display_name` came from (WA-A §0b): `whatsapp_profile` (filled from the WhatsApp
+   * profile, so a name given in the chat replaces it) or `chat` (the person gave it). Null for
+   * names set before the column, which are kept as given.
+   */
+  @Column({
+    type: 'varchar',
+    length: 16,
+    name: 'display_name_source',
+    nullable: true,
+  })
+  displayNameSource?: 'whatsapp_profile' | 'chat' | null;
 }

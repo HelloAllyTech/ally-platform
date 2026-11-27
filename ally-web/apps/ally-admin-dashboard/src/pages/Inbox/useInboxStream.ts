@@ -14,7 +14,7 @@ import type { AppDispatch } from "../../store";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export interface InboxStreamEvent {
-  type: "hello" | "message" | "state" | "safety" | "read";
+  type: "hello" | "message" | "state" | "safety" | "read" | "status";
   chatbotId?: string;
   conversationId?: string;
   state?: string;

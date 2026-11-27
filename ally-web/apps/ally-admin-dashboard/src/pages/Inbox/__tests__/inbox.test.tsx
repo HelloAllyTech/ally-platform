@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   takeOver: vi.fn(),
   handBack: vi.fn(),
   reply: vi.fn(),
+  attach: vi.fn(),
   addCase: vi.fn(),
 }));
 
@@ -33,6 +34,7 @@ vi.mock("@api", async importOriginal => ({
   useTakeOverMutation: () => [unwrapped(h.takeOver), { isLoading: false }],
   useHandBackMutation: () => [unwrapped(h.handBack), { isLoading: false }],
   useReplyInInboxMutation: () => [unwrapped(h.reply), { isLoading: false }],
+  useAttachInInboxMutation: () => [unwrapped(h.attach), { isLoading: false }],
   useAddCheckupCaseMutation: () => [unwrapped(h.addCase), { isLoading: false }],
 }));
 vi.mock("@hooks", () => ({ useUser: () => ({ user: { id: 7 } }) }));
@@ -40,7 +42,7 @@ vi.mock("../useInboxStream", () => ({ useInboxStream: () => undefined }));
 
 // eslint-disable-next-line import/first
 import { TF1_COPY } from "../../AssistantHome/copy/tf1";
-import { INBOX } from "../copy";
+import { INBOX, INBOX_WA } from "../copy";
 // eslint-disable-next-line import/first
 import { Inbox } from "../Inbox";
 // eslint-disable-next-line import/first
@@ -352,5 +354,145 @@ describe("the stream's reconnect backoff", () => {
     expect(first).toBeLessThan(2_000);
     expect(backoff(99)).toBeGreaterThanOrEqual(30_000);
     expect(backoff(99)).toBeLessThan(31_000);
+  });
+
+  describe("WhatsApp: ticks, files, attach and buttons (WA-A)", () => {
+    const wa = (messages: unknown[], over: Record<string, unknown> = {}) => ({
+      ...thread({ channel: "whatsapp", heldBy: { id: 7, name: "Me" }, state: "held" }),
+      replyWindowClosesAt: "2999-01-01T00:00:00.000Z",
+      messages,
+      ...over,
+    });
+    const msg = (over: Record<string, unknown>) => ({
+      id: "x",
+      role: "assistant",
+      text: "Hello",
+      citations: [],
+      handledBy: "rag",
+      at: "2026-11-09T10:00:00.000Z",
+      sentBy: null,
+      rating: null,
+      ratingReason: null,
+      ...over,
+    });
+
+    it("shows read and delivered ticks, and a failed send with its reason", () => {
+      h.thread.current = wa([
+        msg({ id: "a", status: "read" }),
+        msg({ id: "b", status: "delivered" }),
+        msg({
+          id: "c",
+          role: "agent_human",
+          status: "failed",
+          failedReason: "More than 24 hours have passed",
+        }),
+      ]);
+      open("/inbox?conversation=c1&bot=b1");
+      expect(screen.getByLabelText(INBOX_WA.delivery.read)).toBeTruthy();
+      expect(screen.getByLabelText(INBOX_WA.delivery.delivered)).toBeTruthy();
+      expect(
+        screen.getByText(`${INBOX_WA.delivery.failed}: More than 24 hours have passed`, {
+          exact: false,
+        }),
+      ).toBeTruthy();
+    });
+
+    it("plays a voice note with its transcript, and shows a photo and a document", () => {
+      h.thread.current = wa([
+        msg({
+          id: "v",
+          role: "user",
+          text: "मुझे अपॉइंटमेंट चाहिए",
+          attachments: [
+            {
+              kind: "audio",
+              mimeType: "audio/ogg",
+              filename: null,
+              caption: null,
+              voice: true,
+              transcript: "मुझे अपॉइंटमेंट चाहिए",
+              transcriptError: null,
+              durationSec: 4,
+              url: "https://s3.example/v.ogg",
+            },
+          ],
+        }),
+        msg({
+          id: "p",
+          role: "user",
+          text: "",
+          attachments: [
+            {
+              kind: "document",
+              mimeType: "application/pdf",
+              filename: "report.pdf",
+              caption: null,
+              voice: false,
+              transcript: null,
+              transcriptError: null,
+              durationSec: null,
+              url: "https://s3.example/r.pdf",
+            },
+          ],
+        }),
+      ]);
+      const { container } = open("/inbox?conversation=c1&bot=b1");
+      expect(container.querySelector("audio")?.getAttribute("src")).toBe(
+        "https://s3.example/v.ogg",
+      );
+      expect(screen.getAllByText("मुझे अपॉइंटमेंट चाहिए").length).toBeGreaterThan(0);
+      expect(screen.getByText("Open report.pdf").getAttribute("href")).toBe(
+        "https://s3.example/r.pdf",
+      );
+    });
+
+    it("sends an attached file with the text as its caption", async () => {
+      h.thread.current = wa([msg({ id: "a", status: "sent" })]);
+      h.attach.mockReturnValue({ messageId: "f1" });
+      open("/inbox?conversation=c1&bot=b1");
+      const file = new File(["%PDF"], "form.pdf", { type: "application/pdf" });
+      fireEvent.change(screen.getByTestId("inbox-attach-input"), { target: { files: [file] } });
+      fireEvent.change(screen.getByPlaceholderText(INBOX.replyPlaceholder), {
+        target: { value: "The form" },
+      });
+      fireEvent.click(screen.getByText(INBOX.send));
+      await waitFor(() =>
+        expect(h.attach).toHaveBeenCalledWith({
+          chatbotId: "b1",
+          id: "c1",
+          file,
+          text: "The form",
+        }),
+      );
+      expect(h.reply).not.toHaveBeenCalled();
+    });
+
+    it("sends reply buttons with the text", async () => {
+      h.thread.current = wa([msg({ id: "a", status: "sent" })]);
+      h.reply.mockReturnValue({ messageId: "r1" });
+      open("/inbox?conversation=c1&bot=b1");
+      fireEvent.click(screen.getByText(INBOX_WA.addButtons));
+      fireEvent.change(screen.getByLabelText("Button 1"), { target: { value: "Yes" } });
+      fireEvent.change(screen.getByLabelText("Button 2"), { target: { value: "No" } });
+      fireEvent.change(screen.getByPlaceholderText(INBOX.replyPlaceholder), {
+        target: { value: "Shall I book it?" },
+      });
+      fireEvent.click(screen.getByText(INBOX.send));
+      await waitFor(() =>
+        expect(h.reply).toHaveBeenCalledWith({
+          chatbotId: "b1",
+          id: "c1",
+          text: "Shall I book it?",
+          buttons: ["Yes", "No"],
+        }),
+      );
+    });
+
+    it("no file or buttons on a web chat", () => {
+      h.thread.current = { ...wa([msg({ id: "a" })]), channel: "web" };
+      open("/inbox?conversation=c1&bot=b1");
+      expect(screen.queryByText(INBOX_WA.attach)).toBeNull();
+      expect(screen.queryByText(INBOX_WA.addButtons)).toBeNull();
+    });
   });
 });

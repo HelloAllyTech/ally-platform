@@ -181,12 +181,16 @@ describe('ChatbotEngineService', () => {
 
     it('runs the crisis check alongside with the same prompts', async () => {
       await engine.respond(turn());
-      expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledWith({
-        message: 'What does Ally do?',
-        // The person's earlier messages (chunk 15a).
-        history: ['hi'],
-        prompts: aiService.runAgent.mock.calls[0][0].prompts,
-      });
+      expect(aiService.checkWhatsAppCrisis).toHaveBeenCalledWith(
+        {
+          message: 'What does Ally do?',
+          // The person's earlier messages (chunk 15a).
+          history: ['hi'],
+          prompts: aiService.runAgent.mock.calls[0][0].prompts,
+        },
+        // WA-A §0a: where a late verdict goes.
+        { onLate: expect.any(Function) },
+      );
     });
   });
 
@@ -486,6 +490,72 @@ describe('ChatbotEngineService', () => {
           turn({ text: 'What are your opening hours?' }),
         );
         expect(decision.body).not.toMatch(/14416|findahelpline/);
+      });
+    });
+
+    describe('a verdict that answers after its wait (WA-A §0a)', () => {
+      const AT_RISK = { is_crisis: true, confidence: 0.92, signal: 'end it' };
+      const lateBy = (
+        verdict: { is_crisis: boolean; confidence: number; signal: string },
+        ms = 50,
+      ) =>
+        aiService.checkWhatsAppCrisis.mockImplementation(
+          (_req: unknown, opts?: { onLate?: (v: unknown) => void }) => {
+            setTimeout(() => opts?.onLate?.(verdict), ms);
+            return Promise.reject(upstream(504, ErrorCode.AI_SERVICE_TIMEOUT));
+          },
+        );
+      const settle = () => new Promise((resolve) => setTimeout(resolve, 150));
+      let lateCrisis: { flag: jest.Mock };
+
+      beforeEach(() => {
+        lateCrisis = { flag: jest.fn().mockResolvedValue(true) };
+        engine = makeEngine({ aiService, promptShared, lateCrisis });
+        engine.levelWaitMs = 0;
+      });
+
+      it('flags the chat and alerts once when the late verdict is at risk; the reply already carried 112 and 14416', async () => {
+        lateBy(AT_RISK);
+        const atRisk = turn({
+          text: "Nothing matters anymore, I just want to disappear for good. I'm so hopeless",
+          conversationId: 'conv-1',
+          providerMessageId: 'wamid.late',
+        });
+        const decision = await engine.respond(atRisk);
+        expect(decision.handledBy).not.toBe(WaHandledBy.CRISIS);
+        expect(decision.body).toMatch(/call 112 now/);
+        expect(decision.body).toContain('Tele-MANAS on 14416');
+        await settle();
+        // Both checks (with history and alone) answered late; the chat is flagged once.
+        expect(lateCrisis.flag).toHaveBeenCalledTimes(1);
+        expect(lateCrisis.flag).toHaveBeenCalledWith(
+          expect.objectContaining({ conversationId: 'conv-1' }),
+          AT_RISK,
+        );
+      });
+
+      it('does nothing when the late verdict is not at risk', async () => {
+        lateBy({ is_crisis: false, confidence: 0.1, signal: '' });
+        await engine.respond(
+          turn({ text: 'I feel hopeless and alone', conversationId: 'conv-1' }),
+        );
+        await settle();
+        expect(lateCrisis.flag).not.toHaveBeenCalled();
+      });
+
+      it('does not flag twice when the reply was already the crisis reply', async () => {
+        aiService.checkWhatsAppCrisis.mockImplementation(
+          (_req: unknown, opts?: { onLate?: (v: unknown) => void }) => {
+            setTimeout(() => opts?.onLate?.(AT_RISK), 50);
+            return Promise.resolve(AT_RISK);
+          },
+        );
+        const decision = await engine.respond(
+          turn({ text: 'I want to end it all', conversationId: 'conv-1' }),
+        );
+        expect(decision.handledBy).toBe(WaHandledBy.CRISIS);
+        await settle();
+        expect(lateCrisis.flag).not.toHaveBeenCalled();
       });
     });
 

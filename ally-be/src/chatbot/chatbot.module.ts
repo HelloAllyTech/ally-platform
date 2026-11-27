@@ -33,6 +33,7 @@ import { ConversationService } from './service/conversation.service';
 import { AlertOutboxService } from './safety/alert-outbox.service';
 import { AssistantsMonitoringService } from './safety/assistants-monitoring.service';
 import { CrisisAlertService } from './safety/crisis-alert.service';
+import { LateCrisisService } from './safety/late-crisis.service';
 import { GoLiveController } from './safety/go-live.controller';
 import { GoLiveGateService } from './safety/go-live-gate.service';
 import { GoLiveBackfillService } from './safety/go-live-backfill.service';
@@ -53,6 +54,7 @@ import { HandOverTool } from './agent-tools/hand-over.tool';
 import { ListConsentService } from './agent-tools/list-consent.service';
 import { ListToolsService } from './agent-tools/list-tools.service';
 import { AGENT_GATEWAY_TOOLS, AgentToolRegistry } from './agent-tools/tools';
+import { SendSourceFileTool } from './agent-tools/send-source-file.tool';
 import { ToolRun } from './entity/tool-run.entity';
 import { MemoryEntry } from './entity/memory-entry.entity';
 import { MemoryService } from './memory/memory.service';
@@ -194,6 +196,8 @@ import {
     AssistantsMonitoringService,
     CrisisAlertService,
     CrisisBackfillService,
+    // WA-A §0a: a crisis verdict that arrives after the reply still flags and alerts.
+    LateCrisisService,
     // Safety core (stage 4): the go-live gate on every path, and the D10 backfill.
     SafetyStateService,
     GoLiveGateService,
@@ -202,10 +206,15 @@ import {
     AgentRunTokenService,
     AgentGatewayService,
     HandOverTool,
+    SendSourceFileTool,
     {
       provide: AGENT_GATEWAY_TOOLS,
-      useFactory: (handOver: HandOverTool) => [handOver],
-      inject: [HandOverTool],
+      // WA-A §2: send_source_file, opt-in per assistant like hand_over.
+      useFactory: (handOver: HandOverTool, sendFile: SendSourceFileTool) => [
+        handOver,
+        sendFile,
+      ],
+      inject: [HandOverTool, SendSourceFileTool],
     },
     AgentToolRegistry,
     ListToolsService,

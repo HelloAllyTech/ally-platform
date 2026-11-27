@@ -207,7 +207,7 @@ export async function checkSharedStore(
              AND i.chatbot_id = w.chatbot_id
       WHERE w.chatbot_id IS NOT NULL AND w.started_at < $1
         AND (s.id IS NULL OR i.id IS NULL
-             OR NOT (i.external_id = k.phone_e164
+             OR NOT (i.external_id = COALESCE(k.phone_e164, k.bsuid)
                      OR (i.external_id LIKE 'erased:%' AND k.phone_e164 LIKE 'erased:%')))
       LIMIT 100`,
       [settle],

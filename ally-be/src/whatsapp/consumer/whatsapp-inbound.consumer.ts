@@ -46,7 +46,8 @@ export class WhatsAppInboundConsumer {
       return;
     }
 
-    if (!inbound.providerMessageId || !inbound.from) {
+    // WA-A §4: a sender may be known only by their business-scoped user ID.
+    if (!inbound.providerMessageId || (!inbound.from && !inbound.fromUserId)) {
       this.logger.error(
         'Discarding an inbound message missing its id or sender',
       );

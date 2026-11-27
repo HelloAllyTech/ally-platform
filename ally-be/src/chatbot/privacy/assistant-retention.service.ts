@@ -2,6 +2,12 @@ import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
+import { S3Service } from '../../aws/service/s3.service';
+import { AppConfigService } from '../../config/config.service';
+import {
+  deleteWaMedia,
+  waMediaKeysOf,
+} from '../../whatsapp/media/wa-attachment';
 import { LoggerService } from '../../logger/logger.service';
 import { safetySettingsOf } from '../safety/safety-settings';
 import { SWITCHES, switchOn } from '../safety/switches';
@@ -98,6 +104,9 @@ export class AssistantRetentionService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     @Optional() private readonly config?: ConfigService,
+    // WA-A: the stored voice notes, images and documents go with their messages.
+    @Optional() private readonly s3?: S3Service,
+    @Optional() private readonly appConfig?: AppConfigService,
   ) {}
 
   /** Why a real sweep may not run now, or null. */
@@ -152,6 +161,7 @@ export class AssistantRetentionService {
 
     this.running = !dryRun;
     try {
+      if (!dryRun) await this.purgeMedia(params);
       for (const step of this.steps()) {
         counts[step.store] = dryRun
           ? await this.count(step, params)
@@ -184,6 +194,34 @@ export class AssistantRetentionService {
       new Date(now.getTime() - ORPHAN_RETENTION_DAYS * day),
       ERASED_PREFIX,
     ];
+  }
+
+  /**
+   * WA-A: before the messages step clears `attachments`, the files they point at (`wa-media/` in
+   * the private bucket) are deleted, batch by batch, and only those rows' references cleared, so
+   * no file outlives its message. Audio is kept only as long as the conversation.
+   */
+  private async purgeMedia(params: unknown[]): Promise<number> {
+    const messages = this.steps().find((s) => s.store === 'chatbot_messages');
+    const bucket = this.appConfig?.s3.audioBucket;
+    if (!messages || !this.s3 || !bucket) return 0;
+    let deleted = 0;
+    for (let i = 0; i < MAX_BATCHES; i += 1) {
+      const rows = (await this.dataSource.query(
+        `${HEAD} SELECT x.id, x.attachments ${messages.from}
+           AND x.attachments IS NOT NULL LIMIT ${BATCH}`,
+        params,
+      )) as { id: string; attachments: unknown }[];
+      if (!rows.length) break;
+      deleted += await deleteWaMedia(this.s3, bucket, waMediaKeysOf(rows));
+      await this.dataSource.query(
+        `UPDATE chatbot_messages SET attachments = NULL, "updatedAt" = now()
+          WHERE id = ANY($1::uuid[])`,
+        [rows.map((r) => r.id)],
+      );
+      if (rows.length < BATCH) break;
+    }
+    return deleted;
   }
 
   private async count(step: Step, params: unknown[]): Promise<number> {
@@ -330,7 +368,7 @@ export class AssistantRetentionService {
         store: 'wa_contacts',
         table: 'wa_contacts',
         from: `FROM wa_contacts x CROSS JOIN p
-              WHERE x.phone_e164 NOT LIKE p.prefix || '%'
+              WHERE COALESCE(x.phone_e164, '') NOT LIKE p.prefix || '%'
                 AND EXISTS (SELECT 1 FROM wa_conversations w0 WHERE w0.contact_id = x.id)
                 AND NOT EXISTS (
                   SELECT 1 FROM wa_conversations wc
@@ -338,7 +376,7 @@ export class AssistantRetentionService {
                     LEFT JOIN chatbot_conversations c ON c.id = wc.id
                    WHERE wc.contact_id = x.id
                      AND (wc.last_message_at >= ${waCutoff} OR ${EXEMPT('c')}))`,
-        set: `phone_e164 = (SELECT prefix FROM p) || id::text, phone_last4 = '0000', locale = NULL,
+        set: `phone_e164 = (SELECT prefix FROM p) || id::text, bsuid = NULL, phone_last4 = '0000', locale = NULL,
               user_id = NULL, tenant_id = NULL, identified_at = NULL, identity_source = NULL, "updatedAt" = now()`,
       },
       {

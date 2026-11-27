@@ -316,9 +316,11 @@ export class MemoryService {
       const rows = (await this.dataSource.query(
         `WITH named AS (
            UPDATE chatbot_contacts
-              SET display_name = $3, name_forgotten_at = NULL, "updatedAt" = now()
+              SET display_name = $3, display_name_source = 'chat',
+                  name_forgotten_at = NULL, "updatedAt" = now()
             WHERE id = $1 AND chatbot_id = $2
-              AND (display_name IS NULL OR btrim(display_name) = '')
+              AND (display_name IS NULL OR btrim(display_name) = ''
+                   OR display_name_source = 'whatsapp_profile')
            RETURNING id)
          SELECT id FROM named`,
         [contactId, chatbot.id, candidate],
@@ -627,25 +629,34 @@ export class MemoryService {
     await this.dataSource.transaction(async (m) => {
       // One writer per person at a time, so the limit and renewals can't race.
       const [contact] = (await m.query(
-        `SELECT id, display_name, name_forgotten_at FROM chatbot_contacts
+        `SELECT id, display_name, display_name_source, name_forgotten_at FROM chatbot_contacts
           WHERE id = $1 AND chatbot_id = $2 FOR UPDATE`,
         [run.contactId, chatbot.id],
       )) as {
         id: string;
         display_name: string | null;
+        display_name_source?: string | null;
         name_forgotten_at: Date | null;
       }[];
       if (!contact) return;
       for (const write of allowed) {
         if (write.op === 'name') {
           // TF1 round 2: a name they asked to forget is only given back by them (`nameNow`).
-          if (contact.display_name?.trim() || contact.name_forgotten_at) {
+          // WA-A §0b: a WhatsApp profile name is only a stand-in; the name they give replaces it.
+          const profileOnly =
+            contact.display_name_source === 'whatsapp_profile';
+          if (
+            (contact.display_name?.trim() && !profileOnly) ||
+            contact.name_forgotten_at
+          ) {
             continue;
           }
           await m.query(
-            `UPDATE chatbot_contacts SET display_name = $3, "updatedAt" = now()
+            `UPDATE chatbot_contacts
+                SET display_name = $3, display_name_source = 'chat', "updatedAt" = now()
               WHERE id = $1 AND chatbot_id = $2
-                AND (display_name IS NULL OR btrim(display_name) = '')`,
+                AND (display_name IS NULL OR btrim(display_name) = ''
+                     OR display_name_source = 'whatsapp_profile')`,
             [run.contactId, chatbot.id, write.text],
           );
           out.named = true;

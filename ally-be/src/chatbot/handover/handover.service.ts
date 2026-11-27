@@ -56,6 +56,19 @@ export interface WhatsAppSendRequest {
   text: string;
   handledBy: WaHandledBy;
   sentByUserId: number | null;
+  /** WA-A §3: a file the team attached (stored under `wa-media/`); `text` is its caption. */
+  media?: TeamMedia;
+  /** WA-A §3: up to 3 reply buttons (BT1's interactive send); a tap reads as its title. */
+  buttons?: string[];
+}
+
+/** WA-A: a file a team member attached in the Inbox, already stored in the private bucket. */
+export interface TeamMedia {
+  kind: 'image' | 'document';
+  key: string;
+  mimeType: string;
+  sizeBytes: number;
+  filename?: string;
 }
 
 export interface WhatsAppSendResult {
@@ -357,8 +370,10 @@ export class HandoverService implements OnModuleInit {
     user: { id: number; name: string | null },
     text: string,
     now = new Date(),
+    extra: { buttons?: string[]; media?: TeamMedia } = {},
   ): Promise<{ messageId: string }> {
     const body = text.trim();
+    const buttons = (extra.buttons ?? []).map((b) => b.trim()).filter(Boolean);
     const conversation = await this.conversation(chatbot.id, conversationId);
     if (conversation.handled_by_user_id !== user.id) {
       throw new ConflictException({
@@ -383,9 +398,17 @@ export class HandoverService implements OnModuleInit {
       }
       messageId = await this.sendWhatsApp({
         conversationId,
-        text: `*${from}*\n${body}`,
+        text: body ? `*${from}*\n${body}` : `*${from}*`,
         handledBy: WaHandledBy.HUMAN,
         sentByUserId: user.id,
+        ...(extra.media ? { media: extra.media } : {}),
+        ...(buttons.length ? { buttons } : {}),
+      });
+    } else if (extra.media) {
+      // Files go out on WhatsApp only for now (the bot page can't show them yet).
+      throw new ConflictException({
+        errorCode: 'files_whatsapp_only',
+        message: 'Files can be sent on WhatsApp only for now.',
       });
     } else {
       const stored = await this.conversations.appendMessage(conversationId, {

@@ -25,6 +25,7 @@ from app.api.v1.endpoints import (
     roadmap_opportunity,
     round_trip,
     summary,
+    voice_notes,
 )
 
 api_router = APIRouter()
@@ -99,4 +100,7 @@ api_router.include_router(
     debrief_language.router,
     prefix="/debrief-language",
     tags=["debrief-language"],
+)
+api_router.include_router(
+    voice_notes.router, prefix="/voice-notes", tags=["voice-notes"]
 )

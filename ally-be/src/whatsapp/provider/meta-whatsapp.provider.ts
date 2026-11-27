@@ -3,26 +3,39 @@ import { Injectable } from '@nestjs/common';
 import axios, { AxiosRequestConfig } from 'axios';
 import { Request } from 'express';
 import { AppConfigService } from 'src/config/config.service';
+import { isBusinessScopedId } from '../util/wa-address';
 import { LoggerService } from 'src/logger/logger.service';
 import {
   InboundWhatsAppMessage,
   WhatsAppConnectionCheck,
   WaNumberCredentials,
   WhatsAppInteractive,
+  WhatsAppMedia,
   WhatsAppProvider,
   whatsappInteractiveFits,
+  whatsappMediaProblem,
+  WHATSAPP_DOCUMENT_MAX_BYTES,
 } from '../type/whatsapp-provider.interface';
 
-/** Message types that carry no readable text. */
-const UNSUPPORTED_TYPES = new Set([
-  'image',
-  'audio',
-  'video',
-  'document',
-  'sticker',
-  'location',
-  'contacts',
-]);
+/** A file on an incoming message, as Meta sends it. */
+interface MetaMedia {
+  id?: string;
+  mime_type?: string;
+  sha256?: string;
+  filename?: string;
+  caption?: string;
+  voice?: boolean;
+}
+
+/** Message types the pipeline doesn't handle (WA-A: voice notes, images and documents it does). */
+const UNSUPPORTED_TYPES = new Set(['video', 'sticker', 'location', 'contacts']);
+
+/** WA-A: the media types kept and shown in the Inbox (a voice note is also transcribed). */
+const MEDIA_TYPES = new Set(['audio', 'image', 'document'] as const);
+type MediaType = 'audio' | 'image' | 'document';
+
+/** Files larger than this are not downloaded (the message is still kept and answered). */
+export const MAX_MEDIA_DOWNLOAD_BYTES = WHATSAPP_DOCUMENT_MAX_BYTES;
 
 /**
  * What to do about the Meta error codes a go-live actually hits.
@@ -198,14 +211,22 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         changes?: {
           value?: {
             metadata?: { phone_number_id?: string };
-            contacts?: { wa_id?: string; profile?: { name?: string } }[];
+            contacts?: {
+              wa_id?: string;
+              user_id?: string;
+              profile?: { name?: string };
+            }[];
             messages?: {
               id?: string;
               from?: string;
+              from_user_id?: string;
               type?: string;
               timestamp?: string;
               text?: { body?: string };
               button?: { text?: string };
+              audio?: MetaMedia;
+              image?: MetaMedia;
+              document?: MetaMedia;
               interactive?: {
                 button_reply?: { id?: string; title?: string };
                 list_reply?: { id?: string; title?: string };
@@ -225,16 +246,20 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         // number answers for, so a reply never reaches a worker from a number they never wrote to.
         const addressedTo = change?.value?.metadata?.phone_number_id;
         // TF1 B5: the sender's profile name, by their WhatsApp id.
-        const profiles = new Map(
-          (change?.value?.contacts ?? [])
-            .filter((c) => c?.wa_id && c.profile?.name?.trim())
-            .map((c) => [
-              String(c.wa_id),
-              c.profile!.name!.trim().slice(0, 120),
-            ]),
-        );
+        // WA-A §4: keyed by number and by business-scoped ID, whichever Meta sent.
+        const profiles = new Map<string, string>();
+        for (const c of change?.value?.contacts ?? []) {
+          const name = c?.profile?.name?.trim();
+          if (!name) continue;
+          if (c.wa_id) profiles.set(String(c.wa_id), name.slice(0, 120));
+          if (c.user_id) profiles.set(String(c.user_id), name.slice(0, 120));
+        }
         for (const message of change?.value?.messages ?? []) {
-          if (!message?.id || !message?.from) continue;
+          // WA-A §4 (RC1 §4b): a message with only Meta's business-scoped user ID (a person with a
+          // WhatsApp username) is kept and answered, never dropped.
+          const fromUserId = String(message?.from_user_id ?? '').trim();
+          if (!message?.id || (!message?.from && !fromUserId)) continue;
+          const sender = message.from ?? fromUserId;
 
           const type = message.type ?? 'text';
           // A quick-reply button or list selection is a text answer as far as the bot is concerned,
@@ -246,22 +271,51 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
             message.interactive?.list_reply?.title ??
             '';
 
+          // WA-A: a voice note, image or document is kept (and a voice note transcribed); its
+          // caption, if any, is the person's words.
+          const raw = MEDIA_TYPES.has(type as MediaType)
+            ? message[type as MediaType]
+            : undefined;
+          const media = raw?.id
+            ? {
+                kind: type as MediaType,
+                id: String(raw.id),
+                mimeType: String(raw.mime_type ?? 'application/octet-stream'),
+                ...(raw.sha256 ? { sha256: String(raw.sha256) } : {}),
+                ...(raw.filename
+                  ? { filename: String(raw.filename).slice(0, 240) }
+                  : {}),
+                ...(raw.caption?.trim()
+                  ? { caption: raw.caption.trim().slice(0, 1024) }
+                  : {}),
+                ...(raw.voice ? { voice: true } : {}),
+              }
+            : undefined;
+          const said = (text || media?.caption || '').trim();
+
           // BT1: a tap on our own list row or reply button carries its action token as the id.
           const actionId =
             message.interactive?.button_reply?.id ??
             message.interactive?.list_reply?.id;
           out.push({
             providerMessageId: message.id,
-            from: this.normalisePhone(message.from),
-            text: text.trim(),
+            from: message.from ? this.normalisePhone(message.from) : '',
+            ...(fromUserId ? { fromUserId: fromUserId.slice(0, 140) } : {}),
+            text: said,
             ...(actionId ? { actionId } : {}),
-            isUnsupportedMedia: !text.trim() && UNSUPPORTED_TYPES.has(type),
+            ...(media ? { media } : {}),
+            // A media message with no id (nothing to fetch) is still unsupported, as before.
+            isUnsupportedMedia:
+              !said &&
+              !media &&
+              (UNSUPPORTED_TYPES.has(type) ||
+                MEDIA_TYPES.has(type as MediaType)),
             timestamp: message.timestamp
               ? new Date(Number(message.timestamp) * 1000)
               : new Date(),
             ...(addressedTo ? { phoneNumberId: addressedTo } : {}),
-            ...(profiles.get(message.from)
-              ? { profileName: profiles.get(message.from) }
+            ...(profiles.get(sender)
+              ? { profileName: profiles.get(sender) }
               : {}),
           });
         }
@@ -303,6 +357,72 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
     return this.postMessage(to, { type: 'interactive', interactive }, creds);
   }
 
+  /**
+   * WA-A §2: an image or document by link (a short-lived signed URL Meta fetches), checked against
+   * Meta's limits first: a file that doesn't fit is never sent.
+   */
+  async sendMedia(
+    to: string,
+    media: WhatsAppMedia,
+    creds?: WaNumberCredentials,
+  ): Promise<{ providerMessageId: string }> {
+    const problem = whatsappMediaProblem(media);
+    if (problem) {
+      throw new Error(`The file is outside WhatsApp limits: ${problem}`);
+    }
+    const body: Record<string, unknown> = { link: media.link };
+    if (media.caption?.trim()) body.caption = media.caption.trim();
+    if (media.kind === 'document' && media.filename) {
+      body.filename = media.filename;
+    }
+    return this.postMessage(
+      to,
+      { type: media.kind, [media.kind]: body },
+      creds,
+    );
+  }
+
+  /**
+   * WA-A §1: a file someone sent. Meta's media id gives a URL valid for 5 minutes, fetched with the
+   * same token; capped at `maxBytes` so a large document never fills memory.
+   */
+  async downloadMedia(
+    mediaId: string,
+    creds?: WaNumberCredentials,
+    maxBytes = MAX_MEDIA_DOWNLOAD_BYTES,
+  ): Promise<{ data: Buffer; mimeType: string; sizeBytes: number }> {
+    const resolved = this.creds(creds);
+    if (!resolved.accessToken) {
+      throw new Error('WhatsApp is not configured (no access token).');
+    }
+    const info = await this.graph<{
+      url?: string;
+      mime_type?: string;
+      file_size?: number;
+    }>(resolved, 'get', encodeURIComponent(mediaId), 'the media lookup');
+    if (!info?.url) throw new Error('Meta returned no URL for the media');
+    if (Number(info.file_size) > maxBytes) {
+      throw new Error(`The file is over ${maxBytes} bytes`);
+    }
+    let response: { data: ArrayBuffer; headers?: Record<string, unknown> };
+    try {
+      response = await axios.get<ArrayBuffer>(info.url, {
+        headers: { Authorization: `Bearer ${resolved.accessToken}` },
+        responseType: 'arraybuffer',
+        maxContentLength: maxBytes,
+        timeout: 15_000,
+      });
+    } catch (error) {
+      throw new MetaGraphError('the media download', error);
+    }
+    const data = Buffer.from(response.data);
+    return {
+      data,
+      mimeType: String(info.mime_type ?? 'application/octet-stream'),
+      sizeBytes: data.length,
+    };
+  }
+
   async sendText(
     to: string,
     body: string,
@@ -338,7 +458,8 @@ export class MetaWhatsAppProvider implements WhatsAppProvider {
         {
           messaging_product: 'whatsapp',
           recipient_type: 'individual',
-          to,
+          // WA-A §4: a person known by their business-scoped user ID is addressed as `recipient`.
+          ...(isBusinessScopedId(to) ? { recipient: to } : { to }),
           ...content,
         },
         {

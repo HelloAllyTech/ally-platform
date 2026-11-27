@@ -1,4 +1,6 @@
 export const ENDPOINTS = {
+  // WA-A: a WhatsApp voice note's transcript (ally-ai `/voice-notes/transcribe`).
+  VOICE_NOTE_TRANSCRIBE: 'api/v1/voice-notes/transcribe',
   SUMMARY: 'api/v1/summary/note',
   CONVERSATION: 'api/v1/conversation/analyze',
   ENHANCE: 'api/v1/summary/enhance',

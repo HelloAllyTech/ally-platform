@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { ExecutionManager } from '../../common/execution/execution-manager';
@@ -7,6 +8,22 @@ import { ConversationChannel } from '../enum/conversation.enum';
 import { WHATSAPP_WINDOW_MS } from '../handover/handover';
 import { ChatbotAccessService } from '../service/chatbot-access.service';
 import { ERASED_TEXT } from '../privacy/erased';
+import { S3Service } from '../../aws/service/s3.service';
+import { AppConfigService } from '../../config/config.service';
+import {
+  WA_MEDIA_PREFIX,
+  WA_MEDIA_SIGNED_SECONDS,
+  waAttachmentsOf,
+} from '../../whatsapp/media/wa-attachment';
+import {
+  WHATSAPP_DOCUMENT_MAX_BYTES,
+  WHATSAPP_MEDIA_LIMITS,
+} from '../../whatsapp/type/whatsapp-provider.interface';
+import type { TeamMedia } from '../handover/handover.service';
+
+/** WA-A: the largest file the team can send from the Inbox: WhatsApp's document cap (25 MB). */
+export const TEAM_FILE_MAX_BYTES = WHATSAPP_DOCUMENT_MAX_BYTES;
+import { failedSendReason } from '../../whatsapp/wa-a-copy';
 
 /** "Live now": a message in the last this many minutes. */
 const LIVE_MINUTES = 15;
@@ -63,6 +80,9 @@ export class InboxService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly access: ChatbotAccessService,
+    // WA-A: signed links to voice notes, images and documents. Optional for the specs.
+    @Optional() private readonly s3?: S3Service,
+    @Optional() private readonly appConfig?: AppConfigService,
   ) {}
 
   /** The assistants whose chats the caller can see: the ones they are a member of. */
@@ -205,10 +225,13 @@ export class InboxService {
     if (!conversation) return null;
     const messages = (await this.dataSource.query(
       `SELECT m.id, m.role, m.text, m.citations, m.handled_by, m."createdAt" AS at,
-              m.sent_by_user_id, su.name AS sent_by_name, f.rating, f.reason
+              m.sent_by_user_id, su.name AS sent_by_name, f.rating, f.reason,
+              m.attachments, m.status, ds.status AS delivery, ds.error_code
          FROM chatbot_messages m
          LEFT JOIN users su ON su.id = m.sent_by_user_id
          LEFT JOIN chatbot_message_feedback f ON f.message_id = m.id
+         LEFT JOIN wa_message_statuses ds ON ds.provider_message_id = m.provider_message_id
+                                          AND m.channel = 'whatsapp'
         WHERE m.conversation_id = $1
         ORDER BY m."createdAt" ASC
         LIMIT 500`,
@@ -262,21 +285,126 @@ export class InboxService {
               new Date(lastInbound).getTime() + WHATSAPP_WINDOW_MS,
             ).toISOString()
           : null,
-      messages: messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        text: m.text,
-        citations: m.citations ?? [],
-        handledBy: m.handled_by,
-        at: m.at,
-        sentBy:
-          m.sent_by_user_id === null
-            ? null
-            : { id: m.sent_by_user_id, name: m.sent_by_name ?? null },
-        rating: m.rating ?? null,
-        ratingReason: m.reason ?? null,
-      })),
+      messages: await Promise.all(
+        messages.map(async (m) => ({
+          id: m.id,
+          role: m.role,
+          text: m.text,
+          citations: m.citations ?? [],
+          handledBy: m.handled_by,
+          at: m.at,
+          sentBy:
+            m.sent_by_user_id === null
+              ? null
+              : { id: m.sent_by_user_id, name: m.sent_by_name ?? null },
+          rating: m.rating ?? null,
+          ratingReason: m.reason ?? null,
+          // WA-A §3: what WhatsApp says happened to a message sent to the person.
+          ...deliveryOf(m),
+          // WA-A §1–2: voice notes (with their transcript), images and documents, as short links.
+          attachments: await this.signed(m.attachments),
+        })),
+      ),
     };
+  }
+
+  /**
+   * WA-A §3: a file a team member attaches, checked against what WhatsApp accepts (type and size)
+   * and stored in the private bucket beside the chat's other files. The send itself is the
+   * handover's, with its holder and 24-hour checks.
+   */
+  async storeTeamFile(
+    chatbotId: string,
+    conversationId: string,
+    file: {
+      buffer: Buffer;
+      mimetype: string;
+      size: number;
+      originalname?: string;
+    },
+  ): Promise<TeamMedia> {
+    await this.access.assert(chatbotId, ChatbotMemberRole.VIEWER);
+    const mimeType = (file.mimetype || '').split(';')[0].trim().toLowerCase();
+    const kind = (
+      WHATSAPP_MEDIA_LIMITS.image.mimeTypes as readonly string[]
+    ).includes(mimeType)
+      ? ('image' as const)
+      : (
+            WHATSAPP_MEDIA_LIMITS.document.mimeTypes as readonly string[]
+          ).includes(mimeType)
+        ? ('document' as const)
+        : null;
+    if (!kind) {
+      throw new BadRequestException({
+        errorCode: 'file_type',
+        message:
+          'WhatsApp takes JPEG or PNG images, PDFs and Office documents.',
+      });
+    }
+    const max = WHATSAPP_MEDIA_LIMITS[kind].maxBytes;
+    if (!(file.size > 0) || file.size > max) {
+      throw new BadRequestException({
+        errorCode: 'file_size',
+        message: `That file is too large for WhatsApp (up to ${Math.round(max / 1024 / 1024)} MB).`,
+      });
+    }
+    const bucket = this.appConfig?.s3.audioBucket;
+    if (!bucket || !this.s3) {
+      throw new BadRequestException({
+        errorCode: 'file_storage',
+        message: "Files can't be sent from this environment.",
+      });
+    }
+    const ext = (file.originalname?.split('.').pop() ?? 'bin')
+      .replace(/[^a-z0-9]/gi, '')
+      .slice(0, 8)
+      .toLowerCase();
+    const key = `${WA_MEDIA_PREFIX}${chatbotId}/${conversationId}/team-${randomUUID()}.${ext || 'bin'}`;
+    await this.s3.uploadStream({
+      Bucket: bucket,
+      Key: key,
+      Body: file.buffer,
+      ContentType: mimeType,
+    });
+    return {
+      kind,
+      key,
+      mimeType,
+      sizeBytes: file.size,
+      ...(file.originalname
+        ? { filename: file.originalname.slice(0, 240) }
+        : {}),
+    };
+  }
+
+  /** Each stored file with a short-lived link for the dashboard; no link when it wasn't stored. */
+  private async signed(value: unknown) {
+    const attachments = waAttachmentsOf(value);
+    if (!attachments.length) return [];
+    const bucket = this.appConfig?.s3.audioBucket;
+    return Promise.all(
+      attachments.map(async (a) => ({
+        kind: a.kind,
+        mimeType: a.mimeType,
+        filename: a.filename ?? null,
+        caption: a.caption ?? null,
+        voice: Boolean(a.voice),
+        transcript: a.transcript ?? null,
+        transcriptError: a.transcriptError ?? null,
+        durationSec: a.durationSec ?? null,
+        url:
+          a.key && bucket && this.s3
+            ? await this.s3
+                .generatePresignedUrl({
+                  bucket,
+                  key: a.key,
+                  operation: 'get',
+                  expiresIn: WA_MEDIA_SIGNED_SECONDS,
+                })
+                .catch(() => null)
+            : null,
+      })),
+    );
   }
 
   /** Opening a chat marks it read for you (and keeps it out of the owners' "nobody opened" email). */
@@ -374,5 +502,27 @@ function toItem(row: Record<string, unknown>): InboxItem {
     safety: Boolean(row.safety_at),
     contactId: (row.contact_id as string | null) ?? null,
     chats: Number(row.chats ?? 1),
+  };
+}
+
+/**
+ * A WhatsApp message's delivery (WA-A §3): `sent`, `delivered`, `read` or `failed` with Meta's
+ * reason in plain words. The callback's state wins over the row's own (`queued`, `sent`).
+ */
+function deliveryOf(m: Record<string, unknown>): {
+  status: string | null;
+  failedReason: string | null;
+} {
+  const status =
+    (m.delivery as string | null) ??
+    (['sent', 'delivered', 'read', 'failed'].includes(String(m.status))
+      ? String(m.status)
+      : null);
+  return {
+    status,
+    failedReason:
+      status === 'failed'
+        ? failedSendReason(m.error_code == null ? null : Number(m.error_code))
+        : null,
   };
 }

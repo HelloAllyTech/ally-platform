@@ -23,8 +23,14 @@ export enum WaHandledBy {
   CLARIFIED = 'clarified',
   /** Rate limited. */
   RATE_LIMITED = 'rate_limited',
-  /** An image, audio note or document — nothing we can read. */
+  /** A video, sticker, location or contact card — nothing we can read. */
   UNSUPPORTED_MEDIA = 'unsupported_media',
+  /** WA-A: a voice note that couldn't be transcribed or is over 2 minutes; asked to type it. */
+  VOICE_FAILED = 'voice_failed',
+  /** WA-A: an image or document with no words: kept for the team; "can't read files yet". */
+  FILE_NOT_READ = 'file_not_read',
+  /** WA-A: one of the assistant's own source documents, sent after its reply (`send_source_file`). */
+  SOURCE_FILE = 'source_file',
   /**
    * The number is not linked to an Ally account, so the corpus could not be scoped to an
    * organisation and no answer was attempted.
@@ -76,6 +82,10 @@ export enum WaMessageStatus {
   QUEUED = 'queued',
   PROCESSING = 'processing',
   SENT = 'sent',
+  /** WA-A §3: Meta reported it delivered to the person's phone. */
+  DELIVERED = 'delivered',
+  /** WA-A §3: Meta reported the person read it. */
+  READ = 'read',
   FAILED = 'failed',
   /** Deliberately not replied to — opted out, blocked, or the bot is off. */
   DISCARDED = 'discarded',

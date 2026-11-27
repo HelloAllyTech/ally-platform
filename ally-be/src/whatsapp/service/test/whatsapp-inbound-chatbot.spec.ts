@@ -634,7 +634,7 @@ describe('WhatsAppInboundService through the chatbot engine', () => {
 
       expect(aiService.runAgent).not.toHaveBeenCalled();
       expect(aiService.checkWhatsAppCrisis).not.toHaveBeenCalled();
-      expect(sentBody()).toContain('available by invitation only');
+      expect(sentBody()).toContain('This assistant is by invitation.'); // WA-A §4
       expect(sentBody()).toContain('https://findahelpline.com');
       expect(handledBy()).toBe(WaHandledBy.UNIDENTIFIED);
     });

@@ -605,6 +605,23 @@ const ALLY_AI_DEFAULT_SOURCE =
 
 const ALLY_AI_TASKS: AiTaskEntry[] = [
   {
+    id: 'whatsapp-voice-note-transcribe',
+    task: LlmTask.TRANSCRIPTION,
+    runtime: LlmRuntime.ALLY_AI,
+    trigger: 'Someone sends a voice note to an assistant on WhatsApp',
+    detail:
+      'Agents v2 WA-A. One call per voice note of up to 2 minutes (longer notes are not ' +
+      'sent; the person is asked to type). Sarvam saarika detects the language (Hindi, ' +
+      'Hinglish heard as Hindi, English, Marathi, Tamil, Bengali and other Indian ' +
+      'languages), in 29-second pieces; OpenAI Whisper is the fallback. Only the transcript ' +
+      'goes on, through the crisis check first and then the agent; the audio never reaches ' +
+      'a language model.',
+    kind: AiTaskKind.TRANSCRIPTION,
+    provider: 'sarvam',
+    defaultModel: 'saarika:v2.5',
+    configuredBy: 'SARVAM__API_KEY (fallback OPENAI__API_KEY, whisper-1)',
+  },
+  {
     id: 'session-summary',
     task: LlmTask.SUMMARY,
     runtime: LlmRuntime.ALLY_AI,

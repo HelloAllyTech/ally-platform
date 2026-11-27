@@ -293,6 +293,54 @@ describe('HandoverService', () => {
       expect(h.emitter.emitAsync).not.toHaveBeenCalled();
     });
 
+    it('WA-A: on WhatsApp, a file and reply buttons ride with the reply', async () => {
+      const h = harness({
+        holderId: 7,
+        channel: 'whatsapp',
+        lastInbound: new Date('2026-11-12T09:00:00Z'),
+      });
+      const media = {
+        kind: 'document' as const,
+        key: 'wa-media/bot-1/chat/team-1.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 2048,
+        filename: 'form.pdf',
+      };
+      await h.service.reply(
+        BOT,
+        CHAT,
+        asha,
+        '',
+        new Date('2026-11-12T10:00:00Z'),
+        { media, buttons: [' Yes ', ''] },
+      );
+      expect(h.emitter.emitAsync).toHaveBeenCalledWith(WHATSAPP_SEND_EVENT, {
+        conversationId: CHAT,
+        text: '*Asha from Sunrise Mind*',
+        handledBy: WaHandledBy.HUMAN,
+        sentByUserId: 7,
+        media,
+        buttons: ['Yes'],
+      });
+    });
+
+    it('WA-A: a file on a web chat is refused in plain words', async () => {
+      const h = harness({ holderId: 7 });
+      await expect(
+        h.service.reply(BOT, CHAT, asha, 'here', new Date(), {
+          media: {
+            kind: 'image',
+            key: 'wa-media/x.png',
+            mimeType: 'image/png',
+            sizeBytes: 10,
+          },
+        }),
+      ).rejects.toMatchObject({
+        response: { errorCode: 'files_whatsapp_only' },
+      });
+      expect(h.appendMessage).not.toHaveBeenCalled();
+    });
+
     it('only the person holding the chat can reply', async () => {
       const h = harness({ holderId: 8 });
       await expect(
