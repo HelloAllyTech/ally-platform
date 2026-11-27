@@ -1001,7 +1001,6 @@ export const en = {
       LEARNER: "Learner",
       SIMULATION_REVIEWER: "Simulation reviewer",
       SCRIBE_REVIEWER: "Scribe reviewer",
-      EVALUATOR: "Evaluator",
       CLIENT: "Client",
     } as Record<string, string>,
   },
@@ -1034,8 +1033,6 @@ export const en = {
     needEmail: "Write their email address.",
     needOrganisation: "Choose an organisation.",
     failedCreate: "Couldn't create the account: {reason}",
-    failedAdmin:
-      "The account was made, but it couldn't be made a custom login: {reason}. Ask an engineer to finish it.",
     failedFeatures:
       "The account was made, but its features couldn't be set: {reason}. Open it from Custom logins to finish.",
     // CR1 Part B: Users → Custom logins, the Assistant owner role.

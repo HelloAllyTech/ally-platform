@@ -1207,6 +1207,7 @@ export const ApiEndpoints = {
   /** Ally admin → Custom logins (CR1 Part B): the Assistant owner role. */
   CUSTOM_LOGINS: {
     LIST: "/v1/custom-logins",
+    CREATE: "/v1/custom-logins/users",
     ONE: (userId: number) => `/v1/custom-logins/${userId}`,
   },
   INBOX: {

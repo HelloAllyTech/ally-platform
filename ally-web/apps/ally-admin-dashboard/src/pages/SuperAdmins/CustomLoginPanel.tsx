@@ -3,8 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
-  useAddCustomLoginMutation,
-  useAddUserMutation,
+  useCreateCustomLoginMutation,
   useGetFeatureToggleRegistryQuery,
   useGetTenantsQuery,
   useGetUserFeatureTogglesQuery,
@@ -22,13 +21,6 @@ const t = () => en.customLogins;
 const fill = (text: string, values: Record<string, string>) =>
   text.replace(/\{(\w+)\}/g, (_, key: string) => values[key] ?? "");
 
-/**
- * The least role the create-user route accepts (one permission). What the login can actually use
- * comes from its toggles: it is given the Assistant owner role, then every toggle is set to what
- * was ticked.
- */
-export const CUSTOM_LOGIN_BASE_ROLE = "EVALUATOR";
-
 const reason = (error: unknown): string =>
   String(
     (error as { data?: { message?: string | string[] } })?.data?.message ??
@@ -37,14 +29,14 @@ const reason = (error: unknown): string =>
   );
 
 /**
- * Create a custom login, or edit what one can use (A1, CR1 Part B). Creating runs three routes in
- * order: POST /v1/users → POST /v1/custom-logins (the Assistant owner role; custom logins are no
- * longer platform admins) → PATCH /v1/users/:id/feature-toggles, the last with EVERY key set to
- * exactly what was ticked (so default-on keys are switched off too). If a step fails, the message
- * says which, and what is left to do.
+ * Create a custom login, or edit what one can use (A1, CR1 Part B). Creating runs two routes in
+ * order: POST /v1/custom-logins/users (creates the user with the Assistant owner role in one
+ * transaction; custom logins are not platform admins) → PATCH /v1/users/:id/feature-toggles, with
+ * EVERY key set to exactly what was ticked (so default-on keys are switched off too). If the
+ * second step fails, the message says what is left to do.
  *
  * Shown only on Users → Custom logins and Ally admins, which need the admin_user_management
- * toggle; the server refuses the three routes to anyone without it.
+ * toggle; the server refuses both routes to anyone without it.
  */
 export const CustomLoginPanel: React.FC<{
   edit?: PlatformAdmin | CustomLogin;
@@ -53,8 +45,7 @@ export const CustomLoginPanel: React.FC<{
   const { data: registry, isLoading: registryLoading } = useGetFeatureToggleRegistryQuery();
   const { data: current } = useGetUserFeatureTogglesQuery(edit?.id ?? 0, { skip: !edit });
   const { data: tenants } = useGetTenantsQuery({ limit: 500 }, { skip: Boolean(edit) });
-  const [addUser] = useAddUserMutation();
-  const [addCustomLogin] = useAddCustomLoginMutation();
+  const [createCustomLogin] = useCreateCustomLoginMutation();
   const [setToggles] = useSetUserFeatureTogglesMutation();
 
   const [name, setName] = useState("");
@@ -104,21 +95,14 @@ export const CustomLoginPanel: React.FC<{
       let userId = edit?.id;
       if (!edit) {
         try {
-          const created = await addUser({
+          const created = await createCustomLogin({
             name: name.trim(),
             email: email.trim().toLowerCase(),
-            roles: [CUSTOM_LOGIN_BASE_ROLE],
-            externalId: "",
             tenantId,
           }).unwrap();
           userId = created.id;
         } catch (error) {
           return setProblem(fill(t().failedCreate, { reason: reason(error) }));
-        }
-        try {
-          await addCustomLogin({ userId: userId! }).unwrap();
-        } catch (error) {
-          return setProblem(fill(t().failedAdmin, { reason: reason(error) }));
         }
       }
       try {

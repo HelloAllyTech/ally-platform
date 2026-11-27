@@ -442,6 +442,14 @@ export const plansApi = baseAPI.injectEndpoints({
       query: body => ({ url: ApiEndpoints.CUSTOM_LOGINS.LIST, method: HttpMethod.POST, body }),
       invalidatesTags: [TAG_TYPES.CUSTOM_LOGINS, TAG_TYPES.USERS],
     }),
+    /** Creates a brand-new user directly as a custom login (Assistant owner), in one call. */
+    createCustomLogin: builder.mutation<
+      { id: number },
+      { name: string; email: string; tenantId: string }
+    >({
+      query: body => ({ url: ApiEndpoints.CUSTOM_LOGINS.CREATE, method: HttpMethod.POST, body }),
+      invalidatesTags: [TAG_TYPES.CUSTOM_LOGINS, TAG_TYPES.USERS],
+    }),
     removeCustomLogin: builder.mutation<unknown, number>({
       query: userId => ({ url: ApiEndpoints.CUSTOM_LOGINS.ONE(userId), method: HttpMethod.DELETE }),
       invalidatesTags: [TAG_TYPES.CUSTOM_LOGINS, TAG_TYPES.USERS],
@@ -468,5 +476,6 @@ export const {
   useGetPlanCostsQuery,
   useListCustomLoginsQuery,
   useAddCustomLoginMutation,
+  useCreateCustomLoginMutation,
   useRemoveCustomLoginMutation,
 } = plansApi;
