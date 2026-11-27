@@ -6,6 +6,7 @@ export type ManualItemOutcomeCode =
   | 'applied'
   | 'dismissed'
   | 'edited'
+  | 'flagged'
   | 'checked'
   | 'not_finished';
 

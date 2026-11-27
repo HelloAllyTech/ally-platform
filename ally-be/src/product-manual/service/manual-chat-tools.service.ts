@@ -67,6 +67,8 @@ export interface ManualToolContext {
   seen: Map<string, string>;
   /** Weekly: slugs edited or verified, and proposals resolved. */
   verified: Set<string>;
+  /** Weekly: slugs where a sentence was flagged as contradicted by code (never also verified). */
+  flagged: Set<string>;
   appliedProposals: string[];
   dismissedProposals: string[];
   /**
@@ -105,6 +107,7 @@ export function newToolContext(
     read: new Map(),
     seen: new Map(),
     verified: new Set(),
+    flagged: new Set(),
     appliedProposals: [],
     dismissedProposals: [],
     filesRead: new Set(),
@@ -147,6 +150,7 @@ const TAGS_SCHEMA = { type: 'array', items: { type: 'string' } };
 /** Tools only the weekly agent gets. */
 const WEEKLY_ONLY = new Set([
   'mark_verified',
+  'flag_discrepancy',
   'apply_proposal',
   'dismiss_proposal',
 ]);
@@ -208,6 +212,13 @@ export class ManualChatToolsService {
         EDIT_TOOLS.has(tool.name) &&
         (!ctx.proposal || ctx.proposal.kind === 'gap') &&
         !this.codeSearchAvailable()
+      ) {
+        return false;
+      }
+      // Proposals are not worked by the weekly agent any more: no proposal in hand, nothing to resolve.
+      if (
+        (tool.name === 'apply_proposal' || tool.name === 'dismiss_proposal') &&
+        !ctx.proposal
       ) {
         return false;
       }
@@ -393,6 +404,39 @@ export class ManualChatToolsService {
             pageSlug: { type: 'string' },
           },
           required: ['question'],
+        },
+      },
+      {
+        name: 'flag_discrepancy',
+        description:
+          'Record that ONE specific sentence on this page is contradicted by code you read. Give the ' +
+          'sentence exactly as it appears on the page, what the code shows instead, the surfaces you ' +
+          'checked (web, mobile, server) and the files you read. Only when the code you read ' +
+          'contradicts the sentence, on every surface you checked: never because you could not find ' +
+          'something. You cannot edit the page; this goes to the update queue. Never also call ' +
+          'mark_verified for the same page.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            slug: { type: 'string' },
+            claim: {
+              type: 'string',
+              description: 'The exact sentence or table row from the page',
+            },
+            finding: {
+              type: 'string',
+              description: 'What the code shows instead, in plain words',
+            },
+            surfacesChecked: {
+              type: 'array',
+              minItems: 1,
+              items: { type: 'string' },
+              description:
+                'Which of web, mobile, server (or others) you read code for',
+            },
+            sources: SOURCES_SCHEMA,
+          },
+          required: ['slug', 'claim', 'finding', 'surfacesChecked', 'sources'],
         },
       },
       {
@@ -628,6 +672,11 @@ export class ManualChatToolsService {
         return {
           result: await this.markVerified(String(input.slug ?? ''), ctx),
           summary: () => 'Marked as checked',
+        };
+      case 'flag_discrepancy':
+        return {
+          result: await this.flagDiscrepancy(input, ctx),
+          summary: () => 'Recorded for the update queue',
         };
       case 'apply_proposal':
         return {
@@ -1037,9 +1086,100 @@ export class ManualChatToolsService {
     }
   }
 
+  /**
+   * The weekly agent cannot edit a page. When code it read contradicts a sentence it files that as a
+   * proposal (source `weekly_agent`) naming the exact sentence, what the code shows, the surfaces it
+   * checked and the files it read. Not a guess: the sentence must be on the page, and a code file it
+   * read this run must back the finding.
+   */
+  private async flagDiscrepancy(
+    input: Record<string, any>,
+    ctx: ManualToolContext,
+  ) {
+    const slug = String(input.slug ?? '');
+    if (!isValidSlug(slug))
+      return { ok: false, error: `"${slug}" is not a valid slug.` };
+    const squash = (text: string) => text.replace(/\s+/g, ' ').trim();
+    const claim = typeof input.claim === 'string' ? squash(input.claim) : '';
+    const finding =
+      typeof input.finding === 'string' ? squash(input.finding) : '';
+    if (!claim || !finding) {
+      return {
+        ok: false,
+        error:
+          'Give the exact sentence from the page and what the code shows instead.',
+      };
+    }
+    const surfaces = Array.isArray(input.surfacesChecked)
+      ? input.surfacesChecked
+          .map((s: unknown) => String(s).trim())
+          .filter(Boolean)
+          .slice(0, 6)
+      : [];
+    if (!surfaces.length) {
+      return {
+        ok: false,
+        error: 'Say which surfaces you read code for (web, mobile, server).',
+      };
+    }
+    const page = await this.pages.getBySlug(slug);
+    if (!page) return { ok: false, error: `No page "${slug}".` };
+    if (!squash(page.body ?? '').includes(claim)) {
+      return {
+        ok: false,
+        error:
+          'That sentence is not on the page as written. Copy it exactly from the page.',
+      };
+    }
+    const checked = this.checkReasonAndSources(
+      { reason: finding, sources: input.sources },
+      ctx,
+    );
+    if ('error' in checked) return { ok: false, error: checked.error };
+    const rejected = this.scrubbed(claim, finding);
+    if (rejected) return { ok: false, error: rejected };
+
+    const summary = `Page says: "${claim.slice(0, 200)}". The code shows: ${finding.slice(0, 300)}`;
+    ctx.flagged.add(slug);
+    const open = await this.proposals.listOpen(500);
+    if (
+      open.some(
+        (p) =>
+          p.source === 'weekly_agent' &&
+          p.pageSlug === slug &&
+          p.summary === summary,
+      )
+    ) {
+      return { ok: true, flagged: true, alreadyFlagged: true };
+    }
+    const files = checked.sources
+      .filter((src) => src.kind === 'code' && src.repo && src.path)
+      .map((src) => `${src.repo}:${src.path}`);
+    await this.proposals.create({
+      kind: 'edit',
+      pageSlug: slug,
+      summary,
+      detail:
+        `Sentence: ${claim}\nCode shows: ${finding}\nSurfaces checked: ${surfaces.join(', ')}\n` +
+        `Files read: ${files.join(', ') || '(none)'}`,
+      prRef: null,
+      source: 'weekly_agent',
+      keyId: null,
+      submittedBy: ctx.userId ?? null,
+    });
+    return { ok: true, flagged: true };
+  }
+
   private async markVerified(slug: string, ctx: ManualToolContext) {
     if (!isValidSlug(slug))
       return { ok: false, error: `"${slug}" is not a valid slug.` };
+    if (ctx.flagged.has(slug)) {
+      return {
+        ok: false,
+        error:
+          'You flagged a discrepancy on this page, so it is not verified. Do not mark it.',
+      };
+    }
     try {
       await this.pages.markVerified(slug, ctx.verifiedRef ?? null);
     } catch (error) {

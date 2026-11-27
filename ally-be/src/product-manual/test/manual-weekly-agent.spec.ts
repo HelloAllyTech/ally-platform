@@ -298,9 +298,9 @@ describe('ManualWeeklyAgentService', () => {
       stopReason: null,
     });
     expect(runs.begin).toHaveBeenCalledWith('scheduled', null, 25);
-    // proposal (page a covered), page b, then the summary call.
+    // page a, page b (an open proposal no longer takes a page out of the queue), then the summary call.
     expect(requests).toHaveLength(3);
-    expect(requests[0].messages[0].content).toContain('proposal prop-1');
+    expect(requests[0].messages[0].content).toContain('slug a');
     expect(requests[1].messages[0].content).toContain('slug b');
     expect(requests.every((r) => r.gate === requests[0].gate)).toBe(true);
     expect(requests[0].maxIterations).toBe(
@@ -347,7 +347,9 @@ describe('ManualWeeklyAgentService', () => {
       `at most ${MANUAL_WEEKLY_LIMITS.MAX_CODE_LOOKUPS_PER_PAGE} code lookups`,
     );
     expect(item).toContain('do not read it again');
-    expect(item).toContain('do not guess and do not mark the page');
+    expect(item).toContain('You cannot edit the page');
+    expect(item).toContain('flag_discrepancy');
+    expect(item).toContain('Not finding it is not a contradiction');
   });
 
   it('gives each work item its own lookup budget and saves the tool trace on the item log', async () => {
@@ -390,14 +392,14 @@ describe('ManualWeeklyAgentService', () => {
     let n = 0;
     core.run.mockImplementation(async function* () {
       n += 1;
-      // call 1 = proposal item (not a page), call 2 = page "b"
+      // call 1 = page "a", call 2 = page "b"
       return n === 2
         ? { status: 'iteration_cap', text: '', iterations: 16, costUsd: 0.01 }
         : { status: 'done', text: '', iterations: 1, costUsd: 0.001 };
     } as never);
     await service.run({ trigger: 'manual', triggeredBy: 7 });
+    expect(pages.markAttempted).toHaveBeenCalledWith('a');
     expect(pages.markAttempted).toHaveBeenCalledWith('b');
-    expect(pages.markAttempted).not.toHaveBeenCalledWith('a'); // covered by the proposal item
 
     const second = setup();
     second.core.run.mockImplementation(async function* () {
@@ -432,7 +434,7 @@ describe('ManualWeeklyAgentService', () => {
     const patch = runs.finish.mock.calls[0][1];
     expect(patch.itemLog).toHaveLength(2);
     expect(patch.itemLog[0]).toEqual({
-      item: expect.stringContaining('Proposal'),
+      item: 'Page "a"',
       outcome: 'not_finished',
       status: 'iteration_cap',
       iterations: 12,
@@ -530,17 +532,16 @@ describe('ManualSchedulerRegistrationService.tick', () => {
 });
 
 describe('ManualWeeklyAgentService without code access', () => {
-  it('works open proposals only and says so in the summary', async () => {
+  it('checks nothing and says so in the summary', async () => {
     const { service, runs, requests, tools } = setup();
     tools.codeSearchAvailable.mockReturnValue(false);
     await service.run({ trigger: 'scheduled', triggeredBy: null });
-    // One proposal item, then the summary call: no page items at all.
-    expect(requests).toHaveLength(2);
-    expect(requests[0].messages[0].content).toContain('proposal prop-1');
+    // No code to read: no page is worked, no proposal is worked, no model call at all.
+    expect(requests).toHaveLength(0);
     const summary = runs.finish.mock.calls[0][1].summary as string;
     expect(
       summary.startsWith(
-        "Code access isn't set up, so only proposals were applied.",
+        "Code access isn't set up, so no page could be checked against the code.",
       ),
     ).toBe(true);
   });
@@ -556,11 +557,10 @@ describe('ManualWeeklyAgentService without code access', () => {
   });
 });
 
-describe('ManualWeeklyAgentService gaps without code access', () => {
-  it('leaves gap proposals open, unqueued, and counts them in the summary', async () => {
-    const { service, runs, requests, tools, proposalsMock } = setup() as any;
-    tools.codeSearchAvailable.mockReturnValue(false);
-    proposalsMock.listOpen.mockResolvedValueOnce([
+describe('ManualWeeklyAgentService never works proposals', () => {
+  it('leaves every open proposal open: only pages become work items, and the agent cannot edit', async () => {
+    const { service, requests, tools, proposalsMock } = setup() as any;
+    proposalsMock.listOpen.mockResolvedValue([
       {
         id: 'gap-1',
         kind: 'gap',
@@ -568,14 +568,6 @@ describe('ManualWeeklyAgentService gaps without code access', () => {
         summary: 'How?',
         source: 'chat',
         createdAt: daysAgo(3),
-      },
-      {
-        id: 'gap-2',
-        kind: 'gap',
-        pageSlug: null,
-        summary: 'Why?',
-        source: 'chat',
-        createdAt: daysAgo(2),
       },
       {
         id: 'edit-1',
@@ -587,27 +579,40 @@ describe('ManualWeeklyAgentService gaps without code access', () => {
       },
     ]);
     await service.run({ trigger: 'scheduled', triggeredBy: null });
-    expect(requests).toHaveLength(2); // edit-1, then the summary
-    expect(requests[0].messages[0].content).toContain('proposal edit-1');
-    const summary = runs.finish.mock.calls[0][1].summary as string;
-    expect(summary).toContain(
-      "Code access isn't set up, so only proposals were applied. 2 questions from the chat were left open: answering them needs code access.",
+    const items = requests
+      .slice(0, -1)
+      .map((r: ManualLoopRequest) => String(r.messages[0].content));
+    expect(items).toHaveLength(2);
+    expect(
+      items.every((t: string) => t.startsWith('Work item: verify the page')),
+    ).toBe(true);
+    expect(items.join('\n')).not.toContain('edit-1');
+    const contexts = tools.getToolDefinitions.mock.calls.map(
+      (c: any[]) => c[0],
     );
+    expect(
+      contexts.every(
+        (c: any) => c.editsAllowed === false && c.proposal === null,
+      ),
+    ).toBe(true);
   });
 
-  it('frames a gap work item as a question when the code can be read', async () => {
-    const { service, requests, proposalsMock } = setup() as any;
-    proposalsMock.listOpen.mockResolvedValueOnce([
-      {
-        id: 'gap-1',
-        kind: 'gap',
-        pageSlug: null,
-        summary: 'How?',
-        source: 'chat',
-        createdAt: daysAgo(3),
+  it('records a flagged page on the item log instead of marking it checked', async () => {
+    const { service, runs, core, tools } = setup();
+    tools.execute.mockImplementation(
+      async (_n: string, _i: unknown, ctx: any) => {
+        ctx.flagged.add('a');
+        return { ok: true, modelResult: '{}', summary: '' };
       },
-    ]);
-    await service.run({ trigger: 'scheduled', triggeredBy: null });
-    expect(requests[0].messages[0].content).toContain('This is a QUESTION');
+    );
+    core.run.mockImplementation(async function* (request: ManualLoopRequest) {
+      if (request.metadata?.item === 'Page "a"')
+        await request.execute('flag_discrepancy', {});
+      return { status: 'done', text: '', iterations: 3, costUsd: 0.002 };
+    } as never);
+    await service.run({ trigger: 'manual', triggeredBy: 7 });
+    const log = runs.finish.mock.calls[0][1].itemLog;
+    expect(log[0]).toMatchObject({ item: 'Page "a"', outcome: 'flagged' });
+    expect(log[1]).toMatchObject({ item: 'Page "b"', outcome: 'not_finished' });
   });
 });

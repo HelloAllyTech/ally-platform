@@ -13,7 +13,7 @@ Scoped in a six-round interview with the product owner (2026-11-25). Decisions t
 | Access | All staff with the `product_manual` toggle (default on for every admin tier) + roadmap v2 role ≠ none |
 | Spine | Organised by **user journey / job-to-be-done**; role and surface are tags and filtered views |
 | Source of truth | Database only (`manual_pages` + `manual_revisions`) |
-| Freshness | No blocking AI gate. Coding agents **propose**; a **weekly agent applies**; the **chat agent edits live**; every edit is a revision in the visible change log with one-click revert |
+| Freshness | No blocking AI gate. Coding agents **propose**; a **weekly agent verifies and flags** (it never edits, Rule 7); the **chat agent edits live**; every edit is a revision in the visible change log with one-click revert |
 | Budget | `monthly_budget_usd` default 100, IST calendar month; at the cap the agent stops and the tab shows a banner |
 | CI | A no-AI PR trailer check: `Manual: proposal <id>` or `Manual: none — <reason>` |
 | Release state | Manual describes master; a page edited since the last release carries a **"ships in next release"** badge |
@@ -184,22 +184,23 @@ never write secrets, strategy or personal data into a page.
 Registered on the shared `weekly` scheduled-task tick (Mondays 02:00 UTC) via
 `scheduledTaskRegistry.register('weekly', 'product-manual-weekly', …)`. A run: advisory lock + the
 `uq_manual_runs_one_running` index; skip if disabled or budget exhausted (records a `skipped` run);
-per-run cap = `min(remaining month, monthly/4)`; work order = open proposals oldest first, then pages
-with the oldest `verified_at` (never-verified first), then pages whose last revision is older than the
-newest code in the matching surface. For each: read the page, read the code it describes, then
-`edit_manual_page` (author `proposal` when applying one, else `weekly_agent`) and `mark_verified`.
+per-run cap = `min(remaining month, monthly/4)`; work order = pages only: those with the oldest
+`verified_at` (never-verified first), then pages whose last revision is older than the newest code in the
+matching surface. **The agent is verify-only (Rule 7).** For each page: read the code it describes, then
+`mark_verified`, or `flag_discrepancy` for one sentence the code contradicts. It has no edit tool, and open
+proposals are left open for an admin.
 Stops cleanly when the cap is reached; leaves a one-paragraph summary on the run and on
 `manual_settings.last_run`. `POST /admin/run` runs the same code.
 
 Each work item is handed the page text, the likely code folders for its surfaces and a step budget
 (`MANUAL_WEEKLY_LIMITS`: 16 steps, at most 8 code lookups), so no step is spent reading the page. A page is
-"checked" only when the agent calls `mark_verified` or makes an edit. Each item's outcome is kept in
+"checked" only when the agent calls `mark_verified`; a flagged page (`outcome: 'flagged'`) is not. Each item's outcome is kept in
 `manual_runs.item_log` (with the ordered list of tools it called) and returned as `itemLog` by `GET /admin/runs`; the first production run verified
 nothing at 8 steps a page and only totals were stored, so the reason could not be read back.
 
 The lookup limits are enforced in code, not left to the prompt: after 8 code lookups or 3 manual lookups for a
 page (`MAX_CODE_LOOKUPS_PER_PAGE`, `MAX_MANUAL_LOOKUPS_PER_PAGE`) a further lookup is refused with an instruction to
-decide (edit citing a file read, `mark_verified`, or stop and say what could not be found). Every attempt counts,
+decide (`mark_verified`, `flag_discrepancy`, or stop and say what could not be found). Every attempt counts,
 including a failing one; edits, `mark_verified` and proposal tools are never limited. The second production run
 (12 steps, prompt-only limit) used every step on 22 of 25 pages and checked none. With the limit enforced at 4 code
 lookups the third run checked 7 of 25 and 18 ran out of lookups, so the budget is now 8 (cost about doubles, to roughly
@@ -240,8 +241,8 @@ ally-be/src/database/migrations/1988600000000-CreateProductManual.ts
 
 These came from running the agents against the real model, not from reading code. Keep them when editing a prompt:
 
-1. **No code access, no unsupported edits.** Without a GitHub token the weekly agent works `edit` and
-   `new_page` proposals only; it never queues verification, and a `gap` proposal (a question) stays open.
+1. **No code access, no unsupported edits.** Without a GitHub token the weekly agent checks nothing (it was proposals-only
+   before Rule 7) and the run says so; proposals and `gap` questions stay open.
 2. **Evidence rule.** An edit that is not applying a proposal must cite a code file the agent actually read in
    this run or turn. Chat edit tools are not offered at all without code access.
 3. **Truth, not polish.** "Needs confirmation:" lines are deliberate open questions; the agents never delete or
@@ -253,6 +254,14 @@ These came from running the agents against the real model, not from reading code
    page of 8+ lines (or 600+ characters) is now refused unless at least 60% of its non-empty lines survive and it keeps
    at least half its length (`pageLossRefusal` in `src/product-manual/util/manual-edit-guard.util.ts`). Small pages are
    free to rewrite; a real change (a row, a paragraph, a section) passes. Revert and import do not go through the tool.
+7. **The weekly agent only verifies; it never edits.** Six of six live production edits were wrong: it judged a claim
+   against one surface (web only, ignoring mobile), took "I did not find it" as "it is not there", and deleted true
+   statements. So it has no `edit_manual_page`/`create_manual_page`, and it does not apply or dismiss proposals.
+   When code it read contradicts one exact sentence it calls `flag_discrepancy` (exact sentence from the page, what the
+   code shows, surfaces checked, files read this run), which files an `edit` proposal with `source = 'weekly_agent'`,
+   deduplicated, for an admin; a page it flagged is never marked verified. Page changes come from the chat (an admin
+   in the room) and from admins applying proposals. Re-running this against the live model is the only real test of
+   the prompt.
 
 ## Operating it
 

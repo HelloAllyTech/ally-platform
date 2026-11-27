@@ -58,6 +58,7 @@ function setup() {
   };
   const proposals = {
     create: jest.fn().mockResolvedValue({ id: 'prop-1' }),
+    listOpen: jest.fn().mockResolvedValue([]),
     markApplied: jest.fn().mockResolvedValue(undefined),
     dismiss: jest.fn().mockResolvedValue(undefined),
   };
@@ -153,13 +154,13 @@ describe('ManualChatToolsService', () => {
     ]);
   });
 
-  it('gives the weekly agent read, edit, verify and proposal tools only', () => {
+  it('gives the weekly agent read, verify and flag tools only: no edit, no proposal tools without a proposal', () => {
     const { tools } = setup();
     const ctx = newToolContext({
       mode: 'weekly',
       userId: null,
       ref: 'run-1',
-      editsAllowed: true,
+      editsAllowed: false,
     });
     expect(names(tools.getToolDefinitions(ctx))).toEqual([
       'search_manual',
@@ -167,11 +168,8 @@ describe('ManualChatToolsService', () => {
       'github_search_code',
       'github_read_file',
       'github_repo_tree',
-      'edit_manual_page',
-      'create_manual_page',
+      'flag_discrepancy',
       'mark_verified',
-      'apply_proposal',
-      'dismiss_proposal',
     ]);
   });
 
@@ -604,13 +602,11 @@ describe('agent prompts: truth, not polish', () => {
       expect(prompt).toContain(
         '"Needs confirmation:" are deliberate open questions',
       );
-      expect(prompt).toContain(
-        'Do not change naming, labels, tone or structure',
-      );
-      expect(prompt).toContain(
-        'Labels and button names are copied exactly from code you read',
-      );
+      expect(prompt).toContain('Labels and button names are');
     }
+    expect(c.MANUAL_CHAT_SYSTEM_PROMPT).toContain(
+      'Do not change naming, labels, tone or structure',
+    );
   });
 });
 
@@ -725,14 +721,15 @@ describe('ManualChatToolsService proposal kinds', () => {
     });
   });
 
-  it('tells the weekly agent to write only what the proposal states, and that a gap is a question', () => {
+  it('tells the weekly agent it cannot edit, must check every surface, and that not finding code is not evidence', () => {
     const c = require('../constants/manual-agent.constants');
-    expect(c.MANUAL_WEEKLY_SYSTEM_PROMPT).toContain(
-      "Write ONLY what the proposal's summary and detail state",
+    const prompt = c.MANUAL_WEEKLY_SYSTEM_PROMPT;
+    expect(prompt).toContain('You CANNOT edit the manual');
+    expect(prompt).toContain('Check every surface the page names');
+    expect(prompt).toContain(
+      'Not finding something in the code is NOT evidence',
     );
-    expect(c.MANUAL_WEEKLY_SYSTEM_PROMPT).toContain(
-      'A gap proposal is a question the manual could not answer, not a statement of change',
-    );
+    expect(prompt).toContain('flag_discrepancy');
   });
 });
 
@@ -930,5 +927,108 @@ describe('ManualChatToolsService page protection', () => {
     );
     expect(outcome.ok).toBe(true);
     expect(pages.write).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ManualChatToolsService flag_discrepancy', () => {
+  const weekly = () =>
+    newToolContext({
+      mode: 'weekly',
+      userId: 7,
+      ref: 'run-1',
+      editsAllowed: false,
+    });
+  const claim = {
+    slug: 'running-a-roleplay',
+    claim: 'old body',
+    finding: 'The code shows a different limit.',
+    surfacesChecked: ['web', 'mobile'],
+    sources: [{ kind: 'code', repo: 'ally-platform', path: 'ally-web/x.tsx' }],
+  };
+
+  it('files a weekly_agent proposal naming the sentence, finding, surfaces and files', async () => {
+    const { tools, proposals, pages } = setup();
+    const ctx = weekly();
+    ctx.filesRead.add('ally-platform:ally-web/x.tsx');
+    const outcome = await tools.execute('flag_discrepancy', claim, ctx);
+    expect(outcome.ok).toBe(true);
+    expect(pages.write).not.toHaveBeenCalled();
+    expect(proposals.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'edit',
+        pageSlug: 'running-a-roleplay',
+        source: 'weekly_agent',
+        submittedBy: 7,
+      }),
+    );
+    const detail = proposals.create.mock.calls[0][0].detail as string;
+    expect(detail).toContain('Surfaces checked: web, mobile');
+    expect(detail).toContain('ally-platform:ally-web/x.tsx');
+    expect(ctx.flagged.has('running-a-roleplay')).toBe(true);
+  });
+
+  it('refuses a sentence that is not on the page, or a flag with no code read this run', async () => {
+    const { tools, proposals } = setup();
+    const ctx = weekly();
+    ctx.filesRead.add('ally-platform:ally-web/x.tsx');
+    expect(
+      (
+        await tools.execute(
+          'flag_discrepancy',
+          { ...claim, claim: 'invented' },
+          ctx,
+        )
+      ).ok,
+    ).toBe(false);
+    const unread = weekly();
+    expect((await tools.execute('flag_discrepancy', claim, unread)).ok).toBe(
+      false,
+    );
+    expect(proposals.create).not.toHaveBeenCalled();
+  });
+
+  it('needs the surfaces checked', async () => {
+    const { tools, proposals } = setup();
+    const ctx = weekly();
+    ctx.filesRead.add('ally-platform:ally-web/x.tsx');
+    const outcome = await tools.execute(
+      'flag_discrepancy',
+      { ...claim, surfacesChecked: [] },
+      ctx,
+    );
+    expect(outcome.ok).toBe(false);
+    expect(proposals.create).not.toHaveBeenCalled();
+  });
+
+  it('does not file the same finding twice', async () => {
+    const { tools, proposals } = setup();
+    const ctx = weekly();
+    ctx.filesRead.add('ally-platform:ally-web/x.tsx');
+    await tools.execute('flag_discrepancy', claim, ctx);
+    const summary = proposals.create.mock.calls[0][0].summary;
+    proposals.listOpen.mockResolvedValue([
+      { source: 'weekly_agent', pageSlug: 'running-a-roleplay', summary },
+    ]);
+    proposals.create.mockClear();
+    const again = await tools.execute('flag_discrepancy', claim, ctx);
+    expect(again.ok).toBe(true);
+    expect(proposals.create).not.toHaveBeenCalled();
+  });
+
+  it('will not mark a flagged page verified, and the chat never gets the tool', async () => {
+    const { tools, pages } = setup();
+    const ctx = weekly();
+    ctx.filesRead.add('ally-platform:ally-web/x.tsx');
+    await tools.execute('flag_discrepancy', claim, ctx);
+    const marked = await tools.execute(
+      'mark_verified',
+      { slug: 'running-a-roleplay' },
+      ctx,
+    );
+    expect(marked.ok).toBe(false);
+    expect(pages.markVerified).not.toHaveBeenCalled();
+    expect(names(tools.getToolDefinitions(chatCtx()))).not.toContain(
+      'flag_discrepancy',
+    );
   });
 });
