@@ -40,9 +40,14 @@ import { RoleplayInterviewMessage } from '../../entity/roleplay-interview-messag
 import { RoleplayInterviewMessageRepository } from '../repository/roleplay-interview.repository';
 import { RoleplayInterviewSessionService } from './roleplay-interview-session.service';
 import {
+  roleplayPilotPosition,
   RoleplayInterviewToolContext,
   RoleplayInterviewToolsService,
 } from './roleplay-interview-tools.service';
+import {
+  countStageQuestions,
+  renderRoleplayPilotStage,
+} from '../util/roleplay-pilot-stages.util';
 import {
   RoleplayInterviewMessageRole,
   RoleplayInterviewPlan,
@@ -248,6 +253,9 @@ export class RoleplayInterviewOrchestratorService {
       session,
       userId,
       changes: { briefFields: new Set(), planVersion: null },
+      ...(this.configService.courseCopilot?.roleplayStages
+        ? { pilot: { asked: countStageQuestions(history) } }
+        : {}),
     };
     // A pick on a question that fills a brief field is recorded here, by the server, before the
     // model reads it: left to the model, an answer was sometimes never recorded and the trainer
@@ -261,7 +269,7 @@ export class RoleplayInterviewOrchestratorService {
       // The brief rides on the newest user turn only; it is not persisted.
       {
         role: 'user',
-        content: `${userContent}${recorded.note ? `\n${recorded.note}` : ''}\n\n${this.briefBlock(session)}`,
+        content: `${userContent}${recorded.note ? `\n${recorded.note}` : ''}\n\n${this.briefBlock(session)}${this.stageBlock(context)}`,
       },
     ];
     const turn: RoleplayInterviewTurnState = {
@@ -290,7 +298,9 @@ export class RoleplayInterviewOrchestratorService {
         model,
         system,
         messages,
-        tools: () => this.toolsService.getToolDefinitions(),
+        // Re-read each step: an answer recorded this turn can open the next stage's tools.
+        tools: () =>
+          this.toolsService.getToolDefinitions(roleplayPilotPosition(context)),
         maxIterations,
         maxTokens: ROLEPLAY_INTERVIEW_MAX_TOKENS,
         maxRetries: ROLEPLAY_INTERVIEW_MAX_RETRIES,
@@ -495,6 +505,12 @@ export class RoleplayInterviewOrchestratorService {
   }
 
   /** The brief as the model sees it this turn. */
+  /** Course Pilot stages: where the interview is, on the newest user turn. Empty when off. */
+  private stageBlock(context: RoleplayInterviewToolContext): string {
+    const position = roleplayPilotPosition(context);
+    return position ? `\n\n${renderRoleplayPilotStage(position)}` : '';
+  }
+
   private briefBlock(session: {
     brief: any;
     plan?: any;

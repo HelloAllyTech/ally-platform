@@ -1177,6 +1177,13 @@ export class AppConfigService {
         String(
           this.configService.get<string>('COURSE_PILOT_CRITIC', 'false'),
         ).toLowerCase() === 'true',
+      // Course Pilot stages for the roleplay interview (phase 5): interview stages, per-stage
+      // question limits, and propose_plan only once the brief can carry a plan. On by default
+      // (eval: complete briefs 7/8 vs 4/8, same questions); ROLEPLAY_PILOT_STAGES=false turns it off.
+      roleplayStages:
+        String(
+          this.configService.get<string>('ROLEPLAY_PILOT_STAGES', 'true'),
+        ).toLowerCase() !== 'false',
       // Course Pilot answer-key check: a second model answers each quiz without the key; a
       // disputed question goes back to the quiz writer once. On by default (eval: 68/68
       // planted key errors caught, no false alarms); COURSE_PILOT_ANSWER_CHECK=false turns it off.

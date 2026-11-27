@@ -150,6 +150,7 @@ in AWS form, so they do not render locally — the same as the course editor's o
 | `COURSE_PILOT_STAGES` | false | Course Pilot stage machine (below) and the B2/B3 transfer check |
 | `COURSE_PILOT_CRITIC` | false | Course Pilot blueprint critic (below) |
 | `COURSE_PILOT_ANSWER_CHECK` | true | Course Pilot quiz answer-key check (below); `false` turns it off |
+| `ROLEPLAY_PILOT_STAGES` | true | Course Pilot stages for the roleplay interview (below); `false` turns it off |
 
 Limits (sections 20, items 100, items per section 30, new cases 2, images 12, languages per roleplay 4, two
 active CREATE sessions per user) are in `constants/course-copilot.constants.ts` and enforced in code. New roleplays
@@ -157,8 +158,9 @@ have no limit of their own; the item limits and the session budget bound them.
 
 ## Course Pilot (behind switches)
 
-Phases 1, 3 and 4B of the Course Pilot architecture plan, each behind its own env switch. The stage
-machine and critic are off until turned on; the answer-key check is on unless set to `false`.
+Phases 1, 3, 4B and 5 of the Course Pilot architecture plan, each behind its own env switch. The
+course stage machine and critic are off until turned on; the answer-key check and the roleplay
+interview's stages are on unless set to `false`.
 
 - **Stage machine** (`COURSE_PILOT_STAGES`, `src/course-copilot/util/course-pilot-stages.util.ts`). The interview's
   stages live in code: intake → learners → outcomes and skill targets → assessment → time and
@@ -185,10 +187,18 @@ machine and critic are off until turned on; the answer-key check is on unless se
   to the writer as repair notes. On the repair pass a question still answered differently is
   dropped while at least half the quiz remains (otherwise the item summary says to check it). Other
   question types and scenario quizzes are not checked. A failed check never blocks the quiz.
+- **Roleplay interview stages** (`ROLEPLAY_PILOT_STAGES`, `src/course-copilot/roleplay-interview/util/roleplay-pilot-stages.util.ts`).
+  The roleplay chat's stages in code: learners and goal → competency and mode → client → practice
+  details → plan, derived from the brief like the course stages. Question limits 2/2/2/3 (8 in
+  all); a card for a later stage's field waits for that stage; propose_plan opens at practice
+  details and is refused until difficulty, language and pass mark are in the brief (defaults are
+  fine). No stored state: each question card is tagged with its stage and counted from the
+  transcript.
 - **Evals** (`scripts/course-pilot-evals/`): `run.mjs` plays 10 fixed course requests end to end with
   a simulated trainer; `plan-eval.mjs` plans the same briefs with and without the critic or transfer
   check and scores them with an independent judge (`judge.mjs`); `manual-tests.mjs` runs test cases
-  2-8 of the manual test plan. All need the local stack and the seeded test accounts.
+  2-8 of the manual test plan; `roleplay-run.mjs` plays 8 roleplay requests (stages on vs off) and
+  `roleplay-stage-test.mjs` checks one roleplay interview stage by stage. All need the local stack and the seeded test accounts.
 
 ## Departures from the plan (plans/course-copilot-plan.md)
 

@@ -1,0 +1,115 @@
+[
+  {
+    "id": "suicide-helpline-practice",
+    "firstMessage": "I need a practice roleplay for new helpline volunteers: a caller who hints at suicide.",
+    "style": "cooperative",
+    "truth": {
+      "learners": "New helpline volunteers, no counselling background",
+      "goal": "Ask directly about suicide when a caller hints at it, and agree a safety step",
+      "competency": "risk assessment",
+      "mode": "practice",
+      "difficulty": "MEDIUM",
+      "client": "A 22-year-old student calling late at night, exhausted, hinting she does not want to wake up",
+      "language": "en"
+    }
+  },
+  {
+    "id": "vague",
+    "firstMessage": "Can you make a roleplay for my team?",
+    "style": "cooperative",
+    "truth": {
+      "learners": "School counsellors with 1-3 years of experience",
+      "goal": "Build rapport with a withdrawn teenager referred by a teacher",
+      "competency": "rapport building",
+      "mode": "learning",
+      "difficulty": "EASY",
+      "client": "A 14-year-old boy who answers in one word and does not want to be there",
+      "language": "en"
+    }
+  },
+  {
+    "id": "just-build",
+    "firstMessage": "Make a hard assessment roleplay on de-escalating an angry caller for experienced helpline staff. Use your defaults, don't ask me much.",
+    "style": "just-build",
+    "truth": {
+      "learners": "Experienced helpline staff",
+      "goal": "De-escalate an angry caller and set a respectful boundary",
+      "competency": "de-escalation",
+      "mode": "performance",
+      "difficulty": "HARD",
+      "client": "any",
+      "language": "en"
+    }
+  },
+  {
+    "id": "detailed",
+    "firstMessage": "Roleplay for ASHA workers screening a new mother for postpartum depression. Learners: community health workers with no mental health training. Goal: ask the screening questions warmly and refer when needed. Practice mode, medium difficulty, in Hindi. The client is a 24-year-old first-time mother, tired and ashamed to admit she feels low.",
+    "style": "cooperative",
+    "truth": {
+      "learners": "ASHA community health workers, no mental health training",
+      "goal": "Ask postpartum screening questions warmly and refer when needed",
+      "competency": "screening",
+      "mode": "practice",
+      "difficulty": "MEDIUM",
+      "client": "A 24-year-old first-time mother, tired and ashamed to admit she feels low",
+      "language": "hi"
+    }
+  },
+  {
+    "id": "terse-grief",
+    "firstMessage": "Grief roleplay for volunteers.",
+    "style": "terse",
+    "truth": {
+      "learners": "Hospice volunteers",
+      "goal": "Stay present with a grieving person without offering clichés",
+      "competency": "empathy",
+      "mode": "practice",
+      "difficulty": "MEDIUM",
+      "client": "A man in his sixties whose wife died two weeks ago",
+      "language": "en"
+    }
+  },
+  {
+    "id": "you-decide",
+    "firstMessage": "We need a roleplay about burnout for our NGO field staff.",
+    "style": "you-decide",
+    "truth": {
+      "learners": "NGO field staff",
+      "goal": "any",
+      "competency": "any",
+      "mode": "any",
+      "difficulty": "any",
+      "client": "any",
+      "language": "en"
+    }
+  },
+  {
+    "id": "bad-news",
+    "firstMessage": "A performance roleplay for junior doctors breaking bad news to a family.",
+    "style": "cooperative",
+    "truth": {
+      "learners": "Junior doctors (residents)",
+      "goal": "Deliver bad news using a structured approach and respond to emotion",
+      "competency": "communication",
+      "mode": "performance",
+      "difficulty": "HARD",
+      "client": "The adult daughter of a patient whose cancer has spread",
+      "language": "en"
+    }
+  },
+  {
+    "id": "changes-mind",
+    "firstMessage": "Practice roleplay for peer supporters: a college student who is struggling with exams.",
+    "style": "cooperative",
+    "changeAtPlan": "Actually, make the client harder: she should be guarded and deny anything is wrong at first.",
+    "truth": {
+      "learners": "College student peer supporters",
+      "goal": "Hold a supportive listening conversation and know when to refer",
+      "competency": "active listening",
+      "mode": "practice",
+      "difficulty": "HARD",
+      "client": "A second-year college student failing her exams, guarded at first",
+      "language": "en"
+    }
+  }
+]

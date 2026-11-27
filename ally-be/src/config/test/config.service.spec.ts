@@ -29,6 +29,15 @@ describe('AppConfigService', () => {
     });
   });
 
+  describe('courseCopilot.roleplayStages', () => {
+    it("is on when unset, and off only for 'false'", () => {
+      expect(make({}).courseCopilot.roleplayStages).toBe(true);
+      expect(
+        make({ ROLEPLAY_PILOT_STAGES: 'false' }).courseCopilot.roleplayStages,
+      ).toBe(false);
+    });
+  });
+
   describe('courseCopilot.answerCheck', () => {
     it('is on when unset, and for any value but false', () => {
       expect(make({}).courseCopilot.answerCheck).toBe(true);
