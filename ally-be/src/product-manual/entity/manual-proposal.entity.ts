@@ -1,7 +1,7 @@
 import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 export type ManualProposalKind = 'edit' | 'new_page' | 'gap';
-export type ManualProposalSource = 'coding_agent' | 'chat';
+export type ManualProposalSource = 'coding_agent' | 'chat' | 'weekly_agent';
 export type ManualProposalStatus = 'open' | 'applied' | 'dismissed';
 
 /**
