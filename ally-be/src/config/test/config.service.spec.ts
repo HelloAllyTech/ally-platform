@@ -29,6 +29,21 @@ describe('AppConfigService', () => {
     });
   });
 
+  describe('courseCopilot.answerCheck', () => {
+    it('is on when unset, and for any value but false', () => {
+      expect(make({}).courseCopilot.answerCheck).toBe(true);
+      expect(
+        make({ COURSE_PILOT_ANSWER_CHECK: 'true' }).courseCopilot.answerCheck,
+      ).toBe(true);
+    });
+
+    it("is off only for 'false'", () => {
+      expect(
+        make({ COURSE_PILOT_ANSWER_CHECK: 'FALSE' }).courseCopilot.answerCheck,
+      ).toBe(false);
+    });
+  });
+
   describe('translation', () => {
     it('defaults to Gemini 2.5 Flash with thinking off', () => {
       expect(make({}).translation).toEqual({

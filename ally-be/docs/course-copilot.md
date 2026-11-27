@@ -149,16 +149,16 @@ in AWS form, so they do not render locally — the same as the course editor's o
 | `OPENAI_IMAGE_MODEL` / `CHARACTER_IMAGE_DEFAULT_PROVIDER` + `LEARN_MEDIA_PUBLIC_S3_BUCKET` | — | Images are skipped with a reason without them |
 | `COURSE_PILOT_STAGES` | false | Course Pilot stage machine (below) and the B2/B3 transfer check |
 | `COURSE_PILOT_CRITIC` | false | Course Pilot blueprint critic (below) |
-| `COURSE_PILOT_ANSWER_CHECK` | false | Course Pilot quiz answer-key check (below) |
+| `COURSE_PILOT_ANSWER_CHECK` | true | Course Pilot quiz answer-key check (below); `false` turns it off |
 
 Limits (sections 20, items 100, items per section 30, new cases 2, images 12, languages per roleplay 4, two
 active CREATE sessions per user) are in `constants/course-copilot.constants.ts` and enforced in code. New roleplays
 have no limit of their own; the item limits and the session budget bound them.
 
-## Course Pilot (behind switches, off by default)
+## Course Pilot (behind switches)
 
-Phases 1, 3 and 4B of the Course Pilot architecture plan, each behind its own env switch so production
-behaves as before until one is turned on.
+Phases 1, 3 and 4B of the Course Pilot architecture plan, each behind its own env switch. The stage
+machine and critic are off until turned on; the answer-key check is on unless set to `false`.
 
 - **Stage machine** (`COURSE_PILOT_STAGES`, `src/course-copilot/util/course-pilot-stages.util.ts`). The interview's
   stages live in code: intake → learners → outcomes and skill targets → assessment → time and

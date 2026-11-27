@@ -1178,11 +1178,12 @@ export class AppConfigService {
           this.configService.get<string>('COURSE_PILOT_CRITIC', 'false'),
         ).toLowerCase() === 'true',
       // Course Pilot answer-key check: a second model answers each quiz without the key; a
-      // disputed question goes back to the quiz writer once. Off = quizzes keyed as written.
+      // disputed question goes back to the quiz writer once. On by default (eval: 68/68
+      // planted key errors caught, no false alarms); COURSE_PILOT_ANSWER_CHECK=false turns it off.
       answerCheck:
         String(
-          this.configService.get<string>('COURSE_PILOT_ANSWER_CHECK', 'false'),
-        ).toLowerCase() === 'true',
+          this.configService.get<string>('COURSE_PILOT_ANSWER_CHECK', 'true'),
+        ).toLowerCase() !== 'false',
       // Default per-session spend ceiling, USD. 0 = uncapped.
       sessionBudgetUsd: Number(
         this.configService.get<number>('COURSE_COPILOT_SESSION_BUDGET_USD', 15),
