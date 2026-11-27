@@ -72,6 +72,18 @@ const textOf = (html: unknown, max = 4_000): string => {
 };
 
 /**
+ * Text for the post-build reviewer. A plain "…" cut reads to the reviewer as truncated content,
+ * which it then reports as a defect (complete 617-character course descriptions and ~1,000
+ * character roleplays were flagged "cut off mid-sentence"), so a cut says what it is.
+ */
+const reviewText = (html: unknown, max: number, what: string): string => {
+  const full = textOf(html, 100_000);
+  return full.length > max
+    ? `${full.slice(0, max)} [digest excerpt — the ${what} continues; not a defect]`
+    : full;
+};
+
+/**
  * Runs one job: the specialist (or library lookup) for its kind, plus the
  * side effect on the course where the job owns one (meta, cover).
  *
@@ -852,7 +864,14 @@ export class CourseCopilotJobExecutorService {
     const out = new Map<number, string>();
     if (!ids.length) return out;
     try {
-      const scenarios = await this.library.getActiveScenarios(ids);
+      const [scenarios, warnings] = await Promise.all([
+        this.library.getActiveScenarios(ids),
+        // The reviewer cannot see a roleplay's trigger warnings otherwise, and
+        // asked to regenerate roleplays that already carried them.
+        this.library
+          .triggerWarningNamesFor(ids)
+          .catch(() => new Map<number, string[]>()),
+      ]);
       for (const scenario of scenarios) {
         const meta: Record<string, any> = (scenario as any).metadata ?? {};
         const states = Array.isArray(meta.states)
@@ -866,9 +885,12 @@ export class CourseCopilotJobExecutorService {
           scenario.id,
           [
             `roleplay #${scenario.id} "${scenario.title}"`,
-            `challenge: ${textOf(scenario.description, 300)}`,
-            `role instruction: ${textOf((scenario as any).prompt ?? meta.prompt, 500)}`,
+            `challenge: ${reviewText(scenario.description, 1_200, 'challenge')}`,
+            `role instruction: ${reviewText((scenario as any).prompt ?? meta.prompt, 1_500, 'role instruction')}`,
             `states: ${states || 'none'}`,
+            `trigger warnings shown before it starts: ${
+              warnings.get(scenario.id)?.join(', ') || 'none'
+            }`,
             `supports: experience ${meta.experienceMode ?? 'FEEDBACK'}, reminders ${
               meta.remindersEnabled ? 'on' : 'off'
             }, state shown ${meta.currentState ? 'yes' : 'no'}, supervisor notes ${
@@ -894,7 +916,7 @@ export class CourseCopilotJobExecutorService {
   ): string {
     const lines: string[] = [
       `COURSE: ${track.title}`,
-      `DESCRIPTION: ${textOf(track.description, 600)}`,
+      `DESCRIPTION: ${reviewText(track.description, 2_000, 'description')}`,
       `COVER: ${track.coverImageUrl ? 'set' : 'missing'}`,
     ];
     for (const section of track.sections) {
