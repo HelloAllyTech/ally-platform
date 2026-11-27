@@ -9463,12 +9463,40 @@ export const en = {
       groups: {
         emergency: "Emergency",
         roadmap: "Roadmap",
+        builders: "Builders",
         agent: "Agent",
       },
       groupHelp: {
         emergency: "The two switches people reach for in an incident.",
         roadmap: "Strategy, product goals and how ideas rank.",
+        builders: "Which Ally admins can be picked as the builder of an idea.",
         agent: "Autonomy, release policy, models, budgets and concurrency.",
+      },
+      builders: {
+        label: "Admins who can build ideas",
+        hint: "A builder is picked on an idea once its plan is closed. They approve its design, start the build and merge its pull requests, so choose people you trust with code.",
+        placeholder: "Choose Ally admins",
+        loadFailed: "Couldn't load the Ally admins.",
+        empty: "There are no Ally admins to choose from.",
+        owners: (names: string) => `Owners always can, and aren't listed here: ${names}.`,
+        restricted: (count: number) =>
+          count === 1
+            ? "1 admin is limited to some organisations and can't be a builder."
+            : `${count} admins are limited to some organisations and can't be builders.`,
+        notYet: (names: string) =>
+          `Chosen, but can't build yet: ${names}. Their Builder access hasn't taken effect. It can take up to 30 minutes after a change, or an admin may be missing the Builder permission.`,
+        save: "Save builders",
+        saving: "Saving…",
+        unsaved: "You have unsaved changes.",
+        confirmTitle: "Change who can build?",
+        confirmAdd: (names: string) => `Give the Builder role to: ${names}.`,
+        confirmRemove: (names: string) =>
+          `Take the Builder role from: ${names}. They keep their Idea access.`,
+        confirmButton: "Save",
+        cancel: "Cancel",
+        saved: "Builders saved.",
+        savedPartly: (names: string) => `Saved, except for ${names}. Try those again.`,
+        failed: "Couldn't save the builders. Nothing changed.",
       },
       roadmapSections: {
         strategy: "Vision and strategy",

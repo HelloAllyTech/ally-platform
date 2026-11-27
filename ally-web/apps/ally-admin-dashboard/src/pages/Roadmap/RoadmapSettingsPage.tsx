@@ -33,6 +33,7 @@ import { RoadmapBottomBar } from "./components/RoadmapBottomBar";
 import { RoadmapDropdown } from "./components/RoadmapDropdown";
 import { useRoadmapBreakpoint } from "./hooks/useRoadmapBreakpoint";
 import { ProductGoalsManager } from "./settings/ProductGoalsManager";
+import { RoadmapBuildersManager } from "./settings/RoadmapBuildersManager";
 import { StrategyContextManager } from "./settings/StrategyContextManager";
 import { StrategyRankingManager } from "./settings/StrategyRankingManager";
 import { shortDate } from "./utils/copy";
@@ -411,6 +412,10 @@ export const RoadmapSettingsPage: React.FC = () => {
                 <StrategyRankingManager />
               </AccordionItem>
             </Accordion>
+          </Group>
+
+          <Group id="settings-builders" title={copy.groups.builders} help={copy.groupHelp.builders}>
+            <RoadmapBuildersManager />
           </Group>
 
           <Group id="settings-agent" title={copy.groups.agent} help={copy.groupHelp.agent}>
