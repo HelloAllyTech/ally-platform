@@ -13,7 +13,11 @@ import { isValidSlug } from '../util/manual-slug.util';
 import { ManualScrubService } from './manual-scrub.service';
 
 const KINDS: ManualProposalKind[] = ['edit', 'new_page', 'gap'];
-const SOURCES: ManualProposalSource[] = ['coding_agent', 'chat'];
+const SOURCES: ManualProposalSource[] = [
+  'coding_agent',
+  'chat',
+  'weekly_agent',
+];
 const STATUSES: ManualProposalStatus[] = ['open', 'applied', 'dismissed'];
 const SUMMARY_MAX = 1_000;
 const DETAIL_MAX = 20_000;

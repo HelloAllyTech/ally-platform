@@ -1140,7 +1140,6 @@ export class ManualChatToolsService {
     if (rejected) return { ok: false, error: rejected };
 
     const summary = `Page says: "${claim.slice(0, 200)}". The code shows: ${finding.slice(0, 300)}`;
-    ctx.flagged.add(slug);
     const open = await this.proposals.listOpen(500);
     if (
       open.some(
@@ -1150,6 +1149,7 @@ export class ManualChatToolsService {
           p.summary === summary,
       )
     ) {
+      ctx.flagged.add(slug);
       return { ok: true, flagged: true, alreadyFlagged: true };
     }
     const files = checked.sources
@@ -1167,6 +1167,8 @@ export class ManualChatToolsService {
       keyId: null,
       submittedBy: ctx.userId ?? null,
     });
+    // Only once the proposal is saved: a flag that failed to save must not count as a finding.
+    ctx.flagged.add(slug);
     return { ok: true, flagged: true };
   }
 

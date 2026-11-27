@@ -201,6 +201,15 @@ describe('ManualProposalService', () => {
     source: 'coding_agent' as const,
   };
 
+  it.each(['coding_agent', 'chat', 'weekly_agent'] as const)(
+    'accepts a proposal from %s',
+    async (source) => {
+      const { service, repo } = build();
+      await service.create({ ...base, source });
+      expect(repo.save).toHaveBeenCalled();
+    },
+  );
+
   it('creates an open proposal with trimmed text', async () => {
     const { service, repo } = build();
     const saved = await service.create({

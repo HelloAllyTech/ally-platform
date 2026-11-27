@@ -987,6 +987,16 @@ describe('ManualChatToolsService flag_discrepancy', () => {
     expect(proposals.create).not.toHaveBeenCalled();
   });
 
+  it('does not count a flag that failed to save as a finding', async () => {
+    const { tools, proposals } = setup();
+    proposals.create.mockRejectedValue(new Error('boom'));
+    const ctx = weekly();
+    ctx.filesRead.add('ally-platform:ally-web/x.tsx');
+    const outcome = await tools.execute('flag_discrepancy', claim, ctx);
+    expect(outcome.ok).toBe(false);
+    expect(ctx.flagged.size).toBe(0);
+  });
+
   it('needs the surfaces checked', async () => {
     const { tools, proposals } = setup();
     const ctx = weekly();
