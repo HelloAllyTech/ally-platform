@@ -1,0 +1,87 @@
+[
+  {
+    "id": "student-exam-stress",
+    "firstMessage": "I need a character: a college student struggling with exam stress.",
+    "style": "cooperative",
+    "truth": {
+      "kind": "client for a counselling practice roleplay",
+      "age": 20,
+      "gender": "female",
+      "profession": "second-year engineering student",
+      "location": "Pune, India",
+      "languages": ["en"],
+      "notes": "anxious, perfectionist, first in her family at college"
+    }
+  },
+  {
+    "id": "vague",
+    "firstMessage": "Create a new character for our roleplays.",
+    "style": "cooperative",
+    "truth": {
+      "kind": "client calling a helpline",
+      "age": 45,
+      "gender": "male",
+      "profession": "factory supervisor",
+      "location": "a small town in Maharashtra",
+      "languages": ["en", "hi"],
+      "notes": "recently lost his job, ashamed to ask for help"
+    }
+  },
+  {
+    "id": "just-build",
+    "firstMessage": "Make a grieving widower in his sixties. Use your defaults, don't ask me much.",
+    "style": "just-build",
+    "truth": {
+      "kind": "client for grief support practice",
+      "age": "any",
+      "gender": "male",
+      "profession": "any",
+      "location": "any",
+      "languages": ["en"],
+      "notes": "any"
+    }
+  },
+  {
+    "id": "detailed",
+    "firstMessage": "A character called Meena, 28, female, a nurse in Bengaluru, speaks English and Hindi, exhausted from night shifts and starting to feel numb. She will be a client in burnout roleplays.",
+    "style": "cooperative",
+    "truth": {
+      "kind": "client for burnout roleplays",
+      "name": "Meena",
+      "age": 28,
+      "gender": "female",
+      "profession": "nurse",
+      "location": "Bengaluru",
+      "languages": ["en", "hi"],
+      "notes": "night shifts, emotional numbness"
+    }
+  },
+  {
+    "id": "terse-teen",
+    "firstMessage": "Teen boy, bullied.",
+    "style": "terse",
+    "truth": {
+      "kind": "client for school counsellor practice",
+      "age": 14,
+      "gender": "male",
+      "profession": "school student",
+      "location": "Delhi",
+      "languages": ["en"],
+      "notes": "withdrawn, one-word answers"
+    }
+  },
+  {
+    "id": "you-decide",
+    "firstMessage": "We need a character for a roleplay about a difficult caller. You decide the details.",
+    "style": "you-decide",
+    "truth": {
+      "kind": "any",
+      "age": "any",
+      "gender": "any",
+      "profession": "any",
+      "location": "any",
+      "languages": ["en"],
+      "notes": "any"
+    }
+  }
+]

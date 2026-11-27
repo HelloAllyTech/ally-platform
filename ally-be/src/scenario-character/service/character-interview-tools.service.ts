@@ -34,6 +34,15 @@ import {
   GENDER_VALUES,
   SEXUAL_ORIENTATION_VALUES,
 } from '../constants/character-demographics.constants';
+import {
+  CharacterPilotBrief,
+  CharacterPilotPosition,
+  CharacterPilotStageId,
+  characterQuestionRefusal,
+  characterSaveRefusal,
+  draftAgainstBrief,
+  resolveCharacterPilotStage,
+} from '../util/character-pilot-stages.util';
 
 /**
  * How many served insight codes a session carries.
@@ -48,7 +57,66 @@ const MAX_SERVED_CODES = 200;
 export interface InterviewToolExecutionContext {
   session: CharacterInterviewSession;
   userId: number;
+  /**
+   * Course Pilot stages (CHARACTER_PILOT_STAGES), when on: questions asked so far per stage,
+   * counted from the transcript and kept up to date as this turn asks more.
+   */
+  pilot?: { asked: Partial<Record<CharacterPilotStageId, number>> };
 }
+
+/** What the interview has recorded about the character (record_character). */
+export function characterBriefOf(
+  session: Pick<CharacterInterviewSession, 'metadata'>,
+): CharacterPilotBrief {
+  return (session.metadata?.characterBrief ?? {}) as CharacterPilotBrief;
+}
+
+/** Where a staged interview is now; null when stages are off. */
+export function characterPilotPosition(
+  context: Pick<InterviewToolExecutionContext, 'session' | 'pilot'>,
+): CharacterPilotPosition | null {
+  if (!context.pilot) return null;
+  return resolveCharacterPilotStage(
+    characterBriefOf(context.session),
+    context.pilot.asked,
+  );
+}
+
+/** Stages only: records what is settled, so the stage can be worked out in code. */
+const RECORD_CHARACTER = {
+  name: 'record_character',
+  description:
+    'Record what is settled about the character, straight away — every field the admin gave ' +
+    'or asked you to decide, several at once. Does not end the turn. The interview moves to ' +
+    'the next stage by itself once a stage is recorded; save_character_draft opens at the end.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      kind: {
+        type: 'string',
+        description:
+          'Who they are and what they are going through, 1-2 sentences',
+      },
+      name: { type: 'string' },
+      age: { type: 'number' },
+      gender: { type: 'string', enum: GENDER_VALUES },
+      genderIdentity: { type: 'string', enum: GENDER_IDENTITY_VALUES },
+      sexualOrientation: { type: 'string', enum: SEXUAL_ORIENTATION_VALUES },
+      profession: { type: 'string' },
+      currentLocation: { type: 'string' },
+      personality: { type: 'string', description: 'One line' },
+      languageIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Numeric language ids from get_voices',
+      },
+      voices: {
+        type: 'object',
+        description: '{ "<languageId>": "<voiceId>" } from get_voices',
+      },
+    },
+  },
+};
 
 /**
  * Coerce a per-language map the model sent, tolerating the shape the tool
@@ -165,11 +233,27 @@ export class CharacterInterviewToolsService {
    * reply (`message`) and finish_turn ends a turn with no question; off, it is
    * exactly the belt the interview had before.
    */
-  getToolDefinitions(options: { validatedTurns?: boolean } = {}): any[] {
+  getToolDefinitions(
+    options: {
+      validatedTurns?: boolean;
+      /** Stages on: add record_character, and save_character_draft only at the end. */
+      position?: CharacterPilotPosition | null;
+    } = {},
+  ): any[] {
     const tools = this.legacyToolDefinitions();
     if (!options.validatedTurns) return tools;
+    const position = options.position ?? null;
+    const staged = position
+      ? [
+          ...tools.filter(
+            (tool) =>
+              tool.name !== 'save_character_draft' || position.stage.canSave,
+          ),
+          RECORD_CHARACTER,
+        ]
+      : tools;
     return [
-      ...tools.map((tool) =>
+      ...staged.map((tool) =>
         tool.name === 'ask_question'
           ? withValidatedAsk(tool, CHARACTER_INTERVIEW_TURN_VOCABULARY)
           : tool,
@@ -404,14 +488,54 @@ export class CharacterInterviewToolsService {
     context: InterviewToolExecutionContext,
   ): Promise<InterviewToolExecutionOutcome> {
     switch (name) {
-      case 'ask_question':
-        return this.executeAskQuestion(input);
+      case 'ask_question': {
+        const position = characterPilotPosition(context);
+        const refusal = position
+          ? characterQuestionRefusal(
+              position,
+              characterBriefOf(context.session),
+            )
+          : null;
+        if (refusal) {
+          return {
+            modelResult: {
+              ok: false,
+              error: 'question_limit',
+              message: refusal,
+            },
+            summary: `Question refused: ${position!.stage.title} is out of questions`,
+          };
+        }
+        const asked = this.executeAskQuestion(input);
+        if (position && context.pilot) {
+          const question = asked.events?.[0]?.data;
+          if (question) question.stage = position.stage.id;
+          context.pilot.asked[position.stage.id] =
+            (context.pilot.asked[position.stage.id] ?? 0) + 1;
+        }
+        return asked;
+      }
+      case 'record_character':
+        return this.executeRecordCharacter(input, context);
       case 'get_voices':
         return this.executeGetVoices();
       case 'search_corpus':
         return this.executeSearchCorpus(input, context);
-      case 'save_character_draft':
+      case 'save_character_draft': {
+        const position = characterPilotPosition(context);
+        const notYet = position ? characterSaveRefusal(position) : null;
+        if (notYet) {
+          return {
+            modelResult: {
+              ok: false,
+              error: 'stage_not_ready',
+              message: notYet,
+            },
+            summary: `Draft not saved: ${position!.stage.title} still needs ${position!.missing.join(', ')}`,
+          };
+        }
         return this.executeSaveCharacterDraft(input, context);
+      }
       case 'finish_turn':
         return {
           modelResult: { ok: true, delivered: true },
@@ -747,6 +871,152 @@ export class CharacterInterviewToolsService {
    * back as ok:false so the model self-repairs; nothing is written to
    * scenario_characters here.
    */
+  /**
+   * Stages: the admin handed the rest to the agent ("you decide"). Recorded once, by code, so
+   * every later stage decides instead of asking; the baseline asked 3-9 questions after it.
+   */
+  async markDecideRest(context: InterviewToolExecutionContext): Promise<void> {
+    const brief = characterBriefOf(context.session);
+    if (brief.decideRest) return;
+    context.session.metadata = {
+      ...(context.session.metadata ?? {}),
+      characterBrief: { ...brief, decideRest: true },
+    };
+    await this.sessionRepository.update(
+      { id: context.session.id },
+      { metadata: context.session.metadata },
+    );
+  }
+
+  /** Stages: merge what is settled into session.metadata.characterBrief. */
+  private async executeRecordCharacter(
+    input: Record<string, any>,
+    context: InterviewToolExecutionContext,
+  ): Promise<InterviewToolExecutionOutcome> {
+    const errors: string[] = [];
+    const patch: CharacterPilotBrief = {};
+    const text = (key: keyof CharacterPilotBrief, max: number) => {
+      const value = typeof input?.[key] === 'string' ? input[key].trim() : '';
+      if (!value) return;
+      if (value.length > max) errors.push(`${key} is over ${max} characters`);
+      else (patch as any)[key] = value;
+    };
+    text('kind', 600);
+    text('name', 200);
+    text('profession', 200);
+    text('currentLocation', 300);
+    text('personality', 300);
+    if (input?.age !== undefined && input?.age !== null && input?.age !== '') {
+      const age = Number(input.age);
+      if (Number.isFinite(age) && age >= 1 && age <= 150)
+        patch.age = Math.round(age);
+      else errors.push('age must be a number between 1 and 150');
+    }
+    const choice = (
+      key: 'gender' | 'genderIdentity' | 'sexualOrientation',
+      allowed: string[],
+    ) => {
+      const value = typeof input?.[key] === 'string' ? input[key].trim() : '';
+      if (!value) return;
+      if (allowed.includes(value)) patch[key] = value;
+      else errors.push(`${key} must be one of: ${allowed.join(', ')}`);
+    };
+    choice('gender', GENDER_VALUES);
+    choice('genderIdentity', GENDER_IDENTITY_VALUES);
+    choice('sexualOrientation', SEXUAL_ORIENTATION_VALUES);
+    if (Array.isArray(input?.languageIds)) {
+      patch.languageIds = [
+        ...new Set<string>(
+          input.languageIds
+            .map((id: unknown) => String(id).trim())
+            .filter(Boolean),
+        ),
+      ];
+    }
+    if (input?.voices && typeof input.voices === 'object') {
+      const voices: Record<string, string> = {};
+      for (const [languageId, voiceId] of Object.entries(input.voices)) {
+        const voice = await this.dataSource
+          .getRepository(ScenarioVoices)
+          .findOne({ where: { id: String(voiceId), active: true } });
+        if (!voice) {
+          errors.push(
+            `voice "${String(voiceId)}" is not an active voice: use an id from get_voices`,
+          );
+        } else if (
+          voice.languageId != null &&
+          String(voice.languageId) !== languageId
+        ) {
+          errors.push(
+            `voice "${voice.name}" belongs to language ${voice.languageId}, not ${languageId}`,
+          );
+        } else {
+          voices[languageId] = String(voiceId);
+        }
+      }
+      if (Object.keys(voices).length) patch.voices = voices;
+    }
+
+    // A language with no voice in the catalogue needs none: without this, a character who
+    // speaks only such a language could never leave the voice stage.
+    if (patch.languageIds?.length) {
+      const ids = patch.languageIds.map(Number).filter(Number.isFinite);
+      const voiced: { languageId: string | number }[] = ids.length
+        ? await this.dataSource
+            .getRepository(ScenarioVoices)
+            .createQueryBuilder('voice')
+            .select('DISTINCT voice."languageId"', 'languageId')
+            .where('voice.active = true')
+            .andWhere('voice."languageId" IN (:...ids)', { ids })
+            .getRawMany()
+            .catch(() => patch.languageIds!.map((id) => ({ languageId: id })))
+        : [];
+      const has = new Set(voiced.map((row) => String(row.languageId)));
+      patch.unvoicedLanguageIds = patch.languageIds.filter(
+        (id) => !has.has(id),
+      );
+    }
+    const current = characterBriefOf(context.session);
+    const brief: CharacterPilotBrief = {
+      ...current,
+      ...patch,
+      ...(patch.voices
+        ? { voices: { ...(current.voices ?? {}), ...patch.voices } }
+        : {}),
+    };
+    context.session.metadata = {
+      ...(context.session.metadata ?? {}),
+      characterBrief: brief,
+    };
+    await this.sessionRepository.update(
+      { id: context.session.id },
+      { metadata: context.session.metadata },
+    );
+    const position = characterPilotPosition(context);
+    const recorded = Object.keys(patch);
+    return {
+      modelResult: {
+        ok: errors.length === 0 || recorded.length > 0,
+        recorded,
+        ...(errors.length ? { errors } : {}),
+        ...(position
+          ? {
+              stage: position.stage.title,
+              stillNeeded: position.missing,
+              ...(position.stage.canSave
+                ? {
+                    next: 'Everything is recorded: write the draft with save_character_draft.',
+                  }
+                : {}),
+            }
+          : {}),
+      },
+      summary: recorded.length
+        ? `Recorded ${recorded.join(', ')}`
+        : `Nothing recorded${errors.length ? `: ${errors[0]}` : ''}`,
+    };
+  }
+
   private async executeSaveCharacterDraft(
     input: Record<string, any>,
     context: InterviewToolExecutionContext,
@@ -923,6 +1193,16 @@ export class CharacterInterviewToolsService {
             `${voice.languageId} — file each voice under its own languageId`,
         );
       }
+    }
+
+    // Stages: the draft carries what the interview recorded — every language, with its voice.
+    if (context.pilot) {
+      errors.push(
+        ...draftAgainstBrief(
+          { voices, languageCharacteristics },
+          characterBriefOf(context.session),
+        ),
+      );
     }
 
     if (errors.length > 0) {

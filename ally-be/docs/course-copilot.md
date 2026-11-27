@@ -151,6 +151,7 @@ in AWS form, so they do not render locally — the same as the course editor's o
 | `COURSE_PILOT_CRITIC` | false | Course Pilot blueprint critic (below) |
 | `COURSE_PILOT_ANSWER_CHECK` | true | Course Pilot quiz answer-key check (below); `false` turns it off |
 | `ROLEPLAY_PILOT_STAGES` | true | Course Pilot stages for the roleplay interview (below); `false` turns it off |
+| `CHARACTER_PILOT_STAGES` | true | Course Pilot stages for the character interview (below); `false` turns it off |
 
 Limits (sections 20, items 100, items per section 30, new cases 2, images 12, languages per roleplay 4, two
 active CREATE sessions per user) are in `constants/course-copilot.constants.ts` and enforced in code. New roleplays
@@ -160,7 +161,7 @@ have no limit of their own; the item limits and the session budget bound them.
 
 Phases 1, 3, 4B and 5 of the Course Pilot architecture plan, each behind its own env switch. The
 course stage machine and critic are off until turned on; the answer-key check and the roleplay
-interview's stages are on unless set to `false`.
+and character interviews' stages are on unless set to `false`.
 
 - **Stage machine** (`COURSE_PILOT_STAGES`, `src/course-copilot/util/course-pilot-stages.util.ts`). The interview's
   stages live in code: intake → learners → outcomes and skill targets → assessment → time and
@@ -194,6 +195,12 @@ interview's stages are on unless set to `false`.
   details and is refused until difficulty, language and pass mark are in the brief (defaults are
   fine). No stored state: each question card is tagged with its stage and counted from the
   transcript.
+- **Character interview stages** (`CHARACTER_PILOT_STAGES`, `src/scenario-character/util/character-pilot-stages.util.ts`).
+  The character interview records what is settled as it goes (`record_character` →
+  `character_interview_sessions.metadata.characterBrief`), and its stage is derived from that
+  record: kind of character → identity → life → languages and voices → draft. Question limits
+  2/3/3/3/1 (10 in all); save_character_draft opens only at the end, and the draft must carry
+  every recorded language with its voice. Needs validated turns.
 - **Evals** (`scripts/course-pilot-evals/`): `run.mjs` plays 10 fixed course requests end to end with
   a simulated trainer; `plan-eval.mjs` plans the same briefs with and without the critic or transfer
   check and scores them with an independent judge (`judge.mjs`); `manual-tests.mjs` runs test cases

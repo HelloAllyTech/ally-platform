@@ -49,7 +49,7 @@ export const isCharacterInterviewLookup = (name: string): boolean =>
   CHARACTER_INTERVIEW_LOOKUP_TOOLS.has(name);
 
 export const isCharacterInterviewEdit = (name: string): boolean =>
-  name === 'save_character_draft';
+  name === 'save_character_draft' || name === 'record_character';
 
 /** What a call set out to do, in the admin's terms. */
 export function describeCharacterInterviewAttempt(
@@ -63,6 +63,8 @@ export function describeCharacterInterviewAttempt(
       return `Corpus search "${clipText(input?.query, 80)}"`;
     case 'save_character_draft':
       return `Save the character draft${input?.name ? ` (${clipText(input.name, 60)})` : ''}`;
+    case 'record_character':
+      return `Record ${Object.keys(input ?? {}).join(', ') || 'character details'}`;
     default:
       return name;
   }

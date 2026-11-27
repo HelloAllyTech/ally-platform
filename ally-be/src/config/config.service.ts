@@ -1230,6 +1230,14 @@ export class AppConfigService {
       // Hard cap on tool-use round-trips per interview turn. A normal turn is
       // 1-2 (commentary + ask_question); the final turn legitimately chains
       // get_voices + a validation-retried save_character_draft.
+      // Course Pilot stages for the character interview (phase 5C): what is settled is recorded
+      // as the interview goes, the stage is worked out from it, each stage has a question limit
+      // and the draft opens only at the end. Needs validated turns (the default). On by default;
+      // CHARACTER_PILOT_STAGES=false turns it off.
+      stages:
+        String(
+          this.configService.get<string>('CHARACTER_PILOT_STAGES', 'true'),
+        ).toLowerCase() !== 'false',
       maxToolIterations: this.configService.get<number>(
         'CHARACTER_INTERVIEW_MAX_TOOL_ITERATIONS',
         8,

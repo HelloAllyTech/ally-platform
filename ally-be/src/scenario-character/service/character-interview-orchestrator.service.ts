@@ -35,9 +35,16 @@ import {
 } from '../enum/character-interview.enum';
 import { CharacterInterviewSessionService } from './character-interview-session.service';
 import {
+  characterBriefOf,
+  characterPilotPosition,
   CharacterInterviewToolsService,
   InterviewToolExecutionContext,
 } from './character-interview-tools.service';
+import {
+  countCharacterStageQuestions,
+  handsRestToAgent,
+  renderCharacterPilotStage,
+} from '../util/character-pilot-stages.util';
 import {
   CharacterInterviewSseFrame,
   InterviewToolExecutionOutcome,
@@ -408,7 +415,26 @@ export class CharacterInterviewOrchestratorService {
     const context: InterviewToolExecutionContext = {
       session,
       userId,
+      // Course Pilot stages need the validated loop (the legacy loop has no per-step belt).
+      ...(validatedTurns && this.configService.characterInterview?.stages
+        ? { pilot: { asked: countCharacterStageQuestions(history) } }
+        : {}),
     };
+    // "You decide" / "use your defaults": recorded by code, so the stages decide instead of asking.
+    if (
+      context.pilot &&
+      handsRestToAgent(
+        [dto.message, ...(dto.answer?.customValues ?? [])].join(' '),
+      )
+    ) {
+      await this.toolsService.markDecideRest(context);
+    }
+    // The stage block rides on the newest user turn for the model only; it is not persisted.
+    const position = characterPilotPosition(context);
+    if (position) {
+      const last = messages[messages.length - 1];
+      last.content = `${String(last.content)}\n\n${renderCharacterPilotStage(position, characterBriefOf(session))}`;
+    }
 
     // Turn accumulators for the persisted assistant message. Question payloads
     // are persisted in the row's metadata so a resumed chat can reconstruct
@@ -580,8 +606,12 @@ export class CharacterInterviewOrchestratorService {
       model,
       system: loop.system,
       messages: loop.messages,
+      // Re-read each step: a record_character call this turn can open the next stage's tools.
       tools: () =>
-        this.toolsService.getToolDefinitions({ validatedTurns: true }),
+        this.toolsService.getToolDefinitions({
+          validatedTurns: true,
+          position: characterPilotPosition(context),
+        }),
       maxIterations: loop.maxIterations,
       maxTokens: CHARACTER_INTERVIEW_MAX_TOKENS,
       maxRetries: CHARACTER_INTERVIEW_MAX_TRUNCATION_RETRIES,
