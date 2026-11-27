@@ -46,6 +46,17 @@ import {
   COURSE_COPILOT_FINISH_WHEN,
   COURSE_COPILOT_TURN_VOCABULARY,
 } from '../util/course-copilot-turn.util';
+import {
+  briefHash,
+  CONFIRM_BRIEF_PROMPT,
+  confirmBriefOptions,
+  renderBriefSummary,
+  CoursePilotPosition,
+  CoursePilotState,
+  questionRefusal,
+  resolveCoursePilotStage,
+} from '../util/course-pilot-stages.util';
+import { CourseCopilotMode } from '../enum/course-copilot.enum';
 
 /** Per-turn context threaded through tool executions. */
 export interface CourseCopilotToolContext {
@@ -63,6 +74,38 @@ export interface CourseCopilotToolContext {
    * only through ask_trainer / finish_turn, which carry the reply.
    */
   validatedTurns?: boolean;
+  /** Course Pilot stage machine on (config `COURSE_PILOT_STAGES`). */
+  stages?: boolean;
+}
+
+/** The session's stage-machine state, kept in `metadata.coursePilot`. */
+export function coursePilotState(
+  session: CourseCopilotSession,
+): CoursePilotState {
+  const raw = session.metadata?.coursePilot;
+  return raw && typeof raw === 'object' ? (raw as CoursePilotState) : {};
+}
+
+/**
+ * Whether the stage machine governs this session right now: switched on, a new course
+ * (an EDIT session has no interview), and still interviewing. Later stages follow the status.
+ */
+export function coursePilotStaged(
+  session: CourseCopilotSession,
+  stages: boolean | undefined,
+): boolean {
+  return (
+    !!stages &&
+    session.mode !== CourseCopilotMode.EDIT &&
+    session.status === CourseCopilotSessionStatus.INTERVIEWING
+  );
+}
+
+/** Where a staged session's interview is. */
+export function coursePilotPosition(
+  session: CourseCopilotSession,
+): CoursePilotPosition {
+  return resolveCoursePilotStage(session.brief, coursePilotState(session));
 }
 
 const DATA_NOTE =
@@ -361,7 +404,16 @@ export function planningNote(
       ? `design principles ${context.principles.join(', ')}`
       : '',
   ].filter(Boolean);
-  return parts.length ? ` · planned with ${parts.join(' and ')}` : '';
+  const critic = context.critic
+    ? ` · checked by the critic${
+        context.critic.repaired
+          ? ` (fixed ${context.critic.found.filter((f) => f.severity === 'blocking').length})`
+          : ''
+      }`
+    : '';
+  return (
+    (parts.length ? ` · planned with ${parts.join(' and ')}` : '') + critic
+  );
 }
 
 @Injectable()
@@ -406,9 +458,14 @@ export class CourseCopilotToolsService {
    */
   getToolDefinitions(
     session: CourseCopilotSession,
-    options: { validatedTurns?: boolean } = {},
+    options: { validatedTurns?: boolean; stages?: boolean } = {},
   ): AgentToolDefinition[] {
-    const tools = this.toolsForState(session);
+    let tools = this.toolsForState(session);
+    if (coursePilotStaged(session, options.stages)) {
+      // The stage's belt only: propose_blueprint does not exist until the brief is confirmed.
+      const allowed = new Set(coursePilotPosition(session).stage.tools);
+      tools = tools.filter((tool) => allowed.has(tool.name));
+    }
     if (!options.validatedTurns || !tools.length) return tools;
     return [
       ...tools.map((tool) =>
@@ -453,8 +510,24 @@ export class CourseCopilotToolsService {
   ): Promise<CourseCopilotToolOutcome> {
     const allowed = this.getToolDefinitions(context.session, {
       validatedTurns: context.validatedTurns,
+      stages: context.stages,
     }).map((t) => t.name);
     if (!allowed.includes(name)) {
+      if (coursePilotStaged(context.session, context.stages)) {
+        const { stage, missing } = coursePilotPosition(context.session);
+        return {
+          modelResult: {
+            ok: false,
+            error: 'tool_unavailable',
+            message:
+              `${name} is not available in the "${stage.title}" stage. ` +
+              (missing.length
+                ? `Still needed first: ${missing.join('; ')}.`
+                : ''),
+          },
+          summary: `${name} is not available in this stage`,
+        };
+      }
       return {
         modelResult: {
           ok: false,
@@ -466,7 +539,9 @@ export class CourseCopilotToolsService {
     }
     switch (name) {
       case 'ask_trainer':
-        return this.askTrainer(input);
+        return coursePilotStaged(context.session, context.stages)
+          ? this.askTrainerStaged(input, context)
+          : this.askTrainer(input);
       case 'finish_turn':
         return {
           modelResult: { ok: true, delivered: true },
@@ -476,11 +551,29 @@ export class CourseCopilotToolsService {
       case 'update_brief':
         return this.updateBrief(input, context);
       case 'list_competencies': {
-        const competencies = await this.library.listCompetencies(
-          input?.query ? String(input.query) : undefined,
-        );
+        const query = input?.query ? String(input.query).trim() : '';
+        const matches = query
+          ? await this.library.listCompetencies(query)
+          : await this.library.listCompetencies();
+        // The library is small and its names rarely match a trainer's words, so a search that
+        // matches nothing returns the whole list, as the roleplay interview's does. Searching
+        // word combinations one by one used up a whole turn's steps, leaving no question card.
+        const competencies =
+          query && !matches.length
+            ? await this.library.listCompetencies(undefined, 100)
+            : matches;
         return {
-          modelResult: { ok: true, competencies },
+          modelResult: {
+            ok: true,
+            competencies,
+            ...(query && !matches.length
+              ? {
+                  note:
+                    `Nothing is named "${query}"; these are all the competencies there are. ` +
+                    'Pick the closest by meaning instead of searching again.',
+                }
+              : {}),
+          },
           summary: `Looked up ${competencies.length} competencies`,
         };
       }
@@ -740,6 +833,106 @@ export class CourseCopilotToolsService {
     };
   }
 
+  /**
+   * ask_trainer under the stage machine: refused past the stage's or the interview's question
+   * limit, counted per stage, and in the final check turned into the confirm card whose two
+   * options code owns — so only the trainer's answer, matched to this brief, can confirm it.
+   */
+  private async askTrainerStaged(
+    input: Record<string, any>,
+    context: CourseCopilotToolContext,
+  ): Promise<CourseCopilotToolOutcome> {
+    const position = coursePilotPosition(context.session);
+    const refusal = questionRefusal(position);
+    if (refusal) {
+      return {
+        modelResult: { ok: false, error: 'question_limit', message: refusal },
+        summary: `Question refused: limit reached in ${position.stage.title}`,
+      };
+    }
+    const isConfirm = position.stage.id === 'brief.final';
+    const outcome = this.askTrainer(
+      isConfirm
+        ? {
+            prompt: CONFIRM_BRIEF_PROMPT,
+            rationale: renderBriefSummary(
+              context.session.brief ?? {},
+              await this.languageNames(),
+            ),
+            kind: 'singleSelect',
+            options: confirmBriefOptions(),
+            allowCustom: true,
+            allowNone: false,
+          }
+        : input,
+    );
+    const state = coursePilotState(context.session);
+    const questionId = String(outcome.modelResult?.questionId ?? '');
+    await this.saveCoursePilotState(context.session, {
+      questions: {
+        ...(state.questions ?? {}),
+        [position.stage.id]: position.questionsAsked + 1,
+      },
+      ...(isConfirm
+        ? {
+            pendingConfirm: {
+              questionId,
+              briefHash: briefHash(context.session.brief),
+            },
+          }
+        : {}),
+    });
+    return outcome;
+  }
+
+  /** Language names by id, for the confirm card; ids stand in if the lookup fails. */
+  private async languageNames(): Promise<Record<string, string>> {
+    try {
+      const languages = await this.library.listLanguages();
+      return Object.fromEntries(
+        (languages ?? []).map((l: any) => [String(l.id), String(l.name)]),
+      );
+    } catch {
+      return {};
+    }
+  }
+
+  /** Where the interview is now, for the model after it changed the brief. */
+  stageReport(session: CourseCopilotSession) {
+    const position = coursePilotPosition(session);
+    return {
+      id: position.stage.id,
+      title: position.stage.title,
+      step: `${position.step} of ${position.steps}`,
+      goal: position.stage.goal,
+      stillNeeded: position.missing,
+      questionsLeft: position.questionsLeft,
+    };
+  }
+
+  /**
+   * Merge into `metadata.coursePilot`, in the row and on the in-memory session the turn holds.
+   * Atomic jsonb merge: the turn's other metadata writers (change log, library context) are
+   * left alone.
+   */
+  async saveCoursePilotState(
+    session: CourseCopilotSession,
+    patch: Partial<CoursePilotState>,
+  ): Promise<void> {
+    await this.sessionRepository.manager.query(
+      `UPDATE "course_copilot_sessions"
+          SET "metadata" = COALESCE("metadata", '{}'::jsonb) || jsonb_build_object(
+                'coursePilot',
+                COALESCE("metadata" -> 'coursePilot', '{}'::jsonb) || $2::jsonb)
+        WHERE id = $1`,
+      [session.id, JSON.stringify(patch)],
+    );
+    session.metadata = {
+      ...(session.metadata ?? {}),
+      coursePilot: { ...coursePilotState(session), ...patch },
+    };
+  }
+
   /** Builder's question normalisation: ids minted here, one recommendation at most. */
   buildQuestion(
     input: Record<string, any>,
@@ -835,6 +1028,9 @@ export class CourseCopilotToolsService {
           ok: true,
           readyForBlueprint: readiness.ready,
           stillMissing: readiness.missing,
+          ...(coursePilotStaged(context.session, context.stages)
+            ? { stage: this.stageReport(context.session) }
+            : {}),
           ...(ignoredKeys.length
             ? {
                 ignoredKeys: ignoredKeys.map(
@@ -901,6 +1097,15 @@ export class CourseCopilotToolsService {
           // Also read by the turn receipt ("Blueprint drafted (v1) · planned with …").
           planning:
             planningNote(response.planningContext).replace(/^ · /, '') || null,
+          // What the critic left for the trainer: name the important ones, briefly.
+          ...(response.planningContext?.critic
+            ? {
+                criticRepaired: response.planningContext.critic.repaired,
+                stillWorthAChange: response.planningContext.critic.remaining
+                  .slice(0, 3)
+                  .map((f) => `${f.problem}${f.fix ? ` (${f.fix})` : ''}`),
+              }
+            : {}),
           note:
             'The trainer now sees the blueprint and approves it in the panel. In one or two ' +
             'sentences, say what shape you chose and why; mention any problem they must fix. ' +

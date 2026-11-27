@@ -904,6 +904,23 @@ describe('CourseCopilotToolsService', () => {
       });
     });
 
+    it('list_competencies returns the whole list, with a note, when a search matches nothing', async () => {
+      library.listCompetencies.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { id: 'c-1', name: 'Listening' },
+        { id: 'c-2', name: 'Assessment of Harm & Response Planning' },
+      ]);
+      const outcome = await exec(
+        'list_competencies',
+        { query: 'suicide assessment helpline empathy' },
+        interviewing(),
+      );
+      expect(library.listCompetencies).toHaveBeenLastCalledWith(undefined, 100);
+      expect(outcome.modelResult.competencies).toHaveLength(2);
+      expect(outcome.modelResult.note).toMatch(
+        /Nothing is named "suicide assessment helpline empathy"/,
+      );
+    });
+
     it('get_competency_behaviours stringifies ids', async () => {
       await exec(
         'get_competency_behaviours',

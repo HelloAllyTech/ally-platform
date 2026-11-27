@@ -141,6 +141,18 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
     outputPer1MUsd: 10,
     cachedInputPer1MUsd: 0.125,
   },
+  // Builder's design run and weekly repo map (opencode cannot run the 2.5 models
+  // any more, see BUILDER_ENGINE_PRO_MODEL). Google's published rate for the
+  // <=200k-token tier, the one every other row here is priced at: $2.00 in /
+  // $12.00 out, cached input $0.20 (above 200k it is 4 / 18 / 0.40). Looked up
+  // 2026-11-26 at ai.google.dev/gemini-api/docs/pricing; the page is a preview
+  // price list, so re-check when the model leaves preview. The -customtools
+  // variant resolves here by prefix.
+  'gemini-3.1-pro-preview': {
+    inputPer1MUsd: 2,
+    outputPer1MUsd: 12,
+    cachedInputPer1MUsd: 0.2,
+  },
   // Required, not optional: every Indic language except Malayalam moved onto
   // 2.5-flash in 1881000000000-MoveLanguagesOffExperimentalGemini. Their
   // previous model, gemini-2.0-flash-exp, was priced by the longest-prefix

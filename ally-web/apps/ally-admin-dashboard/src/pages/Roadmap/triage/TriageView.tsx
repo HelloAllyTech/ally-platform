@@ -11,9 +11,6 @@ import type { RoadmapItemRow, RoadmapItemsResponse } from "@types";
 
 import { DeclineDialog, DeclineTarget } from "./DeclineDialog";
 import { LeadPicker } from "./LeadPicker";
-import { TodoGroupHeader } from "./TodoGroupHeader";
-import { TodoGroupKey, WAITING_GROUPS, todoGroups } from "./todoGroups";
-import { TodoSweepBanner, TodoSweepPanel } from "./TodoSweep";
 import { TriageReviewMode } from "./TriageReviewMode";
 import { todoNextStep, workingDaysSince } from "./triageUtils";
 import { triageExit, undoLastReview, useReviewActions } from "./useReviewActions";
@@ -71,26 +68,10 @@ export const TriageView: React.FC<TriageViewProps> = ({
   const copy = en.roadmapV2;
   const touch = !hasReadingPane(breakpoint);
   const actions = useReviewActions();
-  // Grouped by the Owner's next step (idea-to-plan audit rec 9); Later is folded until asked for.
-  const groups = useMemo(() => todoGroups(rowsOfItemsResponse(data)), [data]);
-  const [laterOpen, setLaterOpen] = useState(false);
-  const [sweepOpen, setSweepOpen] = useState(false);
-  const sections = useMemo(
-    () =>
-      groups.map(group => ({
-        ...group,
-        total: group.rows.length,
-        rows: group.key === "later" && !laterOpen ? [] : group.rows,
-      })),
-    [groups, laterOpen],
-  );
-  const groupOf = useMemo(() => {
-    const map = new Map<string, TodoGroupKey>();
-    groups.forEach(group => group.rows.forEach(row => map.set(row.code, group.key)));
-    return map;
-  }, [groups]);
-  const allRows = useMemo(() => groups.flatMap(g => g.rows), [groups]);
-  const rows = useMemo(() => sections.flatMap(s => s.rows), [sections]);
+  // One flat list, in the order the server sent it: the page's sort, which is rank (#1 first) unless
+  // the Owner picked another. No groups and no folding, so nothing is hidden behind a heading.
+  const rows = useMemo(() => rowsOfItemsResponse(data), [data]);
+  const allRows = rows;
   const codes = useMemo(() => rows.map(r => r.code), [rows]);
   useEffect(() => onVisibleCodes(codes), [codes, onVisibleCodes]);
 
@@ -268,47 +249,20 @@ export const TriageView: React.FC<TriageViewProps> = ({
           <p className="m-0 pt-1 text-xs text-typography-secondary">{copy.triage.reviewModeHelp}</p>
         </div>
       )}
-      {sweepOpen ? (
-        <TodoSweepPanel
-          onDecline={list => startDecline(list)}
-          onClose={() => setSweepOpen(false)}
-        />
-      ) : (
-        <TodoSweepBanner onOpen={() => setSweepOpen(true)} />
-      )}
-      {sections.map(section =>
-        section.total === 0 ? null : (
-          <section
-            key={section.key}
-            aria-label={copy.sectionCount(
-              en.roadmapIdeaToPlan.groups[section.key] ?? section.key,
-              section.total,
-            )}
-          >
-            <TodoGroupHeader
-              group={section.key}
-              count={section.total}
-              collapsed={section.key === "later" ? !laterOpen : undefined}
-              onToggle={section.key === "later" ? () => setLaterOpen(open => !open) : undefined}
+      <ul className="m-0 list-none p-0">
+        <AnimatePresence initial={false}>
+          {rows.map(row => (
+            <TriageRow
+              key={row.code}
+              row={row}
+              current={paneCode === row.code}
+              leaving={leaving.get(row.code) ?? null}
+              touch={touch}
+              onOpen={() => onOpen(row.code)}
             />
-            <ul className="m-0 list-none p-0">
-              <AnimatePresence initial={false}>
-                {section.rows.map(row => (
-                  <TriageRow
-                    key={row.code}
-                    row={row}
-                    awaitingReview={WAITING_GROUPS.includes(groupOf.get(row.code) ?? "later")}
-                    current={paneCode === row.code}
-                    leaving={leaving.get(row.code) ?? null}
-                    touch={touch}
-                    onOpen={() => onOpen(row.code)}
-                  />
-                ))}
-              </AnimatePresence>
-            </ul>
-          </section>
-        ),
-      )}
+          ))}
+        </AnimatePresence>
+      </ul>
       {onLoadMore && (
         <div className="flex justify-center py-3">
           <Button kind="tertiary" size="sm" onClick={onLoadMore}>
@@ -374,16 +328,29 @@ export const TriageView: React.FC<TriageViewProps> = ({
   );
 };
 
+/** The stage tag for a row waiting on the Owner; accepted ideas carry none. */
+const stageTagOf = (row: RoadmapItemRow): string | null => {
+  const labels = en.roadmapIdeaToPlan.groups;
+  if (row.shownStage === "submitted") return labels.review;
+  if (row.shownStage === "planning") {
+    const closed = !!(row.statusParts as { planClosed?: unknown } | undefined)?.planClosed;
+    return closed ? labels.planClosed : labels.planning;
+  }
+  return null;
+};
+
 const TriageRow: React.FC<{
   row: RoadmapItemRow;
-  awaitingReview: boolean;
   current: boolean;
   leaving: Decision | null;
   touch: boolean;
   onOpen: () => void;
-}> = ({ row, awaitingReview, current, leaving, touch, onOpen }) => {
+}> = ({ row, current, leaving, touch, onOpen }) => {
   const reduced = useReducedMotionPreference();
   const copy = en.roadmapV2.triage;
+  // Ideas waiting on the Owner: a review, a plan in progress, a closed plan awaiting a builder.
+  const stageLabel = stageTagOf(row);
+  const awaitingReview = stageLabel !== null;
   const why = row.whyHere;
   const since = why && "since" in why ? why.since : row.stageSince;
   const days = workingDaysSince(since);
@@ -437,6 +404,11 @@ const TriageRow: React.FC<{
               <span className="shrink-0 text-xs tabular-nums text-typography-secondary">
                 {row.code}
               </span>
+              {stageLabel && (
+                <span className="shrink-0 rounded-sm bg-neutral-100 px-1.5 text-xs text-typography-secondary">
+                  {stageLabel}
+                </span>
+              )}
             </span>
             <span
               className="mt-1 line-clamp-2 break-words text-base leading-snug text-typography-primary"

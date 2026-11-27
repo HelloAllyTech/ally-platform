@@ -18,7 +18,7 @@ signals:
   issues: true
   error_logs: true
   commit_sweep: true
-  apps: [ally-be, ally-web, ally-ai, ally-ai-learn, ally-mobile]   # rollout: dry-run -> [ally-be] -> all
+  apps: [ally-be, ally-web, ally-ai, ally-ai-learn, ally-mobile]   # rollout: live for all five since 2026-11-26
   org: HelloAllyTech          # issue signals only from issues opened or labelled `bug` by members
   issue_label: bug
   reports_repo: HelloAllyTech/bug-hunter-reports   # private; nothing about findings goes to ally-platform
@@ -35,6 +35,9 @@ pr:
   # otherwise it asks in Needs you, where an admin may press Open PR. pr: every
   # passing run opens one (not used).
   output_mode: auto
+  # strict gate's confidence floor (user, 2026-11-26): medium and high both open a
+  # draft PR when every other condition holds; low still asks
+  min_confidence: medium
   repo: HelloAllyTech/ally-platform
 sandbox:
   cpus: 2

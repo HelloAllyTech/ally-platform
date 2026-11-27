@@ -88,15 +88,25 @@ class HttpGitHubReader:
         ]
 
     def failed_job_logs(self, run_id):
+        return "\n".join(j["log"] for j in self.failed_jobs(run_id))
+
+    def failed_jobs(self, run_id):
         jobs = self._get(f"/repos/{self.repo}/actions/runs/{run_id}/jobs")
-        parts = []
+        out = []
         for job in jobs.get("jobs", []):
             if job.get("conclusion") == "failure":
                 _, text = self._get(
                     f"/repos/{self.repo}/actions/jobs/{job['id']}/logs", raw=True
                 )
-                parts.append(text)
-        return "\n".join(parts)
+                steps = [
+                    s.get("name", "")
+                    for s in job.get("steps") or []
+                    if s.get("conclusion") == "failure"
+                ]
+                out.append(
+                    {"name": job.get("name", ""), "failed_steps": steps, "log": text}
+                )
+        return out
 
     def issues(self, since, label):
         return self._get(

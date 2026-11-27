@@ -76,7 +76,7 @@ export * from "./plans";
 export * from "./credits";
 export * from "./accessList";
 export * from "./knowledgePrivacy";
-export * from "./roadmapV2Sweep";
 export * from "./directory";
 export * from "./channels";
 export * from "./bugHunterV2";
+export * from "./productManual";

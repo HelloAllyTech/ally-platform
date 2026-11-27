@@ -46,6 +46,14 @@ export interface SessionFacts {
   planStageAt: string | null;
   updatedAt: string | null;
   lastRunSequence: number;
+  /**
+   * Whether a run other than a design run exists. A design run is drafted from
+   * PRD_READY and never moves the session (BuilderRunMode.DESIGN), so it is not
+   * a build having started; `lastRunSequence` counts it anyway, because it
+   * numbers every run. Absent on callers that did not read the runs: they fall
+   * back to the old sequence test.
+   */
+  hasBuildRun?: boolean | null;
   repos: string[];
   closed: {
     at?: string;
@@ -157,10 +165,8 @@ export function mirrorPlanFacts(
 }
 
 export function buildStarted(session: SessionFacts): boolean {
-  return (
-    (session.lastRunSequence ?? 0) > 0 ||
-    BUILD_STARTED_STATUSES.includes(session.status)
-  );
+  const ran = session.hasBuildRun ?? (session.lastRunSequence ?? 0) > 0;
+  return ran || BUILD_STARTED_STATUSES.includes(session.status);
 }
 
 /**

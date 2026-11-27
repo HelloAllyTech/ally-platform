@@ -18,6 +18,7 @@ import { CourseCopilotSession } from '../entity/course-copilot-session.entity';
 import { CourseCopilotSessionStatus } from '../enum/course-copilot.enum';
 import { CourseCopilotSessionRepository } from '../repository/course-copilot.repository';
 import { CourseBlueprint } from '../type/course-copilot.type';
+import { transferProblems } from '../util/course-pilot-transfer.util';
 import { CourseCopilotBlueprintResponse } from '../type/course-copilot-api.type';
 import {
   blueprintWarnings,
@@ -65,6 +66,21 @@ export function blueprintPatchOps(ops: JsonPatchOp[]): JsonPatchOp[] {
   });
 }
 
+import {
+  BlueprintCriticFinding,
+  BlueprintCriticSpecialist,
+  criticRepairList,
+} from './specialists/blueprint-critic.specialist';
+
+/** What the critic did to a plan, kept on the session and shown to the interviewer. */
+export interface CoursePilotCriticReport {
+  at: string;
+  found: BlueprintCriticFinding[];
+  repaired: boolean;
+  /** Findings on the plan that went out (the repaired one, when kept). */
+  remaining: BlueprintCriticFinding[];
+}
+
 @Injectable()
 export class CourseCopilotBlueprintService {
   private readonly logger = LoggerService.getInstance(
@@ -84,6 +100,8 @@ export class CourseCopilotBlueprintService {
     @Optional() private readonly sources?: CourseCopilotSourcesService,
     @Optional()
     private readonly designGuidance?: CourseCopilotDesignGuidanceService,
+    /** Course Pilot's blueprint critic. Optional: fixtures without it plan as before. */
+    @Optional() private readonly critic?: BlueprintCriticSpecialist,
   ) {}
 
   /** Run the planner and store blueprint v(n+1). Caller has checked readiness. */
@@ -105,7 +123,7 @@ export class CourseCopilotBlueprintService {
     const example = new CourseCopilotExampleCourseService().closestTo(
       session.brief?.shape?.durationMinutes,
     );
-    const planned = await this.planner.plan({
+    const plannerInput = {
       sessionId: session.id,
       brief: session.brief ?? {},
       notes,
@@ -114,8 +132,16 @@ export class CourseCopilotBlueprintService {
       referenceMaterial: reference?.text ?? null,
       designGuidance: guidance.text || null,
       usageMetadata: { courseCopilotSessionId: session.id },
-    });
-    const response = await this.store(session, planned, {
+      checkTransfer: this.configService.courseCopilot.stages,
+    };
+    const planned = await this.planner.plan(plannerInput);
+    const checked = await this.checkWithCritic(
+      session,
+      plannerInput,
+      planned,
+      guidance.text || null,
+    );
+    const response = await this.store(session, checked.blueprint, {
       status: CourseCopilotSessionStatus.AWAITING_BLUEPRINT,
     });
     return {
@@ -123,8 +149,96 @@ export class CourseCopilotBlueprintService {
       planningContext: {
         exampleCourse: example?.title ?? null,
         principles: guidance.codes,
+        ...(checked.report ? { critic: checked.report } : {}),
       },
     };
+  }
+
+  /**
+   * Course Pilot's critic (COURSE_PILOT_CRITIC): check the plan against the brief before the
+   * trainer sees it; on blocking findings, one repair round by the planner, then a second check
+   * to see what is left. The repaired plan is kept only if it has no more code problems and no
+   * more blocking findings than the first. A critic failure never blocks the plan.
+   */
+  private async checkWithCritic(
+    session: CourseCopilotSession,
+    plannerInput: Parameters<BlueprintPlannerSpecialist['plan']>[0],
+    planned: CourseBlueprint,
+    designGuidance: string | null,
+  ): Promise<{
+    blueprint: CourseBlueprint;
+    report: CoursePilotCriticReport | null;
+  }> {
+    if (!this.critic || !this.configService.courseCopilot.critic) {
+      return { blueprint: planned, report: null };
+    }
+    const brief = session.brief ?? {};
+    const usageMetadata = { courseCopilotSessionId: session.id };
+    try {
+      const findings = await this.critic.critique({
+        brief,
+        blueprint: planned,
+        designGuidance,
+        usageMetadata,
+      });
+      const blocking = criticRepairList(findings);
+      let blueprint = planned;
+      let remaining = findings;
+      let repaired = false;
+      if (blocking.length) {
+        const second = await this.planner.repair(plannerInput, blocking);
+        // Code problems, transfer included: a repair must not undo what the planner's check fixed.
+        const codeProblems = (plan: CourseBlueprint) =>
+          validateBlueprint(plan, brief).length +
+          (plannerInput.checkTransfer
+            ? transferProblems(plan, brief).length
+            : 0);
+        if (second && codeProblems(second) <= codeProblems(planned)) {
+          const after = await this.critic.critique({
+            brief,
+            blueprint: second,
+            designGuidance,
+            usageMetadata,
+          });
+          const blockingAfter = after.filter(
+            (f) => f.severity === 'blocking',
+          ).length;
+          if (blockingAfter <= blocking.length) {
+            blueprint = second;
+            remaining = after;
+            repaired = true;
+          }
+        }
+      }
+      const report: CoursePilotCriticReport = {
+        at: new Date().toISOString(),
+        found: findings,
+        repaired,
+        remaining,
+      };
+      await this.sessionRepository.manager.query(
+        `UPDATE "course_copilot_sessions"
+            SET "metadata" = COALESCE("metadata", '{}'::jsonb) || jsonb_build_object(
+                  'coursePilot',
+                  COALESCE("metadata" -> 'coursePilot', '{}'::jsonb) ||
+                    jsonb_build_object('critic', $2::jsonb))
+          WHERE id = $1`,
+        [session.id, JSON.stringify(report)],
+      );
+      this.logger.info(
+        `[COURSE_PILOT] session=${session.id} critic: ${findings.length} findings ` +
+          `(${blocking.length} blocking), repaired=${repaired}, left blocking=` +
+          remaining.filter((f) => f.severity === 'blocking').length,
+      );
+      return { blueprint, report };
+    } catch (error) {
+      this.logger.warn(
+        `Course Pilot critic failed for ${session.id}; the plan goes out unchecked: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return { blueprint: planned, report: null };
+    }
   }
 
   /**
@@ -217,7 +331,13 @@ export class CourseCopilotBlueprintService {
     return {
       blueprint,
       problems,
-      warnings: blueprintWarnings(blueprint, brief),
+      warnings: [
+        ...blueprintWarnings(blueprint, brief),
+        // Course Pilot: shown, never blocking — the trainer may approve a plan without it.
+        ...(this.configService?.courseCopilot?.stages
+          ? transferProblems(blueprint, brief)
+          : []),
+      ],
     };
   }
 

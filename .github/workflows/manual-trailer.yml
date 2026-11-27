@@ -1,0 +1,33 @@
+name: Product Manual trailer
+
+# Every PR says what it did to the Product Manual: `Manual: proposal <id>` (a coding agent filed one
+# through the product-manual MCP) or `Manual: none — <reason>`. A plain string check — no AI, no tokens.
+# The manual itself lives only in the database, so there is nothing to diff here; this only makes a
+# forgotten manual visibly forgotten. Bots and PRs labelled `manual:skip` are exempt.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  trailer:
+    runs-on: ubuntu-latest
+    if: >-
+      github.actor != 'dependabot[bot]' &&
+      !contains(github.event.pull_request.labels.*.name, 'manual:skip')
+    steps:
+      - name: Require a Manual line in the PR description
+        env:
+          # Passed through the environment, never interpolated into the script.
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          if printf '%s\n' "$PR_BODY" | grep -Eiq '^[[:space:]]*Manual:[[:space:]]*(proposal[[:space:]]+[0-9a-f][0-9a-f-]{7,}|none[[:space:]]*(—|–|-)[[:space:]]*[^[:space:]].*)[[:space:]]*$'; then
+            echo "Manual line found."
+            exit 0
+          fi
+          echo "::error::Add one line to the PR description: 'Manual: proposal <id>' (from the product-manual MCP's propose_manual_change) or 'Manual: none — <why no user-visible change>'. Label the PR 'manual:skip' to exempt it."
+          exit 1

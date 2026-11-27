@@ -95,6 +95,7 @@ import { AssistantInvite } from "../pages/AssistantInvite";
 import { CreateGate } from "../pages/BuilderHome/CreateGate";
 import { CHATBOT_SUPPORT_ROUTE, ChatbotSupport } from "../pages/ChatbotSupport/ChatbotSupport";
 import { OnboardingSession, OnboardingStart } from "../pages/Onboarding";
+import { ManualRouteFallback } from "../pages/Roadmap/manual/ManualRouteFallback";
 
 /**
  * The Debrief console opens with the Analytics toggle or the clinical
@@ -149,6 +150,14 @@ const ChatbotDetailRoute: React.FC = () => (
 // stylesheet ship as their own chunk, loaded only when the Analytics tab opens.
 const Analytics = lazy(() =>
   import("../pages/Analytics/Analytics").then(module => ({ default: module.Analytics })),
+);
+
+// Lazy-loaded: the Product Manual (Roadmap → Product Manual) carries markdown, the chat and, behind
+// a second split, the xyflow map — none of which the other Roadmap pages need.
+const RoadmapManualPage = lazy(() =>
+  import("../pages/Roadmap/manual/RoadmapManualPage").then(module => ({
+    default: module.RoadmapManualPage,
+  })),
 );
 
 // Lazy-loaded (kept out of the eager @pages barrel): the Context Library is a large page that
@@ -823,6 +832,43 @@ export const RouteLayout: React.FC = () => {
                 <RoadmapGate fallback={<NotFound />}>
                   <RoadmapFrame>
                     <RoadmapMeasuresPage />
+                  </RoadmapFrame>
+                </RoadmapGate>
+              </PrivateLayout>
+            }
+          />
+          {/* Product Manual: a guide to the whole product, its chat and map (product_manual). */}
+          <Route
+            path={ROUTES.ROADMAP_MANUAL}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                requiredFeature={FeatureToggleKey.PRODUCT_MANUAL}
+                fullBleed
+              >
+                <RoadmapGate fallback={<NotFound />}>
+                  <RoadmapFrame>
+                    <Suspense fallback={<ManualRouteFallback />}>
+                      <RoadmapManualPage />
+                    </Suspense>
+                  </RoadmapFrame>
+                </RoadmapGate>
+              </PrivateLayout>
+            }
+          />
+          <Route
+            path={ROUTES.ROADMAP_MANUAL_PAGE(":slug")}
+            element={
+              <PrivateLayout
+                requiredPermissions={[Permissions.VIEW_PRODUCT_ROADMAP]}
+                requiredFeature={FeatureToggleKey.PRODUCT_MANUAL}
+                fullBleed
+              >
+                <RoadmapGate fallback={<NotFound />}>
+                  <RoadmapFrame>
+                    <Suspense fallback={<ManualRouteFallback />}>
+                      <RoadmapManualPage />
+                    </Suspense>
                   </RoadmapFrame>
                 </RoadmapGate>
               </PrivateLayout>

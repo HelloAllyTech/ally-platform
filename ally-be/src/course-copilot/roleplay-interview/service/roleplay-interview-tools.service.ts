@@ -40,6 +40,14 @@ import {
   ROLEPLAY_INTERVIEW_FINISH_WHEN,
   ROLEPLAY_INTERVIEW_TURN_VOCABULARY,
 } from '../util/roleplay-interview-turn.util';
+import {
+  fieldStageRefusal,
+  planRefusal,
+  resolveRoleplayPilotStage,
+  RoleplayPilotPosition,
+  RoleplayPilotStageId,
+  roleplayQuestionRefusal,
+} from '../util/roleplay-pilot-stages.util';
 
 /** Mutable per-turn context threaded through tool executions. */
 export interface RoleplayInterviewToolContext {
@@ -47,6 +55,24 @@ export interface RoleplayInterviewToolContext {
   userId: number;
   /** What this turn wrote, for the receipt and the "something changed" check. */
   changes: { briefFields: Set<string>; planVersion: number | null };
+  /**
+   * Course Pilot stages (ROLEPLAY_PILOT_STAGES), when on: questions asked so far per stage,
+   * counted from the transcript and kept up to date as this turn asks more.
+   */
+  pilot?: { asked: Partial<Record<RoleplayPilotStageId, number>> };
+}
+
+/** Where a staged interview is now; null when stages are off. */
+export function roleplayPilotPosition(
+  context: Pick<RoleplayInterviewToolContext, 'session' | 'pilot'>,
+): RoleplayPilotPosition | null {
+  if (!context.pilot) return null;
+  const brief = context.session.brief ?? {};
+  return resolveRoleplayPilotStage(brief, {
+    clientChosen: characterChoiceProblem(brief) === null,
+    hasPlan: Boolean(context.session.plan),
+    asked: context.pilot.asked,
+  });
 }
 
 const DATA_NOTE =
@@ -331,8 +357,13 @@ export class RoleplayInterviewToolsService {
     @Optional() private readonly guidance?: ContextToolsService,
   ) {}
 
-  /** The validated-turn belt: ask_trainer carries the reply, finish_turn closes. */
-  getToolDefinitions(): AgentToolDefinition[] {
+  /**
+   * The validated-turn belt: ask_trainer carries the reply, finish_turn closes. With stages on,
+   * propose_plan is on it only once the stage allows a plan.
+   */
+  getToolDefinitions(
+    position: RoleplayPilotPosition | null = null,
+  ): AgentToolDefinition[] {
     return [
       withValidatedAsk(ASK_TRAINER, ROLEPLAY_INTERVIEW_TURN_VOCABULARY),
       closingToolDefinition(
@@ -340,7 +371,7 @@ export class RoleplayInterviewToolsService {
         ROLEPLAY_INTERVIEW_FINISH_WHEN,
       ),
       UPDATE_BRIEF,
-      PROPOSE_PLAN,
+      ...(position && !position.stage.canPlan ? [] : [PROPOSE_PLAN]),
       ...LOOKUP_TOOLS,
       ...(this.guidance ? DESIGN_GUIDANCE_SEARCH : []),
     ];
@@ -353,7 +384,37 @@ export class RoleplayInterviewToolsService {
   ): Promise<RoleplayInterviewToolOutcome> {
     switch (name) {
       case 'ask_trainer': {
+        const position = roleplayPilotPosition(context);
+        const refusal = position ? roleplayQuestionRefusal(position) : null;
+        if (refusal) {
+          return {
+            modelResult: {
+              ok: false,
+              error: 'question_limit',
+              message: refusal,
+            },
+            summary: `Question refused: ${position!.stage.title} is out of questions`,
+          };
+        }
+        const early = position
+          ? fieldStageRefusal(position, input?.field)
+          : null;
+        if (early) {
+          return {
+            modelResult: {
+              ok: false,
+              error: 'question_out_of_stage',
+              message: early,
+            },
+            summary: `Question refused: ${String(input?.field)} belongs to a later stage`,
+          };
+        }
         const question = buildQuestion(input);
+        if (position && context.pilot) {
+          question.stage = position.stage.id;
+          context.pilot.asked[position.stage.id] =
+            (context.pilot.asked[position.stage.id] ?? 0) + 1;
+        }
         return {
           modelResult: {
             ok: true,
@@ -701,6 +762,14 @@ export class RoleplayInterviewToolsService {
     input: Record<string, any>,
     context: RoleplayInterviewToolContext,
   ): Promise<RoleplayInterviewToolOutcome> {
+    const position = roleplayPilotPosition(context);
+    const notYet = position ? planRefusal(position) : null;
+    if (notYet) {
+      return {
+        modelResult: { ok: false, error: 'stage_not_ready', message: notYet },
+        summary: `Plan not proposed: ${position!.stage.title} still needs ${position!.missing.join(', ')}`,
+      };
+    }
     const brief = context.session.brief ?? {};
     const needed = stillNeeded(brief);
     if (needed.length) {

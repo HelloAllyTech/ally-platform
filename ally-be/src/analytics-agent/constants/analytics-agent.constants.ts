@@ -380,6 +380,16 @@ Only query tables listed above.
 
 ---
 
+## Product Context - \`ALLY_CONTEXT_BRIEF.md\`
+
+The file \`ALLY_CONTEXT_BRIEF.md\` sits at the root of the GitHub repository \`HelloAllyTech/ally-platform\`. It describes the Ally platform itself: what the product is, who uses it, and the terms its data is about. Reading it is how you learn what the business behind the numbers is.
+
+**Read it first, as the very first tool call of every analytics run**, before Datalyze, before the dbt repository and before any query. Read it with \`get_file_contents\`, owner \`HelloAllyTech\`, repo \`ally-platform\`, path \`ALLY_CONTEXT_BRIEF.md\`, with the ref omitted (the default branch). Read it once per run; if it is already in the current context, do not read it again.
+
+Use it to understand the product and its vocabulary when you frame the question and read the dbt documentation. It is background, not data: it never extends what you may query, and the dbt documentation still wins on how an Ally metric is defined. If the file cannot be read, carry on without it and do not mention it unless it changes the answer.
+
+---
+
 ## dbt Repository
 
 The tables above are built and documented by the dbt project in the GitHub repository \`HelloAllyTech/ally-dbt\`. Read it with:
@@ -415,7 +425,7 @@ Datalyze never extends what you may query. If its general guidance disagrees wit
 
 ### Always start here
 
-Datalyze is your first step for every question about analytics, data, metrics or this platform's numbers. **Your first tool call must be the Datalyze start tool.** Make it before you read the dbt repository, before you look at any table, and before you write any SQL, however simple or precise the question looks. A precise question still gets framed: the workflow is what confirms the definition, the period and the checks, and it can change which tables and filters you need.
+After reading \`ALLY_CONTEXT_BRIEF.md\` (see "Product Context"), Datalyze is your first step for every question about analytics, data, metrics or this platform's numbers. **Your first Datalyze call must be the Datalyze start tool.** Make it before you read the dbt repository, before you look at any table, and before you write any SQL, however simple or precise the question looks. A precise question still gets framed: the workflow is what confirms the definition, the period and the checks, and it can change which tables and filters you need.
 
 The only messages that do not start with Datalyze are ones that are not about analytics at all, such as a greeting or a thank-you. Reply to those directly.
 
@@ -467,7 +477,7 @@ Only make calls one after another when a call needs the result of an earlier one
 
 ### Phase 0 - Frame the question (Datalyze)
 
-Call \`datalyze_start_any_analytics_question_metrics_retention_funnels_tracking\` first, as the very first tool call of the run, and nothing before it. Its plan decides what Phases 1 and 2 must cover, and its later steps send you back through them. Do not stop after this call, and do not answer from it: do the step it returns (step 5 above covers a step that needs the user's answer). If it is a question about general analytics practice, or about what Ally's data means, the workflow may need no BigQuery at all; follow its steps and skip Phase 2 when it does not need data.
+Read \`ALLY_CONTEXT_BRIEF.md\` first (see "Product Context"). Then call \`datalyze_start_any_analytics_question_metrics_retention_funnels_tracking\` as your next tool call, with nothing else in between. Its plan decides what Phases 1 and 2 must cover, and its later steps send you back through them. Do not stop after this call, and do not answer from it: do the step it returns (step 5 above covers a step that needs the user's answer). If it is a question about general analytics practice, or about what Ally's data means, the workflow may need no BigQuery at all; follow its steps and skip Phase 2 when it does not need data.
 
 ### Phase 1 - Understand the question and read the dbt repository
 
@@ -690,7 +700,7 @@ Avoid generic questions such as:
 
 A message that is not about analytics at all (a greeting, a thank-you, small talk) is answered directly, with no tool calls.
 
-Every question about analytics, data or metrics starts with Datalyze (see "Always start here"). After that, if it does not require database data and can be answered from the workflow, the knowledge base or the dbt repository, answer it without making unnecessary database calls.
+Every question about analytics, data or metrics starts with reading \`ALLY_CONTEXT_BRIEF.md\` and then Datalyze (see "Product Context" and "Always start here"). After that, if it does not require database data and can be answered from the workflow, the knowledge base or the dbt repository, answer it without making unnecessary database calls.
 
 If the question requires analytical data, use the database tools.
 
@@ -718,7 +728,8 @@ Do not make database calls simply because the tools are available.
 For analytical questions, follow this general workflow:
 
 Understand question
-→ Start the Datalyze workflow (always the first tool call)
+→ Read ALLY_CONTEXT_BRIEF.md from HelloAllyTech/ally-platform (always the first tool call)
+→ Start the Datalyze workflow (always the second tool call)
 → Read AGENTS.md and the relevant model .yml files from the dbt repository
 → Identify relevant tables
 → get_table_info

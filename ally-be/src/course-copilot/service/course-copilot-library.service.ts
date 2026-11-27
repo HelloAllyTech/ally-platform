@@ -177,6 +177,28 @@ export class CourseCopilotLibraryService {
     return rows.map((row) => ({ id: row.id, name: row.name }));
   }
 
+  /** Trigger-warning names on each roleplay, for the post-build reviewer. */
+  async triggerWarningNamesFor(
+    scenarioIds: number[],
+  ): Promise<Map<number, string[]>> {
+    const out = new Map<number, string[]>();
+    if (!scenarioIds.length) return out;
+    const rows: { scenarioId: number; name: string }[] =
+      await this.dataSource.query(
+        `SELECT stw."scenarioId" AS "scenarioId", tw.name AS name
+           FROM scenario_trigger_warnings stw
+           JOIN trigger_warnings tw ON tw.id = stw."triggerWarningId"
+          WHERE stw."scenarioId" = ANY($1)
+          ORDER BY tw.name`,
+        [scenarioIds],
+      );
+    for (const row of rows) {
+      const id = Number(row.scenarioId);
+      out.set(id, [...(out.get(id) ?? []), row.name]);
+    }
+    return out;
+  }
+
   async listCoverImages(limit = 12): Promise<{ id: string; url: string }[]> {
     const rows = await this.dataSource
       .getRepository(ScenarioCoverImageLibrary)

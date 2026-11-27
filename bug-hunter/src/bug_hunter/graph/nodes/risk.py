@@ -129,6 +129,7 @@ def make_risk_gate_node(deps: GraphDeps):
                     max_lines=limits.run.max_fix_lines_changed,
                     max_prs_per_day=limits.sweep.max_prs_per_day,
                     prs_today=deps.prs_opened_today() if deps.prs_opened_today else 0,
+                    min_confidence=limits.pr.min_confidence,
                 )
                 update["pr_gate_blockers"] = blockers
                 deps.scratchpad.append_note(

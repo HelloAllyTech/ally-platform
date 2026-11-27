@@ -153,8 +153,8 @@ model_for() {
   value="$(printf '%s' "$MODELS_JSON" | jq -r --arg r "$role" '.[$r] // empty' 2>/dev/null || true)"
   printf '%s' "${value:-$fallback}"
 }
-PLANNER_MODEL="$(model_for planner "gemini-2.5-pro")"
-VERIFIER_MODEL="$(model_for verifier "gemini-2.5-pro")"
+PLANNER_MODEL="$(model_for planner "gemini-3.1-pro-preview")"
+VERIFIER_MODEL="$(model_for verifier "gemini-3.1-pro-preview")"
 
 # ── A wall clock per phase ──────────────────────────────────────────────────
 #

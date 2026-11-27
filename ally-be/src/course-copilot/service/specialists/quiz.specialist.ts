@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import {
   TRACK_DEFAULT_QUIZ_PASS_SCORE,
@@ -27,11 +27,16 @@ import {
   COURSE_COPILOT_LIMITS,
   COURSE_COPILOT_PROMPTS,
 } from '../../constants/course-copilot.constants';
+import {
+  AnswerKeyCheckSpecialist,
+  answerKeyProblems,
+} from './answer-key-check.specialist';
 import { SpecialistLlmService } from './specialist-llm.service';
 import {
   ItemSpecialist,
   SpecialistContext,
   SpecialistOutput,
+  SpecialistValidationError,
 } from './specialist.types';
 import {
   asArray,
@@ -151,7 +156,10 @@ interface QuizNormaliseOptions {
  */
 @Injectable()
 export class QuizSpecialist implements ItemSpecialist {
-  constructor(private readonly llm: SpecialistLlmService) {}
+  constructor(
+    private readonly llm: SpecialistLlmService,
+    @Optional() private readonly answerCheck?: AnswerKeyCheckSpecialist,
+  ) {}
 
   async generate(context: SpecialistContext): Promise<SpecialistOutput> {
     const { brief, blueprint, item, previous } = context;
@@ -198,7 +206,7 @@ export class QuizSpecialist implements ItemSpecialist {
       },
     });
 
-    return normaliseQuizOutput(data, {
+    const output = normaliseQuizOutput(data, {
       title: item.title,
       passScore: clampInt(
         item.completionCriteria?.passScore,
@@ -210,6 +218,50 @@ export class QuizSpecialist implements ItemSpecialist {
       keepIds: previous ? collectContentIds(previous.content) : new Set(),
       lenient: Boolean(context.repairErrors?.length),
     });
+    return this.checkAnswerKey(output, context, item.title);
+  }
+
+  /**
+   * Course Pilot 4B (COURSE_PILOT_ANSWER_CHECK): a second model answers the quiz without its key.
+   * First pass: any dispute goes back to the writer as repair notes. Repair pass: a question
+   * still answered differently is dropped while at least half the quiz remains; a question the
+   * check agreed with but called ambiguous stays.
+   */
+  private async checkAnswerKey(
+    output: SpecialistOutput,
+    context: SpecialistContext,
+    title: string,
+  ): Promise<SpecialistOutput> {
+    if (!this.answerCheck?.enabled) return output;
+    const content = output.content as unknown as QuizContent;
+    const disputes = await this.answerCheck.check(
+      content,
+      context.brief,
+      context.usageMetadata,
+    );
+    if (!disputes.length) return output;
+    if (!context.repairErrors?.length) {
+      throw new SpecialistValidationError(answerKeyProblems(disputes));
+    }
+
+    const wrong = new Set(
+      disputes.filter((d) => d.keyed !== d.answered).map((d) => d.questionId),
+    );
+    if (!wrong.size) return output;
+    const kept = content.questions.filter((q) => !wrong.has(q.id));
+    const atLeast = Math.max(1, Math.ceil(content.questions.length / 2));
+    if (kept.length < atLeast) {
+      return {
+        ...output,
+        summary: `${output.summary} · ${plural(wrong.size, 'answer')} still disputed, check before publishing`,
+      };
+    }
+    const next: QuizContent = { ...content, questions: kept };
+    assertTrackItemContent(TrackItemType.QUIZ, next, title);
+    return {
+      content: next as unknown as Record<string, any>,
+      summary: `${summariseQuiz(kept)} · ${plural(wrong.size, 'question')} removed: answer key disputed`,
+    };
   }
 }
 

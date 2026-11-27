@@ -94,6 +94,11 @@ export interface BlueprintPlannerInput {
   referenceMaterial?: string | null;
   /** Learning Design principles ranked for this course; absent when the library has none. */
   designGuidance?: string | null;
+  /**
+   * Course Pilot: require transfer practice for B2/B3 skill targets (told up front, checked by
+   * code, repaired once). Off = today's planning.
+   */
+  checkTransfer?: boolean;
   usageMetadata: Record<string, any>;
 }
 

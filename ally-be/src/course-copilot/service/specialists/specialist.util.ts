@@ -22,6 +22,9 @@ import { SpecialistValidationError } from './specialist.types';
 export const SPECIALIST_MAX_TOKENS = {
   // Sized for a 100-item course: about 400 tokens of JSON per item, plus reasoning.
   BLUEPRINT: 64_000,
+  // Findings only, at most 8: small output, room for reasoning over a 100-item plan.
+  BLUEPRINT_CRITIC: 16_000,
+  ANSWER_KEY_CHECK: 8_000,
   ARTICLE: 12_000,
   QUIZ: 12_000,
   ANNOTATION: 14_000,

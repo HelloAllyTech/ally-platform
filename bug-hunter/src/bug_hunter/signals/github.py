@@ -18,6 +18,10 @@ class GitHubReader(Protocol):
         """The logs of the run's failed jobs, concatenated."""
         ...
 
+    def failed_jobs(self, run_id: int) -> list[dict[str, Any]]:
+        """The run's failed jobs: ``[{name, failed_steps: [str], log}]``."""
+        ...
+
     def issues(self, since: str, label: str) -> list[dict[str, Any]]:
         """Open issues with ``label`` updated since: ``[{number, title, body,
         user: {login}, labels: [{name}], created_at, pull_request?}]``."""

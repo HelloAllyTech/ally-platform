@@ -58,9 +58,17 @@ import { CourseCopilotLibraryService } from './course-copilot-library.service';
 import { CourseCopilotStructureService } from './course-copilot-structure.service';
 import { CourseCopilotCostService } from './course-copilot-cost.service';
 import {
+  coursePilotPosition,
+  coursePilotStaged,
+  coursePilotState,
   CourseCopilotToolContext,
   CourseCopilotToolsService,
 } from './course-copilot-tools.service';
+import {
+  answerConfirmsBrief,
+  briefHash,
+  renderCoursePilotStage,
+} from '../util/course-pilot-stages.util';
 import { AgentTurnSettingsService } from 'src/llm-agent/runtime/agent-turn-settings.service';
 import {
   createValidatedTurnState,
@@ -82,6 +90,8 @@ import { renderTurnProtocol } from 'src/llm-agent/runtime/agent-turn-tools.util'
 import { userWordsToApply } from 'src/llm-agent/runtime/agent-turn-words.util';
 import {
   claimsBriefReady,
+  claimsBuildStarted,
+  promisesQuestion,
   claimsCourseChange,
   COURSE_COPILOT_RECEIPT_VOCABULARY,
   COURSE_COPILOT_TURN_RULES,
@@ -502,14 +512,20 @@ export class CourseCopilotOrchestratorService {
         ? { questionId: dto.questionId, ...(dto.answer ?? {}) }
         : undefined,
       validatedTurns,
+      stages: this.configService.courseCopilot.stages,
     };
+    const stageBefore = await this.recordBriefConfirmation(context);
 
     const system = await this.buildSystemBlocks(session, validatedTurns);
     const messages: any[] = [
       ...(await this.replayHistory(session, history)),
       {
         role: 'user',
-        content: await this.buildLiveUserTurn(session, userContent),
+        content: await this.buildLiveUserTurn(
+          session,
+          userContent,
+          context.stages,
+        ),
       },
     ];
 
@@ -636,6 +652,7 @@ export class CourseCopilotOrchestratorService {
     });
 
     await checkpoint(true);
+    await this.recordStageChange(context, stageBefore);
 
     const fresh = await this.sessionRepository.findOne({
       where: { id: sessionId },
@@ -656,6 +673,58 @@ export class CourseCopilotOrchestratorService {
           : {}),
       },
     };
+  }
+
+  /**
+   * Course Pilot: the trainer's answer to the confirm card closes the final check — in code,
+   * and only for the brief that card summarised. Returns the stage the turn starts in (null
+   * when the stage machine does not govern this session).
+   */
+  private async recordBriefConfirmation(
+    context: CourseCopilotToolContext,
+  ): Promise<string | null> {
+    const { session } = context;
+    if (!coursePilotStaged(session, context.stages)) return null;
+    const state = coursePilotState(session);
+    if (answerConfirmsBrief(state, context.answer, session.brief)) {
+      await this.toolsService.saveCoursePilotState(session, {
+        confirmedBriefHash: briefHash(session.brief),
+        pendingConfirm: null,
+      });
+    }
+    return coursePilotPosition(session).stage.id;
+  }
+
+  /** Append the stage the turn ended in to the session's stage history, when it moved. */
+  private async recordStageChange(
+    context: CourseCopilotToolContext,
+    stageBefore: string | null,
+  ): Promise<void> {
+    if (stageBefore === null) return;
+    try {
+      const { session } = context;
+      // The proposal moved the session past the interview: the plan stage was reached.
+      const now = coursePilotStaged(session, context.stages)
+        ? coursePilotPosition(session).stage.id
+        : 'blueprint';
+      if (now === stageBefore) return;
+      const history = coursePilotState(session).history ?? [];
+      await this.toolsService.saveCoursePilotState(session, {
+        history: [
+          ...history,
+          { stage: now as any, at: new Date().toISOString() },
+        ].slice(-50),
+      });
+      this.logger.info(
+        `[COURSE_PILOT] session=${session.id} stage ${stageBefore} -> ${now}`,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Course Pilot ${context.session.id}: stage history not saved: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   /**
@@ -711,6 +780,7 @@ export class CourseCopilotOrchestratorService {
       tools: () =>
         this.toolsService.getToolDefinitions(context.session, {
           validatedTurns: true,
+          stages: context.stages,
         }),
       maxIterations: loop.maxIterations,
       maxTokens: COURSE_COPILOT_INTERVIEW_MAX_TOKENS,
@@ -726,7 +796,39 @@ export class CourseCopilotOrchestratorService {
       extraProblems: async (ending) => {
         const { message } = ending;
         // Course Pilot: every question is a short choice.
-        const questionProblems = courseCopilotQuestionProblems(ending);
+        const questionProblems = [
+          ...courseCopilotQuestionProblems(ending),
+          ...(ending.name === COURSE_COPILOT_TURN_VOCABULARY.closingTool &&
+          promisesQuestion(message)
+            ? [
+                {
+                  key: 'promised_question_without_card',
+                  toModel:
+                    'Your message says a question is coming, but you ended the turn without one, ' +
+                    'so the trainer has nothing to answer. Ask it now with ask_trainer (one short ' +
+                    'choice card), or remove the promise. Do not list the lookups you ran: the ' +
+                    'trainer sees those already.',
+                  toUser:
+                    'Course Copilot said a question was coming but did not ask it.',
+                },
+              ]
+            : []),
+          ...(context.session.status ===
+            CourseCopilotSessionStatus.AWAITING_BLUEPRINT &&
+          claimsBuildStarted(message)
+            ? [
+                {
+                  key: 'claims_build_started',
+                  toModel:
+                    'Your message says the build is starting, and it is not: only the trainer ' +
+                    'can start it, with the Approve button in the course plan panel. You cannot. ' +
+                    'Tell them to click Approve when they are happy with the plan.',
+                  toUser:
+                    'Course Copilot said the build was starting; it starts only when you click Approve.',
+                },
+              ]
+            : []),
+        ];
         if (!claimsBriefReady(message)) return questionProblems;
         const readiness = this.briefService.readiness(context.session.brief);
         return readiness.ready
@@ -801,7 +903,9 @@ export class CourseCopilotOrchestratorService {
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       turn.iterations = iteration + 1;
       // Tools follow the session's state, which a tool can move mid-turn.
-      const tools = this.toolsService.getToolDefinitions(context.session);
+      const tools = this.toolsService.getToolDefinitions(context.session, {
+        stages: context.stages,
+      });
       const final = yield* this.runPass(provider, {
         model,
         maxTokens: COURSE_COPILOT_INTERVIEW_MAX_TOKENS,
@@ -1005,8 +1109,12 @@ export class CourseCopilotOrchestratorService {
   private async buildLiveUserTurn(
     session: CourseCopilotSession,
     userContent: string,
+    stages?: boolean,
   ): Promise<string> {
     const parts: string[] = [];
+    if (coursePilotStaged(session, stages)) {
+      parts.push(renderCoursePilotStage(coursePilotPosition(session)));
+    }
     const readiness = this.briefService.readiness(session.brief);
     parts.push(
       `<session status="${session.status}" mode="${session.mode}" />`,
@@ -1025,6 +1133,9 @@ export class CourseCopilotOrchestratorService {
       session.blueprint
     ) {
       parts.push(
+        '<approval>The build starts only when the trainer clicks Approve in the course plan ' +
+          'panel. You cannot start it, and you never ask for approval in the chat: when the ' +
+          'trainer is happy with the plan, tell them to click Approve.</approval>',
         `<current_blueprint version="${session.blueprintVersion}">`,
         JSON.stringify(this.compactBlueprint(session)),
         '</current_blueprint>',

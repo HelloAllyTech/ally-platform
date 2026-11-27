@@ -570,11 +570,6 @@ export const ApiEndpoints = {
     ITEM_STAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/star`,
     SEARCH: "/v1/roadmap/search",
   },
-  /** The Owner's old-and-quiet sweep of To do (idea-to-plan audit rec 9). 403 for anyone else. */
-  ROADMAP_V2_SWEEP: {
-    LIST: "/v1/roadmap/todo-sweep",
-    KEEP: "/v1/roadmap/todo-sweep/keep",
-  },
   /** Roadmap v2 P8: the Owner's Measures. 404 while the flag is off, 403 for anyone but an Owner. */
   ROADMAP_V2_MEASURES: {
     METRICS: "/v1/roadmap/metrics",
@@ -1452,6 +1447,33 @@ export const ApiEndpoints = {
   HELPLINE_ADMIN: {
     SETTINGS: "/v1/helpline/admin/settings",
   },
+  /** Roadmap → Product Manual (ally-be docs/product-manual.md). Gated by `product_manual`. */
+  PRODUCT_MANUAL: {
+    TREE: "/v1/product-manual/tree",
+    PAGE: (slug: string) => `/v1/product-manual/pages/${encodeURIComponent(slug)}`,
+    REVERT: (slug: string) => `/v1/product-manual/pages/${encodeURIComponent(slug)}/revert`,
+    SEARCH: "/v1/product-manual/search",
+    GRAPH: "/v1/product-manual/graph",
+    CHANGES: "/v1/product-manual/changes",
+    STATE: "/v1/product-manual/state",
+    CONVERSATIONS: "/v1/product-manual/conversations",
+    CONVERSATION: (id: string) => `/v1/product-manual/conversations/${encodeURIComponent(id)}`,
+    CHAT_STREAM: "/v1/product-manual/chat/stream",
+    DRAFTS: "/v1/product-manual/drafts",
+    DRAFTS_DISMISS: "/v1/product-manual/drafts/dismiss",
+    ADMIN_SETTINGS: "/v1/product-manual/admin/settings",
+    ADMIN_RUN: "/v1/product-manual/admin/run",
+    ADMIN_RUNS: "/v1/product-manual/admin/runs",
+    ADMIN_IMPORT: "/v1/product-manual/admin/import",
+    ADMIN_PROPOSALS: "/v1/product-manual/admin/proposals",
+    ADMIN_PROPOSAL_DISMISS: (id: string) =>
+      `/v1/product-manual/admin/proposals/${encodeURIComponent(id)}/dismiss`,
+    ADMIN_AGENT_KEYS: "/v1/product-manual/admin/agent-keys",
+    ADMIN_AGENT_KEY: (id: string) =>
+      `/v1/product-manual/admin/agent-keys/${encodeURIComponent(id)}`,
+    /** The proposal MCP a coding agent connects to (no admin session, its own key). */
+    MCP: "/v1/product-manual/mcp",
+  },
 };
 
 export const ROUTES = {
@@ -1587,6 +1609,9 @@ export const ROUTES = {
   ROADMAP_BUGS: "/roadmap/bugs",
   /** Roadmap v2's Measures (Owner, P8): funnel, stage times, review wait, releases, spend. */
   ROADMAP_MEASURES: "/roadmap/measures",
+  /** Roadmap → Product Manual: the reader, its chat and map. */
+  ROADMAP_MANUAL: "/roadmap/manual",
+  ROADMAP_MANUAL_PAGE: (slug: string) => `/roadmap/manual/${slug}`,
   /** User Interviews, out of the Roadmap into its own sidebar entry (D14). */
   USER_INTERVIEWS: "/user-interviews",
   COURSE_COPILOT: "/course-copilot",
@@ -1908,6 +1933,13 @@ export const TAG_TYPES = {
   CONTEXT_LIBRARY_READER_KEYS: "contextLibraryReaderKeys",
   // Builder's "Principles in play", per session. Also registered in baseApi.ts's `tagTypes`.
   BUILDER_PRINCIPLES: "builderPrinciples",
+  // Roadmap → Product Manual. Also registered in baseApi.ts's `tagTypes`.
+  PRODUCT_MANUAL_TREE: "productManualTree",
+  PRODUCT_MANUAL_PAGE: "productManualPage",
+  PRODUCT_MANUAL_CHANGES: "productManualChanges",
+  PRODUCT_MANUAL_STATE: "productManualState",
+  PRODUCT_MANUAL_CONVERSATIONS: "productManualConversations",
+  PRODUCT_MANUAL_ADMIN: "productManualAdmin",
 };
 
 /**

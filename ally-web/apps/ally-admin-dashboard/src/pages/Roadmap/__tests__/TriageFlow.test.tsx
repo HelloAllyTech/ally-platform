@@ -183,31 +183,52 @@ describe("To triage (§4.6)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("groups To do by next step, naming only the groups that have ideas (idea-to-plan audit rec 9)", () => {
+  it("lists every To do idea in one flat list, in the order sent (rank #1 first), with no groups or folds", () => {
+    const accepted = Array.from({ length: 12 }, (_, i) =>
+      row(`OPP-5${String(i).padStart(2, "0")}`, { shownStage: "accepted", queueRank: i + 1 }),
+    );
+    renderTriage({
+      data: {
+        sections: {
+          backlog: [
+            ...accepted,
+            row("OPP-414", { queueRank: 13 }),
+            row("OPP-416", {
+              shownStage: "planning",
+              queueRank: 14,
+              statusParts: { stage: "planning" },
+            }),
+          ],
+        },
+      },
+    });
+    const order = Array.from(document.querySelectorAll("li[data-code]")).map(li =>
+      li.getAttribute("data-code"),
+    );
+    expect(order).toEqual([...accepted.map(r => r.code), "OPP-414", "OPP-416"]);
+    // Nothing is folded away, and there are no group headings.
+    expect(screen.getByText("Idea OPP-511")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Plan next|Later/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Show \d+ more$/ })).not.toBeInTheDocument();
+    // The old-ideas banner is gone.
+    expect(screen.queryByText(/older than \d+ days/)).not.toBeInTheDocument();
+  });
+
+  it("tags ideas waiting on the Owner with their stage, and leaves accepted ones plain", () => {
     renderTriage({
       data: {
         sections: {
           backlog: [
             row("OPP-414"),
             row("OPP-416", { shownStage: "planning", statusParts: { stage: "planning" } }),
+            row("OPP-418", { shownStage: "accepted" }),
           ],
         },
       },
     });
-    expect(screen.getByRole("heading", { name: "Review · 1" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Planning in progress · 1" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /^Plan closed/ })).not.toBeInTheDocument();
-  });
-
-  it("folds Later away until asked for", () => {
-    const accepted = Array.from({ length: 11 }, (_, i) =>
-      row(`OPP-5${String(i).padStart(2, "0")}`, { shownStage: "accepted", queueRank: i + 1 }),
-    );
-    renderTriage({ data: { sections: { backlog: accepted } } });
-    expect(screen.getByRole("heading", { name: "Plan next · 10" })).toBeInTheDocument();
-    expect(screen.queryByText("Idea OPP-510")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Show 1 more" }));
-    expect(screen.getByText("Idea OPP-510")).toBeInTheDocument();
+    expect(screen.getByText("Review")).toBeInTheDocument();
+    expect(screen.getByText("Planning in progress")).toBeInTheDocument();
+    expect(screen.queryByText("Later")).not.toBeInTheDocument();
   });
 
   it("shows each idea's queue rank on its row", () => {

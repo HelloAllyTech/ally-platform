@@ -584,6 +584,42 @@ export const COURSE_COPILOT_COURSE_META = definePrompt(
   },
 );
 
+/** src/prompts/course_copilot/answer_key_check.txt */
+export const COURSE_COPILOT_ANSWER_KEY_CHECK = definePrompt(
+  'course_copilot_answer_key_check',
+  {
+    brief_json: 'required',
+    questions_json: 'required',
+  },
+  {
+    name: 'Course Copilot — Answer Key Check',
+    description:
+      "Course Pilot: answers a freshly written quiz's choice and true/false questions without the answer key, flagging ambiguous ones; code compares the answers with the key and sends disputes back to the quiz writer once. JSON mode.",
+    category: 'Course Copilot',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
+/** src/prompts/course_copilot/blueprint_critic.txt */
+export const COURSE_COPILOT_BLUEPRINT_CRITIC = definePrompt(
+  'course_copilot_blueprint_critic',
+  {
+    blueprint_json: 'required',
+    brief_json: 'required',
+    design_guidance: 'optional',
+    max_findings: 'optional',
+  },
+  {
+    name: 'Course Copilot — Blueprint Critic',
+    description:
+      'Course Pilot: checks a freshly planned blueprint against the confirmed brief and Learning Design principles (assessment, skill targets at their A/B, progression, reflection, fit) before the trainer sees it. Returns at most 8 blocking/advisory findings; blocking ones send the plan back to the planner once. JSON mode.',
+    category: 'Course Copilot',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
 /** src/prompts/course_copilot/course_reviewer.txt */
 export const COURSE_COPILOT_COURSE_REVIEWER = definePrompt(
   'course_copilot_course_reviewer',

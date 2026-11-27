@@ -12,6 +12,10 @@ import {
   normaliseBlueprint,
   validateBlueprint,
 } from '../../util/course-blueprint.util';
+import {
+  transferProblems,
+  transferRequirements,
+} from '../../util/course-pilot-transfer.util';
 import { SpecialistLlmService } from './specialist-llm.service';
 import { learnerProfileReference } from '../course-copilot-learner-profile.service';
 import { exampleCourseReference } from '../course-copilot-example-course.service';
@@ -55,8 +59,10 @@ export class BlueprintPlannerSpecialist {
   constructor(private readonly llm: SpecialistLlmService) {}
 
   async plan(input: BlueprintPlannerInput): Promise<CourseBlueprint> {
-    const problemsOf = (blueprint: CourseBlueprint) =>
-      validateBlueprint(blueprint, input.brief);
+    const problemsOf = (blueprint: CourseBlueprint) => [
+      ...validateBlueprint(blueprint, input.brief),
+      ...(input.checkTransfer ? transferProblems(blueprint, input.brief) : []),
+    ];
 
     let first: CourseBlueprint;
     try {
@@ -79,6 +85,25 @@ export class BlueprintPlannerSpecialist {
         `Blueprint repair for session ${input.sessionId} returned no JSON; keeping the first plan.`,
       );
       return first;
+    }
+  }
+
+  /**
+   * One more plan with a list of problems to fix (the Course Pilot critic's blocking findings).
+   * Null when the model returns no usable JSON — the caller keeps the plan it has.
+   */
+  async repair(
+    input: BlueprintPlannerInput,
+    problems: string[],
+  ): Promise<CourseBlueprint | null> {
+    try {
+      return await this.attempt(input, problems);
+    } catch (error) {
+      if (!(error instanceof SpecialistValidationError)) throw error;
+      this.logger.warn(
+        `Critic repair for session ${input.sessionId} returned no JSON; keeping the first plan.`,
+      );
+      return null;
     }
   }
 
@@ -105,6 +130,7 @@ export class BlueprintPlannerSpecialist {
           // A person-chosen published course of a similar size, as a pattern (not content).
           exampleCourseReference(brief?.shape?.durationMinutes),
           input.designGuidance,
+          input.checkTransfer ? transferRequirements(brief) : null,
         ]
           .map((part) => part?.trim())
           .filter(Boolean)

@@ -22,6 +22,8 @@ import { RateLimitModule } from './rate-limit/rate-limit.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AnalyticsAgentModule } from './analytics-agent/analytics-agent.module';
 import { PmAgentModule } from './pm-agent/pm-agent.module';
+import { ProductManualAgentModule } from './product-manual/product-manual-agent.module';
+import { ProductManualModule } from './product-manual/product-manual.module';
 import { BugHunterApprovalsModule } from './bug-hunter-approvals/bug-hunter-approvals.module';
 import { BuilderModule } from './builder/builder.module';
 import { ContextLibraryModule } from './context-library/context-library.module';
@@ -175,6 +177,8 @@ import { DebriefFeedbackModule } from './debrief-feedback/debrief-feedback.modul
     LabModule,
     SkillExperimentModule,
     ProductRoadmapModule,
+    ProductManualModule,
+    ProductManualAgentModule,
     ProductPlanningModule,
     LogsModule,
     ChangelogModule,

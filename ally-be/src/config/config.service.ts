@@ -1165,6 +1165,32 @@ export class AppConfigService {
           10,
         ),
       ),
+      // Course Pilot stage machine (phase 1): interview stages, per-stage tools and question
+      // limits, and a trainer-confirmed brief before any blueprint. Off = today's interview.
+      stages:
+        String(
+          this.configService.get<string>('COURSE_PILOT_STAGES', 'false'),
+        ).toLowerCase() === 'true',
+      // Course Pilot blueprint critic: a separate check of each proposed plan, with one repair
+      // round on blocking findings. Off = the plan goes to the trainer as the planner wrote it.
+      critic:
+        String(
+          this.configService.get<string>('COURSE_PILOT_CRITIC', 'false'),
+        ).toLowerCase() === 'true',
+      // Course Pilot stages for the roleplay interview (phase 5): interview stages, per-stage
+      // question limits, and propose_plan only once the brief can carry a plan. On by default
+      // (eval: complete briefs 7/8 vs 4/8, same questions); ROLEPLAY_PILOT_STAGES=false turns it off.
+      roleplayStages:
+        String(
+          this.configService.get<string>('ROLEPLAY_PILOT_STAGES', 'true'),
+        ).toLowerCase() !== 'false',
+      // Course Pilot answer-key check: a second model answers each quiz without the key; a
+      // disputed question goes back to the quiz writer once. On by default (eval: 68/68
+      // planted key errors caught, no false alarms); COURSE_PILOT_ANSWER_CHECK=false turns it off.
+      answerCheck:
+        String(
+          this.configService.get<string>('COURSE_PILOT_ANSWER_CHECK', 'true'),
+        ).toLowerCase() !== 'false',
       // Default per-session spend ceiling, USD. 0 = uncapped.
       sessionBudgetUsd: Number(
         this.configService.get<number>('COURSE_COPILOT_SESSION_BUDGET_USD', 15),

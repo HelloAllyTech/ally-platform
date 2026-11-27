@@ -298,6 +298,9 @@ class PrConfig(_Strict):
     # patch, reviewer notes), never a PR or an approval request. Switching to pr
     # needs a holdout milestone with >= 60% fix pass (docs/bug-hunter/CONTEXT.md).
     output_mode: OutputMode = "suggested_fix"
+    # the lowest confidence the strict gate accepts in auto mode (user, 2026-11-26:
+    # medium, so a fix that passes every other check opens its PR without asking)
+    min_confidence: Literal["high", "medium"] = "high"
     # where PRs open (chunk 11); never the default branch as head
     repo: str = "HelloAllyTech/ally-platform"
 

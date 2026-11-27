@@ -34,7 +34,15 @@ def test_reader_only_issues_get_requests_with_the_token() -> None:
             return Resp(
                 {
                     "jobs": [
-                        {"id": 7, "conclusion": "failure"},
+                        {
+                            "id": 7,
+                            "name": "Jest",
+                            "conclusion": "failure",
+                            "steps": [
+                                {"name": "Lint", "conclusion": "success"},
+                                {"name": "Run tests", "conclusion": "failure"},
+                            ],
+                        },
                         {"id": 8, "conclusion": "success"},
                     ]
                 }
@@ -51,6 +59,13 @@ def test_reader_only_issues_get_requests_with_the_token() -> None:
         == 1
     )
     assert gh.failed_job_logs(1) == "FAILED tests/x.py::test_a"
+    assert gh.failed_jobs(1) == [
+        {
+            "name": "Jest",
+            "failed_steps": ["Run tests"],
+            "log": "FAILED tests/x.py::test_a",
+        }
+    ]
     assert gh.is_org_member("HelloAllyTech", "staff") is True
     assert gh.is_org_member("HelloAllyTech", "outsider") is False
     assert all(r.get_method() == "GET" for r in seen)

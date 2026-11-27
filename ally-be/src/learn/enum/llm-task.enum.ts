@@ -191,6 +191,12 @@ export enum LlmTask {
   // read from llm_usage rows carrying it (PmAgentBudgetService, IST month). The pipeline
   // may add finer `pm_agent_*` labels per lane; the budget sums those too.
   PM_AGENT = 'pm_agent',
+  // Product Manual (src/product-manual, docs/product-manual.md): one pass of the staff chat's tool
+  // loop, and one pass of the weekly maintenance agent. Both labels start `product_manual_` because
+  // the manual's monthly budget is read from llm_usage rows carrying that prefix (ManualBudgetService,
+  // IST month), so chat and weekly spend share one cap.
+  PRODUCT_MANUAL_CHAT = 'product_manual_chat',
+  PRODUCT_MANUAL_AGENT = 'product_manual_agent',
   // Foundational helping skills (src/foundational-skills): one call per
   // 5,000-character cut of a learner's roleplay speech, scoring it against the
   // fixed foundational helping skills rubric. Scheduled, never on a request path. Its own
@@ -385,6 +391,8 @@ export enum LlmTask {
   // metadata.courseCopilotSessionId, which is what the session budget sums.
   COURSE_COPILOT_INTERVIEW = 'course_copilot_interview',
   COURSE_COPILOT_BLUEPRINT = 'course_copilot_blueprint',
+  COURSE_COPILOT_BLUEPRINT_CRITIC = 'course_copilot_blueprint_critic',
+  COURSE_COPILOT_ANSWER_KEY_CHECK = 'course_copilot_answer_key_check',
   COURSE_COPILOT_ARTICLE = 'course_copilot_article',
   COURSE_COPILOT_QUIZ = 'course_copilot_quiz',
   COURSE_COPILOT_JOURNAL = 'course_copilot_journal',

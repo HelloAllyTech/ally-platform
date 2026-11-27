@@ -2252,6 +2252,50 @@ const ALLY_BE_TASKS: AiTaskEntry[] = [
     configuredBy: 'LLM_REASONING_MODEL',
     promptOverride: 'pm_agent_lessons',
   },
+  // Product Manual (src/product-manual, docs/product-manual.md). The system prompts are code
+  // constants (src/product-manual/constants/manual-agent.constants.ts), not Skills Store rows, so
+  // there is no promptOverride: the model is the tier's unless the resolver is given one. Both
+  // labels start `product_manual_`, which is how the manual's one monthly budget sums them.
+  {
+    id: 'product-manual-chat',
+    task: LlmTask.PRODUCT_MANUAL_CHAT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'A staff member sends a message in the Product Manual chat (admin → Roadmap → Product Manual)',
+    detail:
+      'A tool loop of at most 10 lookups plus one closing pass per message, 4,000 output tokens a ' +
+      'pass, each pass one llm_usage row. It searches and reads the manual first, then the code on ' +
+      'master through Builder’s GitHub read tools, the roadmap, and the Analytics Agent for callers ' +
+      'holding analytics_agent (that call is the analytics agent’s own row). It may edit or add a ' +
+      'manual page live and put rough ideas in the drafts tray; edits are withheld once the month’s ' +
+      'manual budget is used up, reading and answering are not. Prompt and page outline ride in two ' +
+      'cached system blocks; a failing provider retries the pass once on the tier model.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+  },
+  {
+    id: 'product-manual-agent',
+    task: LlmTask.PRODUCT_MANUAL_AGENT,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Weekly on Mondays (07:30 IST), or Run now in the Product Manual settings, while the weekly ' +
+      'agent is switched on and the month has budget',
+    detail:
+      'Applies open manual proposals (from coding agents and the chat), then checks pages against the ' +
+      'code on master: at most 25 work items a run and 8 passes of 4,000 output tokens each, then one ' +
+      '600-token summary call. Every pass first reserves its worst-case cost inside a per-run cap ' +
+      '(the smaller of what is left this month and a quarter of the monthly budget); a pass that ' +
+      'cannot reserve is not made and the run stops cleanly. Writes go through the single page ' +
+      'writer, so every change is a revision in the change log.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+  },
   {
     id: 'foundational-skills-judge',
     task: LlmTask.FOUNDATIONAL_SKILLS_ASSESSMENT,
@@ -2886,7 +2930,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
     trigger: 'A large PRD is cut into milestones',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
-    defaultModel: 'gemini-2.5-pro',
+    defaultModel: 'gemini-3.1-pro-preview',
     configuredBy: 'BUILDER_PLANNER_MODEL',
     promptOverride: 'builder_epic_system',
     configPath: 'builder.plannerModel',
@@ -2903,7 +2947,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       'worked by opencode (builder-opencode-build, below).',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
-    defaultModel: 'gemini-2.5-pro',
+    defaultModel: 'gemini-3.1-pro-preview',
     configuredBy:
       'BUILDER_BUILD_MODEL / BUILDER_PLANNER_MODEL / BUILDER_VERIFIER_MODEL',
     configPath: 'builder.coderModel',
@@ -3084,7 +3128,7 @@ const BUILDER_TASKS: AiTaskEntry[] = [
       'and every build phase read before opening files.',
     kind: AiTaskKind.COMPLETION,
     provider: 'gemini',
-    defaultModel: 'gemini-2.5-pro',
+    defaultModel: 'gemini-3.1-pro-preview',
     configuredBy: 'BUILDER_MAP_MODEL (scripts/builder/refresh-repo-map.sh)',
   },
 ];
@@ -3261,6 +3305,40 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
     defaultModel: 'gpt-4o-mini',
     configuredBy: 'LLM_FAST_MODEL',
     promptOverride: 'course_copilot_course_meta',
+  },
+  {
+    id: 'course-copilot-blueprint-critic',
+    task: LlmTask.COURSE_COPILOT_BLUEPRINT_CRITIC,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Course Pilot checks a freshly planned blueprint before the trainer sees it (COURSE_PILOT_CRITIC)',
+    detail:
+      'One critic pass per proposed blueprint against the brief and Learning Design ' +
+      'principles (assessment, skill targets at A/B, progression, reflection, fit). ' +
+      'Blocking findings send the plan back to the planner once. At most 8 findings. JSON mode.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'course_copilot_blueprint_critic',
+  },
+  {
+    id: 'course-copilot-answer-key-check',
+    task: LlmTask.COURSE_COPILOT_ANSWER_KEY_CHECK,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'Course Pilot checks a freshly written quiz answer key (COURSE_PILOT_ANSWER_CHECK)',
+    detail:
+      'Answers every choice and true/false question without the key; code compares with ' +
+      'the key. Disputes go back to the quiz writer once, then a still-disputed question ' +
+      'is dropped. One call per quiz (two when repaired). JSON mode.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'course_copilot_answer_key_check',
   },
   {
     id: 'course-copilot-review',

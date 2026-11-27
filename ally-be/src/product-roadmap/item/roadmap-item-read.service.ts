@@ -989,6 +989,9 @@ export class RoadmapItemReadService {
               s."leadUserId", s."planStage" AS "sessionPlanStage",
               s."planStageAt" AS "sessionPlanStageAt", s."updatedAt" AS "sessionUpdatedAt",
               s."lastRunSequence", s.repos AS "sessionRepos",
+              EXISTS (SELECT 1 FROM "builder_build_runs" br
+                       WHERE br."sessionId" = s.id AND br.mode <> 'design'
+                     ) AS "hasBuildRun",
               s."totalCostUsd", s."budgetUsd",
               s.plan->'closed' AS "planClosed",
               s.plan->'launch'->>'launchedAt' AS "launchedAt",
@@ -1116,6 +1119,7 @@ export class RoadmapItemReadService {
             planStageAt: toIso(f.sessionPlanStageAt),
             updatedAt: toIso(f.sessionUpdatedAt),
             lastRunSequence: num(f.lastRunSequence),
+            hasBuildRun: f.hasBuildRun === true,
             repos: Array.isArray(asJson(f.sessionRepos))
               ? (asJson<string[]>(f.sessionRepos) as string[])
               : [],

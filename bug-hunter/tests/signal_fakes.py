@@ -20,6 +20,19 @@ class FixtureGitHub:
     def failed_job_logs(self, run_id):
         return self.data["logs"].get(str(run_id), "")
 
+    def failed_jobs(self, run_id):
+        # recorded jobs when the fixture has them, else one test job with the log
+        jobs = self.data.get("jobs", {}).get(str(run_id))
+        if jobs is not None:
+            return [dict(j, log=j.get("log", "")) for j in jobs]
+        return [
+            {
+                "name": "Tests",
+                "failed_steps": ["Run tests"],
+                "log": self.failed_job_logs(run_id),
+            }
+        ]
+
     def issues(self, since, label):
         self.calls.append(("issues", since, label))
         return list(self.data["issues"])

@@ -185,6 +185,8 @@ export interface RoleplayInterviewQuestion {
   rationale?: string;
   /** The brief field this question fills: a pick is recorded by the server, not left to the model. */
   field?: QuestionBriefField;
+  /** Staged interviews (ROLEPLAY_PILOT_STAGES): the stage it was asked in, to count per stage. */
+  stage?: string;
 }
 
 /**

@@ -1,6 +1,11 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+import {
+  BUILDER_ENGINE_PRO_MODEL,
+  BUILDER_MODEL_DEFAULTS,
+} from '../builder.constants';
+
 const SCRIPTS = join(__dirname, '..', '..', '..', '..', 'scripts', 'builder');
 
 const runEngine = (): string =>
@@ -110,5 +115,28 @@ describe('opencode engine invocation', () => {
    */
   it('is installed at the version the spike verified', () => {
     expect(installEngine()).toMatch(/OPENCODE_VERSION="1\.18\.32"/);
+  });
+});
+
+describe('opencode engine model defaults', () => {
+  /**
+   * opencode 1.18.32 lists `google/gemini-2.5-*` but cannot run them: the phase
+   * dies in two seconds with ProviderModelNotFoundError, reported as "Unexpected
+   * server error" (every design run from 2026-11-26). The key and the model are
+   * fine at Google, so nothing about the failure points here — this is the check.
+   */
+  it('runs no opencode tier on a Gemini 2.5 model', () => {
+    for (const tier of ['planner', 'coder', 'verifier'] as const) {
+      expect(BUILDER_MODEL_DEFAULTS[tier]).toBe(BUILDER_ENGINE_PRO_MODEL);
+      expect(BUILDER_MODEL_DEFAULTS[tier]).not.toMatch(/^gemini-2\.5/);
+    }
+  });
+
+  it('keeps the script fallbacks on the same model as the constant', () => {
+    const run = runEngine();
+    expect(run).toContain(`model_for planner "${BUILDER_ENGINE_PRO_MODEL}"`);
+    expect(run).toContain(`model_for verifier "${BUILDER_ENGINE_PRO_MODEL}"`);
+    const map = readFileSync(join(SCRIPTS, 'refresh-repo-map.sh'), 'utf8');
+    expect(map).toContain(`BUILDER_MAP_MODEL:-${BUILDER_ENGINE_PRO_MODEL}}`);
   });
 });
