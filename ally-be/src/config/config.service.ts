@@ -1169,8 +1169,8 @@ export class AppConfigService {
       // limits, and a trainer-confirmed brief before any blueprint. Off = today's interview.
       stages:
         String(
-          this.configService.get<string>('COURSE_PILOT_STAGES', 'false'),
-        ).toLowerCase() === 'true',
+          this.configService.get<string>('COURSE_PILOT_STAGES', 'true'),
+        ).toLowerCase() !== 'false',
       // Course Pilot blueprint critic: a separate check of each proposed plan, with one repair
       // round on blocking findings. Off = the plan goes to the trainer as the planner wrote it.
       critic:

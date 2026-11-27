@@ -391,3 +391,37 @@ export function courseCopilotQuestionProblems(ending: {
   }
   return problems;
 }
+
+/**
+ * Brief field paths a reply names ("/audience/who"). A trainer should never see one, and a path
+ * the reply claims to have recorded must actually be in the brief: a turn said "I recorded your
+ * wording in /audience/who" having saved only /seed.
+ */
+const BRIEF_PATH =
+  /(?:^|[\s'"(`])(\/(?:seed|audience|learnerProfileId|outcomes|competencyIds|skillTargets|assessment|shape|look|notes)(?:\/[A-Za-z0-9_-]+)*)/g;
+
+/** Brief field names a trainer should never read ("learnerProfileId", "durationMinutes"). */
+const BRIEF_FIELD_NAME =
+  /\b(learnerProfileId|learnerProfileName|competencyIds|skillTargets|durationMinutes|languageIds|terminalOutcome|enablingOutcomes|confirmedBriefHash)\b/g;
+
+export function briefPathsIn(text: string | null | undefined): string[] {
+  return [...String(text ?? '').matchAll(BRIEF_PATH)].map((m) => m[1]);
+}
+
+export function briefFieldNamesIn(text: string | null | undefined): string[] {
+  return [
+    ...new Set(
+      [...String(text ?? '').matchAll(BRIEF_FIELD_NAME)].map((m) => m[1]),
+    ),
+  ];
+}
+
+/** The value at a JSON-pointer-like path in the brief, or undefined. */
+export function briefValueAt(brief: unknown, path: string): unknown {
+  let node: any = brief;
+  for (const key of path.split('/').filter(Boolean)) {
+    if (node == null || typeof node !== 'object') return undefined;
+    node = node[key];
+  }
+  return node;
+}

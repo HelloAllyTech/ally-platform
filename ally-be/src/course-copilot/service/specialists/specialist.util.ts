@@ -25,6 +25,7 @@ export const SPECIALIST_MAX_TOKENS = {
   // Findings only, at most 8: small output, room for reasoning over a 100-item plan.
   BLUEPRINT_CRITIC: 16_000,
   ANSWER_KEY_CHECK: 8_000,
+  RESEARCHER: 4_000,
   ARTICLE: 12_000,
   QUIZ: 12_000,
   ANNOTATION: 14_000,

@@ -263,6 +263,9 @@ describe('Course Pilot stages', () => {
 });
 
 import {
+  briefFieldNamesIn,
+  briefPathsIn,
+  briefValueAt,
   claimsBuildStarted,
   promisesQuestion,
 } from '../course-copilot-turn.util';
@@ -333,5 +336,79 @@ describe('promisesQuestion', () => {
     expect(
       promisesQuestion('The plan is on the right. Approve it when ready.'),
     ).toBe(false);
+  });
+});
+
+describe('briefPathsIn / briefValueAt', () => {
+  it('finds brief field paths a reply names', () => {
+    expect(
+      briefPathsIn(
+        "I recorded your wording 'new helpline volunteers' in /audience/who.",
+      ),
+    ).toEqual(['/audience/who']);
+    expect(
+      briefPathsIn('Set /shape/durationMinutes and /assessment/kind.'),
+    ).toEqual(['/shape/durationMinutes', '/assessment/kind']);
+    expect(
+      briefPathsIn('About 60 minutes, in English, with a roleplay at the end.'),
+    ).toEqual([]);
+    expect(briefPathsIn('See https://example.com/audience/who')).toEqual([]);
+  });
+
+  it('reads the value at a path, undefined when absent', () => {
+    const brief = {
+      seed: 'x',
+      audience: { who: '' },
+      shape: { durationMinutes: 60 },
+    };
+    expect(briefValueAt(brief, '/shape/durationMinutes')).toBe(60);
+    expect(briefValueAt(brief, '/audience/who')).toBe('');
+    expect(briefValueAt(brief, '/assessment/kind')).toBeUndefined();
+  });
+});
+
+describe('briefFieldNamesIn', () => {
+  it('finds field names a trainer should not read', () => {
+    expect(
+      briefFieldNamesIn("I set the learnerProfileId to 'helpline-responders'."),
+    ).toEqual(['learnerProfileId']);
+    expect(
+      briefFieldNamesIn('I chose the Helpline responders profile.'),
+    ).toEqual([]);
+  });
+});
+
+describe('stage research text', () => {
+  it('builds the stage question from the brief, none for the confirm and plan stages', () => {
+    const { stageResearchQuestion } = jest.requireActual(
+      '../course-pilot-stages.util',
+    );
+    expect(
+      stageResearchQuestion('brief.assessment', {
+        seed: 'crisis calls',
+        audience: { who: 'new volunteers' },
+      }),
+    ).toBe(
+      'How should mastery be assessed for new volunteers after a course on: crisis calls?',
+    );
+    expect(stageResearchQuestion('brief.final', {})).toBeNull();
+    expect(stageResearchQuestion('blueprint', {})).toBeNull();
+  });
+
+  it("shows the pack with each point's sources", () => {
+    const { renderStageResearch } = jest.requireActual(
+      '../course-pilot-stages.util',
+    );
+    const text = renderStageResearch({
+      question: 'q',
+      summary: 'Roleplay suits it.',
+      points: [
+        { text: 'Assess by roleplay', sources: ['Design principle FP-1'] },
+      ],
+      gaps: ['local numbers'],
+      at: 'now',
+    });
+    expect(text).toContain('- Assess by roleplay [Design principle FP-1]');
+    expect(text).toContain('Not covered by the sources: local numbers');
   });
 });

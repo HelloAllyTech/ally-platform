@@ -147,7 +147,7 @@ in AWS form, so they do not render locally — the same as the course editor's o
 | `COURSE_COPILOT_IMAGE_COST_USD` | 0.10 | Flat per image |
 | `COURSE_COPILOT_BUILD_CONCURRENCY` | 4 | |
 | `OPENAI_IMAGE_MODEL` / `CHARACTER_IMAGE_DEFAULT_PROVIDER` + `LEARN_MEDIA_PUBLIC_S3_BUCKET` | — | Images are skipped with a reason without them |
-| `COURSE_PILOT_STAGES` | false | Course Pilot stage machine (below) and the B2/B3 transfer check |
+| `COURSE_PILOT_STAGES` | true | Course Pilot stage machine (below), the Researcher and the B2/B3 transfer check; `false` turns them off |
 | `COURSE_PILOT_CRITIC` | false | Course Pilot blueprint critic (below) |
 | `COURSE_PILOT_ANSWER_CHECK` | true | Course Pilot quiz answer-key check (below); `false` turns it off |
 | `ROLEPLAY_PILOT_STAGES` | true | Course Pilot stages for the roleplay interview (below); `false` turns it off |
@@ -160,8 +160,8 @@ have no limit of their own; the item limits and the session budget bound them.
 ## Course Pilot (behind switches)
 
 Phases 1, 3, 4B and 5 of the Course Pilot architecture plan, each behind its own env switch. The
-course stage machine and critic are off until turned on; the answer-key check and the roleplay
-and character interviews' stages are on unless set to `false`.
+critic is off until turned on; the course stage machine (with the Researcher), the answer-key
+check and the roleplay and character interviews' stages are on unless set to `false`.
 
 - **Stage machine** (`COURSE_PILOT_STAGES`, `src/course-copilot/util/course-pilot-stages.util.ts`). The interview's
   stages live in code: intake → learners → outcomes and skill targets → assessment → time and
@@ -172,6 +172,15 @@ and character interviews' stages are on unless set to `false`.
   confirmation is matched to a hash of what the card shows, so changing any of it reopens the
   check). State: `course_copilot_sessions.metadata.coursePilot` (questions per stage, the pending
   confirm card, the confirmed hash, stage history).
+- **Researcher and knowledge per stage** (same switch, `src/course-copilot/service/specialists/researcher.specialist.ts`,
+  prompt `course_copilot_researcher`). Each stage lists what it may read (files, Learning Design
+  principles, learner profiles, example courses, learner results); its belt has one `research`
+  tool instead of the raw reading tools. Code gathers snippets from that stage's sources in
+  parallel and a fast model condenses them into a short pack, every point citing a snippet it was
+  given (uncited points are dropped). Code runs it once when the interview enters a stage and
+  hands the pack to the agent (`metadata.coursePilot.research`); after the confirm card, the brief
+  is locked for that turn so the plan is built from what was confirmed. Lookups that return ids for the brief (learner profile and
+  competency lists, languages, the roleplay library) stay on the belt.
 - **Transfer check** (same switch, `src/course-copilot/util/course-pilot-transfer.util.ts`). Practice items carry
   `spec.transfer` (`practised` / `new-similar` / `new-harder`) and `spec.targetSkills`; a B2 skill
   target needs a `new-similar` practice and a B3 one a `new-harder` practice, each after a practised

@@ -58,6 +58,7 @@ import { CourseMetaSpecialist } from './service/specialists/course-meta.speciali
 import { CourseReviewSpecialist } from './service/specialists/course-review.specialist';
 import { BlueprintCriticSpecialist } from './service/specialists/blueprint-critic.specialist';
 import { AnswerKeyCheckSpecialist } from './service/specialists/answer-key-check.specialist';
+import { ResearcherSpecialist } from './service/specialists/researcher.specialist';
 import { ImagePromptSpecialist } from './service/specialists/image-prompt.specialist';
 import { JournalSpecialist } from './service/specialists/journal.specialist';
 import { LandingPageSpecialist } from './service/specialists/landing-page.specialist';
@@ -148,6 +149,7 @@ import { RoleplayInterviewOrchestratorService } from './roleplay-interview/servi
     BlueprintPlannerSpecialist,
     BlueprintCriticSpecialist,
     AnswerKeyCheckSpecialist,
+    ResearcherSpecialist,
     ArticleSpecialist,
     QuizSpecialist,
     JournalSpecialist,

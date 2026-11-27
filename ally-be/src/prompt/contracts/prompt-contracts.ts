@@ -584,6 +584,26 @@ export const COURSE_COPILOT_COURSE_META = definePrompt(
   },
 );
 
+/** src/prompts/course_copilot/researcher.txt */
+export const COURSE_COPILOT_RESEARCHER = definePrompt(
+  'course_copilot_researcher',
+  {
+    question: 'required',
+    stage: 'required',
+    brief_json: 'required',
+    snippets_json: 'required',
+    max_points: 'optional',
+  },
+  {
+    name: 'Course Copilot — Researcher',
+    description:
+      "Course Pilot: condenses snippets from the current stage's knowledge (files, principles, learner profiles, example courses, learner results) into a short cited knowledge pack for the course designer. Never writes content or decides. JSON mode.",
+    category: 'Course Copilot',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
 /** src/prompts/course_copilot/answer_key_check.txt */
 export const COURSE_COPILOT_ANSWER_KEY_CHECK = definePrompt(
   'course_copilot_answer_key_check',

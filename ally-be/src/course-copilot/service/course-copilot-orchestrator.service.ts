@@ -68,6 +68,7 @@ import {
   answerConfirmsBrief,
   briefHash,
   renderCoursePilotStage,
+  renderStageResearch,
 } from '../util/course-pilot-stages.util';
 import { AgentTurnSettingsService } from 'src/llm-agent/runtime/agent-turn-settings.service';
 import {
@@ -92,6 +93,9 @@ import {
   claimsBriefReady,
   claimsBuildStarted,
   promisesQuestion,
+  briefFieldNamesIn,
+  briefPathsIn,
+  briefValueAt,
   claimsCourseChange,
   COURSE_COPILOT_RECEIPT_VOCABULARY,
   COURSE_COPILOT_TURN_RULES,
@@ -515,6 +519,8 @@ export class CourseCopilotOrchestratorService {
       stages: this.configService.courseCopilot.stages,
     };
     const stageBefore = await this.recordBriefConfirmation(context);
+    // Knowledge per stage: the Researcher's pack for the stage this turn is in (run once).
+    const stagePack = await this.toolsService.stageResearch(context);
 
     const system = await this.buildSystemBlocks(session, validatedTurns);
     const messages: any[] = [
@@ -525,6 +531,8 @@ export class CourseCopilotOrchestratorService {
           session,
           userContent,
           context.stages,
+          context.justConfirmed,
+          stagePack?.pack ?? null,
         ),
       },
     ];
@@ -691,6 +699,10 @@ export class CourseCopilotOrchestratorService {
         confirmedBriefHash: briefHash(session.brief),
         pendingConfirm: null,
       });
+      // Confirmed with nothing typed: plan now, brief locked for this turn.
+      context.justConfirmed = !(context.answer?.customValues ?? []).some(
+        (value) => String(value ?? '').trim(),
+      );
     }
     return coursePilotPosition(session).stage.id;
   }
@@ -781,6 +793,7 @@ export class CourseCopilotOrchestratorService {
         this.toolsService.getToolDefinitions(context.session, {
           validatedTurns: true,
           stages: context.stages,
+          justConfirmed: context.justConfirmed,
         }),
       maxIterations: loop.maxIterations,
       maxTokens: COURSE_COPILOT_INTERVIEW_MAX_TOKENS,
@@ -798,6 +811,35 @@ export class CourseCopilotOrchestratorService {
         // Course Pilot: every question is a short choice.
         const questionProblems = [
           ...courseCopilotQuestionProblems(ending),
+          // A reply that names a brief field path: the trainer should see plain words, and a
+          // path it claims to have recorded must be in the brief.
+          ...(() => {
+            const paths = briefPathsIn(message);
+            const names = briefFieldNamesIn(message);
+            if (!paths.length && !names.length) return [];
+            const empty = paths.filter((path) => {
+              const value = briefValueAt(context.session.brief, path);
+              return (
+                value === undefined ||
+                value === null ||
+                value === '' ||
+                (Array.isArray(value) && !value.length)
+              );
+            });
+            return [
+              {
+                key: 'brief_path_in_reply',
+                toModel:
+                  `Your message names brief fields (${[...paths, ...names].join(', ')}). Say what you ` +
+                  'recorded in plain words instead.' +
+                  (empty.length
+                    ? ` And ${empty.join(', ')} is still empty in the brief: you did not record ` +
+                      'it. Record it with update_brief, or do not claim it.'
+                    : ''),
+                toUser: 'Course Copilot showed an internal field name.',
+              },
+            ];
+          })(),
           ...(ending.name === COURSE_COPILOT_TURN_VOCABULARY.closingTool &&
           promisesQuestion(message)
             ? [
@@ -905,6 +947,7 @@ export class CourseCopilotOrchestratorService {
       // Tools follow the session's state, which a tool can move mid-turn.
       const tools = this.toolsService.getToolDefinitions(context.session, {
         stages: context.stages,
+        justConfirmed: context.justConfirmed,
       });
       const final = yield* this.runPass(provider, {
         model,
@@ -1110,10 +1153,20 @@ export class CourseCopilotOrchestratorService {
     session: CourseCopilotSession,
     userContent: string,
     stages?: boolean,
+    justConfirmed?: boolean,
+    stagePack: Parameters<typeof renderStageResearch>[0] | null = null,
   ): Promise<string> {
     const parts: string[] = [];
     if (coursePilotStaged(session, stages)) {
       parts.push(renderCoursePilotStage(coursePilotPosition(session)));
+      if (stagePack) parts.push(renderStageResearch(stagePack));
+      if (justConfirmed) {
+        parts.push(
+          '<confirmed>The trainer just confirmed this brief on the card. Call propose_blueprint ' +
+            'now. Do not change the brief this turn (it is locked): defaults the plan needs, such ' +
+            'as images or a pass rule, go in the plan itself.</confirmed>',
+        );
+      }
     }
     const readiness = this.briefService.readiness(session.brief);
     parts.push(

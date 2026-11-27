@@ -3341,6 +3341,23 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
     promptOverride: 'course_copilot_answer_key_check',
   },
   {
+    id: 'course-copilot-researcher',
+    task: LlmTask.COURSE_COPILOT_RESEARCHER,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.FAST,
+    trigger:
+      'Course Pilot stage asks the Researcher a question (research tool; COURSE_PILOT_STAGES)',
+    detail:
+      "Condenses snippets code gathered from the stage's knowledge (uploaded files, Learning " +
+      'Design principles, learner profiles, example courses, learner results) into a short pack ' +
+      'with a citation on every point; uncited points are dropped. One call per research. JSON mode.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-4o-mini',
+    configuredBy: 'LLM_FAST_MODEL',
+    promptOverride: 'course_copilot_researcher',
+  },
+  {
     id: 'course-copilot-review',
     task: LlmTask.COURSE_COPILOT_REVIEW,
     runtime: LlmRuntime.ALLY_BE,
