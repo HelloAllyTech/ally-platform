@@ -157,15 +157,6 @@ export type RoadmapDecisionKind =
 /** What moved on an idea you follow, when an unread notice says. */
 export type RoadmapProgressNotice = "accepted" | "planReady" | "planClosed" | "comment";
 
-/** The Owner's old-and-quiet sweep of To do (`GET /v1/roadmap/todo-sweep`). */
-export interface RoadmapSweepResponse {
-  olderThanDays: number;
-  maxVoters: number;
-  /** Every idea the sweep pulls up now; `rows` holds the first of them. */
-  total: number;
-  rows: RoadmapItemRow[];
-}
-
 /** Why a row is in a view. The frontend renders the copy. */
 export type RoadmapWhyHere =
   | {
