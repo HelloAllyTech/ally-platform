@@ -79,4 +79,8 @@ Three migrations, all additive:
 - Streaming to lift the 25 MB document cap.
 - A native speaker's review of the Hindi and Hinglish drafts.
 
+Manual: proposal 5b01a8bc-0cc3-47b5-baf3-e8e88c64c3e2
+
+Also filed for this PR: 88ad54dd-6017-4c28-bd8f-5c00da82fce6 (Inbox), d0d2e507-7100-49c0-b57b-3d018ec5687a (who may chat), 8da7ee58-c4c2-4b89-a26f-3e4d90f84017 (assistant safety).
+
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
