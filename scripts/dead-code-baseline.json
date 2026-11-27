@@ -125,7 +125,6 @@
  "ally-be|export|ally-be/src/auth/dto/register.dto.ts|RegisterDto",
  "ally-be|export|ally-be/src/authorization/constants/permissions.constants.ts|CLIENT_PERMISSIONS",
  "ally-be|export|ally-be/src/authorization/constants/permissions.constants.ts|COUNSELOR_PERMISSIONS",
- "ally-be|export|ally-be/src/authorization/constants/permissions.constants.ts|EVALUATOR_PERMISSIONS",
  "ally-be|export|ally-be/src/authorization/constants/permissions.constants.ts|LEARNER_PERMISSIONS",
  "ally-be|export|ally-be/src/authorization/constants/permissions.constants.ts|MULTI_TENANT_ADMIN_PERMISSIONS",
  "ally-be|export|ally-be/src/authorization/constants/permissions.constants.ts|SCRIBE_REVIEWER_PERMISSIONS",

@@ -9,22 +9,6 @@ export enum UserRole {
   SCRIBE_REVIEWER = 'SCRIBE_REVIEWER',
   MULTI_TENANT_ADMIN = 'MULTI_TENANT_ADMIN',
   /**
-   * Consumer-app role marking an account as an evaluator: someone who, on top
-   * of whatever they normally use the app for, is asked evaluation questions on
-   * particular screens and at particular moments.
-   *
-   * Purely additive — it carries `evaluator:access` and nothing else, so it is
-   * meant to sit alongside LEARNER/COUNSELOR rather than replace one. An
-   * account holding only EVALUATOR can sign into the consumer apps (it is in
-   * their `allowedRoles`) but has none of their permissions, so it would land
-   * on an empty app.
-   *
-   * Gate the evaluation surfaces on the `evaluator:access` permission, not on
-   * this name: the single collapsed `role` a client sees cannot represent a
-   * multi-role account (see determineUserRole).
-   */
-  EVALUATOR = 'EVALUATOR',
-  /**
    * The single platform-tier role, replacing SUPER_ADMIN / SUPER_DUPER_ADMIN /
    * MULTI_TENANT_ADMIN (kept, unreferenced by new code, for rollback safety —
    * see CreatePlatformAdminRole1895000000001). Fine-grained access is
@@ -34,8 +18,8 @@ export enum UserRole {
    */
   PLATFORM_ADMIN = 'PLATFORM_ADMIN',
   /**
-   * Text helpline listener: answers anonymous talkers' chats. Additive, like
-   * EVALUATOR — granted alongside the account's normal role from
+   * Text helpline listener: answers anonymous talkers' chats. Additive —
+   * granted alongside the account's normal role from
    * Helpline → Team. Gate on the `view:helpline:*` permissions, never on this
    * name (see docs/text-helpline.md §2). A LISTENER-only account collapses to
    * `role: 'LISTENER'` in determineUserRole's fallback.
@@ -45,8 +29,8 @@ export enum UserRole {
   HELPLINE_SUPERVISOR = 'HELPLINE_SUPERVISOR',
   /**
    * The Debrief console's clinical advisor: expert verdicts with the agreement
-   * answers, comments, escalated flags, and approving pinned rules. Additive,
-   * like EVALUATOR: it carries `review:admin:debriefs` and nothing else, and is
+   * answers, comments, escalated flags, and approving pinned rules. Additive: it
+   * carries `review:admin:debriefs` and nothing else, and is
    * held alongside the account's normal role (usually PLATFORM_ADMIN). Gate on
    * the permission, never on this name. Platform-managed (see
    * PLATFORM_MANAGED_ROLES): the generic role picker can't grant it, because

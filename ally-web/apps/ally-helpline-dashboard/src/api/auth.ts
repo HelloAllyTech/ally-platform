@@ -31,7 +31,6 @@ export const ALLOWED_ROLES = [
   UserRole.LEARNER,
   UserRole.SIMULATION_REVIEWER,
   UserRole.SCRIBE_REVIEWER,
-  UserRole.EVALUATOR,
   UserRole.LISTENER,
   UserRole.HELPLINE_SUPERVISOR,
 ];

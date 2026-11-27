@@ -65,7 +65,4 @@ class UserPermissions {
 
   // === COUNSELLOR ===
   static const counselorAccess = 'counselor:access';
-
-  // === EVALUATION ===
-  static const evaluatorAccess = 'evaluator:access';
 }

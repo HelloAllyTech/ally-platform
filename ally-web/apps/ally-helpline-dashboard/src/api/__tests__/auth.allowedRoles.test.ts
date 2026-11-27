@@ -21,7 +21,6 @@ describe("login allow-list", () => {
         UserRole.LEARNER,
         UserRole.SIMULATION_REVIEWER,
         UserRole.SCRIBE_REVIEWER,
-        UserRole.EVALUATOR,
       ]),
     );
   });

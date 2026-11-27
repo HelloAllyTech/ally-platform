@@ -15,7 +15,6 @@ const _allowedRoles = [
   'LEARNER',
   'SIMULATION_REVIEWER',
   'SCRIBE_REVIEWER',
-  'EVALUATOR',
 ];
 
 Response<T> _response<T>(T? data, {int statusCode = 200}) => Response<T>(

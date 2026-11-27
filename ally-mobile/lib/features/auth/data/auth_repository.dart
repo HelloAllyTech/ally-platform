@@ -12,7 +12,6 @@ const _allowedRoles = [
   'LEARNER',
   'SIMULATION_REVIEWER',
   'SCRIBE_REVIEWER',
-  'EVALUATOR',
 ];
 
 /// Ported from ally-mobile (React Native)'s `src/services/authApi.ts`.
