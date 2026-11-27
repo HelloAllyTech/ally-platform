@@ -204,6 +204,30 @@ describe('CourseCopilotBriefService', () => {
       });
     });
 
+    describe('rejectedValues', () => {
+      it('reports an assessment kind the brief does not allow', () => {
+        // "any" used to vanish silently; the interview looped on the assessment stage.
+        const { brief, rejectedValues } = service.applyPatch({}, [
+          { op: 'add', path: '/assessment/kind', value: 'any' },
+          { op: 'add', path: '/assessment/note', value: 'flexible' },
+        ]);
+        expect(brief.assessment).toEqual({ note: 'flexible' });
+        expect(rejectedValues).toHaveLength(1);
+        expect(rejectedValues![0]).toContain('"any" is not allowed');
+        expect(rejectedValues![0]).toContain(
+          'roleplay, quiz, annotated_artifact, journal',
+        );
+      });
+
+      it('reports nothing for a valid kind', () => {
+        const { brief, rejectedValues } = service.applyPatch({}, [
+          { op: 'add', path: '/assessment/kind', value: 'roleplay' },
+        ]);
+        expect(brief.assessment?.kind).toBe('roleplay');
+        expect(rejectedValues).toBeUndefined();
+      });
+    });
+
     describe('notes only grow', () => {
       const withNotes: CourseBrief = { notes: ['first', 'second'] };
 

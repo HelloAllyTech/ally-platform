@@ -31,7 +31,9 @@ export async function judgeBlueprint(apiKey, savedBrief, blueprint) {
   };
   const rubric = [
     'assessment: the final assessed item matches the brief assessment kind and carries its pass rule',
-    'skill_targets: every skill target is practised; a B2 target has practice on a new scenario of similar difficulty, a B3 target on a harder one',
+    // B2/B3 transfer is checked in code below: gpt-4o asked for "B3 harder" practice on plans
+    // whose targets were all B2 (3 of 10 plans in one eval).
+    'skill_targets: every skill target is practised in at least one roleplay or scenario',
     'progression: practice goes from easier to harder, explanation before practice',
     'reflection: some reflection or debrief follows roleplay practice',
     'fit: items suit the learners (level, context) and serve the outcome; nothing off-topic or duplicated',
@@ -53,15 +55,11 @@ export async function judgeBlueprint(apiKey, savedBrief, blueprint) {
             'You are a senior instructional designer judging a course plan for helper/counsellor training against its brief. ' +
             'Judge EACH criterion below exactly once, as pass or fail:\n- ' +
             rubric.join('\n- ') +
-            '\nThe skill targets, exactly as in the brief (judge only these levels; a B2 target needs no harder scenario): ' +
+            '\nThe skill targets: ' +
             JSON.stringify(
-              (savedBrief?.skillTargets ?? []).map((t) => ({
-                skill: t.skill,
-                a: t.a,
-                b: t.b,
-              })),
+              (savedBrief?.skillTargets ?? []).map((t) => t.skill),
             ) +
-            '. Items may carry "transfer" (practised | new-similar | new-harder) and "targetSkills"; use them as the plan\'s own statement of what each practice is. ' +
+            '. Items may carry "targetSkills"; use it as the plan\'s own statement of what each practice covers. ' +
             'Return JSON {"criteria":[{"criterion": one of assessment|skill_targets|progression|reflection|fit, "pass": true|false, ' +
             '"severity": "blocking"|"minor" (only when pass is false; blocking = a trainer would send the plan back), ' +
             '"evidence": "one sentence quoting the plan or brief"}]}. A criterion the plan meets is pass:true, never a problem.',
@@ -86,6 +84,7 @@ export async function judgeBlueprint(apiKey, savedBrief, blueprint) {
         problem: v.evidence,
       }));
   } catch {}
+  issues.push(...transferIssues(savedBrief, items));
   if (target && Math.abs(minutes - target) > target * 0.2) {
     issues.push({
       criterion: 'minutes',
@@ -101,4 +100,44 @@ export async function judgeBlueprint(apiKey, savedBrief, blueprint) {
     issues,
     verdicts,
   };
+}
+
+/**
+ * B2 needs a practice on a new scenario (similar or harder) and B3 a new, harder one, each after
+ * something was practised, for that skill (an item with no targetSkills covers every skill).
+ * Checked in code, independently of ally-be's transfer check, from the plan's own marks.
+ */
+function transferIssues(savedBrief, items) {
+  const practice = items.filter((i) =>
+    ['ROLEPLAY', 'BRANCHING_SCENARIO'].includes(String(i.type).toUpperCase()),
+  );
+  const firstPractised = practice.findIndex(
+    (i) => (i.spec?.transfer ?? 'practised') === 'practised',
+  );
+  const issues = [];
+  for (const t of savedBrief?.skillTargets ?? []) {
+    const accepted =
+      t.b === 'B3'
+        ? ['new-harder']
+        : t.b === 'B2'
+          ? ['new-similar', 'new-harder']
+          : null;
+    if (!accepted) continue;
+    const covers = (i) =>
+      !i.spec?.targetSkills?.length || i.spec.targetSkills.includes(t.skill);
+    const ok = practice.some(
+      (i, index) =>
+        index > firstPractised &&
+        firstPractised >= 0 &&
+        covers(i) &&
+        accepted.includes(i.spec?.transfer),
+    );
+    if (!ok)
+      issues.push({
+        criterion: 'transfer',
+        severity: 'blocking',
+        problem: `${t.b} target "${t.skill}" has no ${accepted.join(' or ')} practice after a practised one`,
+      });
+  }
+  return issues;
 }

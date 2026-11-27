@@ -85,6 +85,7 @@ import { RoleplayInterviewOrchestratorService } from './roleplay-interview/servi
  * their owners' own services (exported for it), and nothing imports it back,
  * so it adds no edge to the existing module cycles.
  */
+import { CoursePilotStagesReportService } from './service/course-pilot-stages-report.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -136,6 +137,7 @@ import { RoleplayInterviewOrchestratorService } from './roleplay-interview/servi
     CourseCopilotSessionService,
     CourseCopilotMediaService,
     CourseCopilotBlueprintService,
+    CoursePilotStagesReportService,
     CourseCopilotJobExecutorService,
     CourseCopilotSourcesService,
     CourseCopilotBuildService,

@@ -170,8 +170,9 @@ export const COURSE_PILOT_STAGES: readonly CoursePilotStage[] = [
     knowledge: ['learning_design', 'sources'],
     title: 'Assessment',
     goal:
-      'How learners show the skill at the end (/assessment/kind) and, where it applies, the pass ' +
-      'threshold. Check design guidance once before recommending.',
+      'How learners show the skill at the end (/assessment/kind: roleplay, quiz, ' +
+      'annotated_artifact or journal — exactly one, never "any") and, where it applies, the pass ' +
+      'threshold (/assessment/threshold). With no preference from the trainer, recommend one.',
     tools: [...BASE_TOOLS, 'search_library'],
     questions: 3,
     exit: (brief) =>

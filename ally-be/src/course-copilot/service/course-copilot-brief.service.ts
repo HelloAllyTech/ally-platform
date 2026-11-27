@@ -63,6 +63,12 @@ export interface BriefPatchResult {
   readiness: CourseBriefReadiness;
   /** Keys the model wrote that the brief does not declare — NOT stored. */
   ignoredKeys: string[];
+  /**
+   * Values the model wrote that the field does not allow — NOT stored. Reported back like
+   * ignoredKeys: an assessment kind of "any" used to vanish silently, and the interview looped
+   * 20 turns on an assessment stage the agent believed was done.
+   */
+  rejectedValues?: string[];
 }
 
 const str = (value: unknown): string | undefined => {
@@ -142,6 +148,16 @@ export class CourseCopilotBriefService {
       (key) => !TOP_LEVEL_KEYS.has(key),
     );
     const brief = this.normalise(patched);
+    const rejectedValues: string[] = [];
+    const kind = patched?.assessment?.kind;
+    if (kind != null && kind !== '' && !brief.assessment?.kind) {
+      rejectedValues.push(
+        `/assessment/kind ${JSON.stringify(kind)} is not allowed, so it was NOT stored. It must be ` +
+          `one of: ${ASSESSMENT_KINDS.join(', ')}. The course ends in one assessed item; if the ` +
+          'trainer has no preference, choose the kind that best shows the outcome (a roleplay for ' +
+          'a conversation skill), record it, and tell them in one line that they can change it.',
+      );
+    }
 
     // Nothing the trainer said may be lost: notes only ever grow. A patch that
     // shrinks them is almost always a `replace /notes` that meant `add`.
@@ -154,7 +170,12 @@ export class CourseCopilotBriefService {
       );
     }
 
-    return { brief, readiness: this.readiness(brief), ignoredKeys };
+    return {
+      brief,
+      readiness: this.readiness(brief),
+      ignoredKeys,
+      ...(rejectedValues.length ? { rejectedValues } : {}),
+    };
   }
 
   /**

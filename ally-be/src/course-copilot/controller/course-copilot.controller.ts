@@ -26,6 +26,8 @@ import {
 } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CurrentUser } from 'src/auth/decorators/user.decorator';
+import { PlatformAdminOnly } from 'src/auth/decorators/platform-admin-only.decorator';
+import { CoursePilotStagesReportService } from '../service/course-pilot-stages-report.service';
 import { TokenUser } from 'src/auth/type/auth.types';
 import { RequireFeatureToggle } from 'src/auth/decorators/feature-toggle.decorator';
 import { FeatureToggleKey } from 'src/authorization/constants/admin-feature-toggle.constants';
@@ -96,6 +98,7 @@ export class CourseCopilotController {
     private readonly landingPageService: CourseCopilotLandingPageService,
     private readonly allyNotesService: CourseCopilotAllyNotesService,
     private readonly sourcesService: CourseCopilotSourcesService,
+    private readonly stagesReport: CoursePilotStagesReportService,
   ) {}
 
   @Post('sessions')
@@ -214,6 +217,21 @@ export class CourseCopilotController {
     const session = await this.sessionService.getOwned(sessionId, user.id);
     await this.buildService.cancel(session);
     return this.sessionService.getDetail(sessionId, user.id);
+  }
+
+  @Get('sessions/:sessionId/stages')
+  @RequireFeatureToggle(FeatureToggleKey.COURSE_COPILOT, VIEW)
+  @PlatformAdminOnly()
+  @ApiOperation({
+    summary:
+      'Platform admins: every Course Pilot stage with what it checked and why it passed or failed',
+  })
+  async getStages(
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+    @CurrentUser() user: TokenUser,
+  ) {
+    const session = await this.sessionService.getOwned(sessionId, user.id);
+    return this.stagesReport.report(session);
   }
 
   @Get('sessions/:sessionId/budget')

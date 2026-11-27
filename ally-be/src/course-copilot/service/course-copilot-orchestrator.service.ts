@@ -555,6 +555,22 @@ export class CourseCopilotOrchestratorService {
             ?.result?.planning ?? null,
       });
 
+    // The stage this turn is in, kept on its row for the Stages tab (null when stages are off).
+    const turnStage = (): string | null => {
+      if (stageBefore === null) return null;
+      const { session } = context;
+      if (coursePilotStaged(session, context.stages)) {
+        return coursePilotPosition(session).stage.id;
+      }
+      return [
+        CourseCopilotSessionStatus.BUILDING,
+        CourseCopilotSessionStatus.BUILD_FAILED,
+        CourseCopilotSessionStatus.EDITING,
+      ].includes(session.status)
+        ? 'course'
+        : 'blueprint';
+    };
+
     const checkpoint = async (final: boolean): Promise<void> => {
       try {
         await this.messageRepository.checkpointMessage(assistantMessage.id, {
@@ -589,6 +605,12 @@ export class CourseCopilotOrchestratorService {
               ? { workingNotes: [...turn.workingNotes] }
               : {}),
             ...(turn.rejections ? { rejections: turn.rejections } : {}),
+            // For the Stages tab: the stage, why replies were sent back, which calls were refused.
+            ...(turnStage() ? { pilotStage: turnStage() } : {}),
+            ...(turn.raised.size ? { sentBack: [...turn.raised] } : {}),
+            ...(refusedToolCalls(turn.toolResults).length
+              ? { refused: refusedToolCalls(turn.toolResults) }
+              : {}),
             ...(turn.receipt ? { receipt: turn.receipt } : {}),
           },
         });
@@ -1602,4 +1624,23 @@ export class CourseCopilotOrchestratorService {
       },
     });
   }
+}
+
+/** Tool calls this turn that code refused (a reply sent back is recorded as sentBack instead). */
+export function refusedToolCalls(
+  results: { name: string; result: any }[],
+): { tool: string; error: string; message: string }[] {
+  return results
+    .filter(
+      (r) =>
+        r?.result?.ok === false &&
+        r.result.error &&
+        r.result.error !== 'not_delivered',
+    )
+    .slice(0, 12)
+    .map((r) => ({
+      tool: r.name,
+      error: String(r.result.error),
+      message: String(r.result.message ?? '').slice(0, 300),
+    }));
 }

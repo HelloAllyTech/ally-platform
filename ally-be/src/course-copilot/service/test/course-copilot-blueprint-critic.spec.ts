@@ -153,10 +153,10 @@ describe('CourseCopilotBlueprintService — critic', () => {
       remaining: [advisory('No debrief')],
     });
     expect(planner.repair).not.toHaveBeenCalled();
-    expect(query).toHaveBeenCalledWith(expect.stringContaining("'critic'"), [
-      'sess-1',
-      expect.any(String),
-    ]);
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining("'coursePilot'"),
+      ['sess-1', 'critic', expect.any(String)],
+    );
   });
 
   it('repairs once on blocking findings and keeps the better plan', async () => {

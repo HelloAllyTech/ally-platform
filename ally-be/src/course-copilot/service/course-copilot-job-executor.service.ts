@@ -451,7 +451,12 @@ export class CourseCopilotJobExecutorService {
     )
       .map(String)
       .slice(0, COURSE_COPILOT_LIMITS.languagesPerRoleplay);
-    const competencyIds = brief.competencyIds ?? [];
+    // Checked here too: a brief written before the brief-time check can hold a mistyped id, and
+    // the roleplay chain fails on it ("Competency with id … not found").
+    const checked = await this.library
+      .checkCompetencyIds(brief.competencyIds ?? [], brief.competencyNames)
+      .catch(() => null);
+    const competencyIds = checked?.ids ?? brief.competencyIds ?? [];
     if (!competencyIds.length) {
       throw new Error(
         'A new roleplay needs a competency, and the brief has none.',

@@ -186,6 +186,12 @@ check and the roleplay and character interviews' stages are on unless set to `fa
   target needs a `new-similar` practice and a B3 one a `new-harder` practice, each after a practised
   one. Told to the planner up front, checked in code, repaired once; shown to the trainer as a
   warning, never a block.
+- **Length check** (same switch, `src/course-copilot/util/course-pilot-length.util.ts`). When the trainer gave
+  a length, the plan must come within 10% of it (at least 2 minutes either way). Each item counts
+  at no less than half its usual minutes, so shrinking estimates cannot pass it. Off-length plans
+  get the planner's one repair, which is kept only if it has fewer problems and no new transfer
+  problem; a plan still off is shown to the trainer with a plain note. What the planner's check
+  found and whether the repair was kept: `metadata.coursePilot.planner`.
 - **Blueprint critic** (`COURSE_PILOT_CRITIC`, `src/course-copilot/service/specialists/blueprint-critic.specialist.ts`, prompt
   `course_copilot_blueprint_critic`). A separate model checks each proposed plan against the brief
   and Learning Design principles; blocking findings get one planner repair round, kept only if it is
@@ -210,6 +216,12 @@ check and the roleplay and character interviews' stages are on unless set to `fa
   record: kind of character → identity → life → languages and voices → draft. Question limits
   2/3/3/3/1 (10 in all); save_character_draft opens only at the end, and the draft must carry
   every recorded language with its voice. Needs validated turns.
+- **Stages tab** (platform admins only; `GET /v1/course-copilot/sessions/:id/stages`,
+  `src/course-copilot/service/course-pilot-stages-report.service.ts`). Every stage of a session
+  (interview stages, plan, build, course) with what happens there, the checks code ran, the
+  Researcher's pack, and a timeline of questions, replies sent back to the agent and refused tool
+  calls. Computed on request with the same functions the pipeline runs. Each assistant turn's row
+  keeps `pilotStage`, `sentBack` (problem keys) and `refused` for it.
 - **Evals** (`scripts/course-pilot-evals/`): `run.mjs` plays 10 fixed course requests end to end with
   a simulated trainer; `plan-eval.mjs` plans the same briefs with and without the critic or transfer
   check and scores them with an independent judge (`judge.mjs`); `manual-tests.mjs` runs test cases

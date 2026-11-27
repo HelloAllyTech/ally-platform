@@ -31,6 +31,10 @@ import {
   parseCatalogueSyncKey,
 } from 'src/context-library/profiles/content-catalogue.profile';
 import { ContextRetrievalService } from 'src/context-library/service/context-retrieval.service';
+import {
+  CompetencyRepair,
+  repairCompetencyIds,
+} from '../util/course-copilot-competency.util';
 
 /** One line per library hit — never full prompts, which are the size of a turn. */
 export interface LibraryHit {
@@ -123,6 +127,18 @@ export class CourseCopilotLibraryService {
       select: { id: true, name: true },
     });
     return rows.map((row) => ({ id: row.id, name: row.name }));
+  }
+
+  /**
+   * Competency ids checked against the shared competencies: near-misses of one real id corrected,
+   * unknown ones matched by name or dropped (see repairCompetencyIds). Null when the list is empty.
+   */
+  async checkCompetencyIds(
+    ids: string[],
+    names?: string[],
+  ): Promise<CompetencyRepair | null> {
+    const known = await this.listCompetencies(undefined, 100);
+    return known.length ? repairCompetencyIds(ids, names, known) : null;
   }
 
   async competencyNames(ids: string[]): Promise<Map<string, string>> {

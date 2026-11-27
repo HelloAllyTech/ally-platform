@@ -65,6 +65,8 @@ import {
   ResearchSnippet,
 } from './specialists/researcher.specialist';
 import { CourseCopilotMode } from '../enum/course-copilot.enum';
+import { repairCompetencyIds } from '../util/course-copilot-competency.util';
+import type { CourseBrief } from '../type/course-copilot.type';
 
 /** Per-turn context threaded through tool executions. */
 export interface CourseCopilotToolContext {
@@ -483,9 +485,7 @@ export class CourseCopilotToolsService {
    * code (not left to the conductor, which never called research by itself). Saved on the session;
    * null when the stage needs no reading or nothing relevant was found. Never throws.
    */
-  async stageResearch(
-    context: CourseCopilotToolContext,
-  ): Promise<{
+  async stageResearch(context: CourseCopilotToolContext): Promise<{
     stage: string;
     pack: NonNullable<CoursePilotState['research']>[CoursePilotStageId];
   } | null> {
@@ -1168,6 +1168,16 @@ export class CourseCopilotToolsService {
           }
         : input,
     );
+    // The card carries its stage, so the Stages tab can place it (as the roleplay interview does).
+    for (const frame of outcome.events ?? []) {
+      if (
+        frame.event === 'question' &&
+        frame.data &&
+        typeof frame.data === 'object'
+      ) {
+        (frame.data as Record<string, any>).stage = position.stage.id;
+      }
+    }
     const state = coursePilotState(context.session);
     const questionId = String(outcome.modelResult?.questionId ?? '');
     await this.saveCoursePilotState(context.session, {
@@ -1233,6 +1243,61 @@ export class CourseCopilotToolsService {
       ...(session.metadata ?? {}),
       coursePilot: { ...coursePilotState(session), ...patch },
     };
+  }
+
+  /**
+   * Competency ids in the brief, checked against the shared competencies (a mistyped UUID once
+   * failed course creation at Approve). Repairs in place; returns what to tell the model. A failed
+   * lookup changes nothing: the build's own check still guards course creation.
+   */
+  private async repairBriefCompetencies(brief: CourseBrief): Promise<string[]> {
+    const ids = brief.competencyIds ?? [];
+    const targetIds = (brief.skillTargets ?? [])
+      .map((t) => t.competencyId)
+      .filter((id): id is string => Boolean(id));
+    if (!ids.length && !targetIds.length) return [];
+    let known: { id: string; name: string }[];
+    try {
+      known = await this.library.listCompetencies(undefined, 100);
+    } catch {
+      return [];
+    }
+    if (!known.length) return [];
+    const notes: string[] = [];
+    if (ids.length) {
+      const repair = repairCompetencyIds(ids, brief.competencyNames, known);
+      if (repair.fixed.length || repair.dropped.length) {
+        const names = new Map(known.map((c) => [c.id, c.name]));
+        brief.competencyIds = repair.ids;
+        if (repair.ids.length) {
+          brief.competencyNames = repair.ids.map((id) => names.get(id) ?? id);
+        } else {
+          delete brief.competencyIds;
+          delete brief.competencyNames;
+        }
+        for (const f of repair.fixed) {
+          notes.push(
+            `/competencyIds ${f.from} is not a competency id; corrected to ${f.to} (${f.name}). Copy ids exactly from list_competencies.`,
+          );
+        }
+        for (const id of repair.dropped) {
+          notes.push(
+            `/competencyIds ${id} is not a shared competency, so it was NOT stored. Use ids from list_competencies.`,
+          );
+        }
+      }
+    }
+    for (const target of brief.skillTargets ?? []) {
+      if (!target.competencyId) continue;
+      const repair = repairCompetencyIds(
+        [target.competencyId],
+        [target.skill],
+        known,
+      );
+      if (repair.fixed.length) target.competencyId = repair.ids[0];
+      else if (repair.dropped.length) delete target.competencyId;
+    }
+    return notes;
   }
 
   /** Builder's question normalisation: ids minted here, one recommendation at most. */
@@ -1316,10 +1381,16 @@ export class CourseCopilotToolsService {
       };
     }
     try {
-      const { brief, readiness, ignoredKeys } = this.briefService.applyPatch(
+      const patched = this.briefService.applyPatch(
         context.session.brief ?? {},
         ops,
       );
+      const { brief, ignoredKeys } = patched;
+      const rejectedValues = [
+        ...(patched.rejectedValues ?? []),
+        ...(await this.repairBriefCompetencies(brief)),
+      ];
+      const readiness = this.briefService.readiness(brief);
       await this.sessionRepository.update(
         { id: context.session.id },
         { brief: brief as any },
@@ -1341,6 +1412,7 @@ export class CourseCopilotToolsService {
                 ),
               }
             : {}),
+          ...(rejectedValues?.length ? { rejectedValues } : {}),
         },
         summary: 'Brief updated',
         events: [{ event: 'brief', data: { brief, readiness } }],

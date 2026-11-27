@@ -19,6 +19,10 @@ import { CourseCopilotSessionStatus } from '../enum/course-copilot.enum';
 import { CourseCopilotSessionRepository } from '../repository/course-copilot.repository';
 import { CourseBlueprint } from '../type/course-copilot.type';
 import { transferProblems } from '../util/course-pilot-transfer.util';
+import {
+  lengthProblems,
+  lengthWarning,
+} from '../util/course-pilot-length.util';
 import { CourseCopilotBlueprintResponse } from '../type/course-copilot-api.type';
 import {
   blueprintWarnings,
@@ -26,7 +30,10 @@ import {
   normaliseBlueprint,
   validateBlueprint,
 } from '../util/course-blueprint.util';
-import { BlueprintPlannerSpecialist } from './specialists/blueprint-planner.specialist';
+import {
+  BlueprintPlannerReport,
+  BlueprintPlannerSpecialist,
+} from './specialists/blueprint-planner.specialist';
 import { CourseCopilotBriefService } from './course-copilot-brief.service';
 import { CourseCopilotCostService } from './course-copilot-cost.service';
 import { CourseCopilotSourcesService } from './course-copilot-sources.service';
@@ -71,6 +78,7 @@ import {
   BlueprintCriticSpecialist,
   criticRepairList,
 } from './specialists/blueprint-critic.specialist';
+import { repairCompetencyIds } from '../util/course-copilot-competency.util';
 
 /** What the critic did to a plan, kept on the session and shown to the interviewer. */
 export interface CoursePilotCriticReport {
@@ -134,7 +142,17 @@ export class CourseCopilotBlueprintService {
       usageMetadata: { courseCopilotSessionId: session.id },
       checkTransfer: this.configService.courseCopilot.stages,
     };
-    const planned = await this.planner.plan(plannerInput);
+    const plannerReport = {} as BlueprintPlannerReport;
+    const planned = await this.planner.plan(plannerInput, plannerReport);
+    if (plannerInput.checkTransfer) {
+      // For the Stages tab: what the planner's own check found and whether its repair was kept.
+      await this.saveCoursePilotKey(session.id, 'planner', {
+        at: new Date().toISOString(),
+        ...plannerReport,
+        exampleCourse: example?.title ?? null,
+        principles: guidance.codes,
+      });
+    }
     const checked = await this.checkWithCritic(
       session,
       plannerInput,
@@ -152,6 +170,50 @@ export class CourseCopilotBlueprintService {
         ...(checked.report ? { critic: checked.report } : {}),
       },
     };
+  }
+
+  /**
+   * Only shared competencies may tag a course, and one mistyped id fails course creation, so ids
+   * are repaired (a near-miss of one real id) or dropped here, never sent on unchecked. A failed
+   * lookup sends them as they are: course creation still checks them.
+   */
+  private async validCompetencyIds(
+    ids: string[],
+    sessionId: string,
+  ): Promise<string[]> {
+    if (!ids.length) return ids;
+    try {
+      const known = await this.library.listCompetencies(undefined, 100);
+      if (!known.length) return ids;
+      const repair = repairCompetencyIds(ids, undefined, known);
+      if (repair.fixed.length || repair.dropped.length) {
+        this.logger.warn(
+          `Course Copilot ${sessionId}: competency ids repaired at approval: ` +
+            `fixed ${repair.fixed.map((f) => `${f.from}->${f.to}`).join(', ') || 'none'}; ` +
+            `dropped ${repair.dropped.join(', ') || 'none'}`,
+        );
+      }
+      return repair.ids;
+    } catch {
+      return ids;
+    }
+  }
+
+  /** Writes one key of metadata.coursePilot without touching the rest. */
+  private async saveCoursePilotKey(
+    sessionId: string,
+    key: 'planner' | 'critic',
+    value: unknown,
+  ): Promise<void> {
+    await this.sessionRepository.manager.query(
+      `UPDATE "course_copilot_sessions"
+          SET "metadata" = COALESCE("metadata", '{}'::jsonb) || jsonb_build_object(
+                'coursePilot',
+                COALESCE("metadata" -> 'coursePilot', '{}'::jsonb) ||
+                  jsonb_build_object($2::text, $3::jsonb))
+        WHERE id = $1`,
+      [sessionId, key, JSON.stringify(value)],
+    );
   }
 
   /**
@@ -187,11 +249,13 @@ export class CourseCopilotBlueprintService {
       let repaired = false;
       if (blocking.length) {
         const second = await this.planner.repair(plannerInput, blocking);
-        // Code problems, transfer included: a repair must not undo what the planner's check fixed.
+        // Code problems, transfer and length included: a repair must not undo what the
+        // planner's check fixed.
         const codeProblems = (plan: CourseBlueprint) =>
           validateBlueprint(plan, brief).length +
           (plannerInput.checkTransfer
-            ? transferProblems(plan, brief).length
+            ? transferProblems(plan, brief).length +
+              lengthProblems(plan, brief).length
             : 0);
         if (second && codeProblems(second) <= codeProblems(planned)) {
           const after = await this.critic.critique({
@@ -216,15 +280,7 @@ export class CourseCopilotBlueprintService {
         repaired,
         remaining,
       };
-      await this.sessionRepository.manager.query(
-        `UPDATE "course_copilot_sessions"
-            SET "metadata" = COALESCE("metadata", '{}'::jsonb) || jsonb_build_object(
-                  'coursePilot',
-                  COALESCE("metadata" -> 'coursePilot', '{}'::jsonb) ||
-                    jsonb_build_object('critic', $2::jsonb))
-          WHERE id = $1`,
-        [session.id, JSON.stringify(report)],
-      );
+      await this.saveCoursePilotKey(session.id, 'critic', report);
       this.logger.info(
         `[COURSE_PILOT] session=${session.id} critic: ${findings.length} findings ` +
           `(${blocking.length} blocking), repaired=${repaired}, left blocking=` +
@@ -335,7 +391,10 @@ export class CourseCopilotBlueprintService {
         ...blueprintWarnings(blueprint, brief),
         // Course Pilot: shown, never blocking — the trainer may approve a plan without it.
         ...(this.configService?.courseCopilot?.stages
-          ? transferProblems(blueprint, brief)
+          ? [
+              ...transferProblems(blueprint, brief),
+              ...lengthWarning(blueprint, brief),
+            ]
           : []),
       ],
     };
@@ -402,12 +461,17 @@ export class CourseCopilotBlueprintService {
     }
 
     const brief = session.brief ?? {};
-    const competencyIds = [
-      ...new Set([
-        ...(blueprint.competencyIds ?? []),
-        ...(brief.competencyIds ?? []),
-      ]),
-    ].slice(0, TRACK_MAX_COMPETENCIES);
+    const competencyIds = (
+      await this.validCompetencyIds(
+        [
+          ...new Set([
+            ...(blueprint.competencyIds ?? []),
+            ...(brief.competencyIds ?? []),
+          ]),
+        ],
+        session.id,
+      )
+    ).slice(0, TRACK_MAX_COMPETENCIES);
     const coverImageUrl =
       blueprint.cover?.mode === 'library'
         ? (blueprint.cover.imageUrl ?? brief.look?.coverImageUrl)
