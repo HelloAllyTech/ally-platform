@@ -131,7 +131,7 @@ async def sarvam_transcribe(pieces: List[bytes]) -> Tuple[str, Optional[str]]:
                 headers={"api-subscription-key": settings.SARVAM.API_KEY or ""},
                 files={"file": ("voice-note.wav", piece, "audio/wav")},
                 data={"model": SARVAM_ASR_MODEL, "language_code": "unknown"},
-                timeout=20,
+                timeout=30,
             )
             resp.raise_for_status()
             body = resp.json()
