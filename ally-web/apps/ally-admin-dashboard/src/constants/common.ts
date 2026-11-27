@@ -1040,6 +1040,8 @@ export const ApiEndpoints = {
     // Raising the ceiling is a POST on the same path as the read, like Builder's:
     // it authorises spend, so it is not folded into a session PATCH.
     SESSION_BUDGET: (id: string) => `/v1/course-copilot/sessions/${id}/budget`,
+    // Platform admins only: every Course Pilot stage with its checks and outcome.
+    SESSION_STAGES: (id: string) => `/v1/course-copilot/sessions/${id}/stages`,
     SESSION_ARCHIVE: (id: string) => `/v1/course-copilot/sessions/${id}/archive`,
     // Reference files (manuals, decks) attached to one session. One file per upload request.
     SESSION_SOURCES: (id: string) => `/v1/course-copilot/sessions/${id}/sources`,

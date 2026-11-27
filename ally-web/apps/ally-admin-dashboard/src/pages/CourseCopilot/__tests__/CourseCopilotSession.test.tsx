@@ -112,6 +112,7 @@ vi.mock("@hooks", () => ({
     socketOpts = opts;
     return { connected: false, markSeen };
   },
+  useIsPlatformAdmin: () => false,
 }));
 
 let queryResult: any;

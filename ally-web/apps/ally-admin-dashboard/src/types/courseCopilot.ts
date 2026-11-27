@@ -315,6 +315,58 @@ export interface CourseChangeLogEntry {
 
 /* ── REST ──────────────────────────────────────────────────────────────── */
 
+/** Platform admins: every Course Pilot stage, what code checked there and why it passed or failed. */
+export type CoursePilotStageStatus = "passed" | "warning" | "failed" | "current" | "not_reached";
+
+export interface CoursePilotStageCheck {
+  label: string;
+  result: "pass" | "fail" | "warn" | "info";
+  detail?: string;
+}
+
+export interface CoursePilotStageEvent {
+  at: string;
+  kind: "question" | "confirm" | "sent_back" | "refused" | "job";
+  text: string;
+}
+
+/** A sub-agent that worked in a stage, and what it did there. */
+export interface CoursePilotStageAgent {
+  name: string;
+  role: string;
+  state: "ran" | "running" | "off" | "not_run";
+  detail?: string;
+}
+
+export interface CoursePilotStageRow {
+  id: string;
+  title: string;
+  group: "interview" | "plan" | "build" | "course";
+  status: CoursePilotStageStatus;
+  why: string;
+  what: string;
+  enteredAt: string | null;
+  leftAt: string | null;
+  questions?: { asked: number; limit: number };
+  checks: CoursePilotStageCheck[];
+  /** Absent from a backend older than the field: treated as none. */
+  agents?: CoursePilotStageAgent[];
+  research?: {
+    question: string;
+    summary: string;
+    points: { text: string; sources: string[] }[];
+    gaps: string[];
+  } | null;
+  researchState?: "found" | "nothing_found" | "not_run" | "none";
+  events: CoursePilotStageEvent[];
+}
+
+export interface CoursePilotStagesReport {
+  staged: boolean;
+  sessionStatus: CourseCopilotSessionStatus;
+  stages: CoursePilotStageRow[];
+}
+
 export interface CourseCopilotBudget {
   /** 0 = uncapped. */
   ceilingUsd: number;

@@ -3,6 +3,7 @@ import {
   CourseBlueprint,
   CourseCopilotBlueprintResponse,
   CourseCopilotBudget,
+  CoursePilotStagesReport,
   CourseCopilotSessionDetail,
   CourseCopilotSessionSummary,
   CourseCopilotSource,
@@ -146,6 +147,18 @@ export const courseCopilotAPI = baseAPI.injectEndpoints({
       }),
     }),
 
+    /**
+     * Platform admins: the Stages tab. Hung on the session tag so it refreshes with every
+     * session change; it is cheap (computed from what the session already keeps).
+     */
+    getCourseCopilotStages: builder.query<CoursePilotStagesReport, string>({
+      query: id => ({
+        url: ApiEndpoints.COURSE_COPILOT.SESSION_STAGES(id),
+        method: HttpMethod.GET,
+      }),
+      providesTags: (result, error, id) => [{ type: TAG_TYPES.COURSE_COPILOT_SESSION, id }],
+    }),
+
     /** Raise the ceiling (0 = uncapped; must exceed spend). Releases any held jobs. */
     raiseCourseCopilotBudget: builder.mutation<
       CourseCopilotBudget,
@@ -235,6 +248,7 @@ export const {
   useRetryCourseCopilotBuildMutation,
   useCancelCourseCopilotBuildMutation,
   useGetCourseCopilotBudgetQuery,
+  useGetCourseCopilotStagesQuery,
   useRaiseCourseCopilotBudgetMutation,
   useArchiveCourseCopilotSessionMutation,
   useDraftTrackLandingPageMutation,

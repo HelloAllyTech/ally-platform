@@ -54,6 +54,10 @@ vi.mock("../CourseOutlinePanel", () => ({
   ),
 }));
 
+vi.mock("../StagesPanel", () => ({
+  StagesPanel: (props: any) => <div data-testid="stages-panel" data-session={props.sessionId} />,
+}));
+
 // eslint-disable-next-line import/first
 import { CourseCopilotWorkPane, CourseCopilotWorkPaneProps } from "../CourseCopilotWorkPane";
 // eslint-disable-next-line import/first
@@ -176,6 +180,27 @@ describe("CourseCopilotWorkPane — which tabs are available", () => {
     expect(queryTab("Build")).toBeNull();
     expect(queryTab("Course")).toBeNull();
     expect(screen.queryByRole("tablist")).toBeNull();
+  });
+
+  it("shows Stages only to platform admins, last, and never opens on it", () => {
+    const { unmount } = setup(detailIn("EDITING"));
+    expect(queryTab("Stages")).toBeNull();
+    unmount();
+
+    setup(detailIn("EDITING"), { showStages: true });
+    expect(tab("Stages")).toBeEnabled();
+    expect(screen.queryByTestId("stages-panel")).toBeNull();
+    const tabs = screen.getAllByRole("tab").map(node => node.textContent);
+    expect(tabs[tabs.length - 1]).toBe("Stages");
+    fireEvent.click(tab("Stages"));
+    expect(screen.getByTestId("stages-panel")).toBeInTheDocument();
+  });
+
+  it("gives a platform admin the Stages tab even mid-interview", () => {
+    setup(makeDetail({ status: "INTERVIEWING" }), { showStages: true });
+    expect(tab("Brief")).toBeInTheDocument();
+    expect(tab("Stages")).toBeEnabled();
+    expect(screen.getByTestId("brief-panel")).toBeInTheDocument();
   });
 
   it("lets the trainer look back at the approved blueprint and the build once editing", () => {

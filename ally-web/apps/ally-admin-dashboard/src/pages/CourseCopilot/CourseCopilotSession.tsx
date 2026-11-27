@@ -32,7 +32,7 @@ import { CourseCopilotWorkPane, ReferenceFiles } from "@components/course-copilo
 import { ErrorBoundary } from "@components/error-boundary";
 import { ButtonVariant } from "@components/types";
 import { en, LOCAL_STORAGE_KEYS, ROUTES } from "@constants";
-import { useCourseCopilotSocket, useCourseCopilotStream } from "@hooks";
+import { useCourseCopilotSocket, useCourseCopilotStream, useIsPlatformAdmin } from "@hooks";
 import {
   CourseBlueprint,
   CourseBrief,
@@ -101,6 +101,7 @@ export const CourseCopilotSession: React.FC = () => {
   const { sessionId = "" } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const isLargeScreen = useIsLargeScreen();
+  const isPlatformAdmin = useIsPlatformAdmin();
 
   /* ── Live overlays (see the doc comment) ─────────────────────────────── */
   const [statusOverlay, setStatusOverlay] = useState<CourseCopilotSessionStatus | null>(null);
@@ -566,6 +567,7 @@ export const CourseCopilotSession: React.FC = () => {
     <ErrorBoundary variant="panel" resetKey={sessionId} className="m-4">
       <CourseCopilotWorkPane
         detail={paneDetail}
+        showStages={isPlatformAdmin}
         liveBrief={liveBrief}
         liveBriefReadiness={liveReadiness}
         liveBlueprint={paneLiveBlueprint}

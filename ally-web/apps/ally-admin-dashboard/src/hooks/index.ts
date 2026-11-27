@@ -15,6 +15,7 @@ import { useCreatePortal } from "./useCreatePortal";
 import { useDebounce } from "./useDebounce";
 import { toImageStudioError, useImageStudioJobs, useSlotImageJobs } from "./useImageStudioJobs";
 import { useIsPlaceholderUsed } from "./useIsPlaceholderUsed";
+import { useIsPlatformAdmin } from "./useIsPlatformAdmin";
 import { useLiveKitRoom } from "./useLiveKitRoom";
 import { useResolvedPrimaryLanguageId } from "./useResolvedPrimaryLanguageId";
 import { useScenarioReportsSocket } from "./useScenarioReportsSocket";
@@ -34,6 +35,7 @@ export {
   useAllySocket,
   AllySocketStatus,
   useUser,
+  useIsPlatformAdmin,
   useLiveKitRoom,
   useClickOutside,
   useAdminActionTracking,

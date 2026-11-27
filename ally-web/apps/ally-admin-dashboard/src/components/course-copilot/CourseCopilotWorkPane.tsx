@@ -18,6 +18,7 @@ import { BuildPanel } from "./BuildPanel";
 import { asArray } from "./courseCopilotFormat";
 import { CourseOutlinePanel } from "./CourseOutlinePanel";
 import { ReferenceFiles } from "./ReferenceFiles";
+import { StagesPanel } from "./StagesPanel";
 
 import type { PublishCheck } from "./PublishReadiness";
 
@@ -42,11 +43,14 @@ export interface CourseCopilotWorkPaneProps {
   onSendMessage: (text: string) => void;
   /** A turn is running: the blueprint may be patched under the trainer, so editing pauses. */
   isBusy?: boolean;
+  /** Platform admins: show the Stages tab (every Course Pilot stage and why it passed or failed). */
+  showStages?: boolean;
 }
 
-type PaneTab = "brief" | "blueprint" | "build" | "course";
+type PaneTab = "brief" | "blueprint" | "build" | "course" | "stages";
 
-const TAB_ORDER: PaneTab[] = ["brief", "blueprint", "build", "course"];
+// Stages is last and never a default: it is a platform admin's look behind the scenes.
+const TAB_ORDER: PaneTab[] = ["brief", "blueprint", "build", "course", "stages"];
 
 /** Where to land when nothing else says otherwise, most useful first. */
 const FALLBACK_ORDER: PaneTab[] = ["course", "build", "blueprint", "brief"];
@@ -128,6 +132,7 @@ export const CourseCopilotWorkPane: React.FC<CourseCopilotWorkPaneProps> = ({
   onOpenEditor,
   onSendMessage,
   isBusy = false,
+  showStages = false,
 }) => {
   const strings = en.courseCopilotPane;
   const session = detail.session;
@@ -151,6 +156,7 @@ export const CourseCopilotWorkPane: React.FC<CourseCopilotWorkPaneProps> = ({
     blueprint: shownBlueprint !== null,
     build: asArray(detail.jobs).length > 0 || status === "BUILDING" || status === "BUILD_FAILED",
     course: Boolean(detail.outline),
+    stages: showStages,
   };
 
   const [picked, setPicked] = useState<{ status: CourseCopilotSessionStatus; tab: PaneTab } | null>(
@@ -290,6 +296,8 @@ export const CourseCopilotWorkPane: React.FC<CourseCopilotWorkPaneProps> = ({
             onChangeItem={canAskCopilot ? handleChangeItem : undefined}
           />
         );
+      case "stages":
+        return <StagesPanel sessionId={session.id} />;
       default:
         return null;
     }
