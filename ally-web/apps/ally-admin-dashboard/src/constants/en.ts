@@ -10706,7 +10706,7 @@ export const en = {
     rankWeightsUnavailable: "Weights are not available to you.",
   },
   /** Roadmap v2 P8: the Owner's Measures (`/roadmap/measures`). One block; nothing else here. */
-  /** Roadmap idea-to-plan audit, recs 8–10: notices, the grouped To do, the sweep and the waits. */
+  /** Roadmap idea-to-plan audit, recs 8–10: notices, the stage tags on To do rows and the waits. */
   roadmapIdeaToPlan: {
     why: {
       authorQuestion: (preview: string) => `Plan agent asks you: ${preview}`,
@@ -10748,36 +10748,7 @@ export const en = {
       planClosed: "Plan closed",
       later: "Later",
     } as Record<string, string>,
-    groupHelp: {
-      review: "Submitted and waiting for you: start planning or decline.",
-      planNext: "The ten highest-ranked accepted ideas nobody is planning yet.",
-      planning: "Being planned. Close the plan from the idea when it's done.",
-      planClosed: "Planned. Pick a builder.",
-      later: "Accepted, lower in the rank.",
-    } as Record<string, string>,
-    showLater: (n: number) => `Show ${n} more`,
-    hideLater: "Hide",
     waitingFor: (days: number) => `Waiting ${days} working days`,
-    sweep: {
-      banner: (n: number, days: number) =>
-        n === 1
-          ? `1 idea is older than ${days} days and has at most one voter.`
-          : `${n} ideas are older than ${days} days and have at most one voter.`,
-      open: "Review them",
-      title: "Old ideas with little support",
-      help: "Nothing changes until you choose. Decline with a reason, or keep an idea and the sweep won't offer it again.",
-      showingFirst: (shown: number, total: number) => `Showing the oldest ${shown} of ${total}.`,
-      selectAll: "Select all",
-      select: (code: string) => `Select ${code}`,
-      selected: (n: number) => (n === 1 ? "1 selected" : `${n} selected`),
-      decline: "Decline selected…",
-      keep: "Keep selected",
-      kept: (n: number) => (n === 1 ? "Kept 1 idea." : `Kept ${n} ideas.`),
-      keepFailed: "Couldn't keep those ideas.",
-      loadFailed: "The sweep didn't load.",
-      empty: "No old, quiet ideas left.",
-      close: "Done",
-    },
     whyRanks: {
       rank: (n: number) => `#${n} in To do`,
       votes: (votes: number, voters: number) =>

@@ -8,7 +8,6 @@ import type { RoadmapItemRow, RoadmapPlanWaits } from "@types";
 
 import { PlanWaits } from "../components/PlanWaits";
 import { AuthorQuestionTag } from "../session/AuthorQuestionTag";
-import { PLAN_NEXT_SIZE, todoGroups } from "../triage/todoGroups";
 import { whyHereLine } from "../utils/copy";
 import { whyRanksLine } from "../utils/whyRanks";
 
@@ -31,40 +30,6 @@ const row = (
   unread: false,
   updatedAt: "",
   stageSince: "",
-});
-
-describe("todoGroups (idea-to-plan audit rec 9)", () => {
-  it("groups To do by the Owner's next step, in a fixed order", () => {
-    const groups = todoGroups([
-      row("A", "accepted", 3),
-      row("R", "submitted", 1),
-      row("P", "planning", 2, { stage: "planning" }),
-      row("C", "planning", 4, { stage: "planning", planClosed: { byUserId: 3, at: "x" } }),
-    ]);
-    expect(groups.map(g => [g.key, g.rows.map(r => r.code)])).toEqual([
-      ["review", ["R"]],
-      ["planNext", ["A"]],
-      ["planning", ["P"]],
-      ["planClosed", ["C"]],
-      ["later", []],
-    ]);
-  });
-
-  it("puts the ten best-ranked accepted ideas in Plan next and keeps the list's own order", () => {
-    const accepted = Array.from({ length: 14 }, (_, i) => row(`A${i}`, "accepted", 14 - i));
-    const groups = todoGroups([...accepted, row("U", "accepted", null)]);
-    const next = groups.find(g => g.key === "planNext")!.rows.map(r => r.code);
-    expect(next).toHaveLength(PLAN_NEXT_SIZE);
-    // Ranks 1–10 are A13…A4; shown in the order the rows came.
-    expect(next).toEqual(["A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13"]);
-    expect(groups.find(g => g.key === "later")!.rows.map(r => r.code)).toEqual([
-      "A0",
-      "A1",
-      "A2",
-      "A3",
-      "U",
-    ]);
-  });
 });
 
 describe("whyRanksLine", () => {

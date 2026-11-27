@@ -570,11 +570,6 @@ export const ApiEndpoints = {
     ITEM_STAR: (code: string) => `/v1/roadmap/items/${encodeURIComponent(code)}/star`,
     SEARCH: "/v1/roadmap/search",
   },
-  /** The Owner's old-and-quiet sweep of To do (idea-to-plan audit rec 9). 403 for anyone else. */
-  ROADMAP_V2_SWEEP: {
-    LIST: "/v1/roadmap/todo-sweep",
-    KEEP: "/v1/roadmap/todo-sweep/keep",
-  },
   /** Roadmap v2 P8: the Owner's Measures. 404 while the flag is off, 403 for anyone but an Owner. */
   ROADMAP_V2_MEASURES: {
     METRICS: "/v1/roadmap/metrics",
