@@ -52,7 +52,7 @@ export interface InboundWhatsAppMedia {
 
 /**
  * WA-A §2: an image or document to send, by a link Meta fetches (a short-lived signed URL).
- * `whatsappMediaFits` checks Meta's limits before anything is sent.
+ * `whatsappMediaProblem` checks Meta's limits before anything is sent.
  */
 export interface WhatsAppMedia {
   kind: 'image' | 'document';
@@ -115,9 +115,6 @@ export function whatsappMediaProblem(media: WhatsAppMedia): string | null {
   if (!/^https:\/\//.test(media.link)) return 'link must be https';
   return null;
 }
-
-export const whatsappMediaFits = (media: WhatsAppMedia): boolean =>
-  whatsappMediaProblem(media) === null;
 
 /**
  * BT1: an interactive message (Meta's list message or reply buttons), inside the 24-hour window
