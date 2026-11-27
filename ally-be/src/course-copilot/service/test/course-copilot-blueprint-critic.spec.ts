@@ -159,9 +159,27 @@ describe('CourseCopilotBlueprintService — critic', () => {
     );
   });
 
+  it('does not count a repair that changed no item', async () => {
+    const first = plan('first');
+    critic.critique.mockResolvedValueOnce([blocking('B2 not practised')]);
+    planner.repair.mockResolvedValue(plan('renamed only'));
+    const result = await check(build(), first);
+    expect(critic.critique).toHaveBeenCalledTimes(1);
+    expect(result.blueprint).toBe(first);
+    expect(result.report).toMatchObject({
+      repaired: false,
+      repairNote: 'The repair changed no item.',
+    });
+  });
+
   it('repairs once on blocking findings and keeps the better plan', async () => {
     const first = plan('first');
     const second = plan('second');
+    // A real repair changes an item (a title-only change counts as no repair).
+    second.sections[0].items[1] = {
+      ...second.sections[0].items[1],
+      title: 'Practise on a new caller',
+    };
     critic.critique
       .mockResolvedValueOnce([
         blocking('B2 not practised'),
@@ -172,7 +190,7 @@ describe('CourseCopilotBlueprintService — critic', () => {
     const result = await check(build(), first);
     expect(planner.repair).toHaveBeenCalledTimes(1);
     expect(planner.repair.mock.calls[0][1]).toHaveLength(2);
-    expect(result.blueprint).toBe(second);
+    expect(result.blueprint).toEqual(second);
     expect(result.report).toMatchObject({
       repaired: true,
       remaining: [advisory('No debrief')],

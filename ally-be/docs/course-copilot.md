@@ -188,14 +188,24 @@ check and the roleplay and character interviews' stages are on unless set to `fa
   warning, never a block.
 - **Length check** (same switch, `src/course-copilot/util/course-pilot-length.util.ts`). When the trainer gave
   a length, the plan must come within 10% of it (at least 2 minutes either way). Each item counts
-  at no less than half its usual minutes, so shrinking estimates cannot pass it. Off-length plans
-  get the planner's one repair, which is kept only if it has fewer problems and no new transfer
-  problem; a plan still off is shown to the trainer with a plain note. What the planner's check
+  at no less than half its usual minutes, so shrinking estimates cannot pass it. The planner gets
+  the budget up front in its reference block (the allowed range, each type's floor, about how many
+  items fit, and that a scenario quiz is cheaper practice than another roleplay). Off-length plans
+  get the planner's one repair, told how many items to remove or add; it is kept if it has fewer
+  problems, or the same problems but closer to the length, and in either case no new transfer
+  problem. A plan still off is shown to the trainer with a plain note. What the planner's check
   found and whether the repair was kept: `metadata.coursePilot.planner`.
 - **Blueprint critic** (`COURSE_PILOT_CRITIC`, `src/course-copilot/service/specialists/blueprint-critic.specialist.ts`, prompt
   `course_copilot_blueprint_critic`). A separate model checks each proposed plan against the brief
   and Learning Design principles; blocking findings get one planner repair round, kept only if it is
-  no worse. Adds about 100 s per plan; its report is in `metadata.coursePilot.critic`.
+  no worse. The repair is an edit (`src/course-copilot/util/course-blueprint-patch.util.ts`): the
+  planner sees the current plan, and when every blocking finding names an item, every item no
+  finding names is put back exactly as it was (`patch.mode: 'patch'`); a finding about the whole
+  course takes the repair as it is (`'whole'`). A repair that changes no item is not counted. Code
+  hides an annotated example's default pass mark from the critic and drops its length findings when
+  the length check passed. Adds about 100 s per plan; its report (with `patch` and `repairNote`) is
+  in `metadata.coursePilot.critic`. Still off by default: in the 2026-11-27 eval most blocking
+  findings were about the whole course and few repairs were kept.
 - **Answer-key check** (`COURSE_PILOT_ANSWER_CHECK`, `src/course-copilot/service/specialists/answer-key-check.specialist.ts`,
   prompt `course_copilot_answer_key_check`). After the quiz writer, a second model answers every
   single-choice, multi-choice and true/false question without the key or explanations; code
@@ -216,9 +226,23 @@ check and the roleplay and character interviews' stages are on unless set to `fa
   record: kind of character → identity → life → languages and voices → draft. Question limits
   2/3/3/3/1 (10 in all); save_character_draft opens only at the end, and the draft must carry
   every recorded language with its voice. Needs validated turns.
+- **Publish stage** (`src/course-copilot/util/course-pilot-publish.util.ts`). `publish_course` keeps
+  its blocking readiness checks and adds what the build left unresolved (items not written or
+  skipped, disputed answer keys, reviewer fixes, critic leftovers) to the publish card, as
+  warnings that never block. The last attempt is in `metadata.coursePilot.publish`.
+- **Improve stage: the Analyst** (`analyse_course` edit tool; `src/course-copilot/service/course-pilot-analyst.service.ts`,
+  `src/course-copilot/util/course-pilot-analysis.util.ts`, prompt `course_copilot_course_analyst`).
+  Reads the same learner results as `get_learner_results` (the session's organisation only, test
+  organisations out, items under 5 learners withheld). Below 5 enrolled learners it measures
+  nothing. Code raises signals (course finished by under half, the biggest drop-off between two
+  items, an item under 60% finished, a quiz question under 40% right first time, an item averaging
+  over 2 attempts); the Analyst model is called only when there is a signal, sees group numbers
+  only, and returns at most 6 suggestions (reword, rule, shorten, add, check_key). The interviewer
+  shows them as one multiSelect question and applies the picked ones with the edit tools. The last
+  analysis is in `metadata.coursePilot.analysis`.
 - **Stages tab** (platform admins only; `GET /v1/course-copilot/sessions/:id/stages`,
   `src/course-copilot/service/course-pilot-stages-report.service.ts`). Every stage of a session
-  (interview stages, plan, build, course) with what happens there, the checks code ran, the
+  (interview stages, plan, build, course, publish, improve) with what happens there, the checks code ran, the
   Researcher's pack, and a timeline of questions, replies sent back to the agent and refused tool
   calls. Computed on request with the same functions the pipeline runs. Each assistant turn's row
   keeps `pilotStage`, `sentBack` (problem keys) and `refused` for it.

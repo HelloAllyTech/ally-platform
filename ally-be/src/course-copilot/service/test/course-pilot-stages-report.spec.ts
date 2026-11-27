@@ -185,6 +185,170 @@ describe('Course Pilot stages report', () => {
     );
   });
 
+  it('shows the publish stage: not reached, waiting with warnings, then published', () => {
+    const at = new Date('2026-11-27T10:00:00Z');
+    const failedJob = {
+      kind: 'article',
+      status: CourseCopilotJobStatus.FAILED,
+      title: 'Intro',
+      error: 'timeout',
+      summary: null,
+      createdAt: at,
+      finishedAt: at,
+    };
+    const notBuilt = buildStagesReport({
+      session: session(),
+      messages: [],
+      jobs: [],
+      stagesSwitch: true,
+    });
+    expect(byId(notBuilt, 'publish').status).toBe('not_reached');
+
+    const editing = session({
+      status: CourseCopilotSessionStatus.EDITING,
+      metadata: { buildCompletedAt: at.toISOString(), coursePilot: {} },
+    });
+    const waiting = byId(
+      buildStagesReport({
+        session: editing,
+        messages: [],
+        jobs: [failedJob],
+        stagesSwitch: true,
+      }),
+      'publish',
+    );
+    expect(waiting.status).toBe('current');
+    expect(waiting.why).toContain('1 thing to look at first');
+    expect(waiting.checks[0]).toMatchObject({
+      label: '1 item was not written',
+      result: 'warn',
+    });
+
+    const refused = byId(
+      buildStagesReport({
+        session: {
+          ...editing,
+          metadata: {
+            ...editing.metadata,
+            coursePilot: {
+              publish: {
+                at: at.toISOString(),
+                ready: false,
+                published: false,
+                checks: [{ label: 'Cover image', result: 'fail' }],
+              },
+            },
+          },
+        },
+        messages: [],
+        jobs: [],
+        stagesSwitch: true,
+      }),
+      'publish',
+    );
+    expect(refused.status).toBe('failed');
+    expect(refused.why).toBe('Publishing was refused: Cover image.');
+
+    const published = byId(
+      buildStagesReport({
+        session: {
+          ...editing,
+          metadata: {
+            ...editing.metadata,
+            coursePilot: {
+              publish: {
+                at: at.toISOString(),
+                ready: true,
+                published: true,
+                checks: [{ label: 'Every item was written', result: 'pass' }],
+              },
+            },
+          },
+        },
+        messages: [],
+        jobs: [],
+        stagesSwitch: true,
+      }),
+      'publish',
+    );
+    expect(published.status).toBe('passed');
+    expect(published.group).toBe('publish');
+  });
+
+  it('shows the improve stage from the last analysis and the edits after it', () => {
+    const analysis = {
+      at: '2026-11-27T10:00:00.000Z',
+      learners: 12,
+      finished: 5,
+      enough: true,
+      signals: [
+        {
+          kind: 'stall',
+          itemId: 'b',
+          text: '"Jamie": 4 of 10 finished it (40%).',
+        },
+      ],
+      summary: 'One roleplay stalls learners.',
+      suggestions: [
+        {
+          itemId: 'b',
+          signal: 'stall',
+          cause: 'The pass mark may be high.',
+          change: 'Lower the pass mark to 65.',
+          kind: 'rule',
+        },
+      ],
+      afterSeq: 10,
+    };
+    const report = (messages: any[]) =>
+      byId(
+        buildStagesReport({
+          session: session({
+            status: CourseCopilotSessionStatus.EDITING,
+            metadata: { coursePilot: { analysis } },
+          }),
+          messages,
+          jobs: [],
+          stagesSwitch: true,
+        }),
+        'improve',
+      );
+    const waiting = report([]);
+    expect(waiting.status).toBe('current');
+    expect(waiting.why).toBe('1 signal, 1 suggestion; nothing changed yet.');
+    expect(waiting.agents[0]).toMatchObject({ name: 'Analyst', state: 'ran' });
+    expect(waiting.checks.map((c: any) => c.label)).toContain(
+      'Suggested (rule): Lower the pass mark to 65.',
+    );
+    const edited = report([
+      {
+        role: 'assistant',
+        seq: 9,
+        createdAt: new Date(),
+        metadata: { coursePatches: [{}] },
+      },
+      {
+        role: 'assistant',
+        seq: 12,
+        createdAt: new Date(),
+        metadata: { coursePatches: [{}] },
+      },
+    ]);
+    expect(edited.status).toBe('passed');
+    expect(edited.why).toBe('1 change made after the analysis.');
+
+    const notRun = byId(
+      buildStagesReport({
+        session: session(),
+        messages: [],
+        jobs: [],
+        stagesSwitch: true,
+      }),
+      'improve',
+    );
+    expect(notRun.status).toBe('not_reached');
+  });
+
   it('places each turn in its stage: a tagged card by its tag, the rest by when the turn ended', () => {
     const history = [
       { stage: 'brief.learners', at: '2026-11-27T10:00:30Z' },

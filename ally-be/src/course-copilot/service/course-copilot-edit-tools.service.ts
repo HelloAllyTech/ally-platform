@@ -5,6 +5,14 @@ import {
   Optional,
   NotFoundException,
 } from '@nestjs/common';
+import { CoursePilotAnalystService } from './course-pilot-analyst.service';
+import { CourseCopilotJob } from '../entity/course-copilot-job.entity';
+import {
+  CoursePilotPublishRecord,
+  PublishCheck,
+  publishQualityChecks,
+  publishWarningText,
+} from '../util/course-pilot-publish.util';
 import { DataSource, ILike, In } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { LoggerService } from 'src/logger/logger.service';
@@ -302,6 +310,19 @@ export const EDIT_TOOL_DEFINITIONS: AgentToolDefinition[] = [
     },
   },
   {
+    name: 'analyse_course',
+    description:
+      'Use when the trainer asks how the course is going or what to improve (get_learner_results ' +
+      'gives the raw numbers). ' +
+      'How learners are doing on this course, as group numbers only (who finished, where they ' +
+      'stop, items that take many attempts, quiz questions most get wrong first time), with ' +
+      'suggested edits. Needs at least 5 enrolled learners. Show the suggestions to the trainer ' +
+      'as one multiSelect question (one option per suggestion, the most useful recommended) and ' +
+      'apply the ones they pick with the edit tools; a "check_key" suggestion means read the ' +
+      'question with get_item first.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
     name: 'publish_course',
     description:
       'Publish the course. Checks it is ready first and returns what is missing if not. When ' +
@@ -331,6 +352,7 @@ export const READ_ONLY_EDIT_TOOLS = new Set(['get_course_outline', 'get_item']);
  */
 const LIVE_EDIT_EXEMPT_TOOLS = new Set([
   ...READ_ONLY_EDIT_TOOLS,
+  'analyse_course',
   'list_organisations',
   'assign_to_tenants',
   'publish_course',
@@ -377,6 +399,7 @@ export class CourseCopilotEditToolsService {
     private readonly scenarioQuiz: ScenarioQuizSpecialist,
     private readonly bucketSort: BucketSortSpecialist,
     @Optional() private readonly analytics?: CourseCopilotAnalyticsService,
+    @Optional() private readonly analystService?: CoursePilotAnalystService,
   ) {}
 
   async execute(
@@ -433,6 +456,8 @@ export class CourseCopilotEditToolsService {
           return await this.assignToTenants(input, context);
         case 'request_translation':
           return await this.requestTranslation(input, context);
+        case 'analyse_course':
+          return await this.analyseCourse(context);
         case 'publish_course':
           return await this.publish(context);
         case 'duplicate_course':
@@ -1266,6 +1291,17 @@ export class CourseCopilotEditToolsService {
     }
     const readiness = await this.structureService.readiness(track);
     if (!readiness.ready) {
+      await this.recordPublish(context, {
+        ready: false,
+        published: false,
+        checks: readiness.checks
+          .filter((check) => !check.ok)
+          .map((check) => ({
+            label: check.label,
+            result: 'fail' as const,
+            detail: check.detail ?? undefined,
+          })),
+      });
       return {
         modelResult: {
           ok: false,
@@ -1278,6 +1314,9 @@ export class CourseCopilotEditToolsService {
         summary: 'Not ready to publish yet',
       };
     }
+    // Course Pilot's publish stage: what the build left unresolved, on the card. Never blocking.
+    const quality = await this.publishQuality(context);
+    const warning = publishWarningText(quality);
     const ask = await this.confirmOrAsk(
       context,
       'publish',
@@ -1286,15 +1325,28 @@ export class CourseCopilotEditToolsService {
         prompt: `Publish "${track.title}" now?`,
         confirmLabel: 'Publish now',
         rationale:
-          'Publishing makes it available to every organisation it is assigned to. After learners enrol, its structure is locked.',
+          'Publishing makes it available to every organisation it is assigned to. After learners enrol, its structure is locked.' +
+          (warning ? ` ${warning}` : ''),
       },
     );
-    if (ask) return ask;
+    if (ask) {
+      await this.recordPublish(context, {
+        ready: true,
+        published: false,
+        checks: quality,
+      });
+      return ask;
+    }
     await this.structureService.asOwner(context.session, () =>
       this.trackService.updateTrack(track.id, {
         status: TrackStatus.ACTIVE,
       } as any),
     );
+    await this.recordPublish(context, {
+      ready: true,
+      published: true,
+      checks: quality,
+    });
     this.analytics?.capture(
       COURSE_COPILOT_ANALYTICS_EVENTS.COURSE_PUBLISHED,
       context.userId,
@@ -1306,6 +1358,108 @@ export class CourseCopilotEditToolsService {
       `Published "${track.title}"`,
       {},
     );
+  }
+
+  /** The build's unresolved problems, from its jobs and the plan critic. */
+  private async publishQuality(
+    context: CourseCopilotToolContext,
+  ): Promise<PublishCheck[]> {
+    try {
+      const jobs = await this.dataSource.getRepository(CourseCopilotJob).find({
+        where: { sessionId: context.session.id },
+        order: { createdAt: 'ASC' },
+      });
+      return publishQualityChecks({
+        jobs: jobs.map((job) => ({
+          kind: String(job.kind),
+          status: String(job.status),
+          title: (job.input as any)?.item?.title ?? null,
+          summary: (job.result as any)?.summary ?? null,
+          reviewFixes: Array.isArray((job.result as any)?.findings)
+            ? (job.result as any).findings.filter(
+                (f: any) => f?.severity === 'fix',
+              ).length
+            : undefined,
+        })),
+        critic: (context.session.metadata as any)?.coursePilot?.critic ?? null,
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  /** Keeps the last publish attempt in metadata.coursePilot.publish for the Stages tab. */
+  private async recordPublish(
+    context: CourseCopilotToolContext,
+    record: Omit<CoursePilotPublishRecord, 'at'>,
+  ): Promise<void> {
+    await this.saveCoursePilotKey(context, 'publish', {
+      at: new Date().toISOString(),
+      ...record,
+    });
+  }
+
+  /** One key of metadata.coursePilot, merged in SQL. Bookkeeping only: a failed write is ignored. */
+  private async saveCoursePilotKey(
+    context: CourseCopilotToolContext,
+    key: 'publish' | 'analysis',
+    value: unknown,
+  ): Promise<void> {
+    try {
+      await this.dataSource.query(
+        `UPDATE course_copilot_sessions
+            SET metadata = jsonb_set(
+              coalesce(metadata, '{}'::jsonb),
+              '{coursePilot}',
+              coalesce(metadata->'coursePilot', '{}'::jsonb) || jsonb_build_object($2::text, $3::jsonb)
+            )
+          WHERE id = $1`,
+        [context.session.id, key, JSON.stringify(value)],
+      );
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Course Pilot's Improve stage: the Analyst's read of how learners did. */
+  private async analyseCourse(
+    context: CourseCopilotToolContext,
+  ): Promise<CourseCopilotToolOutcome> {
+    if (!this.analystService) {
+      return this.refuse('unavailable', 'Course analysis is not available.');
+    }
+    const track = await this.structureService.getTrack(
+      context.session.trackId!,
+    );
+    const outline = this.structureService.outlineForPrompt(
+      await this.structureService.buildOutline(track),
+    );
+    const analysis = await this.analystService.analyse(
+      context.session,
+      outline,
+    );
+    await this.saveCoursePilotKey(context, 'analysis', analysis);
+    return {
+      modelResult: {
+        ok: true,
+        learners: analysis.learners,
+        finished: analysis.finished,
+        enough: analysis.enough,
+        summary: analysis.summary,
+        signals: analysis.signals.map((signal) => signal.text),
+        suggestions: analysis.suggestions,
+        note: !analysis.enough
+          ? 'Tell the trainer there are not enough learners yet to say how the course is going.'
+          : analysis.suggestions.length
+            ? 'Ask the trainer which suggestions to apply (multiSelect), then apply the picked ones.'
+            : analysis.signals.length
+              ? 'Tell the trainer what the signals show and offer to look at those items.'
+              : 'Tell the trainer nothing stands out yet.',
+      },
+      summary: analysis.enough
+        ? `Analysed the course: ${analysis.learners} learners, ${analysis.signals.length} signal(s), ${analysis.suggestions.length} suggestion(s)`
+        : `Not enough learners to analyse yet (${analysis.learners})`,
+    };
   }
 
   private async duplicate(

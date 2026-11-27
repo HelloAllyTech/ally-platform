@@ -78,6 +78,10 @@ import {
   BlueprintCriticSpecialist,
   criticRepairList,
 } from './specialists/blueprint-critic.specialist';
+import {
+  applyCriticPatch,
+  BlueprintPatchResult,
+} from '../util/course-blueprint-patch.util';
 import { repairCompetencyIds } from '../util/course-copilot-competency.util';
 
 /** What the critic did to a plan, kept on the session and shown to the interviewer. */
@@ -85,6 +89,13 @@ export interface CoursePilotCriticReport {
   at: string;
   found: BlueprintCriticFinding[];
   repaired: boolean;
+  /**
+   * How the repair was applied: 'patch' put back every item no finding named; 'whole' took the
+   * repaired plan as it was (a finding about the whole course). Absent when no repair was tried.
+   */
+  patch?: { mode: 'patch' | 'whole'; restored: number; changed: number };
+  /** Why a tried repair was not kept. */
+  repairNote?: string;
   /** Findings on the plan that went out (the repaired one, when kept). */
   remaining: BlueprintCriticFinding[];
 }
@@ -247,8 +258,30 @@ export class CourseCopilotBlueprintService {
       let blueprint = planned;
       let remaining = findings;
       let repaired = false;
+      let patch: BlueprintPatchResult | null = null;
+      let repairNote: string | undefined;
       if (blocking.length) {
-        const second = await this.planner.repair(plannerInput, blocking);
+        const repairedPlan = await this.planner.repair(
+          plannerInput,
+          blocking,
+          planned,
+        );
+        // An edit, not a rewrite: items no blocking finding names go back as they were.
+        const patched = repairedPlan
+          ? applyCriticPatch(planned, repairedPlan, findings)
+          : null;
+        if (patched) patch = patched;
+        // A repair that changed no item (same items, same order) is no repair: an eval critic
+        // was then "fixed" only because its second reading came out kinder.
+        const sameItems = (a: CourseBlueprint, b: CourseBlueprint) =>
+          JSON.stringify((a.sections ?? []).map((s) => s.items)) ===
+          JSON.stringify((b.sections ?? []).map((s) => s.items));
+        const second =
+          patched && !sameItems(planned, patched.blueprint)
+            ? patched.blueprint
+            : null;
+        if (!repairedPlan) repairNote = 'The repair returned no usable plan.';
+        else if (!second) repairNote = 'The repair changed no item.';
         // Code problems, transfer and length included: a repair must not undo what the
         // planner's check fixed.
         const codeProblems = (plan: CourseBlueprint) =>
@@ -257,6 +290,10 @@ export class CourseCopilotBlueprintService {
             ? transferProblems(plan, brief).length +
               lengthProblems(plan, brief).length
             : 0);
+        if (second && codeProblems(second) > codeProblems(planned)) {
+          repairNote =
+            'The repair broke a code check (limits, practice rules or length).';
+        }
         if (second && codeProblems(second) <= codeProblems(planned)) {
           const after = await this.critic.critique({
             brief,
@@ -271,6 +308,8 @@ export class CourseCopilotBlueprintService {
             blueprint = second;
             remaining = after;
             repaired = true;
+          } else {
+            repairNote = `The repaired plan had more blocking findings (${blockingAfter} vs ${blocking.length}).`;
           }
         }
       }
@@ -278,6 +317,16 @@ export class CourseCopilotBlueprintService {
         at: new Date().toISOString(),
         found: findings,
         repaired,
+        ...(patch
+          ? {
+              patch: {
+                mode: patch.mode,
+                restored: patch.restored,
+                changed: patch.changed,
+              },
+            }
+          : {}),
+        ...(repairNote && !repaired ? { repairNote } : {}),
         remaining,
       };
       await this.saveCoursePilotKey(session.id, 'critic', report);

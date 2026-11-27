@@ -24,6 +24,8 @@ export const SPECIALIST_MAX_TOKENS = {
   BLUEPRINT: 64_000,
   // Findings only, at most 8: small output, room for reasoning over a 100-item plan.
   BLUEPRINT_CRITIC: 16_000,
+  // At most 6 suggestions over a course's group numbers.
+  COURSE_ANALYST: 12_000,
   ANSWER_KEY_CHECK: 8_000,
   RESEARCHER: 4_000,
   ARTICLE: 12_000,

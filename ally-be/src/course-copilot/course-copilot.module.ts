@@ -57,6 +57,8 @@ import { BlueprintPlannerSpecialist } from './service/specialists/blueprint-plan
 import { CourseMetaSpecialist } from './service/specialists/course-meta.specialist';
 import { CourseReviewSpecialist } from './service/specialists/course-review.specialist';
 import { BlueprintCriticSpecialist } from './service/specialists/blueprint-critic.specialist';
+import { CourseAnalystSpecialist } from './service/specialists/course-analyst.specialist';
+import { CoursePilotAnalystService } from './service/course-pilot-analyst.service';
 import { AnswerKeyCheckSpecialist } from './service/specialists/answer-key-check.specialist';
 import { ResearcherSpecialist } from './service/specialists/researcher.specialist';
 import { ImagePromptSpecialist } from './service/specialists/image-prompt.specialist';
@@ -150,6 +152,8 @@ import { CoursePilotStagesReportService } from './service/course-pilot-stages-re
     SpecialistLlmService,
     BlueprintPlannerSpecialist,
     BlueprintCriticSpecialist,
+    CourseAnalystSpecialist,
+    CoursePilotAnalystService,
     AnswerKeyCheckSpecialist,
     ResearcherSpecialist,
     ArticleSpecialist,

@@ -3324,6 +3324,23 @@ const COURSE_COPILOT_TASKS: AiTaskEntry[] = [
     promptOverride: 'course_copilot_blueprint_critic',
   },
   {
+    id: 'course-copilot-course-analyst',
+    task: LlmTask.COURSE_COPILOT_COURSE_ANALYST,
+    runtime: LlmRuntime.ALLY_BE,
+    tier: LlmModelTier.REASONING,
+    trigger:
+      'A trainer asks Course Copilot how a course is going (analyse_course, Improve stage)',
+    detail:
+      'One call per analysis, only with at least 5 enrolled learners and at least one signal ' +
+      'code raised. Sees group numbers only (completion, drop-off, attempts, first-try right ' +
+      'rate per quiz question), never a learner. At most 6 suggestions. JSON mode.',
+    kind: AiTaskKind.COMPLETION,
+    provider: 'openai',
+    defaultModel: 'gpt-5-mini',
+    configuredBy: 'LLM_REASONING_MODEL',
+    promptOverride: 'course_copilot_course_analyst',
+  },
+  {
     id: 'course-copilot-answer-key-check',
     task: LlmTask.COURSE_COPILOT_ANSWER_KEY_CHECK,
     runtime: LlmRuntime.ALLY_BE,

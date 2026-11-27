@@ -1,4 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
+import { stripRecommendedMark } from '../util/course-copilot-option-label.util';
 import { v4 as uuidv4 } from 'uuid';
 import { LoggerService } from 'src/logger/logger.service';
 import { JsonPatchOp } from 'src/common/util/json-patch.util';
@@ -1334,13 +1335,24 @@ export class CourseCopilotToolsService {
     const options = raw
       .map((option) => {
         if (typeof option === 'string') {
-          const value = option.trim();
-          return value ? { id: value, label: value } : null;
+          const mark = stripRecommendedMark(option);
+          const value = mark.label;
+          return value
+            ? {
+                id: value,
+                label: value,
+                ...(mark.marked ? { recommended: true } : {}),
+              }
+            : null;
         }
         if (option && typeof option === 'object') {
           const source = option as Record<string, any>;
-          const id = String(source.id ?? source.label ?? '').trim();
-          const label = String(source.label ?? source.id ?? '').trim();
+          const rawLabel = String(source.label ?? source.id ?? '').trim();
+          const mark = stripRecommendedMark(rawLabel);
+          const label = mark.label;
+          const rawId = String(source.id ?? source.label ?? '').trim();
+          // An id copied from the marked label loses the mark too.
+          const id = rawId === rawLabel ? label : rawId;
           if (!id || !label) return null;
           return {
             id,
@@ -1348,7 +1360,7 @@ export class CourseCopilotToolsService {
             ...(source.description
               ? { description: String(source.description) }
               : {}),
-            ...(source.recommended ? { recommended: true } : {}),
+            ...(source.recommended || mark.marked ? { recommended: true } : {}),
           };
         }
         return null;

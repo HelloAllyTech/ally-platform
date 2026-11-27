@@ -1,4 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import type { CoursePilotAnalysisRecord } from './course-pilot-analyst.service';
+import {
+  CoursePilotPublishRecord,
+  publishQualityChecks,
+} from '../util/course-pilot-publish.util';
 import { CourseCopilotSession } from '../entity/course-copilot-session.entity';
 import {
   CourseCopilotJobKind,
@@ -66,7 +71,7 @@ export interface StageAgent {
 export interface CoursePilotStageRow {
   id: string;
   title: string;
-  group: 'interview' | 'plan' | 'build' | 'course';
+  group: 'interview' | 'plan' | 'build' | 'course' | 'publish' | 'improve';
   status: StageStatus;
   /** One line: why this stage passed, failed or is waiting. */
   why: string;
@@ -216,6 +221,7 @@ export class CoursePilotStagesReportService {
       session,
       messages: messages.map((m) => ({
         role: String(m.role),
+        seq: Number((m as any).seq ?? 0),
         createdAt: m.createdAt,
         metadata: (m as any).metadata ?? null,
       })),
@@ -225,6 +231,10 @@ export class CoursePilotStagesReportService {
         title: j.input?.item?.title ?? null,
         error: j.error ?? null,
         summary: j.result?.summary ?? null,
+        reviewFixes: Array.isArray((j.result as any)?.findings)
+          ? (j.result as any).findings.filter((f: any) => f?.severity === 'fix')
+              .length
+          : undefined,
         createdAt: j.createdAt,
         finishedAt: j.finishedAt ?? null,
       })),
@@ -235,6 +245,8 @@ export class CoursePilotStagesReportService {
 
 export interface ReportMessage {
   role: string;
+  /** Message order; absent in old fixtures. */
+  seq?: number;
   createdAt: Date;
   metadata: Record<string, any> | null;
 }
@@ -247,6 +259,8 @@ export interface ReportJob {
   summary: string | null;
   createdAt: Date;
   finishedAt: Date | null;
+  /** Reviewer findings marked "fix" (course_review jobs). */
+  reviewFixes?: number;
 }
 
 /** Pure: the whole report from what the session keeps. */
@@ -437,7 +451,188 @@ export function buildStagesReport(input: {
             },
           ],
   });
+  rows.push(publishRow(session, state, jobs));
+  rows.push(improveRow(state, messages));
   return { staged, sessionStatus: status, stages: rows };
+}
+
+/**
+ * Improve: the Analyst's last read of how learners did (code's signals, the model's suggestions)
+ * and how many changes the trainer made after it.
+ */
+function improveRow(
+  state: CoursePilotState,
+  messages: ReportMessage[],
+): CoursePilotStageRow {
+  const analysis = (state as any).analysis as
+    | CoursePilotAnalysisRecord
+    | undefined;
+  const base = {
+    id: 'improve',
+    title: 'Improve',
+    group: 'improve' as const,
+    what: 'Once learners have taken the course, code measures it in group numbers (who finished, where they stop, attempts, quiz questions most get wrong first time; never one learner) and raises signals; the Analyst explains them and suggests edits; the trainer picks and the copilot applies them.',
+    enteredAt: analysis?.at ?? null,
+    leftAt: null,
+    events: [] as StageEvent[],
+  };
+  const analystRole =
+    'Explains the signals code found and suggests edits; sees group numbers only';
+  if (!analysis) {
+    return {
+      ...base,
+      status: 'not_reached',
+      why: 'Not run yet: ask the copilot how the course is going.',
+      checks: [],
+      agents: [{ name: 'Analyst', role: analystRole, state: 'not_run' }],
+    };
+  }
+  const edits = messages.filter(
+    (m) =>
+      (m.seq ?? 0) > analysis.afterSeq && m.metadata?.coursePatches?.length,
+  ).length;
+  const checks: StageCheck[] = [
+    {
+      label: `${analysis.learners} learner${analysis.learners === 1 ? '' : 's'} enrolled, ${analysis.finished} finished`,
+      result: analysis.enough ? 'info' : 'warn',
+      detail: analysis.enough ? undefined : analysis.summary,
+    },
+    ...analysis.signals.map((signal) => ({
+      label: signal.text,
+      result: 'warn' as const,
+    })),
+    ...analysis.suggestions.map((suggestion) => ({
+      label: `Suggested (${suggestion.kind}): ${suggestion.change}`,
+      result: 'info' as const,
+      detail: suggestion.cause || undefined,
+    })),
+  ];
+  if (analysis.error) {
+    checks.push({
+      label: 'Analyst failed; the signals still stand',
+      result: 'warn',
+      detail: analysis.error,
+    });
+  }
+  return {
+    ...base,
+    status: !analysis.enough
+      ? 'not_reached'
+      : edits
+        ? 'passed'
+        : analysis.signals.length
+          ? 'current'
+          : 'passed',
+    why: !analysis.enough
+      ? analysis.summary
+      : edits
+        ? `${edits} change${edits === 1 ? '' : 's'} made after the analysis.`
+        : analysis.signals.length
+          ? `${analysis.signals.length} signal${analysis.signals.length === 1 ? '' : 's'}, ${analysis.suggestions.length} suggestion${analysis.suggestions.length === 1 ? '' : 's'}; nothing changed yet.`
+          : analysis.summary,
+    checks,
+    agents: [
+      {
+        name: 'Analyst',
+        role: analystRole,
+        state: !analysis.enough
+          ? 'not_run'
+          : analysis.suggestions.length || analysis.error
+            ? 'ran'
+            : 'not_run',
+        detail: !analysis.enough
+          ? 'not enough learners'
+          : analysis.suggestions.length
+            ? `${analysis.suggestions.length} suggestion(s)`
+            : analysis.signals.length
+              ? undefined
+              : 'nothing to explain',
+      },
+    ],
+  };
+}
+
+/**
+ * Publish: the structural readiness checks (blocking) and what the build left unresolved
+ * (warnings), from the last publish attempt; before one, the warnings as they stand now.
+ */
+function publishRow(
+  session: CourseCopilotSession,
+  state: CoursePilotState,
+  jobs: ReportJob[],
+): CoursePilotStageRow {
+  const record = (state as any).publish as CoursePilotPublishRecord | undefined;
+  const built = (session.metadata as any)?.buildCompletedAt ?? null;
+  const base = {
+    id: 'publish',
+    title: 'Publish',
+    group: 'publish' as const,
+    what: 'Code checks the course can go live (title, description, cover, sections, published roleplays), then lists what the build left unresolved. The trainer confirms; warnings never block.',
+    enteredAt: record?.at ?? null,
+    leftAt: record?.published ? record.at : null,
+    events: [] as StageEvent[],
+  };
+  const agent = (state: StageAgent['state'], detail?: string): StageAgent[] => [
+    {
+      name: 'Publish check',
+      role: 'Code, not a model: readiness plus failed items, disputed answer keys, reviewer fixes and critic leftovers',
+      state,
+      ...(detail ? { detail } : {}),
+    },
+  ];
+  if (!built && !record) {
+    return {
+      ...base,
+      status: 'not_reached',
+      why: 'Not reached yet.',
+      checks: [],
+      agents: agent('not_run'),
+    };
+  }
+  const checks: StageCheck[] = record
+    ? record.checks
+    : publishQualityChecks({
+        jobs: jobs.map((j) => ({
+          kind: String(j.kind),
+          status: String(j.status),
+          title: j.title,
+          summary: j.summary,
+          reviewFixes: j.reviewFixes,
+        })),
+        critic: (state as any).critic ?? null,
+      });
+  const warnings = checks.filter((c) => c.result !== 'pass').length;
+  if (record?.published) {
+    return {
+      ...base,
+      status: warnings ? 'warning' : 'passed',
+      why: warnings
+        ? `Published with ${warnings} warning${warnings === 1 ? '' : 's'} on the card.`
+        : 'Published; nothing was left unresolved.',
+      checks,
+      agents: agent('ran'),
+    };
+  }
+  if (record && !record.ready) {
+    return {
+      ...base,
+      status: 'failed',
+      why: `Publishing was refused: ${checks.map((c) => c.label).join('; ')}.`,
+      checks,
+      agents: agent('ran', 'readiness failed'),
+    };
+  }
+  return {
+    ...base,
+    status: 'current',
+    why: record
+      ? 'The publish card is waiting for the trainer.'
+      : warnings
+        ? `Not published yet; ${warnings} thing${warnings === 1 ? '' : 's'} to look at first.`
+        : 'Not published yet; nothing unresolved.',
+    checks,
+    agents: agent(record ? 'running' : 'not_run'),
+  };
 }
 
 function confirmChecks(
@@ -576,6 +771,8 @@ function planRow(
     | {
         found: { severity: string; problem?: string; criterion?: string }[];
         repaired: boolean;
+        patch?: { mode: string; restored: number; changed: number };
+        repairNote?: string;
         remaining: { severity: string; problem?: string }[];
       }
     | undefined;
@@ -588,8 +785,10 @@ function planRow(
       label: `Critic: ${critic.found.length} finding${critic.found.length === 1 ? '' : 's'}, ${blocking} blocking${critic.repaired ? ', repaired' : ''}`,
       result: left.length ? 'warn' : 'pass',
       detail:
-        left
-          .map((f) => f.problem)
+        [
+          critic.repairNote ? `Repair not kept: ${critic.repairNote}` : '',
+          ...left.map((f) => f.problem ?? ''),
+        ]
           .filter(Boolean)
           .join(' · ') || undefined,
     });
@@ -794,7 +993,11 @@ function planAgents(
     | { firstProblems: string[]; repairTried: boolean; repairKept: boolean }
     | undefined;
   const critic = (state as any).critic as
-    | { found: { severity: string }[]; repaired: boolean }
+    | {
+        found: { severity: string }[];
+        repaired: boolean;
+        patch?: { mode: string; restored: number; changed: number };
+      }
     | undefined;
   const reached = status !== 'not_reached';
   return [
@@ -815,7 +1018,7 @@ function planAgents(
       role: 'Reviews the plan against the brief and design principles',
       state: critic ? 'ran' : 'off',
       detail: critic
-        ? `${critic.found.length} finding(s), ${critic.found.filter((f) => f.severity === 'blocking').length} blocking${critic.repaired ? ', repaired' : ''}`
+        ? `${critic.found.length} finding(s), ${critic.found.filter((f) => f.severity === 'blocking').length} blocking${critic.repaired ? ', repaired' : ''}${critic.patch?.mode === 'patch' ? ` (edited ${critic.patch.changed} item(s), kept ${critic.patch.restored} unflagged)` : ''}`
         : 'Switched off (COURSE_PILOT_CRITIC)',
     },
   ];

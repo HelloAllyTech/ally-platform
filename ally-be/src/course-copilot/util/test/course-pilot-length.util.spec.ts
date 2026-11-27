@@ -1,6 +1,8 @@
 import {
   blueprintMinutes,
   lengthBounds,
+  lengthBudget,
+  lengthGap,
   lengthProblems,
   lengthWarning,
   realisticMinutes,
@@ -40,13 +42,15 @@ describe('Course Pilot length check', () => {
     expect(problem).toContain('60-minute course');
     expect(problem).toContain('71 minutes');
     expect(problem).toContain('between 54 and 66');
-    expect(problem).toContain('cutting about 11 minutes');
+    expect(problem).toContain(
+      'removing or merging about 1 item (about 11 minutes)',
+    );
     expect(problem).toContain('"Item 0" (ROLEPLAY, 40 min)');
   });
 
   it('flags a plan that runs short', () => {
     const [problem] = lengthProblems(plan(50, 50), brief(120));
-    expect(problem).toContain('adding about 20 minutes');
+    expect(problem).toContain('adding about 1 item (about 20 minutes)');
   });
 
   it('counts a squeezed estimate at its floor and names it', () => {
@@ -69,5 +73,34 @@ describe('Course Pilot length check', () => {
       'This plan is about 71 minutes; you asked for 60. Ask me to shorten or lengthen it, or approve it as it is.',
     ]);
     expect(lengthWarning(plan(30, 30), brief(60))).toEqual([]);
+  });
+
+  it('asks for a count of items when many small items run long', () => {
+    // Ten small items (51 minutes) for a 30-minute course: about 5 items to remove.
+    const [problem] = lengthProblems(
+      plan(6, 5, 5, 5, 5, 5, 5, 5, 5, 5),
+      brief(30),
+    );
+    expect(problem).toContain('this plan has 10 items');
+    expect(problem).toContain(
+      'removing or merging about 5 items (about 21 minutes)',
+    );
+  });
+
+  it('measures how far outside the range a plan is', () => {
+    expect(lengthGap(plan(40, 20, 11), brief(60))).toBe(5);
+    expect(lengthGap(plan(30, 30), brief(60))).toBe(0);
+    expect(lengthGap(plan(20), brief(60))).toBe(34);
+    expect(lengthGap(plan(200), brief())).toBe(0);
+  });
+
+  it('gives the planner a budget up front only when a length was asked', () => {
+    const budget = lengthBudget(brief(60)) ?? '';
+    expect(budget).toContain('between 54 and 66');
+    expect(budget).toContain('ROLEPLAY 6');
+    expect(budget).toContain('about 10 items');
+    expect(budget).toContain('At most about 2 roleplays');
+    expect(budget).not.toContain('VIDEO');
+    expect(lengthBudget(brief())).toBeNull();
   });
 });

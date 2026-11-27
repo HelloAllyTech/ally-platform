@@ -172,6 +172,33 @@ describe('BlueprintPlannerSpecialist', () => {
     expect(blueprint.sections[0].items).toHaveLength(4);
   });
 
+  it('keeps a repair that comes closer to the asked length', async () => {
+    const withArticle = (minutes: number) => ({
+      ...goodPlan,
+      sections: [
+        {
+          ...goodPlan.sections[0],
+          items: goodPlan.sections[0].items.map((item) =>
+            item.id === 'i1' ? { ...item, estimatedMinutes: minutes } : item,
+          ),
+        },
+      ],
+    });
+    const brief = makeBrief();
+    brief.shape = { ...(brief.shape ?? {}), durationMinutes: 20 } as any;
+    const llm = fakeLlm([withArticle(40), withArticle(30)]);
+    const report: any = {};
+    const blueprint = await new BlueprintPlannerSpecialist(llm.service).plan(
+      { ...input(), brief, checkTransfer: true },
+      report,
+    );
+    expect(llm.promptOf(0)).toContain('LENGTH BUDGET');
+    expect(llm.promptOf(1)).toContain('20-minute course');
+    expect(blueprint.sections[0].items[0].estimatedMinutes).toBe(30);
+    expect(report.repairKept).toBe(true);
+    expect(report.remaining).toHaveLength(1);
+  });
+
   it('repairs the plan correctly with sufficient token limit', async () => {
     const completeMock = jest
       .fn()

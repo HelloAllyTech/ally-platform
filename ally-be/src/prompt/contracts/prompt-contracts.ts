@@ -640,6 +640,25 @@ export const COURSE_COPILOT_BLUEPRINT_CRITIC = definePrompt(
   },
 );
 
+/** src/prompts/course_copilot/course_analyst.txt */
+export const COURSE_COPILOT_COURSE_ANALYST = definePrompt(
+  'course_copilot_course_analyst',
+  {
+    course_outline: 'required',
+    learner_facts: 'required',
+    max_suggestions: 'optional',
+    signals: 'required',
+  },
+  {
+    name: 'Course Copilot — Course Analyst',
+    description:
+      'Course Pilot Improve stage: reads the group numbers of how learners did on a published course (completion, drop-off, attempts, first-try right rate per quiz question; never one learner) and the signals code raised, and proposes at most 6 concrete edits for the trainer to approve. JSON mode.',
+    category: 'Course Copilot',
+    runtimes: ['ally-be'],
+    output: 'structured',
+  },
+);
+
 /** src/prompts/course_copilot/course_reviewer.txt */
 export const COURSE_COPILOT_COURSE_REVIEWER = definePrompt(
   'course_copilot_course_reviewer',

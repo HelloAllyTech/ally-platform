@@ -53,6 +53,47 @@ export function realisticMinutes(blueprint: CourseBlueprint): number {
   );
 }
 
+/** Minutes outside the allowed range (0 inside it, or when no length was asked). */
+export function lengthGap(
+  blueprint: CourseBlueprint,
+  brief: CourseBrief | null | undefined,
+): number {
+  const target = Number(brief?.shape?.durationMinutes);
+  if (!Number.isFinite(target) || target <= 0) return 0;
+  const minutes = realisticMinutes(blueprint);
+  const { min, max } = lengthBounds(target);
+  return minutes > max ? minutes - max : minutes < min ? min - minutes : 0;
+}
+
+/**
+ * The length budget, given to the planner before its first plan (in the reference block, beside
+ * the transfer rules). Two eval plans ran 20% over even after the repair: one listed ten items for
+ * a 30-minute course, one four 9–11 minute roleplays for 60. The budget says up front how much
+ * fits. Null when no length was asked.
+ */
+export function lengthBudget(
+  brief: CourseBrief | null | undefined,
+): string | null {
+  const target = Number(brief?.shape?.durationMinutes);
+  if (!Number.isFinite(target) || target <= 0) return null;
+  const { min, max } = lengthBounds(target);
+  const floors = Object.entries(COURSE_COPILOT_DEFAULT_ITEM_MINUTES)
+    .filter(([type]) => type !== 'VIDEO')
+    .map(([type, usual]) => `${type} ${Math.ceil(usual / 2)}`)
+    .join(', ');
+  const roleplay = COURSE_COPILOT_DEFAULT_ITEM_MINUTES.ROLEPLAY;
+  const typical = Math.max(2, Math.round(target / 6));
+  const roleplays = Math.max(1, Math.floor(max / 2 / roleplay));
+  return [
+    `LENGTH BUDGET (checked in code)`,
+    `The trainer asked for ${target} minutes. The items' estimatedMinutes must add up to between ${min} and ${max}.`,
+    `No estimate counts below its floor (minutes): ${floors}. Listing an item lower does not save time; it is raised to the floor.`,
+    `That is about ${typical} items at usual lengths. At most about ${roleplays} roleplay${roleplays === 1 ? '' : 's'} of ${roleplay} minutes fit if practice is to be half the course.`,
+    `Practice a skill target needs (a new scenario of similar difficulty) still has to fit: a scenario quiz (${COURSE_COPILOT_DEFAULT_ITEM_MINUTES.QUIZ} minutes) gives that practice in less time than another roleplay, so cut reading before practice.`,
+    `Add the minutes up before you answer. If the total is over ${max}, drop or merge items instead of shortening every estimate.`,
+  ].join('\n');
+}
+
 /** Problems for the planner's repair call; empty when the length is right or none was asked. */
 export function lengthProblems(
   blueprint: CourseBlueprint,
@@ -82,14 +123,25 @@ export function lengthProblems(
       (item) => `"${item.title}" (${item.type}, ${item.estimatedMinutes} min)`,
     )
     .join(', ');
+  // A count is a clearer instruction than minutes: a repair told "cut 10 minutes" squeezed every
+  // estimate instead of removing anything.
+  const items = itemsOf(blueprint);
+  const average = items.length ? minutes / items.length : 6;
+  const itemCount = Math.max(
+    1,
+    Math.ceil(
+      (over ? minutes - target : target - minutes) / Math.max(3, average),
+    ),
+  );
   return [
-    `The trainer asked for a ${target}-minute course; this plan takes about ${minutes} minutes. ` +
+    `The trainer asked for a ${target}-minute course; this plan has ${items.length} items and takes about ${minutes} minutes. ` +
       `Bring the total of the items' estimatedMinutes to between ${min} and ${max} by ` +
       (over
-        ? `cutting about ${minutes - target} minutes — drop or merge an item that repeats ` +
-          `another, or shorten one — but keep the capstone and every practice a skill target needs`
-        : `adding about ${target - minutes} minutes of practice or reflection that serves the ` +
-          `outcomes`) +
+        ? `removing or merging about ${itemCount} item${itemCount === 1 ? '' : 's'} (about ${minutes - target} minutes) — ` +
+          `start with an item that repeats another, or replace a long roleplay with a shorter practice — ` +
+          `but keep the capstone and every practice a skill target needs`
+        : `adding about ${itemCount} item${itemCount === 1 ? '' : 's'} (about ${target - minutes} minutes) of practice or ` +
+          `reflection that serves the outcomes`) +
       `. Keep each estimate realistic: do not just change the numbers. Keep every practice ` +
       `item's transfer and targetSkills marks.` +
       (squeezed.length

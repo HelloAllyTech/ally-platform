@@ -392,6 +392,7 @@ export enum LlmTask {
   COURSE_COPILOT_INTERVIEW = 'course_copilot_interview',
   COURSE_COPILOT_BLUEPRINT = 'course_copilot_blueprint',
   COURSE_COPILOT_BLUEPRINT_CRITIC = 'course_copilot_blueprint_critic',
+  COURSE_COPILOT_COURSE_ANALYST = 'course_copilot_course_analyst',
   COURSE_COPILOT_ANSWER_KEY_CHECK = 'course_copilot_answer_key_check',
   COURSE_COPILOT_RESEARCHER = 'course_copilot_researcher',
   COURSE_COPILOT_ARTICLE = 'course_copilot_article',

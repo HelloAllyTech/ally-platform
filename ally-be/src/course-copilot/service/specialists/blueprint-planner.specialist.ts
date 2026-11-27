@@ -16,7 +16,12 @@ import {
   transferProblems,
   transferRequirements,
 } from '../../util/course-pilot-transfer.util';
-import { lengthProblems } from '../../util/course-pilot-length.util';
+import { currentPlanReference } from '../../util/course-blueprint-patch.util';
+import {
+  lengthBudget,
+  lengthGap,
+  lengthProblems,
+} from '../../util/course-pilot-length.util';
 import { SpecialistLlmService } from './specialist-llm.service';
 import { learnerProfileReference } from '../course-copilot-learner-profile.service';
 import { exampleCourseReference } from '../course-copilot-example-course.service';
@@ -125,7 +130,17 @@ export class BlueprintPlannerSpecialist {
         input.checkTransfer ? transferProblems(plan, input.brief).length : 0;
       const fewer = problemsOf(second).length < problems.length;
       const keptTransfer = transferOf(second) <= transferOf(first);
-      return fewer && keptTransfer
+      // Also kept: the same count of problems, but closer to the asked length and no other
+      // problem added. Two eval repairs went from 72 to 66 minutes for a 60-minute course and
+      // were thrown away because the one length problem remained.
+      const otherOf = (plan: CourseBlueprint) =>
+        problemsOf(plan).length -
+        (input.checkTransfer ? lengthProblems(plan, input.brief).length : 0);
+      const closer =
+        input.checkTransfer &&
+        otherOf(second) <= otherOf(first) &&
+        lengthGap(second, input.brief) < lengthGap(first, input.brief);
+      return (fewer || closer) && keptTransfer
         ? done(second, {
             firstProblems: problems,
             repairTried: true,
@@ -136,7 +151,7 @@ export class BlueprintPlannerSpecialist {
             repairTried: true,
             repairKept: false,
             repairNote: !fewer
-              ? 'The repaired plan did not have fewer problems.'
+              ? 'The repaired plan did not have fewer problems or come closer to the asked length.'
               : 'The repaired plan broke a skill-target practice rule.',
           });
     } catch (error) {
@@ -160,9 +175,23 @@ export class BlueprintPlannerSpecialist {
   async repair(
     input: BlueprintPlannerInput,
     problems: string[],
+    current?: CourseBlueprint,
   ): Promise<CourseBlueprint | null> {
     try {
-      return await this.attempt(input, problems);
+      // The plan to edit rides in the reference block, so the repair changes it instead of
+      // writing a new one (the caller then puts back what the critic did not flag).
+      const withPlan = current
+        ? {
+            ...input,
+            referenceMaterial: [
+              input.referenceMaterial,
+              currentPlanReference(current),
+            ]
+              .filter(Boolean)
+              .join('\n\n---\n'),
+          }
+        : input;
+      return await this.attempt(withPlan, problems);
     } catch (error) {
       if (!(error instanceof SpecialistValidationError)) throw error;
       this.logger.warn(
@@ -196,6 +225,7 @@ export class BlueprintPlannerSpecialist {
           exampleCourseReference(brief?.shape?.durationMinutes),
           input.designGuidance,
           input.checkTransfer ? transferRequirements(brief) : null,
+          input.checkTransfer ? lengthBudget(brief) : null,
         ]
           .map((part) => part?.trim())
           .filter(Boolean)

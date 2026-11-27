@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { TRACK_DEFAULT_ANNOTATION_PASS_SCORE } from 'src/track/constants/track.constant';
+import { lengthProblems } from '../../util/course-pilot-length.util';
 import { LlmTask } from 'src/learn/enum/llm-task.enum';
 import {
   COURSE_COPILOT_AI_TASKS,
@@ -75,8 +77,39 @@ export class BlueprintCriticSpecialist {
         max_findings: String(BLUEPRINT_CRITIC_MAX_FINDINGS),
       },
     });
-    return normaliseCriticFindings(data, input.blueprint);
+    return dropCodeCheckedFindings(
+      normaliseCriticFindings(data, input.blueprint),
+      input.blueprint,
+      input.brief,
+    );
   }
+}
+
+/**
+ * Code owns the length: a critic finding about the course's total minutes is dropped when the
+ * length check passed (an eval critic flagged 109 of 120 minutes, inside the 10% range, and sent
+ * the plan back for it).
+ */
+export function dropCodeCheckedFindings(
+  findings: BlueprintCriticFinding[],
+  blueprint: CourseBlueprint,
+  brief: CourseBrief,
+): BlueprintCriticFinding[] {
+  if (lengthProblems(blueprint, brief).length) return findings;
+  const aboutLength = (f: BlueprintCriticFinding) =>
+    !f.itemId &&
+    /\b(duration|length|minutes?|long|short)\b/i.test(f.problem) &&
+    /\b(total|course|brief|plan)\b/i.test(f.problem);
+  return findings.filter((f) => !aboutLength(f));
+}
+
+function isDefaultAnnotationRule(item: any): boolean {
+  return (
+    String(item.type) === 'ANNOTATED_ARTIFACT' &&
+    Number(item.completionCriteria?.passScore) ===
+      TRACK_DEFAULT_ANNOTATION_PASS_SCORE &&
+    Object.keys(item.completionCriteria ?? {}).length === 1
+  );
 }
 
 /** What the critic needs of a plan: structure, purpose, timing, rules and each item's spec. */
@@ -94,7 +127,11 @@ export function compactBlueprintForCritic(blueprint: CourseBlueprint) {
         title: item.title,
         minutes: item.estimatedMinutes,
         source: item.source,
-        ...(item.completionCriteria ? { rule: item.completionCriteria } : {}),
+        // An annotated example's pass mark is the platform default, set by code, not a design
+        // choice the planner can change: the critic flagged it and the repair could not move it.
+        ...(item.completionCriteria && !isDefaultAnnotationRule(item)
+          ? { rule: item.completionCriteria }
+          : {}),
         spec: item.spec ?? undefined,
       })),
     })),
