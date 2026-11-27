@@ -11658,7 +11658,14 @@ export const en = {
       loading: "Loading stages…",
       error: "Could not load the stages.",
       retry: "Try again",
-      groups: { interview: "Interview", plan: "Plan", build: "Build", course: "Course" },
+      groups: {
+        interview: "Interview",
+        plan: "Plan",
+        build: "Build",
+        course: "Course",
+        publish: "Publish",
+        improve: "Improve",
+      },
       status: {
         passed: "Passed",
         warning: "Passed with warnings",

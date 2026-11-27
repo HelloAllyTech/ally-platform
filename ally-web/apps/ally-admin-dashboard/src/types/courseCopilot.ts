@@ -341,7 +341,7 @@ export interface CoursePilotStageAgent {
 export interface CoursePilotStageRow {
   id: string;
   title: string;
-  group: "interview" | "plan" | "build" | "course";
+  group: "interview" | "plan" | "build" | "course" | "publish" | "improve";
   status: CoursePilotStageStatus;
   why: string;
   what: string;

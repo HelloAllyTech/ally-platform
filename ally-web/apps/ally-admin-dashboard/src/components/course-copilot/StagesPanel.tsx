@@ -228,10 +228,12 @@ export const StagesPanel: React.FC<StagesPanelProps> = ({ sessionId }) => {
 
   const report = data as CoursePilotStagesReport;
   const stages = asArray<CoursePilotStageRow>(report.stages);
-  const groups = (["interview", "plan", "build", "course"] as const).map(group => ({
-    group,
-    stages: stages.filter(stage => stage.group === group),
-  }));
+  const groups = (["interview", "plan", "build", "course", "publish", "improve"] as const).map(
+    group => ({
+      group,
+      stages: stages.filter(stage => stage.group === group),
+    }),
+  );
   // Open the stage that needs attention: the first failed one, else the one in progress.
   const focus =
     stages.find(stage => stage.status === "failed") ??
