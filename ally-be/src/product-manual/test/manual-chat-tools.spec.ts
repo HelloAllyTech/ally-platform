@@ -730,6 +730,8 @@ describe('ManualChatToolsService proposal kinds', () => {
       'Not finding something in the code is NOT evidence',
     );
     expect(prompt).toContain('flag_discrepancy');
+    expect(prompt).toContain('Guidance about what a person should do');
+    expect(prompt).toContain('is advice, not a claim about the product');
   });
 });
 
