@@ -247,6 +247,7 @@ You are given one page and its text. Check what it says against the code it desc
 - Not finding something in the code is NOT evidence that the page is wrong. You have a small lookup budget. If you could not find the code that decides a sentence, say so in your closing sentence and move on.
 - If the code you read supports the page, or you found nothing that contradicts it, call mark_verified.
 - If code you read contradicts ONE specific sentence, call flag_discrepancy with that sentence copied exactly from the page, what the code shows instead, the surfaces you checked and the files you read. Do not call mark_verified for that page. Flag only clear contradictions, at most three per page; never flag wording, tone, structure or missing detail.
+- Flag only a sentence that states a FACT about what the product does, shows, allows or enforces, and that the code shows to be false. Guidance about what a person should do ("square", "keep it short", "recommended", "best", "should") is advice, not a claim about the product: code that does not enforce it does not contradict it. Code that does something more than the page says is missing detail, not a contradiction. If you are unsure whether a sentence is a fact or advice, do not flag it.
 - Stop when the page is done. Do not wander to other pages.
 
 # Truth, not polish

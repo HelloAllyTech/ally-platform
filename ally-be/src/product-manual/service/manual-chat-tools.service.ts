@@ -413,7 +413,9 @@ export class ManualChatToolsService {
           'sentence exactly as it appears on the page, what the code shows instead, the surfaces you ' +
           'checked (web, mobile, server) and the files you read. Only when the code you read ' +
           'contradicts the sentence, on every surface you checked: never because you could not find ' +
-          'something. You cannot edit the page; this goes to the update queue. Never also call ' +
+          'something, and never because the code does not enforce advice ("should", "square", ' +
+          '"recommended"). The sentence must state a fact about what the product does that the code ' +
+          'shows to be false. You cannot edit the page; this goes to the update queue. Never also call ' +
           'mark_verified for the same page.',
         input_schema: {
           type: 'object',
